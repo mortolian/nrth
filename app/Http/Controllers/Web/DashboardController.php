@@ -13,6 +13,7 @@ use App\Domain\Tax\Services\VATService;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -41,41 +42,43 @@ class DashboardController extends Controller
         $netProfitCurrent = $currentRevenue - $currentExpenses;
         $netProfitLast = $lastRevenue - $lastExpenses;
 
-        $outstandingRows = $this->getOutstandingInvoices($team, $now);
-        $outstandingTotal = array_sum(array_column($outstandingRows, 'amount_cents'));
+        $outstandingInvoices = $this->getOutstandingInvoices($team, $now);
+        $outstandingRows = $outstandingInvoices->items();
+        $outstandingTotal = array_sum(array_column($outstandingRows, 'amount'));
 
         $vatDueCurrent = $this->vatService
             ->calculateNetVAT($team, $monthStart, $monthEnd)
             ->getMinorAmount()
             ->toInt();
 
+        $vatOutputCurrent = $this->vatService->calculateOutputVAT($team, $monthStart, $monthEnd)->getMinorAmount()->toInt();
+        $vatInputCurrent = $this->vatService->calculateInputVAT($team, $monthStart, $monthEnd)->getMinorAmount()->toInt();
+
         return Inertia::render('Dashboard', [
             'kpis' => [
-                [
-                    'title' => 'Total Revenue (MTD)',
-                    'value_cents' => $currentRevenue,
-                    'trend_percent' => $this->trend($currentRevenue, $lastRevenue),
-                ],
-                [
-                    'title' => 'Outstanding Invoices',
-                    'value_cents' => $outstandingTotal,
-                    'trend_percent' => $this->trend($outstandingTotal, $this->getOutstandingInvoicesTotal($team, $lastMonthEnd)),
-                ],
-                [
-                    'title' => 'VAT Liability',
-                    'value_cents' => $vatDueCurrent,
-                    'trend_percent' => $this->trend($vatDueCurrent, $this->vatService->calculateNetVAT($team, $lastMonthStart, $lastMonthEnd)->getMinorAmount()->toInt()),
-                ],
-                [
-                    'title' => 'Net Profit (MTD)',
-                    'value_cents' => $netProfitCurrent,
-                    'trend_percent' => $this->trend($netProfitCurrent, $netProfitLast),
-                ],
+                'revenue_mtd' => $this->kpiPayload($currentRevenue, $this->trend($currentRevenue, $lastRevenue)),
+                'outstanding_invoices' => $this->kpiPayload($outstandingTotal, $this->trend($outstandingTotal, $this->getOutstandingInvoicesTotal($team, $lastMonthEnd))),
+                'vat_liability' => $this->kpiPayload($vatDueCurrent, $this->trend($vatDueCurrent, $this->vatService->calculateNetVAT($team, $lastMonthStart, $lastMonthEnd)->getMinorAmount()->toInt())),
+                'net_profit_mtd' => $this->kpiPayload($netProfitCurrent, $this->trend($netProfitCurrent, $netProfitLast)),
             ],
-            'revenue_vs_expenses' => $this->revenueVsExpensesLastSixMonths($team),
-            'outstanding_invoices' => $outstandingRows,
+            'revenue_chart' => $this->revenueChart($team),
+            'outstanding_invoices' => $outstandingInvoices,
             'recent_transactions' => $this->recentTransactions($team),
-            'budget_progress' => $this->budgetProgress($team, $monthStart, $monthEnd),
+            'budget_progress' => collect($this->budgetProgress($team, $monthStart, $monthEnd))
+                ->map(fn (array $item) => [
+                    'category' => $item['category'],
+                    'allocated' => $item['allocated_cents'],
+                    'spent' => $item['spent_cents'],
+                    'percentage' => $item['progress_percent'],
+                ])
+                ->all(),
+            'vat_summary' => [
+                'current_period' => $monthStart->format('M Y'),
+                'output_vat' => $vatOutputCurrent,
+                'input_vat' => $vatInputCurrent,
+                'net_vat' => $vatDueCurrent,
+                'due_date' => $monthEnd->copy()->addDays(25)->toDateString(),
+            ],
         ]);
     }
 
@@ -102,35 +105,31 @@ class DashboardController extends Controller
     /**
      * @return array{labels: array<int, string>, revenue_cents: array<int, int>, expense_cents: array<int, int>}
      */
-    private function revenueVsExpensesLastSixMonths(Team $team): array
+    private function revenueChart(Team $team): array
     {
-        $labels = [];
-        $revenue = [];
-        $expense = [];
+        $rows = [];
 
         for ($i = 5; $i >= 0; $i--) {
             $start = now()->subMonths($i)->startOfMonth();
             $end = $start->copy()->endOfMonth();
 
-            $labels[] = $start->format('M Y');
-            $revenue[] = $this->sumByAccountType($team->id, AccountType::Income, $start, $end);
-            $expense[] = $this->sumByAccountType($team->id, AccountType::Expense, $start, $end);
+            $rows[] = [
+                'month' => $start->format('M Y'),
+                'revenue' => $this->sumByAccountType($team->id, AccountType::Income, $start, $end),
+                'expenses' => $this->sumByAccountType($team->id, AccountType::Expense, $start, $end),
+            ];
         }
 
-        return [
-            'labels' => $labels,
-            'revenue_cents' => $revenue,
-            'expense_cents' => $expense,
-        ];
+        return $rows;
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function getOutstandingInvoices(Team $team, Carbon $asOf): array
+    private function getOutstandingInvoices(Team $team, Carbon $asOf): LengthAwarePaginator
     {
         if (! Schema::hasTable('invoices')) {
-            return [];
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, 5);
         }
 
         return Invoice::queryWithoutTeamScope()
@@ -138,29 +137,27 @@ class DashboardController extends Controller
             ->where('team_id', $team->id)
             ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value])
             ->orderBy('due_date')
-            ->limit(10)
-            ->get()
-            ->map(function (Invoice $invoice) use ($asOf): array {
-                $total = (int) $invoice->getRawOriginal('total_cents');
-                $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
-                $due = max(0, $total - $paid);
-                $dueDate = Carbon::parse($invoice->due_date);
+            ->paginate(5)
+            ->through(function (Invoice $invoice) use ($asOf): array {
+                    $total = (int) $invoice->getRawOriginal('total_cents');
+                    $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+                    $due = max(0, $total - $paid);
+                    $dueDate = Carbon::parse($invoice->due_date);
 
-                return [
-                    'id' => $invoice->id,
-                    'client_name' => $invoice->client?->name ?? 'Unknown',
-                    'invoice_number' => $invoice->number,
-                    'amount_cents' => $due,
-                    'due_date' => $dueDate->toDateString(),
-                    'days_overdue' => $dueDate->isPast() ? abs($dueDate->diffInDays($asOf)) : 0,
-                ];
-            })
-            ->all();
+                    return [
+                        'id' => $invoice->id,
+                        'client' => $invoice->client?->name ?? 'Unknown',
+                        'number' => $invoice->number,
+                        'amount' => $due,
+                        'due_date' => $dueDate->toDateString(),
+                        'days_overdue' => $dueDate->isPast() ? abs($dueDate->diffInDays($asOf)) : 0,
+                    ];
+                });
     }
 
     private function getOutstandingInvoicesTotal(Team $team, Carbon $asOfDate): int
     {
-        return array_sum(array_column($this->getOutstandingInvoices($team, $asOfDate), 'amount_cents'));
+        return array_sum(array_column($this->getOutstandingInvoices($team, $asOfDate)->items(), 'amount'));
     }
 
     /**
@@ -184,6 +181,7 @@ class DashboardController extends Controller
                     'description' => $transaction->description ?: (string) $transaction->type->value,
                     'account' => $line?->account?->name ?? 'N/A',
                     'amount_cents' => $amount,
+                    'type' => $transaction->type->value,
                 ];
             })
             ->all();
@@ -232,5 +230,17 @@ class DashboardController extends Controller
         }
 
         return round((($current - $previous) / abs($previous)) * 100, 1);
+    }
+
+    /**
+     * @return array{amount: int, trend_percentage: float|null, trend_direction: string}
+     */
+    private function kpiPayload(int $amount, ?float $trend): array
+    {
+        return [
+            'amount' => $amount,
+            'trend_percentage' => $trend,
+            'trend_direction' => $trend === null ? 'neutral' : ($trend > 0 ? 'up' : ($trend < 0 ? 'down' : 'neutral')),
+        ];
     }
 }

@@ -2,48 +2,68 @@
 import { computed } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
-import { useDateRange } from '@/composables/useDateRange';
-import { useFlash } from '@/composables/useFlash';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
 import VChart from 'vue-echarts';
+import { CircleDollarSign, HandCoins, Landmark, TrendingUp, X } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
 const props = defineProps({
-    kpis: { type: Array, default: () => [] },
-    revenue_vs_expenses: {
-        type: Object,
-        default: () => ({ labels: [], revenue_cents: [], expense_cents: [] }),
-    },
-    outstanding_invoices: { type: Array, default: () => [] },
+    kpis: { type: Object, default: () => ({}) },
+    revenue_chart: { type: Array, default: () => [] },
+    outstanding_invoices: { type: Object, default: () => ({ data: [], current_page: 1, last_page: 1 }) },
     recent_transactions: { type: Array, default: () => [] },
     budget_progress: { type: Array, default: () => [] },
+    vat_summary: { type: Object, default: () => ({}) },
 });
 
-const { setPreset } = useDateRange();
-setPreset('this_month');
-const { success, error } = useFlash();
-
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const paymentDrawerOpen = ref(false);
+const selectedInvoice = ref(null);
+const isLoading = computed(() => !props.kpis || !Object.keys(props.kpis).length);
 
-const kpiRows = computed(() =>
-    props.kpis.map((kpi) => ({
-        title: kpi.title,
-        value: formatCents(kpi.value_cents),
-        hint: kpi.trend_percent == null
+const kpiRows = computed(() => [
+    {
+        key: 'revenue_mtd',
+        title: 'Revenue MTD',
+        icon: CircleDollarSign,
+        ...props.kpis.revenue_mtd,
+    },
+    {
+        key: 'outstanding_invoices',
+        title: 'Outstanding Invoices',
+        icon: HandCoins,
+        ...props.kpis.outstanding_invoices,
+    },
+    {
+        key: 'vat_liability',
+        title: 'VAT Liability',
+        icon: Landmark,
+        ...props.kpis.vat_liability,
+    },
+    {
+        key: 'net_profit_mtd',
+        title: 'Net Profit MTD',
+        icon: TrendingUp,
+        ...props.kpis.net_profit_mtd,
+    },
+].map((item) => ({
+        ...item,
+        value: formatCents(item.amount ?? 0),
+        hint: item.trend_percentage == null
             ? 'No prior month data'
-            : `${kpi.trend_percent >= 0 ? '+' : ''}${kpi.trend_percent}% vs last month`,
-    })),
-);
+            : `${item.trend_percentage >= 0 ? '+' : ''}${item.trend_percentage}% vs last month`,
+    })));
 
 const chartOptions = computed(() => ({
     tooltip: { trigger: 'axis' },
     legend: { data: ['Revenue', 'Expenses'] },
     grid: { left: 16, right: 16, top: 36, bottom: 24, containLabel: true },
-    xAxis: { type: 'category', data: props.revenue_vs_expenses.labels ?? [] },
+    xAxis: { type: 'category', data: props.revenue_chart.map((row) => row.month) ?? [] },
     yAxis: {
         type: 'value',
         axisLabel: {
@@ -54,17 +74,22 @@ const chartOptions = computed(() => ({
         {
             name: 'Revenue',
             type: 'bar',
-            data: props.revenue_vs_expenses.revenue_cents ?? [],
+            data: props.revenue_chart.map((row) => row.revenue) ?? [],
             itemStyle: { color: '#059669' },
         },
         {
             name: 'Expenses',
             type: 'bar',
-            data: props.revenue_vs_expenses.expense_cents ?? [],
-            itemStyle: { color: '#dc2626' },
+            data: props.revenue_chart.map((row) => row.expenses) ?? [],
+            itemStyle: { color: '#ef6f6c' },
         },
     ],
 }));
+
+const openRecordPayment = (invoice) => {
+    selectedInvoice.value = invoice;
+    paymentDrawerOpen.value = true;
+};
 </script>
 
 <template>
@@ -81,88 +106,112 @@ const chartOptions = computed(() => ({
         </template>
 
         <div class="space-y-6">
-            <AppCard v-if="success || error">
-                <p v-if="success" class="text-sm text-emerald-700">{{ success }}</p>
-                <p v-if="error" class="text-sm text-rose-700">{{ error }}</p>
-            </AppCard>
-
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                    v-for="kpi in kpiRows"
-                    :key="kpi.title"
-                    :title="kpi.title"
-                    :value="kpi.value"
-                    :hint="kpi.hint"
-                />
+                <template v-if="isLoading">
+                    <AppCard v-for="n in 4" :key="`kpi-skeleton-${n}`">
+                        <div class="h-5 w-24 animate-pulse rounded bg-slate-100" />
+                        <div class="mt-3 h-8 w-32 animate-pulse rounded bg-slate-100" />
+                    </AppCard>
+                </template>
+                <template v-else>
+                    <StatCard
+                        v-for="kpi in kpiRows"
+                        :key="kpi.key"
+                        :title="kpi.title"
+                        :value="kpi.value"
+                        :hint="kpi.hint"
+                        :trend="kpi.trend_direction ?? 'neutral'"
+                        :trend-percent="kpi.trend_percentage ?? null"
+                        :icon="kpi.icon"
+                    />
+                </template>
             </div>
 
-            <AppCard>
-                <h3 class="mb-4 text-lg font-semibold text-slate-900">Revenue vs Expenses (Last 6 Months)</h3>
-                <VChart class="h-80 w-full" :option="chartOptions" autoresize />
-            </AppCard>
+            <div class="grid gap-6 xl:grid-cols-3">
+                <AppCard class="xl:col-span-2">
+                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Revenue vs Expenses</h3>
+                    <div v-if="isLoading" class="h-80 animate-pulse rounded bg-slate-100" />
+                    <VChart v-else class="h-80 w-full" :option="chartOptions" autoresize />
+                </AppCard>
 
-            <AppCard>
-                <h3 class="mb-4 text-lg font-semibold text-slate-900">Outstanding Invoices</h3>
-                <AppTable :columns="['Client', 'Invoice #', 'Amount', 'Due Date', 'Days Overdue', 'Action']">
-                    <tr
-                        v-for="invoice in outstanding_invoices"
-                        :key="invoice.id"
-                        class="text-sm text-slate-700"
-                    >
-                        <td class="px-4 py-3">{{ invoice.client_name }}</td>
-                        <td class="px-4 py-3 font-medium">{{ invoice.invoice_number }}</td>
-                        <td class="px-4 py-3">{{ formatCents(invoice.amount_cents) }}</td>
-                        <td class="px-4 py-3"><DateDisplay :value="invoice.due_date" /></td>
-                        <td class="px-4 py-3">
-                            <AppBadge :variant="invoice.days_overdue > 0 ? 'danger' : 'default'">
-                                {{ invoice.days_overdue > 0 ? `${invoice.days_overdue} days` : 'Current' }}
-                            </AppBadge>
-                        </td>
-                        <td class="px-4 py-3">
-                            <AppButton size="sm" variant="secondary">Record payment</AppButton>
-                        </td>
-                    </tr>
-                    <tr v-if="!outstanding_invoices.length">
-                        <td class="px-4 py-4 text-sm text-slate-500" colspan="6">No outstanding invoices.</td>
-                    </tr>
-                </AppTable>
-            </AppCard>
-
-            <div class="grid gap-6 lg:grid-cols-2">
                 <AppCard>
-                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Recent Transactions</h3>
-                    <ul class="space-y-3">
-                        <li
-                            v-for="transaction in recent_transactions"
-                            :key="transaction.id"
-                            class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
+                    <h3 class="mb-4 text-lg font-semibold text-slate-900">VAT Summary</h3>
+                    <div v-if="isLoading" class="space-y-3">
+                        <div v-for="n in 5" :key="`vat-skeleton-${n}`" class="h-4 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div v-else class="space-y-3 text-sm">
+                        <p class="text-slate-500">Current period: <span class="font-medium text-slate-700">{{ vat_summary.current_period }}</span></p>
+                        <div class="flex items-center justify-between"><span>Output VAT</span><span class="font-semibold">{{ formatCents(vat_summary.output_vat) }}</span></div>
+                        <div class="flex items-center justify-between"><span>Input VAT</span><span class="font-semibold">{{ formatCents(vat_summary.input_vat) }}</span></div>
+                        <div class="flex items-center justify-between border-t border-slate-200 pt-2"><span class="font-medium">Net VAT</span><span class="font-semibold">{{ formatCents(vat_summary.net_vat) }}</span></div>
+                        <div class="text-xs text-slate-500">Due date: <DateDisplay :value="vat_summary.due_date" /></div>
+                    </div>
+                </AppCard>
+            </div>
+
+            <div class="grid gap-6 xl:grid-cols-3">
+                <AppCard class="xl:col-span-2">
+                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Outstanding Invoices</h3>
+                    <AppTable
+                        :columns="[
+                            { key: 'client', label: 'Client' },
+                            { key: 'number', label: 'Invoice #' },
+                            { key: 'amount', label: 'Amount', sortable: true },
+                            { key: 'due_date', label: 'Due Date', sortable: true },
+                            { key: 'days_overdue', label: 'Days Overdue' },
+                            { key: 'action', label: 'Action' },
+                        ]"
+                        :page="outstanding_invoices.current_page ?? 1"
+                        :last-page="outstanding_invoices.last_page ?? 1"
+                        :loading="isLoading"
+                    >
+                        <tr
+                            v-for="invoice in outstanding_invoices.data ?? []"
+                            :key="invoice.id"
+                            :class="[
+                                'text-sm text-slate-700',
+                                invoice.days_overdue > 0 ? 'border-l-2 border-l-rose-300' : '',
+                            ]"
                         >
-                            <div>
-                                <p class="text-sm font-medium text-slate-900">{{ transaction.description }}</p>
-                                <p class="text-xs text-slate-500">
-                                    <DateDisplay :value="transaction.date" /> · {{ transaction.account }}
-                                </p>
-                            </div>
-                            <p class="text-sm font-semibold text-slate-900">{{ formatCents(transaction.amount_cents) }}</p>
-                        </li>
-                        <li v-if="!recent_transactions.length" class="text-sm text-slate-500">No recent transactions.</li>
-                    </ul>
+                            <td class="px-4 py-3">{{ invoice.client }}</td>
+                            <td class="px-4 py-3 font-medium">{{ invoice.number }}</td>
+                            <td class="px-4 py-3">{{ formatCents(invoice.amount) }}</td>
+                            <td class="px-4 py-3"><DateDisplay :value="invoice.due_date" /></td>
+                            <td class="px-4 py-3">
+                                <AppBadge :variant="invoice.days_overdue > 0 ? 'danger' : 'neutral'">
+                                    {{ invoice.days_overdue > 0 ? `${invoice.days_overdue} days` : 'Current' }}
+                                </AppBadge>
+                            </td>
+                            <td class="px-4 py-3">
+                                <AppButton size="sm" variant="secondary" @click="openRecordPayment(invoice)">Record Payment</AppButton>
+                            </td>
+                        </tr>
+                        <tr v-if="!isLoading && !(outstanding_invoices.data ?? []).length">
+                            <td class="px-4 py-4 text-sm text-slate-500" colspan="6">No outstanding invoices.</td>
+                        </tr>
+                    </AppTable>
                 </AppCard>
 
                 <AppCard>
                     <h3 class="mb-4 text-lg font-semibold text-slate-900">Budget Progress (Current Month)</h3>
-                    <div class="space-y-4">
+                    <div v-if="isLoading" class="space-y-3">
+                        <div v-for="n in 4" :key="`budget-skeleton-${n}`" class="h-8 animate-pulse rounded bg-slate-100" />
+                    </div>
+                    <div v-else class="space-y-4">
                         <div v-for="item in budget_progress" :key="item.category">
                             <div class="mb-1 flex items-center justify-between text-sm">
                                 <span class="font-medium text-slate-700">{{ item.category }}</span>
                                 <span class="text-slate-500">
-                                    {{ formatCents(item.spent_cents) }} / {{ formatCents(item.allocated_cents) }}
+                                    {{ formatCents(item.spent) }} / {{ formatCents(item.allocated) }}
                                 </span>
                             </div>
                             <div class="h-2 rounded-full bg-slate-100">
                                 <div
-                                    class="h-2 rounded-full bg-slate-900"
-                                    :style="{ width: `${Math.min(item.progress_percent, 100)}%` }"
+                                    :class="[
+                                        'h-2 rounded-full',
+                                        item.percentage < 75 ? 'bg-emerald-600' : item.percentage <= 90 ? 'bg-amber-500' : 'bg-rose-500',
+                                    ]"
+                                    :style="{ width: `${Math.min(item.percentage, 100)}%` }"
                                 />
                             </div>
                         </div>
@@ -170,6 +219,60 @@ const chartOptions = computed(() => ({
                     </div>
                 </AppCard>
             </div>
+
+            <AppCard>
+                <h3 class="mb-4 text-lg font-semibold text-slate-900">Recent Transactions</h3>
+                <AppTable
+                    :columns="[
+                        { key: 'date', label: 'Date', sortable: true },
+                        { key: 'description', label: 'Description' },
+                        { key: 'account', label: 'Account' },
+                        { key: 'type', label: 'Type' },
+                        { key: 'amount', label: 'Amount', sortable: true },
+                    ]"
+                    :loading="isLoading"
+                >
+                    <tr v-for="transaction in recent_transactions" :key="transaction.id" class="text-sm text-slate-700">
+                        <td class="px-4 py-3"><DateDisplay :value="transaction.date" /></td>
+                        <td class="px-4 py-3 font-medium">{{ transaction.description }}</td>
+                        <td class="px-4 py-3">{{ transaction.account }}</td>
+                        <td class="px-4 py-3">
+                            <AppBadge variant="info">{{ transaction.type }}</AppBadge>
+                        </td>
+                        <td class="px-4 py-3">{{ formatCents(transaction.amount_cents) }}</td>
+                    </tr>
+                    <tr v-if="!isLoading && !recent_transactions.length">
+                        <td class="px-4 py-4 text-sm text-slate-500" colspan="5">No recent transactions.</td>
+                    </tr>
+                </AppTable>
+            </AppCard>
         </div>
+
+        <div
+            v-if="paymentDrawerOpen"
+            class="fixed inset-0 z-[80] bg-black/40"
+            @click="paymentDrawerOpen = false"
+        />
+        <aside
+            :class="[
+                'fixed inset-y-0 right-0 z-[90] w-full max-w-md transform bg-white shadow-xl transition-transform',
+                paymentDrawerOpen ? 'translate-x-0' : 'translate-x-full',
+            ]"
+        >
+            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <h3 class="text-lg font-semibold text-slate-900">Record Payment</h3>
+                <button class="rounded p-1 hover:bg-slate-100" @click="paymentDrawerOpen = false">
+                    <X class="h-5 w-5" />
+                </button>
+            </div>
+            <div class="space-y-4 px-5 py-4 text-sm text-slate-600">
+                <p v-if="selectedInvoice">
+                    Invoice <strong>{{ selectedInvoice.number }}</strong> for
+                    <strong>{{ selectedInvoice.client }}</strong> is ready for payment capture.
+                </p>
+                <p>UI scaffold ready. Hook this to the payment form/action next.</p>
+                <AppButton variant="primary">Continue</AppButton>
+            </div>
+        </aside>
     </AppLayout>
 </template>

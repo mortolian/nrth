@@ -17,6 +17,9 @@ import AppBadge from '@/Components/AppBadge.vue';
 import StatCard from '@/Components/StatCard.vue';
 import MoneyDisplay from '@/Components/MoneyDisplay.vue';
 import DateDisplay from '@/Components/DateDisplay.vue';
+import PageHeader from '@/Components/PageHeader.vue';
+import EmptyState from '@/Components/EmptyState.vue';
+import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -37,7 +40,10 @@ createInertiaApp({
             .component('AppBadge', AppBadge)
             .component('StatCard', StatCard)
             .component('MoneyDisplay', MoneyDisplay)
-            .component('DateDisplay', DateDisplay);
+            .component('DateDisplay', DateDisplay)
+            .component('PageHeader', PageHeader)
+            .component('EmptyState', EmptyState)
+            .component('ConfirmDialog', ConfirmDialog);
 
         const authStore = useAuthStore(pinia);
         const teamStore = useTeamStore(pinia);
