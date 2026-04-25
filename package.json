@@ -1,0 +1,40 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "name": "spennies",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=20.19.0"
+    },
+    "scripts": {
+        "build": "vite build",
+        "dev": "vite"
+    },
+    "dependencies": {
+        "axios": "^1.15.2",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "dayjs": "^1.11.13",
+        "echarts": "^5.6.0",
+        "lucide-vue-next": "^0.469.0",
+        "pinia": "^2.3.0",
+        "radix-vue": "^1.9.11",
+        "tailwind-merge": "^2.6.0",
+        "vee-validate": "^4.14.7",
+        "vue-echarts": "^7.0.3",
+        "zod": "^3.24.1"
+    },
+    "devDependencies": {
+        "@inertiajs/vue3": "^2.0",
+        "@tailwindcss/forms": "^0.5.9",
+        "@tailwindcss/typography": "^0.5.15",
+        "@tailwindcss/vite": "^4.0.0",
+        "@vitejs/plugin-vue": "^6.0.4",
+        "concurrently": "^9.0.1",
+        "laravel-vite-plugin": "^3.0.0",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.7.2",
+        "vite": "^8.0.0",
+        "vue": "^3.5.13"
+    }
+}

@@ -1,0 +1,176 @@
+x-laravel-env: &laravel-env
+  APP_NAME: Spennies
+  APP_ENV: production
+  APP_DEBUG: 'false'
+  # Replace in production (`php artisan key:generate --show`). Shared by app, worker, and scheduler.
+  APP_KEY: base64:V+VKF8OLRIFxFRKcD7BDsipKDFw0Q6vqq/eehWevI90=
+  APP_URL: http://localhost:8000
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: '5432'
+  DB_DATABASE: spennies
+  DB_USERNAME: spennies
+  DB_PASSWORD: spennies
+  SESSION_DRIVER: redis
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: redis
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: redis
+  REDIS_PORT: '6379'
+  FILESYSTEM_DISK: s3
+  AWS_ACCESS_KEY_ID: minio
+  AWS_SECRET_ACCESS_KEY: miniosecretchange
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_BUCKET: spennies
+  AWS_ENDPOINT: 'http://minio:9000'
+  AWS_URL: 'http://localhost:9000'
+  AWS_USE_PATH_STYLE_ENDPOINT: 'true'
+  MAIL_MAILER: log
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spennies
+      POSTGRES_PASSWORD: spennies
+      POSTGRES_DB: spennies
+    volumes:
+      # Prompt 1.2 names this volume "mysql data"; this stack uses PostgreSQL.
+      - mysql_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U spennies -d spennies']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecretchange
+    volumes:
+      - minio_data:/data
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:9000/minio/health/live']
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        until mc alias set local http://minio:9000 minio miniosecretchange; do
+          sleep 2
+        done
+        mc mb local/spennies --ignore-existing
+    restart: 'no'
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: spennies:local
+    ports:
+      - '8000:8000'
+    environment:
+      <<: *laravel-env
+      DOCKER_ROLE: app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+    volumes:
+      - storage_data:/var/www/html/storage
+    command: ['php', 'artisan', 'octane:start', '--server=swoole', '--host=0.0.0.0', '--port=8000']
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:8000/up']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  worker:
+    image: spennies:local
+    environment:
+      <<: *laravel-env
+      DOCKER_ROLE: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+      app:
+        condition: service_started
+    volumes:
+      - storage_data:/var/www/html/storage
+    command: ['/usr/bin/supervisord', '-n', '-c', '/etc/supervisor/supervisord.conf']
+    healthcheck:
+      test: ['CMD-SHELL', 'supervisorctl -c /etc/supervisor/supervisord.conf status horizon | grep -q RUNNING']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  scheduler:
+    image: spennies:local
+    environment:
+      <<: *laravel-env
+      DOCKER_ROLE: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
+      app:
+        condition: service_started
+    volumes:
+      - storage_data:/var/www/html/storage
+    command: ['php', 'artisan', 'schedule:work']
+    healthcheck:
+      test: ['CMD-SHELL', 'pgrep -f "artisan schedule:work" >/dev/null']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
+  storage_data:
