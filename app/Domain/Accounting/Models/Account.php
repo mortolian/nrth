@@ -67,11 +67,11 @@ class Account extends Model
     }
 
     /**
-     * @return HasMany<JournalEntryLine, $this>
+     * @return HasMany<JournalEntry, $this>
      */
     public function journalEntries(): HasMany
     {
-        return $this->hasMany(JournalEntryLine::class, 'account_id');
+        return $this->hasMany(JournalEntry::class, 'account_id');
     }
 
     protected static function newFactory(): AccountFactory
