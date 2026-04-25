@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\InvoicePdfController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -21,5 +22,9 @@ Route::middleware([
     'verified',
 ])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::prefix('invoicing')->name('invoicing.')->group(function () {
+        Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    });
     Route::get('/invoices/{invoice}/pdf', [InvoicePdfController::class, 'download'])->name('invoices.pdf.download');
 });

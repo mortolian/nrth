@@ -58,9 +58,9 @@ const navItems: MenuItem[] = [
     { label: 'Dashboard', href: route('dashboard'), icon: Home },
     {
         label: 'Money In',
-        href: '#',
+        href: route('invoicing.invoices.index'),
         icon: Wallet,
-        group: [{ title: 'Money In', items: [{ label: 'Invoices', href: '#' }, { label: 'Quotes', href: '#' }, { label: 'Clients', href: '#' }] }],
+        group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Quotes', href: '#' }, { label: 'Clients', href: '#' }] }],
     },
     {
         label: 'Money Out',
@@ -97,7 +97,7 @@ const navItems: MenuItem[] = [
 
 const bottomTabs = computed(() => [
     { label: 'Home', href: route('dashboard'), icon: Home },
-    { label: 'Invoices', href: '#', icon: FileText },
+    { label: 'Invoices', href: route('invoicing.invoices.index'), icon: FileText },
     { label: 'Transact', href: '#', icon: BookOpen },
     { label: 'Tax', href: '#', icon: Calculator },
     { label: 'Reports', href: '#', icon: ChartColumnBig },
