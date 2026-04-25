@@ -1,0 +1,41 @@
+<script setup lang="ts">
+import { Primitive } from 'radix-vue';
+import { cn } from '@/lib/utils';
+
+const props = withDefaults(defineProps<{
+    as?: string;
+    variant?: 'primary' | 'secondary' | 'ghost';
+    size?: 'sm' | 'md' | 'lg';
+    type?: 'button' | 'submit' | 'reset';
+    disabled?: boolean;
+}>(), {
+    as: 'button',
+    variant: 'primary',
+    size: 'md',
+    type: 'button',
+    disabled: false,
+});
+
+const variantClass = {
+    primary: 'bg-slate-900 text-white hover:bg-slate-700',
+    secondary: 'bg-white text-slate-900 border border-slate-300 hover:bg-slate-50',
+    ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
+};
+
+const sizeClass = {
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-5 py-2.5 text-base',
+};
+</script>
+
+<template>
+    <Primitive
+        :as="as"
+        :type="type"
+        :disabled="disabled"
+        :class="cn('inline-flex items-center justify-center rounded-md font-medium transition disabled:cursor-not-allowed disabled:opacity-50', variantClass[variant], sizeClass[size])"
+    >
+        <slot />
+    </Primitive>
+</template>

@@ -22,10 +22,15 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Enums\PaymentMethod;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Services\InvoicePdfService;
+use App\Mail\InvoiceMailer;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Mail;
+use Mockery;
 use Tests\TestCase;
 
 class InvoicingActionsTest extends TestCase
@@ -67,12 +72,21 @@ class InvoicingActionsTest extends TestCase
 
     public function test_send_invoice_action_marks_invoice_as_sent(): void
     {
+        Mail::fake();
         $invoice = Invoice::factory()->create();
+        $tmp = storage_path('app/testing-invoice-'.$invoice->id.'.pdf');
+        File::put($tmp, 'fake pdf');
+        $media = $invoice->addMedia($tmp)->usingFileName('test.pdf')->toMediaCollection('invoice-pdfs');
+        File::delete($tmp);
 
-        $sent = (new SendInvoiceAction)->execute($invoice);
+        $pdfService = Mockery::mock(InvoicePdfService::class);
+        $pdfService->shouldReceive('generate')->once()->andReturn($media);
+
+        $sent = (new SendInvoiceAction($pdfService))->execute($invoice);
 
         $this->assertSame(InvoiceStatus::Sent, $sent->status);
         $this->assertNotNull($sent->sent_at);
+        Mail::assertQueued(InvoiceMailer::class);
     }
 
     public function test_record_payment_action_creates_payment_and_posts_transaction(): void

@@ -12,11 +12,16 @@ use App\Domain\Tax\Models\TaxPeriod;
 use App\Models\Team;
 use Brick\Money\Money;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\Schema;
 
 class VATService
 {
     public function calculateOutputVAT(Team $team, CarbonInterface $from, CarbonInterface $to): Money
     {
+        if (! Schema::hasTable('invoices')) {
+            return Money::zero('ZAR');
+        }
+
         $cents = (int) Invoice::queryWithoutTeamScope()
             ->where('team_id', $team->id)
             ->whereBetween('issue_date', [$from->toDateString(), $to->toDateString()])

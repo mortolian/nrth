@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice {{ $invoice->number }}</title>
+</head>
+<body style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.5;">
+    <p>Hello {{ $invoice->client?->name ?? 'there' }},</p>
+
+    <p>Please find attached invoice <strong>{{ $invoice->number }}</strong>.</p>
+
+    <p>
+        <strong>Issue date:</strong> {{ optional($invoice->issue_date)->format('d M Y') }}<br>
+        <strong>Due date:</strong> {{ optional($invoice->due_date)->format('d M Y') }}<br>
+        <strong>Total due:</strong> R {{ number_format(((int) $invoice->getRawOriginal('total_cents')) / 100, 2) }}
+    </p>
+
+    <p>
+        Please use your invoice number as payment reference when making payment.
+        If you need any help, reply to this email.
+    </p>
+
+    <p>Kind regards,<br>{{ $invoice->team?->name ?? config('app.name') }}</p>
+</body>
+</html>

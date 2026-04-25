@@ -14,12 +14,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Invoice extends Model
+class Invoice extends Model implements HasMedia
 {
     /** @use HasFactory<InvoiceFactory> */
     use HasFactory;
     use HasTeamScope;
+    use InteractsWithMedia;
 
     protected $fillable = [
         'team_id',
@@ -101,6 +106,19 @@ class Invoice extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('invoice-pdfs')->singleFile();
+    }
+
+    /**
+     * @return Collection<int, Media>
+     */
+    public function pdfs(): Collection
+    {
+        return $this->getMedia('invoice-pdfs');
     }
 
     public function amountDue(): Money
