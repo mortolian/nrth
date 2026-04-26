@@ -284,7 +284,7 @@ const liveInvoicePreview = computed(() => {
         <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
             <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
                 <Link href="/" class="flex items-center gap-2 text-slate-200 hover:text-white">
-                    <ApplicationMark class="h-8 w-8" />
+                    <ApplicationMark class="h-10 w-10" />
                     <span class="text-sm font-semibold tracking-tight">{{ appDisplayName }}</span>
                 </Link>
                 <div class="flex items-center gap-3">

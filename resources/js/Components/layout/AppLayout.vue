@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Bell,
@@ -8,6 +8,7 @@ import {
     Building2,
     Calculator,
     ChartColumnBig,
+    ChevronDown,
     ChevronRight,
     Clock,
     CreditCard,
@@ -30,6 +31,30 @@ import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
 import { useAppDisplayName } from '@/lib/appName';
+
+const NAV_SECTIONS_EXPANDED_KEY = 'pennies:nav-sections-expanded:v1';
+
+function loadNavSectionsExpanded(): Record<string, boolean> {
+    if (typeof window === 'undefined') return {};
+    try {
+        const raw = localStorage.getItem(NAV_SECTIONS_EXPANDED_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        return parsed as Record<string, boolean>;
+    } catch {
+        return {};
+    }
+}
+
+function persistNavSectionsExpanded(state: Record<string, boolean>): void {
+    if (typeof window === 'undefined') return;
+    try {
+        localStorage.setItem(NAV_SECTIONS_EXPANDED_KEY, JSON.stringify(state));
+    } catch {
+        /* quota / private mode */
+    }
+}
 
 type Breadcrumb = { label: string; href?: string };
 type NavChild = { label: string; href: string };
@@ -106,6 +131,61 @@ const navItems: MenuItem[] = [
 
 const isActivePath = (href: string) => href !== '#' && currentPath.value === href.split('?')[0];
 
+/** User expand/collapse for nav groups; persisted in localStorage. */
+const navManualOverride = ref<Record<string, boolean>>(loadNavSectionsExpanded());
+
+watch(
+    navManualOverride,
+    (val) => persistNavSectionsExpanded(val),
+    { deep: true },
+);
+
+function sectionHasActiveChild(item: MenuItem): boolean {
+    const items = item.group?.[0]?.items;
+    if (!items) return false;
+    return items.some((sub) => sub.href !== '#' && isActivePath(sub.href));
+}
+
+function sectionDefaultExpanded(item: MenuItem): boolean {
+    return isActive(item.href) || sectionHasActiveChild(item);
+}
+
+function isNavItemOrChildActive(item: MenuItem): boolean {
+    return isActive(item.href) || sectionHasActiveChild(item);
+}
+
+function isNavSectionExpanded(item: MenuItem): boolean {
+    if (!item.group?.length) return false;
+    const o = navManualOverride.value[item.label];
+    const active = sectionDefaultExpanded(item);
+    if (active) {
+        return o !== false;
+    }
+    return o === true;
+}
+
+function toggleNavSection(label: string): void {
+    const item = navItems.find((i) => i.label === label);
+    if (!item?.group) return;
+    const next = !isNavSectionExpanded(item);
+    navManualOverride.value = { ...navManualOverride.value, [label]: next };
+}
+
+/** Group parents navigate only via children; the row expands/collapses (or expands the sidebar when icon-only). */
+function onNavGroupRowClick(item: MenuItem): void {
+    if (!item.group) return;
+    if (collapsed.value) {
+        collapsed.value = false;
+        navManualOverride.value = { ...navManualOverride.value, [item.label]: true };
+        return;
+    }
+    toggleNavSection(item.label);
+}
+
+function navSectionDomId(label: string): string {
+    return 'nav-section-' + label.toLowerCase().replace(/\s+/g, '-');
+}
+
 /** Team settings use `Settings/Team` for both `/settings/team` and `/teams/{id}`. */
 const isTeamSettingsPath = computed(
     () => isActivePath(route('settings.team')) || /^\/teams\/\d+$/.test(currentPath.value),
@@ -154,7 +234,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             >
                 <div class="border-b border-slate-800 px-4 py-4">
                     <Link :href="route('dashboard')" class="flex items-center gap-3">
-                        <ApplicationMark class="h-8 w-8 shrink-0" />
+                        <ApplicationMark class="h-10 w-10 shrink-0" />
                         <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
                     </Link>
 
@@ -183,31 +263,66 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 </div>
 
                 <nav class="flex-1 overflow-y-auto px-2 py-3">
-                    <div v-for="item in navItems" :key="item.label" class="mb-1">
-                        <Link
-                            :href="item.href"
-                            :class="[
-                                'group flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
-                                isActive(item.href)
-                                    ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
-                                    : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
-                            ]"
-                        >
-                            <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                            <span v-if="!collapsed" class="ml-3">{{ item.label }}</span>
-                        </Link>
-
-                        <div v-if="item.group && !collapsed" class="ml-9 mt-1 space-y-1">
+                    <template v-for="item in navItems" :key="item.label">
+                        <div v-if="!item.group" class="mb-1">
                             <Link
-                                v-for="sub in item.group[0].items"
-                                :key="`${item.label}-${sub.label}`"
-                                :href="sub.href"
-                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                                :href="item.href"
+                                :class="[
+                                    'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
+                                    isActive(item.href)
+                                        ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
+                                        : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
+                                ]"
                             >
-                                {{ sub.label }}
+                                <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                                <span v-if="!collapsed" class="ml-3">{{ item.label }}</span>
                             </Link>
                         </div>
-                    </div>
+
+                        <div v-else class="mb-1">
+                            <button
+                                type="button"
+                                :class="[
+                                    'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
+                                    collapsed ? 'justify-center' : '',
+                                    isNavItemOrChildActive(item)
+                                        ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
+                                        : 'border-l-transparent text-slate-300 hover:bg-slate-800/60 hover:text-white',
+                                ]"
+                                :aria-expanded="!collapsed && isNavSectionExpanded(item)"
+                                :aria-controls="navSectionDomId(item.label)"
+                                @click="onNavGroupRowClick(item)"
+                            >
+                                <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                                <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ item.label }}</span>
+                                <ChevronDown
+                                    v-if="!collapsed"
+                                    class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                                    :class="isNavSectionExpanded(item) ? 'rotate-180' : ''"
+                                />
+                            </button>
+
+                            <div
+                                :id="navSectionDomId(item.label)"
+                                v-show="isNavSectionExpanded(item) && !collapsed"
+                                class="ml-9 mt-1 space-y-1 border-l border-slate-700/80 pl-2"
+                            >
+                                <Link
+                                    v-for="sub in item.group[0].items"
+                                    :key="`${item.label}-${sub.label}`"
+                                    :href="sub.href"
+                                    :class="[
+                                        'block rounded px-2 py-1 text-xs transition',
+                                        isActivePath(sub.href)
+                                            ? 'bg-slate-800 font-medium text-emerald-300'
+                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                                    ]"
+                                >
+                                    {{ sub.label }}
+                                </Link>
+                            </div>
+                        </div>
+                    </template>
                 </nav>
 
                 <div class="border-t border-slate-800 p-2">
@@ -330,11 +445,55 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <X class="h-4 w-4" />
                     </button>
                 </div>
-                <div class="space-y-2">
-                    <Link v-for="item in navItems" :key="`m-${item.label}`" :href="item.href" class="block rounded-md px-3 py-2 text-sm hover:bg-slate-800">
-                        {{ item.label }}
+                <div class="space-y-1">
+                    <template v-for="item in navItems" :key="`m-${item.label}`">
+                        <div v-if="!item.group">
+                            <Link
+                                :href="item.href"
+                                class="block rounded-md px-3 py-2 text-sm hover:bg-slate-800"
+                                @click="mobileOpen = false"
+                            >
+                                {{ item.label }}
+                            </Link>
+                        </div>
+                        <div v-else>
+                            <button
+                                type="button"
+                                class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-slate-800/50"
+                                :aria-expanded="isNavSectionExpanded(item)"
+                                :aria-controls="'m-' + navSectionDomId(item.label)"
+                                @click="toggleNavSection(item.label)"
+                            >
+                                <span class="min-w-0 flex-1">{{ item.label }}</span>
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                                    :class="isNavSectionExpanded(item) ? 'rotate-180' : ''"
+                                />
+                            </button>
+                            <div
+                                :id="'m-' + navSectionDomId(item.label)"
+                                v-show="isNavSectionExpanded(item)"
+                                class="ml-3 mt-1 space-y-0.5 border-l border-slate-600 pl-2"
+                            >
+                                <Link
+                                    v-for="sub in item.group[0].items"
+                                    :key="`m-${item.label}-${sub.label}`"
+                                    :href="sub.href"
+                                    class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                                    @click="mobileOpen = false"
+                                >
+                                    {{ sub.label }}
+                                </Link>
+                            </div>
+                        </div>
+                    </template>
+                    <Link
+                        :href="route('profile.show')"
+                        class="block rounded-md px-3 py-2 text-sm hover:bg-slate-800"
+                        @click="mobileOpen = false"
+                    >
+                        Settings
                     </Link>
-                    <Link :href="route('profile.show')" class="block rounded-md px-3 py-2 text-sm hover:bg-slate-800">Settings</Link>
                 </div>
             </aside>
 

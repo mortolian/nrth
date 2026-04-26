@@ -6,8 +6,6 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { useAppDisplayName } from '@/lib/appName';
-import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
-
 
 defineProps({
     canResetPassword: Boolean,
@@ -105,10 +103,7 @@ const submit = () => {
         </div>
 
         <!-- Visual panel (right on lg+, bottom band on mobile) -->
-        <div
-            class="relative h-44 shrink-0 overflow-hidden lg:h-auto lg:min-h-screen lg:w-1/2"
-            aria-hidden="true"
-        >
+        <div class="relative h-44 shrink-0 overflow-hidden lg:h-auto lg:min-h-screen lg:w-1/2">
             <img
                 src="/images/login-side.jpg"
                 alt=""
@@ -122,7 +117,12 @@ const submit = () => {
             <div
                 class="relative flex h-full flex-col items-center justify-center px-8 py-6 text-center lg:p-12"
             >
-                <div class="white"><AuthenticationCardLogo /></div>
+                <p class="text-lg font-semibold tracking-tight text-white lg:text-2xl">
+                    {{ appDisplayName }}
+                </p>
+                <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-emerald-100/85 lg:text-base">
+                    Contractor accounting, invoicing, and tax in one workspace.
+                </p>
             </div>
         </div>
     </div>
