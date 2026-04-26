@@ -61,6 +61,7 @@
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "sail": "APP_SERVICE=app APP_USER=root SAIL_FILES=compose.yaml ./vendor/bin/sail",
+        "sail:autoload": "docker compose -f compose.yaml run --rm --entrypoint /bin/sh app -c 'cd /var/www/html && composer dump-autoload -o --no-scripts'",
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"

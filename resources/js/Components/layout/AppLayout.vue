@@ -106,6 +106,11 @@ const navItems: MenuItem[] = [
 
 const isActivePath = (href: string) => href !== '#' && currentPath.value === href.split('?')[0];
 
+/** Team settings use `Settings/Team` for both `/settings/team` and `/teams/{id}`. */
+const isTeamSettingsPath = computed(
+    () => isActivePath(route('settings.team')) || /^\/teams\/\d+$/.test(currentPath.value),
+);
+
 const commandPaletteData = computed<PaletteData>(() => ({
     quickActions: page.props.commandPalette?.quickActions ?? [
         { id: 'new-invoice', label: 'New Invoice', href: '#', icon: 'invoice' },
@@ -163,7 +168,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </template>
                             <template #content>
                                 <div class="w-60">
-                                    <DropdownLink :href="route('teams.show', currentTeam)">Team Settings</DropdownLink>
+                                    <DropdownLink :href="route('settings.team')">Team and Member Settings</DropdownLink>
                                     <DropdownLink v-if="$page.props.jetstream.canCreateTeams" :href="route('teams.create')">Create Team</DropdownLink>
                                     <div class="my-2 border-t border-slate-200" />
                                     <template v-for="team in teams" :key="team.id">
@@ -211,7 +216,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             :href="route('profile.show')"
                             :class="[
                                 'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
-                                isActive(route('profile.show')) || isActive(route('settings.company')) || isActive(route('settings.team'))
+                                isActive(route('profile.show')) || isActive(route('settings.company')) || isTeamSettingsPath
                                     ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
                                     : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
                             ]"
@@ -236,7 +241,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 :href="route('settings.team')"
                                 class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                             >
-                                Team
+                                Teams and Members
                             </Link>
                         </div>
                     </div>

@@ -46,7 +46,21 @@ export default defineConfig({
     plugins: [
         laravel({
             input: 'resources/js/app.js',
-            refresh: true,
+            // Full page reload when PHP / Blade / routes change (Vue/JS use Vite HMR).
+            refresh: [
+                {
+                    paths: [
+                        'app/**',
+                        'bootstrap/**',
+                        'config/**',
+                        'database/**/*.php',
+                        'lang/**',
+                        'resources/lang/**',
+                        'resources/views/**',
+                        'routes/**',
+                    ],
+                },
+            ],
         }),
         vue({
             template: {

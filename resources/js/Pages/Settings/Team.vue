@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, withDefaults } from 'vue';
+import { computed, ref, watch, withDefaults } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import DeleteTeamForm from '@/Pages/Teams/Partials/DeleteTeamForm.vue';
-import UpdateTeamNameForm from '@/Pages/Teams/Partials/UpdateTeamNameForm.vue';
 
 type Member = {
     id: number;
@@ -52,20 +50,9 @@ const breadcrumbs = computed(() => {
     }
     return [
         { label: 'Settings', href: route('profile.show') },
-        { label: 'Team' },
+        { label: 'Teams and Members' },
     ];
 });
-
-const teamBase = computed(() => ({
-    id: props.team.id,
-    name: props.team.name,
-    personal_team: props.team.personal_team,
-}));
-
-const teamForUpdateName = computed(() => ({
-    ...teamBase.value,
-    owner: props.team.owner!,
-}));
 
 const page = usePage();
 const authUserId = computed(() => (page.props.auth as { user?: { id: number } })?.user?.id);
@@ -137,15 +124,68 @@ const leaveTeam = () => {
         },
     });
 };
+
+const updateTeamNameForm = useForm({ name: props.team.name });
+watch(
+    () => props.team.name,
+    (name) => {
+        updateTeamNameForm.name = name;
+    },
+);
+
+const submitTeamName = () => {
+    updateTeamNameForm.put(route('teams.update', props.team.id), {
+        errorBag: 'updateTeamName',
+        preserveScroll: true,
+    });
+};
+
+const deleteTeamForm = useForm({});
+const deleteTeamModalOpen = ref(false);
+
+const deleteTeam = () => {
+    deleteTeamForm.delete(route('teams.destroy', props.team.id), {
+        errorBag: 'deleteTeam',
+    });
+};
 </script>
 
 <template>
-    <AppLayout title="Team" :breadcrumbs="breadcrumbs">
-        <PageHeader title="Team & members" :subtitle="`Team: ${team.name}`" />
+    <AppLayout title="Teams and Members" :breadcrumbs="breadcrumbs">
+        <PageHeader title="Teams and Members" :subtitle="`Team: ${team.name}`" />
 
-        <div v-if="team.owner" class="mt-6 max-w-3xl">
-            <UpdateTeamNameForm :team="teamForUpdateName" :permissions="permissions" />
-        </div>
+        <AppCard v-if="team.owner" class="mt-6">
+            <h3 class="text-base font-semibold text-slate-900">Team details</h3>
+            <p class="mt-1 text-sm text-slate-500">Display name and owner for this workspace.</p>
+            <div class="mt-4 flex items-center gap-3 border-b border-slate-100 pb-4">
+                <img
+                    :src="team.owner.profile_photo_url"
+                    :alt="team.owner.name"
+                    class="h-12 w-12 rounded-full object-cover"
+                >
+                <div>
+                    <div class="text-sm font-medium text-slate-900">{{ team.owner.name }}</div>
+                    <div class="text-xs text-slate-500">{{ team.owner.email }}</div>
+                    <div class="text-xs text-slate-400">Team owner</div>
+                </div>
+            </div>
+            <div class="mt-4">
+                <label class="mb-1 block text-xs font-medium text-slate-500">Team name</label>
+                <AppInput
+                    v-model="updateTeamNameForm.name"
+                    type="text"
+                    class="max-w-md"
+                    :disabled="!permissions.canUpdateTeam"
+                />
+                <p v-if="updateTeamNameForm.errors.name" class="mt-1 text-xs text-rose-600">{{ updateTeamNameForm.errors.name }}</p>
+            </div>
+            <div v-if="permissions.canUpdateTeam" class="mt-4 flex items-center gap-3">
+                <AppButton variant="primary" :disabled="updateTeamNameForm.processing" @click="submitTeamName">
+                    Save name
+                </AppButton>
+                <span v-if="updateTeamNameForm.recentlySuccessful" class="text-sm text-emerald-600">Saved.</span>
+            </div>
+        </AppCard>
 
         <div class="mt-6 grid gap-4 md:grid-cols-3">
             <AppCard v-for="summary in role_summaries" :key="summary.key" class="border-slate-200">
@@ -201,7 +241,7 @@ const leaveTeam = () => {
         </AppCard>
 
         <AppCard class="mt-6">
-            <h3 class="text-base font-semibold text-slate-900">Team members</h3>
+            <h3 class="text-base font-semibold text-slate-900">Team Members</h3>
             <AppTable
                 class="mt-4"
                 :columns="[
@@ -255,8 +295,35 @@ const leaveTeam = () => {
             </AppTable>
         </AppCard>
 
-        <div v-if="permissions.canDeleteTeam && !team.personal_team" class="mt-6 max-w-3xl">
-            <DeleteTeamForm :team="teamBase" />
+        <AppCard v-if="permissions.canDeleteTeam && !team.personal_team" class="mt-6 border-rose-100">
+            <h3 class="text-base font-semibold text-slate-900">Delete team</h3>
+            <p class="mt-1 text-sm text-slate-500">
+                Permanently delete this team and its data. Download anything you need to keep first.
+            </p>
+            <div class="mt-4">
+                <AppButton variant="ghost" class="!border-rose-200 !text-rose-700 hover:!bg-rose-50" @click="deleteTeamModalOpen = true">
+                    Delete team…
+                </AppButton>
+            </div>
+        </AppCard>
+
+        <div
+            v-if="deleteTeamModalOpen"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            @click.self="deleteTeamModalOpen = false"
+        >
+            <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                <h4 class="text-lg font-semibold text-slate-900">Delete team</h4>
+                <p class="mt-2 text-sm text-slate-600">
+                    Are you sure? This cannot be undone. All resources for this team will be permanently removed.
+                </p>
+                <div class="mt-6 flex justify-end gap-2">
+                    <AppButton variant="ghost" @click="deleteTeamModalOpen = false">Cancel</AppButton>
+                    <AppButton variant="primary" class="!bg-rose-600" :disabled="deleteTeamForm.processing" @click="deleteTeam">
+                        Delete team
+                    </AppButton>
+                </div>
+            </div>
         </div>
 
         <div
