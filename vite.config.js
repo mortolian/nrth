@@ -4,6 +4,44 @@ import vue from '@vitejs/plugin-vue';
 import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
 
+/** @returns {import('vite').ServerOptions} */
+function devServer() {
+    const watch = {
+        ignored: ['**/storage/framework/views/**'],
+    };
+    if (process.env.VITE_DEV_SERVER_USE_POLLING === 'true') {
+        watch.usePolling = true;
+    }
+
+    /** @type {import('vite').ServerOptions} */
+    const server = { watch };
+
+    const host = process.env.VITE_DEV_SERVER_HOST;
+    if (host) {
+        server.host = host;
+    }
+
+    const port = process.env.VITE_DEV_SERVER_PORT;
+    if (port) {
+        server.port = Number(port);
+        server.strictPort = true;
+    }
+
+    const hmrHost = process.env.VITE_DEV_SERVER_HMR_HOST;
+    const hmrPort = process.env.VITE_DEV_SERVER_HMR_PORT;
+    if (hmrHost || hmrPort) {
+        server.hmr = {};
+        if (hmrHost) {
+            server.hmr.host = hmrHost;
+        }
+        if (hmrPort) {
+            server.hmr.port = Number(hmrPort);
+        }
+    }
+
+    return server;
+}
+
 export default defineConfig({
     plugins: [
         laravel({
@@ -25,4 +63,5 @@ export default defineConfig({
             '@': path.resolve(__dirname, 'resources/js'),
         },
     },
+    server: devServer(),
 });
