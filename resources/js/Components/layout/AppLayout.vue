@@ -33,6 +33,7 @@ import CommandPalette from '@/Components/layout/CommandPalette.vue';
 import { useAppDisplayName } from '@/lib/appName';
 
 const NAV_SECTIONS_EXPANDED_KEY = 'pennies:nav-sections-expanded:v1';
+const SETTINGS_SECTION_LABEL = 'Settings';
 
 function loadNavSectionsExpanded(): Record<string, boolean> {
     if (typeof window === 'undefined') return {};
@@ -191,6 +192,32 @@ const isTeamSettingsPath = computed(
     () => isActivePath(route('settings.team')) || /^\/teams\/\d+$/.test(currentPath.value),
 );
 
+const isSettingsSectionActive = computed(
+    () => isActivePath(route('profile.show')) || isActivePath(route('settings.company')) || isTeamSettingsPath.value,
+);
+
+const isSettingsSectionExpanded = computed(() => {
+    const override = navManualOverride.value[SETTINGS_SECTION_LABEL];
+    if (isSettingsSectionActive.value) {
+        return override !== false;
+    }
+    return override === true;
+});
+
+function toggleSettingsSection(): void {
+    const next = !isSettingsSectionExpanded.value;
+    navManualOverride.value = { ...navManualOverride.value, [SETTINGS_SECTION_LABEL]: next };
+}
+
+function onSettingsRowClick(): void {
+    if (collapsed.value) {
+        collapsed.value = false;
+        navManualOverride.value = { ...navManualOverride.value, [SETTINGS_SECTION_LABEL]: true };
+        return;
+    }
+    toggleSettingsSection();
+}
+
 const commandPaletteData = computed<PaletteData>(() => ({
     quickActions: page.props.commandPalette?.quickActions ?? [
         { id: 'new-invoice', label: 'New Invoice', href: '#', icon: 'invoice' },
@@ -326,39 +353,65 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 </nav>
 
                 <div class="border-t border-slate-800 p-2">
-                    <div>
+                    <button
+                        type="button"
+                        :class="[
+                            'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
+                            collapsed ? 'justify-center' : '',
+                            isSettingsSectionActive
+                                ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
+                                : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
+                        ]"
+                        :aria-expanded="!collapsed && isSettingsSectionExpanded"
+                        :aria-controls="navSectionDomId(SETTINGS_SECTION_LABEL)"
+                        @click="onSettingsRowClick"
+                    >
+                        <Settings class="h-4 w-4 shrink-0" />
+                        <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ SETTINGS_SECTION_LABEL }}</span>
+                        <ChevronDown
+                            v-if="!collapsed"
+                            class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                            :class="isSettingsSectionExpanded ? 'rotate-180' : ''"
+                        />
+                    </button>
+                    <div
+                        :id="navSectionDomId(SETTINGS_SECTION_LABEL)"
+                        v-show="isSettingsSectionExpanded && !collapsed"
+                        class="ml-9 mt-1 space-y-1 border-l border-slate-700/80 pl-2"
+                    >
                         <Link
                             :href="route('profile.show')"
                             :class="[
-                                'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
-                                isActive(route('profile.show')) || isActive(route('settings.company')) || isTeamSettingsPath
-                                    ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
-                                    : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
+                                'block rounded px-2 py-1 text-xs transition',
+                                isActivePath(route('profile.show'))
+                                    ? 'bg-slate-800 font-medium text-emerald-300'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
                             ]"
                         >
-                            <Settings class="h-4 w-4 shrink-0" />
-                            <span v-if="!collapsed" class="ml-3">Settings</span>
+                            Profile
                         </Link>
-                        <div v-if="!collapsed" class="ml-9 mt-1 space-y-1">
-                            <Link
-                                :href="route('profile.show')"
-                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                            >
-                                Profile
-                            </Link>
-                            <Link
-                                :href="route('settings.company')"
-                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                            >
-                                Company
-                            </Link>
-                            <Link
-                                :href="route('settings.team')"
-                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                            >
-                                Teams and Members
-                            </Link>
-                        </div>
+                        <Link
+                            :href="route('settings.company')"
+                            :class="[
+                                'block rounded px-2 py-1 text-xs transition',
+                                isActivePath(route('settings.company'))
+                                    ? 'bg-slate-800 font-medium text-emerald-300'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                            ]"
+                        >
+                            Company
+                        </Link>
+                        <Link
+                            :href="route('settings.team')"
+                            :class="[
+                                'block rounded px-2 py-1 text-xs transition',
+                                isTeamSettingsPath
+                                    ? 'bg-slate-800 font-medium text-emerald-300'
+                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                            ]"
+                        >
+                            Teams and Members
+                        </Link>
                     </div>
                 </div>
             </aside>
@@ -487,13 +540,46 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </div>
                         </div>
                     </template>
-                    <Link
-                        :href="route('profile.show')"
-                        class="block rounded-md px-3 py-2 text-sm hover:bg-slate-800"
-                        @click="mobileOpen = false"
+                    <button
+                        type="button"
+                        class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-slate-800/50"
+                        :aria-expanded="isSettingsSectionExpanded"
+                        :aria-controls="'m-' + navSectionDomId(SETTINGS_SECTION_LABEL)"
+                        @click="toggleSettingsSection"
                     >
-                        Settings
-                    </Link>
+                        <span class="min-w-0 flex-1">{{ SETTINGS_SECTION_LABEL }}</span>
+                        <ChevronDown
+                            class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                            :class="isSettingsSectionExpanded ? 'rotate-180' : ''"
+                        />
+                    </button>
+                    <div
+                        :id="'m-' + navSectionDomId(SETTINGS_SECTION_LABEL)"
+                        v-show="isSettingsSectionExpanded"
+                        class="ml-3 mt-1 space-y-0.5 border-l border-slate-600 pl-2"
+                    >
+                        <Link
+                            :href="route('profile.show')"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            @click="mobileOpen = false"
+                        >
+                            Profile
+                        </Link>
+                        <Link
+                            :href="route('settings.company')"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            @click="mobileOpen = false"
+                        >
+                            Company
+                        </Link>
+                        <Link
+                            :href="route('settings.team')"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            @click="mobileOpen = false"
+                        >
+                            Teams and Members
+                        </Link>
+                    </div>
                 </div>
             </aside>
 
