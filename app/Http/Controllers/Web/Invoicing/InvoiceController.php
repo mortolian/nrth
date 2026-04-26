@@ -17,6 +17,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceLineItem;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Invoicing\Models\Payment;
+use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
@@ -281,6 +282,7 @@ class InvoiceController extends Controller
         $overdueTotal = $overdueRows->sum(function (Invoice $invoice): int {
             $total = (int) $invoice->getRawOriginal('total_cents');
             $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+
             return max(0, $total - $paid);
         });
 
@@ -442,13 +444,16 @@ class InvoiceController extends Controller
     private function formMeta(Request $request): array
     {
         $teamId = (int) $request->user()->current_team_id;
+        $team = $request->user()->currentTeam;
+        $settings = $team->mergedCompanySettings();
         $year = (int) now()->format('Y');
         $next = InvoiceNumberSequence::query()
             ->where('team_id', $teamId)
             ->where('year', $year)
             ->first();
 
-        $nextNumber = sprintf('INV-%d-%04d', $year, $next?->next_number ?? 1);
+        $numberService = app(InvoiceNumberService::class);
+        $nextNumber = $numberService->formatNumber($teamId, $year, $next?->next_number ?? 1);
 
         return [
             'clients' => Client::queryWithoutTeamScope()
@@ -487,6 +492,11 @@ class InvoiceController extends Controller
                 ])
                 ->all(),
             'next_number' => $nextNumber,
+            'defaults' => [
+                'payment_terms_days' => (int) ($settings['invoice_default_payment_terms_days'] ?? 30),
+                'notes' => (string) ($settings['invoice_default_notes'] ?? ''),
+                'footer' => (string) ($settings['invoice_default_footer'] ?? ''),
+            ],
         ];
     }
 

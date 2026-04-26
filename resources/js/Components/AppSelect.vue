@@ -16,16 +16,21 @@ type Option = { label: string; value: string };
 const props = withDefaults(defineProps<{
     options: Option[];
     placeholder?: string;
+    disabled?: boolean;
 }>(), {
     placeholder: 'Select...',
+    disabled: false,
 });
 
 const model = defineModel<string>();
 </script>
 
 <template>
-    <SelectRoot v-model="model">
-        <SelectTrigger class="inline-flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm">
+    <SelectRoot v-model="model" :disabled="props.disabled">
+        <SelectTrigger
+            class="inline-flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            :class="props.disabled ? 'cursor-not-allowed opacity-60' : ''"
+        >
             <SelectValue :placeholder="props.placeholder" />
         </SelectTrigger>
         <SelectPortal>

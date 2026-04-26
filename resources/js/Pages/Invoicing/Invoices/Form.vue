@@ -40,6 +40,11 @@ const props = defineProps<{
     tax_rates: TaxRateOption[];
     accounts: AccountOption[];
     next_number: string;
+    defaults?: {
+        payment_terms_days: number;
+        notes: string;
+        footer: string;
+    };
 }>();
 
 const defaultVatRate = computed(() => props.tax_rates.find((rate) => rate.is_default)?.rate ?? 0.15);
@@ -71,8 +76,8 @@ const { handleSubmit, setErrors, values, setFieldValue } = useForm({
         reference: props.invoice?.reference ?? '',
         issue_date: props.invoice?.issue_date ?? new Date().toISOString().slice(0, 10),
         due_date: props.invoice?.due_date ?? new Date().toISOString().slice(0, 10),
-        notes: props.invoice?.notes ?? '',
-        footer: props.invoice?.footer ?? '',
+        notes: props.invoice?.notes ?? props.defaults?.notes ?? '',
+        footer: props.invoice?.footer ?? props.defaults?.footer ?? '',
         line_items: props.invoice?.line_items?.length
             ? props.invoice.line_items.map((line) => ({
                 row_key: makeRowKey(),

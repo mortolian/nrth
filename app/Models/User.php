@@ -35,6 +35,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'preferences',
     ];
 
     /**
@@ -68,6 +69,29 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'preferences' => 'array',
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function defaultPreferences(): array
+    {
+        return [
+            'notify_invoice_overdue' => true,
+            'notify_vat_due' => true,
+            'notify_provisional_tax' => true,
+            'date_format' => 'Y-m-d',
+            'theme' => 'system',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mergedPreferences(): array
+    {
+        return array_merge(self::defaultPreferences(), $this->preferences ?? []);
     }
 }

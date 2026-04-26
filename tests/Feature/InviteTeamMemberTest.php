@@ -25,7 +25,7 @@ class InviteTeamMemberTest extends TestCase
 
         $this->post('/teams/'.$user->currentTeam->id.'/members', [
             'email' => 'test@example.com',
-            'role' => 'admin',
+            'role' => 'accountant',
         ]);
 
         Mail::assertSent(TeamInvitation::class);
@@ -45,7 +45,7 @@ class InviteTeamMemberTest extends TestCase
 
         $invitation = $user->currentTeam->teamInvitations()->create([
             'email' => 'test@example.com',
-            'role' => 'admin',
+            'role' => 'accountant',
         ]);
 
         $this->delete('/team-invitations/'.$invitation->id);

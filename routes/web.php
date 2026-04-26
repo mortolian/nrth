@@ -1,10 +1,21 @@
 <?php
 
+use App\Http\Controllers\Web\Accounting\AccountStatementController;
+use App\Http\Controllers\Web\Accounting\TransactionController;
+use App\Http\Controllers\Web\BudgetingController;
+use App\Http\Controllers\Web\Contracting\ContractController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ExpensesController;
+use App\Http\Controllers\Web\InvoicePdfController;
 use App\Http\Controllers\Web\Invoicing\ClientController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
-use App\Http\Controllers\Web\InvoicePdfController;
+use App\Http\Controllers\Web\ReportsController;
+use App\Http\Controllers\Web\Settings\CompanySettingsController;
+use App\Http\Controllers\Web\Settings\TeamSettingsController;
+use App\Http\Controllers\Web\Settings\UserPreferencesController;
+use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
+use App\Http\Controllers\Web\Tax\TaxDocumentsController;
+use App\Http\Controllers\Web\Tax\VATController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -24,9 +35,36 @@ Route::middleware([
     'verified',
 ])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/settings/company', [CompanySettingsController::class, 'edit'])->name('settings.company');
+    Route::post('/settings/company', [CompanySettingsController::class, 'update'])->name('settings.company.update');
+    Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
+    Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');
     Route::get('/expenses', [ExpensesController::class, 'index'])->name('expenses.index');
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
+    Route::get('/accounting/transactions', [TransactionController::class, 'index'])->name('accounting.transactions.index');
+    Route::get('/accounting/accounts/{account}/statement', AccountStatementController::class)->name('accounting.accounts.statement');
+    Route::get('/budgeting', [BudgetingController::class, 'index'])->name('budgeting.index');
+    Route::get('/budgeting/create', [BudgetingController::class, 'create'])->name('budgeting.create');
+    Route::post('/budgeting', [BudgetingController::class, 'store'])->name('budgeting.store');
+    Route::get('/budgeting/{budget}/edit', [BudgetingController::class, 'edit'])->name('budgeting.edit');
+    Route::put('/budgeting/{budget}', [BudgetingController::class, 'update'])->name('budgeting.update');
+    Route::get('/tax/vat', [VATController::class, 'index'])->name('tax.vat.index');
+    Route::post('/tax/vat/periods/{period}/submit', [VATController::class, 'submit'])->name('tax.vat.submit');
+    Route::get('/tax/provisional', [ProvisionalTaxController::class, 'index'])->name('tax.provisional.index');
+    Route::get('/tax/documents', TaxDocumentsController::class)->name('tax.documents.index');
+    Route::get('/reports/profit-loss', [ReportsController::class, 'profitLoss'])->name('reports.profit-loss');
+    Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
+    Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');
+    Route::get('/reports/cash-flow', [ReportsController::class, 'cashFlow'])->name('reports.cash-flow');
+    Route::prefix('contracting')->name('contracting.')->group(function () {
+        Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
+        Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
+        Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
+        Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
+        Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
+        Route::post('/contracts/{contract}/generate-invoice', [ContractController::class, 'generateInvoice'])->name('contracts.generate-invoice');
+    });
     Route::prefix('invoicing')->name('invoicing.')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
         Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');

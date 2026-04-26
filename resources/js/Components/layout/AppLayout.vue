@@ -70,37 +70,37 @@ const navItems: MenuItem[] = [
     },
     {
         label: 'Accounting',
-        href: '#',
+        href: route('accounting.transactions.index'),
         icon: BookOpen,
-        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: '#' }, { label: 'Journal', href: '#' }, { label: 'Chart of Accounts', href: '#' }] }],
+        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'Journal', href: '#' }, { label: 'Chart of Accounts', href: '#' }] }],
     },
-    { label: 'Planning', href: '#', icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: '#' }] }] },
+    { label: 'Planning', href: route('budgeting.index'), icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }] },
     {
         label: 'Tax',
-        href: '#',
+        href: route('tax.vat.index'),
         icon: Calculator,
-        group: [{ title: 'Tax', items: [{ label: 'VAT Returns', href: '#' }, { label: 'Tax Periods', href: '#' }, { label: 'Documents', href: '#' }] }],
+        group: [{ title: 'Tax', items: [{ label: 'VAT Returns', href: route('tax.vat.index') }, { label: 'Tax Periods', href: route('tax.provisional.index') }, { label: 'Documents', href: route('tax.documents.index') }] }],
     },
     {
         label: 'Contracting',
-        href: '#',
+        href: route('contracting.contracts.index'),
         icon: Briefcase,
-        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: '#' }, { label: 'Time Tracking', href: '#' }] }],
+        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }, { label: 'Time Tracking', href: '#' }] }],
     },
     {
         label: 'Reports',
-        href: '#',
+        href: route('reports.profit-loss'),
         icon: ChartColumnBig,
-        group: [{ title: 'Reports', items: [{ label: 'P&L', href: '#' }, { label: 'Balance Sheet', href: '#' }, { label: 'Cash Flow', href: '#' }, { label: 'Trial Balance', href: '#' }] }],
+        group: [{ title: 'Reports', items: [{ label: 'P&L', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
     },
 ];
 
 const bottomTabs = computed(() => [
     { label: 'Home', href: route('dashboard'), icon: Home },
     { label: 'Invoices', href: route('invoicing.invoices.index'), icon: FileText },
-    { label: 'Transact', href: '#', icon: BookOpen },
-    { label: 'Tax', href: '#', icon: Calculator },
-    { label: 'Reports', href: '#', icon: ChartColumnBig },
+    { label: 'Transact', href: route('accounting.transactions.index'), icon: BookOpen },
+    { label: 'Tax', href: route('tax.vat.index'), icon: Calculator },
+    { label: 'Reports', href: route('reports.profit-loss'), icon: ChartColumnBig },
 ]);
 
 const commandPaletteData = computed<PaletteData>(() => ({
@@ -203,18 +203,40 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 </nav>
 
                 <div class="border-t border-slate-800 p-2">
-                    <Link
-                        :href="route('profile.show')"
-                        :class="[
-                            'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
-                            isActive(route('profile.show'))
-                                ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
-                                : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
-                        ]"
-                    >
-                        <Settings class="h-4 w-4 shrink-0" />
-                        <span v-if="!collapsed" class="ml-3">Settings</span>
-                    </Link>
+                    <div>
+                        <Link
+                            :href="route('profile.show')"
+                            :class="[
+                                'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
+                                isActive(route('profile.show')) || isActive(route('settings.company')) || isActive(route('settings.team'))
+                                    ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
+                                    : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
+                            ]"
+                        >
+                            <Settings class="h-4 w-4 shrink-0" />
+                            <span v-if="!collapsed" class="ml-3">Settings</span>
+                        </Link>
+                        <div v-if="!collapsed" class="ml-9 mt-1 space-y-1">
+                            <Link
+                                :href="route('profile.show')"
+                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            >
+                                Profile
+                            </Link>
+                            <Link
+                                :href="route('settings.company')"
+                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            >
+                                Company
+                            </Link>
+                            <Link
+                                :href="route('settings.team')"
+                                class="block rounded px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            >
+                                Team
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </aside>
 

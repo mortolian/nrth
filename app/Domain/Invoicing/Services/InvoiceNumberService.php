@@ -3,6 +3,7 @@
 namespace App\Domain\Invoicing\Services;
 
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
+use App\Models\Team;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -31,6 +32,25 @@ class InvoiceNumberService
             return $current;
         });
 
-        return sprintf('INV-%d-%04d', $year, $sequence);
+        return $this->formatNumber($teamId, $year, $sequence);
+    }
+
+    public function formatNumber(int $teamId, int $year, int $sequence): string
+    {
+        $prefix = $this->normalizedPrefix($teamId);
+
+        return sprintf('%s-%d-%04d', $prefix, $year, $sequence);
+    }
+
+    public function normalizedPrefix(int $teamId): string
+    {
+        $team = Team::query()->find($teamId);
+        $raw = $team?->mergedCompanySettings()['invoice_prefix'] ?? 'INV';
+        $base = trim((string) $raw, " \t\n\r\0\x0B-");
+        if ($base === '') {
+            return 'INV';
+        }
+
+        return $base;
     }
 }
