@@ -9,6 +9,7 @@ use App\Http\Controllers\Web\ExpensesController;
 use App\Http\Controllers\Web\InvoicePdfController;
 use App\Http\Controllers\Web\Invoicing\ClientController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
+use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\CompanySettingsController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
@@ -34,6 +35,10 @@ Route::middleware([
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
+    Route::get('/onboarding/setup', [OnboardingController::class, 'show'])->name('onboarding.setup');
+    Route::post('/onboarding/progress', [OnboardingController::class, 'saveProgress'])->name('onboarding.progress');
+    Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
+    Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('onboarding.skip');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/settings/company', [CompanySettingsController::class, 'edit'])->name('settings.company');
     Route::post('/settings/company', [CompanySettingsController::class, 'update'])->name('settings.company.update');

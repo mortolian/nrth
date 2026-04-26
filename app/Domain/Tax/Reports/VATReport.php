@@ -3,9 +3,9 @@
 namespace App\Domain\Tax\Reports;
 
 use App\Domain\Tax\DTOs\VATSummaryDTO;
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Facades\Excel;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class VATReport
 {
@@ -30,7 +30,7 @@ class VATReport
         ];
     }
 
-    public function toExcel(string $filename = 'vat-return.xlsx'): BinaryFileResponse
+    public function toExcel(string $filename = 'vat-return.xlsx'): StreamedResponse
     {
         $rows = [
             ['Field', 'Value'],
@@ -40,17 +40,23 @@ class VATReport
             $rows[] = [$key, $value];
         }
 
-        return Excel::download(new class($rows) implements FromArray
-        {
-            /**
-             * @param  array<int, array<int, string|int>>  $rows
-             */
-            public function __construct(private readonly array $rows) {}
-
-            public function array(): array
-            {
-                return $this->rows;
+        return new StreamedResponse(function () use ($rows): void {
+            $spreadsheet = new Spreadsheet;
+            $sheet = $spreadsheet->getActiveSheet();
+            $rowIndex = 1;
+            foreach ($rows as $row) {
+                $colIndex = 1;
+                foreach ($row as $cell) {
+                    $sheet->setCellValue([$colIndex, $rowIndex], $cell);
+                    $colIndex++;
+                }
+                $rowIndex++;
             }
-        }, $filename);
+            (new Xlsx($spreadsheet))->save('php://output');
+        }, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'max-age=0',
+        ]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\EnsureTeamSpatieRoles;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,6 +19,8 @@ class SyncSpatieTeamRole
      */
     public function handle(Request $request, Closure $next): Response
     {
+        EnsureTeamSpatieRoles::sync();
+
         $user = $request->user();
         if ($user !== null && $user->current_team_id) {
             $team = $user->currentTeam;

@@ -30,6 +30,7 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            'completed_onboarding_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
@@ -46,6 +47,16 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * User must complete the first-run onboarding wizard.
+     */
+    public function withoutCompletedOnboarding(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'completed_onboarding_at' => null,
         ]);
     }
 
