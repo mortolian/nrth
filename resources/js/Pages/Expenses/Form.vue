@@ -53,6 +53,8 @@ const { values } = useForm({
 
 const receiptFile = ref<File | null>(null);
 const receiptPreviewUrl = ref<string | null>(null);
+/** On small screens, extra fields stay behind “More options”. */
+const showAdvanced = ref(false);
 
 const selectedTax = computed(() => props.tax_rates.find((rate) => rate.value === values.value.vat_rate) ?? props.tax_rates[0]);
 const vatAutoCents = computed(() => Math.round(Number(values.value.amount_excl_vat || 0) * Number(selectedTax.value?.rate || 0) * 100));
@@ -125,14 +127,40 @@ const submit = () => {
         <PageHeader title="Create Expense" subtitle="Capture expense details and post journal entries" />
 
         <AppCard class="mt-5">
+            <div class="mb-5 flex flex-col gap-3 sm:flex-row md:mb-6">
+                <label
+                    class="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm active:bg-emerald-100"
+                >
+                    <Camera class="h-5 w-5 shrink-0" />
+                    Take photo
+                    <input type="file" accept="image/*" capture="environment" class="hidden" @change="onReceiptChange">
+                </label>
+                <label
+                    class="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800 active:bg-slate-50"
+                >
+                    <Upload class="h-5 w-5 shrink-0" />
+                    Gallery / PDF
+                    <input type="file" accept="image/*,.pdf" class="hidden" @change="onReceiptChange">
+                </label>
+            </div>
+
+            <div v-if="receiptFile" class="mb-5 rounded-md border border-slate-200 p-3">
+                <p class="text-xs text-slate-500">{{ receiptFile.name }}</p>
+                <img v-if="receiptPreviewUrl && receiptFile.type.startsWith('image/')" :src="receiptPreviewUrl" alt="Receipt preview" class="mt-2 max-h-44 rounded">
+                <div v-else class="mt-2 inline-flex items-center gap-2 text-sm text-slate-600">
+                    <Camera class="h-4 w-4" />
+                    PDF ready for upload
+                </div>
+            </div>
+
             <div class="grid gap-4 md:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Date</label>
-                    <AppInput v-model="values.date" type="date" />
+                    <AppInput v-model="values.date" type="date" class="min-h-12 text-base md:min-h-0 md:text-sm" />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Supplier</label>
-                    <AppInput v-model="values.supplier" list="supplier-options" placeholder="Search or create supplier..." />
+                    <AppInput v-model="values.supplier" list="supplier-options" placeholder="Search or create supplier..." class="min-h-12 text-base md:min-h-0 md:text-sm" />
                     <datalist id="supplier-options">
                         <option v-for="supplier in suppliers" :key="supplier" :value="supplier" />
                     </datalist>
@@ -146,13 +174,30 @@ const submit = () => {
                     />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Description</label>
-                    <AppInput v-model="values.description" />
-                </div>
-                <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Amount (excl VAT)</label>
-                    <AppInput v-model="values.amount_excl_vat" type="number" />
+                    <AppInput
+                        v-model="values.amount_excl_vat"
+                        type="text"
+                        inputmode="decimal"
+                        class="min-h-12 text-base md:min-h-0 md:text-sm"
+                    />
                 </div>
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Description <span class="font-normal text-slate-400">(optional)</span></label>
+                    <AppInput v-model="values.description" placeholder="What was purchased?" class="min-h-12 text-base md:min-h-0 md:text-sm" />
+                </div>
+            </div>
+
+            <button
+                type="button"
+                class="mt-4 flex w-full min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-slate-800 md:hidden"
+                @click="showAdvanced = !showAdvanced"
+            >
+                {{ showAdvanced ? 'Hide' : 'More options' }}
+                <span class="text-xs text-slate-500">(VAT, payment, notes)</span>
+            </button>
+
+            <div :class="['mt-4 grid gap-4 md:grid-cols-2', !showAdvanced && 'max-md:hidden']">
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">VAT rate</label>
                     <AppSelect
@@ -162,8 +207,8 @@ const submit = () => {
                     />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount (override allowed)</label>
-                    <AppInput v-model="values.vat_amount" type="number" />
+                    <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount (override)</label>
+                    <AppInput v-model="values.vat_amount" type="text" inputmode="decimal" />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Total (incl VAT)</label>
@@ -216,26 +261,18 @@ const submit = () => {
                 <p class="mt-2 text-xs text-amber-700">Keep logbook for SARS compliance.</p>
             </div>
 
-            <div class="mt-5 rounded-md border border-dashed border-slate-300 p-4">
-                <p class="text-sm font-semibold text-slate-900">Receipt attachment</p>
-                <label class="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-600 hover:bg-slate-100">
+            <div class="mt-5 hidden rounded-md border border-dashed border-slate-300 p-4 md:block">
+                <p class="text-sm font-semibold text-slate-900">Receipt (desktop)</p>
+                <label class="mt-2 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-600 hover:bg-slate-100">
                     <Upload class="h-4 w-4" />
                     Drag and drop or click to upload
-                    <input type="file" accept="image/*,.pdf" capture="environment" class="hidden" @change="onReceiptChange">
+                    <input type="file" accept="image/*,.pdf" class="hidden" @change="onReceiptChange">
                 </label>
-                <div v-if="receiptFile" class="mt-3 rounded-md border border-slate-200 p-3">
-                    <p class="text-xs text-slate-500">{{ receiptFile.name }}</p>
-                    <img v-if="receiptPreviewUrl && receiptFile.type.startsWith('image/')" :src="receiptPreviewUrl" alt="Receipt preview" class="mt-2 max-h-44 rounded">
-                    <div v-else class="mt-2 inline-flex items-center gap-2 text-sm text-slate-600">
-                        <Camera class="h-4 w-4" />
-                        PDF ready for upload
-                    </div>
-                </div>
             </div>
 
-            <div class="mt-6 flex justify-end gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('expenses.index'))">Cancel</AppButton>
-                <AppButton variant="primary" @click="submit">Save Expense</AppButton>
+            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <AppButton variant="ghost" size="touch" class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm" @click="router.visit(route('expenses.index'))">Cancel</AppButton>
+                <AppButton variant="primary" size="touch" class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm" @click="submit">Save Expense</AppButton>
             </div>
         </AppCard>
     </AppLayout>

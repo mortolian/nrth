@@ -6,6 +6,8 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 
 const props = defineProps<{
     isEditing: boolean;
+    /** When set (e.g. from invoice create), redirect here after successful create. */
+    return_to?: string | null;
     client: null | {
         id: number;
         name: string;
@@ -78,7 +80,10 @@ const submit = () => {
         router.put(route('invoicing.clients.update', props.client.id), result.data);
         return;
     }
-    router.post(route('invoicing.clients.store'), result.data);
+    const payload = props.return_to
+        ? { ...result.data, return: props.return_to }
+        : result.data;
+    router.post(route('invoicing.clients.store'), payload);
 };
 </script>
 

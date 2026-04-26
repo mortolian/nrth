@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 const props = withDefaults(defineProps<{
     as?: string;
     variant?: 'primary' | 'secondary' | 'ghost';
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | 'touch';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
 }>(), {
@@ -26,6 +26,7 @@ const sizeClass = {
     sm: 'px-3 py-1.5 text-xs',
     md: 'px-4 py-2 text-sm',
     lg: 'px-5 py-2.5 text-base',
+    touch: 'min-h-12 px-5 py-3 text-base',
 };
 </script>
 

@@ -9,11 +9,16 @@ import {
     Calculator,
     ChartColumnBig,
     ChevronRight,
+    Clock,
+    CreditCard,
     FileText,
     FolderKanban,
     Home,
     Landmark,
     Menu,
+    MoreHorizontal,
+    Plus,
+    Receipt,
     Search,
     Settings,
     Wallet,
@@ -47,6 +52,7 @@ const props = defineProps<{
 const page = usePage();
 const collapsed = ref(false);
 const mobileOpen = ref(false);
+const quickAddOpen = ref(false);
 const commandPaletteOpen = ref(false);
 
 const currentTeam = computed(() => page.props.auth?.user?.current_team);
@@ -85,7 +91,7 @@ const navItems: MenuItem[] = [
         label: 'Contracting',
         href: route('contracting.contracts.index'),
         icon: Briefcase,
-        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }, { label: 'Time Tracking', href: '#' }] }],
+        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }, { label: 'Time tracking', href: route('time.index') }] }],
     },
     {
         label: 'Reports',
@@ -95,13 +101,7 @@ const navItems: MenuItem[] = [
     },
 ];
 
-const bottomTabs = computed(() => [
-    { label: 'Home', href: route('dashboard'), icon: Home },
-    { label: 'Invoices', href: route('invoicing.invoices.index'), icon: FileText },
-    { label: 'Transact', href: route('accounting.transactions.index'), icon: BookOpen },
-    { label: 'Tax', href: route('tax.vat.index'), icon: Calculator },
-    { label: 'Reports', href: route('reports.profit-loss'), icon: ChartColumnBig },
-]);
+const isActivePath = (href: string) => href !== '#' && currentPath.value === href.split('?')[0];
 
 const commandPaletteData = computed<PaletteData>(() => ({
     quickActions: page.props.commandPalette?.quickActions ?? [
@@ -119,7 +119,7 @@ const commandPaletteData = computed<PaletteData>(() => ({
 
 const logout = () => router.post(route('logout'));
 const switchTeam = (team: { id: number }) => router.put(route('current-team.update'), { team_id: team.id }, { preserveState: false });
-const isActive = (href: string) => href !== '#' && currentPath.value === href;
+const isActive = (href: string) => isActivePath(href);
 
 const onGlobalKey = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -299,7 +299,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     </div>
                 </header>
 
-                <main class="pb-20 lg:pb-8">
+                <main class="pb-28 lg:pb-8">
                     <div class="px-4 py-6 sm:px-6 lg:px-8">
                         <header v-if="$slots.header" class="mb-6">
                             <slot name="header" />
@@ -330,20 +330,121 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 </div>
             </aside>
 
-            <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white lg:hidden">
-                <div class="grid grid-cols-5">
+            <nav
+                class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+            >
+                <div class="relative grid min-h-[3.5rem] grid-cols-5 items-end">
                     <Link
-                        v-for="item in bottomTabs"
-                        :key="`tab-${item.label}`"
-                        :href="item.href"
-                        class="flex flex-col items-center justify-center gap-1 py-2 text-[11px] text-slate-600"
+                        :href="route('dashboard')"
+                        :class="[
+                            'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
+                            isActivePath(route('dashboard')) ? 'text-emerald-700' : 'text-slate-600',
+                        ]"
                     >
-                        <component :is="item.icon" class="h-4 w-4" />
-                        <span>{{ item.label }}</span>
+                        <Home class="h-5 w-5 shrink-0" />
+                        <span>Home</span>
                     </Link>
+                    <Link
+                        :href="route('invoicing.invoices.index')"
+                        :class="[
+                            'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
+                            isActivePath(route('invoicing.invoices.index')) ? 'text-emerald-700' : 'text-slate-600',
+                        ]"
+                    >
+                        <FileText class="h-5 w-5 shrink-0" />
+                        <span>Invoices</span>
+                    </Link>
+                    <div class="flex justify-center">
+                        <button
+                            type="button"
+                            class="relative -top-5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg ring-4 ring-white"
+                            aria-label="Quick add"
+                            @click="quickAddOpen = true"
+                        >
+                            <Plus class="h-7 w-7" />
+                        </button>
+                    </div>
+                    <Link
+                        :href="route('reports.profit-loss')"
+                        :class="[
+                            'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
+                            isActivePath(route('reports.profit-loss')) ? 'text-emerald-700' : 'text-slate-600',
+                        ]"
+                    >
+                        <ChartColumnBig class="h-5 w-5 shrink-0" />
+                        <span>Reports</span>
+                    </Link>
+                    <button
+                        type="button"
+                        class="flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium text-slate-600"
+                        @click="mobileOpen = true"
+                    >
+                        <MoreHorizontal class="h-5 w-5 shrink-0" />
+                        <span>More</span>
+                    </button>
                 </div>
             </nav>
         </div>
+
+        <Teleport to="body">
+            <div
+                v-if="quickAddOpen"
+                class="fixed inset-0 z-[70] bg-black/40 lg:hidden"
+                @click.self="quickAddOpen = false"
+            >
+                <div
+                    class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-white px-4 pt-3 shadow-xl pb-[calc(1rem+env(safe-area-inset-bottom))]"
+                    role="dialog"
+                    aria-label="Quick add"
+                >
+                    <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" />
+                    <p class="mb-3 text-center text-sm font-semibold text-slate-900">
+                        Quick add
+                    </p>
+                    <div class="grid gap-2">
+                        <Link
+                            :href="route('expenses.create')"
+                            class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
+                            @click="quickAddOpen = false"
+                        >
+                            <Receipt class="h-5 w-5 shrink-0 text-emerald-700" />
+                            New expense
+                        </Link>
+                        <Link
+                            :href="route('invoicing.invoices.create')"
+                            class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
+                            @click="quickAddOpen = false"
+                        >
+                            <FileText class="h-5 w-5 shrink-0 text-emerald-700" />
+                            New invoice
+                        </Link>
+                        <Link
+                            :href="`${route('dashboard')}#outstanding-invoices`"
+                            class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
+                            @click="quickAddOpen = false"
+                        >
+                            <CreditCard class="h-5 w-5 shrink-0 text-emerald-700" />
+                            Record payment
+                        </Link>
+                        <Link
+                            :href="route('time.index')"
+                            class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
+                            @click="quickAddOpen = false"
+                        >
+                            <Clock class="h-5 w-5 shrink-0 text-emerald-700" />
+                            Start timer
+                        </Link>
+                    </div>
+                    <button
+                        type="button"
+                        class="mt-3 w-full min-h-12 rounded-xl py-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                        @click="quickAddOpen = false"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </Teleport>
 
         <CommandPalette v-model:open="commandPaletteOpen" :data="commandPaletteData" />
     </div>

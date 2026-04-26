@@ -6,10 +6,10 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Inertia\RedirectResponse;
 use Inertia\Response;
 
 class ClientController extends Controller
@@ -50,6 +50,7 @@ class ClientController extends Controller
                     }
                     $total = (int) $invoice->getRawOriginal('total_cents');
                     $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+
                     return max(0, $total - $paid);
                 });
 
@@ -74,11 +75,14 @@ class ClientController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        $returnQuery = $request->query('return');
+
         return Inertia::render('Invoicing/Clients/Form', [
             'isEditing' => false,
             'client' => null,
+            'return_to' => $this->safeInternalReturn(is_string($returnQuery) ? $returnQuery : null),
         ]);
     }
 
@@ -86,11 +90,18 @@ class ClientController extends Controller
     {
         $payload = $this->validateClient($request);
         $teamId = (int) $request->user()->current_team_id;
+        $returnTo = $this->safeInternalReturn(
+            is_string($request->input('return')) ? (string) $request->input('return') : null
+        );
 
         $client = Client::queryWithoutTeamScope()->create([
             'team_id' => $teamId,
             ...$payload,
         ]);
+
+        if ($returnTo !== null) {
+            return redirect($returnTo);
+        }
 
         return to_route('invoicing.clients.show', $client);
     }
@@ -104,6 +115,7 @@ class ClientController extends Controller
         $history = $client->invoices->map(function (Invoice $invoice): array {
             $total = (int) $invoice->getRawOriginal('total_cents');
             $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+
             return [
                 'id' => $invoice->id,
                 'number' => $invoice->number,
@@ -175,8 +187,26 @@ class ClientController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
+     * Allow only same-origin paths under /invoicing/ (prevents open redirects).
      */
+    private function safeInternalReturn(?string $return): ?string
+    {
+        if ($return === null || $return === '') {
+            return null;
+        }
+
+        $trimmed = trim($return);
+        if ($trimmed === '' || str_contains($trimmed, '..') || str_contains($trimmed, "\0")) {
+            return null;
+        }
+
+        if (! preg_match('#^/invoicing/#', $trimmed)) {
+            return null;
+        }
+
+        return $trimmed;
+    }
+
     private function serializeClient(Client $client): array
     {
         return [

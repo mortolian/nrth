@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import draggable from 'vuedraggable';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { GripVertical, Plus, Trash2, Upload } from 'lucide-vue-next';
+import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
 type ClientOption = { id: number; name: string; payment_terms_days: number };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
@@ -48,8 +48,14 @@ const props = defineProps<{
 }>();
 
 const defaultVatRate = computed(() => props.tax_rates.find((rate) => rate.is_default)?.rate ?? 0.15);
-const selectedFiles = computed<File[]>(() => values.value.attachments ?? []);
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+
+const newClientHref = computed(() => route('invoicing.clients.create', {
+    return: '/invoicing/invoices/create',
+}));
+
+const hasClients = computed(() => props.clients.length > 0);
+const canSaveInvoice = computed(() => props.isEditing || hasClients.value);
 
 const invoiceSchema = z.object({
     client_id: z.coerce.number().int().positive('Client is required'),
@@ -66,10 +72,35 @@ const invoiceSchema = z.object({
         vat_rate: z.coerce.number().min(0).max(1),
         account_id: z.coerce.number().nullable().optional(),
     })).min(1, 'Add at least one line item'),
-    attachments: z.array(z.any()).optional(),
 });
 
-const { handleSubmit, setErrors, values, setFieldValue } = useForm({
+const page = usePage();
+
+const inertiaErrors = computed(() => {
+    const raw = page.props.errors as Record<string, string | string[] | undefined>;
+    if (!raw || typeof raw !== 'object') {
+        return [] as { key: string; message: string }[];
+    }
+    return Object.entries(raw).flatMap(([key, val]) => {
+        if (val === undefined || val === null) {
+            return [];
+        }
+        const message = Array.isArray(val) ? val.join(' ') : String(val);
+
+        return [{ key, message }];
+    });
+});
+
+/** Options for VAT select; default rate when team has no tax_rates rows yet. */
+const taxRateSelectOptions = computed(() => {
+    if (props.tax_rates.length) {
+        return props.tax_rates.map((rate) => ({ label: rate.name, value: String(rate.rate) }));
+    }
+
+    return [{ label: '15%', value: String(defaultVatRate.value) }];
+});
+
+const { setErrors, values, setFieldValue } = useForm({
     initialValues: {
         client_id: props.invoice?.client_id ?? (props.clients[0]?.id ?? null),
         number: props.invoice?.number ?? props.next_number,
@@ -88,7 +119,6 @@ const { handleSubmit, setErrors, values, setFieldValue } = useForm({
                 account_id: line.account_id ?? null,
             }))
             : [{ row_key: makeRowKey(), description: '', quantity: 1, unit_price: 0, vat_rate: defaultVatRate.value, account_id: null }],
-        attachments: [] as File[],
     },
 });
 
@@ -162,47 +192,42 @@ const removeLine = (index: number) => {
     }]);
 };
 
-const handleAttachmentInput = (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const files = Array.from(target.files ?? []);
-    setFieldValue('attachments', [...selectedFiles.value, ...files]);
-};
-
 const openPreview = () => {
     if (!props.isEditing || !props.invoice?.id) return;
     window.open(route('invoices.pdf.download', props.invoice.id), '_blank');
 };
 
 const onSubmit = (submitAction: 'draft' | 'send') => {
-    handleSubmit((formValues) => {
-        const result = invoiceSchema.safeParse(formValues);
-        if (!result.success) {
-            const mapped: Record<string, string> = {};
-            for (const issue of result.error.issues) {
-                mapped[issue.path.join('.')] = issue.message;
-            }
-            setErrors(mapped);
-            return;
+    // Read `values` directly: nested line rows use v-model on shared objects; vee-validate's
+    // handleSubmit() can pass a stale snapshot that omits those edits.
+    const result = invoiceSchema.safeParse(values.value);
+    if (!result.success) {
+        const mapped: Record<string, string> = {};
+        for (const issue of result.error.issues) {
+            mapped[issue.path.join('.')] = issue.message;
         }
+        setErrors(mapped);
+        return;
+    }
 
-        const payload = {
-            ...result.data,
-            submit_action: submitAction,
-            line_items: result.data.line_items.map((line) => ({
-                description: line.description,
-                quantity: Number(line.quantity),
-                unit_price_cents: Math.round(Number(line.unit_price) * 100),
-                vat_rate: Number(line.vat_rate),
-            })),
-        };
+    const { line_items: lineItems, ...rest } = result.data;
+    const payload = {
+        ...rest,
+        submit_action: submitAction,
+        line_items: lineItems.map((line) => ({
+            description: line.description,
+            quantity: Number(line.quantity),
+            unit_price_cents: Math.round(Number(line.unit_price) * 100),
+            vat_rate: Number(line.vat_rate),
+        })),
+    };
 
-        if (props.isEditing && props.invoice?.id) {
-            router.put(route('invoicing.invoices.update', props.invoice.id), payload);
-            return;
-        }
+    if (props.isEditing && props.invoice?.id) {
+        router.put(route('invoicing.invoices.update', props.invoice.id), payload);
+        return;
+    }
 
-        router.post(route('invoicing.invoices.store'), payload);
-    })();
+    router.post(route('invoicing.invoices.store'), payload);
 };
 </script>
 
@@ -220,19 +245,49 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
             subtitle="Create and manage invoice details, line items, and totals"
         />
 
+        <div
+            v-if="inertiaErrors.length"
+            class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+        >
+            <p class="font-medium">Could not save invoice</p>
+            <ul class="mt-2 list-inside list-disc space-y-1 text-rose-800">
+                <li v-for="err in inertiaErrors" :key="err.key">{{ err.message }}</li>
+            </ul>
+        </div>
+
         <div class="mt-5 grid gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
                 <AppCard>
                     <div class="grid gap-3 md:grid-cols-2">
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Client</label>
-                            <AppSelect
-                                :model-value="String(values.client_id ?? '')"
-                                :options="clients.map((client) => ({ label: client.name, value: String(client.id) }))"
-                                placeholder="Select client"
-                                @update:model-value="setFieldValue('client_id', Number($event))"
-                            />
-                            <button class="mt-2 text-xs text-emerald-700 hover:underline" type="button">+ Add new client</button>
+                            <div
+                                v-if="!hasClients"
+                                class="rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+                            >
+                                <p class="font-medium">You need at least one client</p>
+                                <p class="mt-1 text-amber-900/90">Create a client first, then you can fill in this invoice.</p>
+                                <Link
+                                    :href="newClientHref"
+                                    class="mt-2 inline-block text-sm font-medium text-emerald-800 underline hover:text-emerald-900"
+                                >
+                                    Create a client
+                                </Link>
+                            </div>
+                            <template v-else>
+                                <AppSelect
+                                    :model-value="String(values.client_id ?? '')"
+                                    :options="clients.map((client) => ({ label: client.name, value: String(client.id) }))"
+                                    placeholder="Select client"
+                                    @update:model-value="setFieldValue('client_id', Number($event))"
+                                />
+                                <Link
+                                    :href="newClientHref"
+                                    class="mt-2 inline-block text-xs text-emerald-700 hover:underline"
+                                >
+                                    + Add new client
+                                </Link>
+                            </template>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Invoice number</label>
@@ -308,7 +363,7 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                         <td class="px-3 py-2">
                                             <AppSelect
                                                 :model-value="String(line.vat_rate)"
-                                                :options="tax_rates.map((rate) => ({ label: rate.name, value: String(rate.rate) }))"
+                                                :options="taxRateSelectOptions"
                                                 @update:model-value="line.vat_rate = Number($event)"
                                             />
                                         </td>
@@ -363,14 +418,9 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Attachments</label>
-                            <label class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 px-3 py-5 text-sm text-slate-500 hover:bg-slate-50">
-                                <Upload class="h-4 w-4" />
-                                Drag and drop or click to attach
-                                <input type="file" multiple class="hidden" @change="handleAttachmentInput">
-                            </label>
-                            <ul v-if="selectedFiles.length" class="mt-2 space-y-1 text-xs text-slate-500">
-                                <li v-for="file in selectedFiles" :key="file.name">{{ file.name }}</li>
-                            </ul>
+                            <p class="text-xs leading-relaxed text-slate-500">
+                                PDFs are generated when you download or send an invoice from its detail page. Uploading extra files here is not supported yet.
+                            </p>
                         </div>
                         <AppButton :disabled="!isEditing" variant="secondary" @click="openPreview">Invoice preview (PDF)</AppButton>
                     </div>
@@ -381,8 +431,8 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
             <div class="flex items-center justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('invoicing.invoices.index'))">Cancel</AppButton>
-                <AppButton variant="secondary" @click="onSubmit('draft')">Save as Draft</AppButton>
-                <AppButton variant="primary" @click="onSubmit('send')">Save and Send</AppButton>
+                <AppButton variant="secondary" :disabled="!canSaveInvoice" @click="onSubmit('draft')">Save as Draft</AppButton>
+                <AppButton variant="primary" :disabled="!canSaveInvoice" @click="onSubmit('send')">Save and Send</AppButton>
             </div>
         </div>
     </AppLayout>

@@ -100,7 +100,7 @@ const openRecordPayment = (invoice) => {
         ]"
     >
         <template #header>
-            <h2 class="text-2xl font-semibold leading-tight text-slate-900">
+            <h2 class="text-xl font-semibold leading-tight text-slate-900 sm:text-2xl">
                 Dashboard
             </h2>
         </template>
@@ -129,9 +129,9 @@ const openRecordPayment = (invoice) => {
 
             <div class="grid gap-6 xl:grid-cols-3">
                 <AppCard class="xl:col-span-2">
-                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Revenue vs Expenses</h3>
-                    <div v-if="isLoading" class="h-80 animate-pulse rounded bg-slate-100" />
-                    <VChart v-else class="h-80 w-full" :option="chartOptions" autoresize />
+                    <h3 class="mb-3 text-base font-semibold text-slate-900 sm:mb-4 sm:text-lg">Revenue vs Expenses</h3>
+                    <div v-if="isLoading" class="h-56 animate-pulse rounded bg-slate-100 md:h-80" />
+                    <VChart v-else class="h-56 w-full md:h-80" :option="chartOptions" autoresize />
                 </AppCard>
 
                 <AppCard>
@@ -150,9 +150,33 @@ const openRecordPayment = (invoice) => {
             </div>
 
             <div class="grid gap-6 xl:grid-cols-3">
-                <AppCard class="xl:col-span-2">
+                <AppCard id="outstanding-invoices" class="xl:col-span-2">
                     <h3 class="mb-4 text-lg font-semibold text-slate-900">Outstanding Invoices</h3>
+                    <div class="space-y-3 md:hidden">
+                        <div
+                            v-for="invoice in outstanding_invoices.data ?? []"
+                            :key="`mo-${invoice.id}`"
+                            class="rounded-xl border border-slate-200 bg-slate-50/80 p-4"
+                        >
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <p class="font-medium text-slate-900">{{ invoice.client }}</p>
+                                    <p class="text-sm text-slate-600">{{ invoice.number }}</p>
+                                </div>
+                                <AppBadge :variant="invoice.days_overdue > 0 ? 'danger' : 'neutral'">
+                                    {{ invoice.days_overdue > 0 ? `${invoice.days_overdue}d` : 'OK' }}
+                                </AppBadge>
+                            </div>
+                            <div class="mt-2 flex items-center justify-between text-sm">
+                                <span class="text-slate-500">Due <DateDisplay :value="invoice.due_date" /></span>
+                                <span class="font-semibold">{{ formatCents(invoice.amount) }}</span>
+                            </div>
+                            <AppButton class="mt-3 w-full min-h-11" variant="secondary" @click="openRecordPayment(invoice)">Record Payment</AppButton>
+                        </div>
+                        <p v-if="!isLoading && !(outstanding_invoices.data ?? []).length" class="text-sm text-slate-500">No outstanding invoices.</p>
+                    </div>
                     <AppTable
+                        class="hidden md:block"
                         :columns="[
                             { key: 'client', label: 'Client' },
                             { key: 'number', label: 'Invoice #' },

@@ -152,7 +152,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                             :key="status.value"
                             type="button"
                             :class="[
-                                'rounded-md border px-3 py-1.5 text-sm transition',
+                                'min-h-11 rounded-md border px-3 py-2 text-sm transition md:min-h-0 md:py-1.5',
                                 localFilters.status === status.value
                                     ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
                                     : 'border-slate-200 text-slate-600 hover:bg-slate-50',
@@ -200,15 +200,61 @@ const toggleSelected = (id: number, checked: boolean) => {
             </AppCard>
 
             <AppCard>
-                <div class="mb-3 flex items-center justify-between">
+                <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 class="text-lg font-semibold text-slate-900">Invoice list</h3>
-                    <div class="flex items-center gap-2">
+                    <div class="hidden items-center gap-2 sm:flex">
                         <AppButton variant="secondary" size="sm" :disabled="selected.length === 0">Export selected (PDF zip)</AppButton>
                         <AppButton variant="secondary" size="sm" :disabled="selected.length === 0">Mark as sent</AppButton>
                     </div>
                 </div>
 
-                <AppTable
+                <div class="mb-4 space-y-3 md:hidden">
+                    <button
+                        v-for="invoice in invoices.data"
+                        :key="`mobile-${invoice.id}`"
+                        type="button"
+                        class="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm active:bg-slate-50"
+                        @click="onAction(invoice, 'view')"
+                    >
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="font-semibold text-slate-900">{{ invoice.number }}</p>
+                                <p class="text-sm text-slate-600">{{ invoice.client_name }}</p>
+                            </div>
+                            <AppBadge
+                                :variant="invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : invoice.is_overdue ? 'danger' : 'info'"
+                            >
+                                {{ invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void' ? 'overdue' : invoice.status }}
+                            </AppBadge>
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                            <span>Due <DateDisplay :value="invoice.due_date" /></span>
+                            <span v-if="invoice.is_overdue" class="font-medium text-rose-700">{{ invoice.days_overdue }}d late</span>
+                        </div>
+                        <div class="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-sm">
+                            <span class="text-slate-500">Due</span>
+                            <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">{{ formatCents(invoice.amount_due) }}</span>
+                        </div>
+                        <div class="mt-3 flex flex-wrap gap-2" @click.stop>
+                            <AppButton
+                                v-for="action in rowActionItems(invoice)"
+                                :key="`m-${invoice.id}-${action.id}`"
+                                size="sm"
+                                variant="secondary"
+                                class="min-h-10"
+                                @click="onAction(invoice, action.id)"
+                            >
+                                {{ action.label }}
+                            </AppButton>
+                        </div>
+                    </button>
+                    <div v-if="!invoices.data.length" class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                        No invoices match. Try filters or create a new invoice.
+                    </div>
+                </div>
+
+                <div class="hidden md:block">
+                    <AppTable
                     :columns="[
                         { key: 'select', label: '' },
                         { key: 'number', label: 'Number', sortable: true },
@@ -298,6 +344,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                         </td>
                     </tr>
                 </AppTable>
+                </div>
             </AppCard>
         </div>
 

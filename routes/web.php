@@ -40,6 +40,9 @@ Route::middleware([
     Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('onboarding.skip');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/time', function () {
+        return Inertia::render('TimeTracking/Index');
+    })->name('time.index');
     Route::get('/settings/company', [CompanySettingsController::class, 'edit'])->name('settings.company');
     Route::post('/settings/company', [CompanySettingsController::class, 'update'])->name('settings.company.update');
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
