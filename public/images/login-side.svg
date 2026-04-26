@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1200" preserveAspectRatio="xMidYMid slice" fill="none">
+  <defs>
+    <linearGradient id="loginBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22"/>
+      <stop offset="55%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#134e4a"/>
+    </linearGradient>
+    <linearGradient id="loginGlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="1200" fill="url(#loginBg)"/>
+  <path fill="url(#loginGlow)" d="M0 520c180-80 360 40 540 20s270-200 360-120v780H0V520Z" opacity="0.9"/>
+  <circle cx="220" cy="280" r="200" fill="#10b981" opacity="0.12"/>
+  <circle cx="720" cy="900" r="280" fill="#2dd4bf" opacity="0.1"/>
+  <circle cx="640" cy="220" r="120" fill="#ecfdf5" opacity="0.06"/>
+</svg>
