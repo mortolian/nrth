@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref, withDefaults } from 'vue';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import DeleteTeamForm from '@/Pages/Teams/Partials/DeleteTeamForm.vue';
+import UpdateTeamNameForm from '@/Pages/Teams/Partials/UpdateTeamNameForm.vue';
 
 type Member = {
     id: number;
@@ -17,20 +19,53 @@ type Invitation = { id: number; email: string; role_key: string; role_label: str
 
 type JetstreamRole = { key: string; name: string; description?: string };
 
-const props = defineProps<{
-    team: { id: number; name: string; personal_team: boolean };
-    members: Member[];
-    invitations: Invitation[];
-    available_roles: JetstreamRole[];
-    permissions: {
-        canAddTeamMembers: boolean;
-        canDeleteTeam: boolean;
-        canRemoveTeamMembers: boolean;
-        canUpdateTeam: boolean;
-        canUpdateTeamMembers: boolean;
-    };
-    role_summaries: Array<{ key: string; title: string; description: string }>;
-}>();
+const props = withDefaults(
+    defineProps<{
+        team: {
+            id: number;
+            name: string;
+            personal_team: boolean;
+            owner: { name: string; email: string; profile_photo_url: string } | null;
+        };
+        members: Member[];
+        invitations: Invitation[];
+        available_roles: JetstreamRole[];
+        permissions: {
+            canAddTeamMembers: boolean;
+            canDeleteTeam: boolean;
+            canRemoveTeamMembers: boolean;
+            canUpdateTeam: boolean;
+            canUpdateTeamMembers: boolean;
+        };
+        role_summaries: Array<{ key: string; title: string; description: string }>;
+        team_settings_entry?: 'settings' | 'direct';
+    }>(),
+    { team_settings_entry: 'settings' },
+);
+
+const breadcrumbs = computed(() => {
+    if (props.team_settings_entry === 'direct') {
+        return [
+            { label: 'Account', href: route('profile.show') },
+            { label: props.team.name },
+        ];
+    }
+    return [
+        { label: 'Settings', href: route('profile.show') },
+        { label: 'Team' },
+    ];
+});
+
+const teamBase = computed(() => ({
+    id: props.team.id,
+    name: props.team.name,
+    personal_team: props.team.personal_team,
+}));
+
+const teamForUpdateName = computed(() => ({
+    ...teamBase.value,
+    owner: props.team.owner!,
+}));
 
 const page = usePage();
 const authUserId = computed(() => (page.props.auth as { user?: { id: number } })?.user?.id);
@@ -75,6 +110,8 @@ const saveRole = () => {
 
 const removeTarget = ref<Member | null>(null);
 const removeForm = useForm({});
+const leaveForm = useForm({});
+const leaveModalOpen = ref(false);
 
 const confirmRemove = (member: Member) => {
     removeTarget.value = member;
@@ -90,26 +127,25 @@ const removeMember = () => {
         },
     });
 };
+
+const leaveTeam = () => {
+    if (!authUserId.value) return;
+    leaveForm.delete(route('team-members.destroy', [props.team.id, authUserId.value]), {
+        preserveScroll: true,
+        onSuccess: () => {
+            leaveModalOpen.value = false;
+        },
+    });
+};
 </script>
 
 <template>
-    <AppLayout
-        title="Team"
-        :breadcrumbs="[
-            { label: 'Settings', href: route('profile.show') },
-            { label: 'Team' },
-        ]"
-    >
-        <PageHeader title="Team & members" :subtitle="`Team: ${team.name}`">
-            <template #actions>
-                <Link
-                    :href="route('teams.show', team.id)"
-                    class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-                >
-                    Classic team screen
-                </Link>
-            </template>
-        </PageHeader>
+    <AppLayout title="Team" :breadcrumbs="breadcrumbs">
+        <PageHeader title="Team & members" :subtitle="`Team: ${team.name}`" />
+
+        <div v-if="team.owner" class="mt-6 max-w-3xl">
+            <UpdateTeamNameForm :team="teamForUpdateName" :permissions="permissions" />
+        </div>
 
         <div class="mt-6 grid gap-4 md:grid-cols-3">
             <AppCard v-for="summary in role_summaries" :key="summary.key" class="border-slate-200">
@@ -199,7 +235,15 @@ const removeMember = () => {
                     </td>
                     <td class="px-4 py-3 text-right">
                         <button
-                            v-if="!m.is_owner && permissions.canRemoveTeamMembers && authUserId !== m.id"
+                            v-if="authUserId === m.id && !m.is_owner"
+                            type="button"
+                            class="text-sm text-rose-600 hover:underline"
+                            @click="leaveModalOpen = true"
+                        >
+                            Leave team
+                        </button>
+                        <button
+                            v-else-if="!m.is_owner && permissions.canRemoveTeamMembers && authUserId !== m.id"
                             type="button"
                             class="text-sm text-rose-600 hover:underline"
                             @click="confirmRemove(m)"
@@ -210,6 +254,27 @@ const removeMember = () => {
                 </tr>
             </AppTable>
         </AppCard>
+
+        <div v-if="permissions.canDeleteTeam && !team.personal_team" class="mt-6 max-w-3xl">
+            <DeleteTeamForm :team="teamBase" />
+        </div>
+
+        <div
+            v-if="leaveModalOpen"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            @click.self="leaveModalOpen = false"
+        >
+            <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                <h4 class="text-lg font-semibold text-slate-900">Leave team</h4>
+                <p class="mt-2 text-sm text-slate-600">Are you sure you want to leave this team? You will lose access immediately.</p>
+                <div class="mt-6 flex justify-end gap-2">
+                    <AppButton variant="ghost" @click="leaveModalOpen = false">Cancel</AppButton>
+                    <AppButton variant="primary" class="!bg-rose-600" :disabled="leaveForm.processing" @click="leaveTeam">
+                        Leave
+                    </AppButton>
+                </div>
+            </div>
+        </div>
 
         <div
             v-if="roleModalOpen"

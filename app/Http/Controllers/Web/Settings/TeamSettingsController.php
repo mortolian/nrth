@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -17,6 +18,15 @@ class TeamSettingsController extends Controller
         $team = $user->currentTeam;
 
         abort_unless($team !== null && $user->belongsToTeam($team), 403);
+
+        return $this->show($request, $team);
+    }
+
+    public function show(Request $request, Team $team): Response
+    {
+        $user = $request->user();
+
+        abort_unless($user->belongsToTeam($team), 403);
 
         Gate::authorize('view', $team);
 
@@ -66,10 +76,16 @@ class TeamSettingsController extends Controller
         })->values()->all();
 
         return Inertia::render('Settings/Team', [
+            'team_settings_entry' => $request->routeIs('teams.show') ? 'direct' : 'settings',
             'team' => [
                 'id' => $team->id,
                 'name' => $team->name,
                 'personal_team' => (bool) $team->personal_team,
+                'owner' => $team->owner === null ? null : [
+                    'name' => $team->owner->name,
+                    'email' => $team->owner->email,
+                    'profile_photo_url' => $team->owner->profile_photo_url,
+                ],
             ],
             'members' => $members->values()->all(),
             'invitations' => $invitations,
