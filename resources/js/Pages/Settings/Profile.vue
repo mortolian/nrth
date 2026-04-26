@@ -33,7 +33,7 @@ defineProps<{
     >
         <PageHeader title="Profile & security" subtitle="Your account, password, two-factor authentication, and preferences" />
 
-        <div class="mx-auto mt-6 max-w-4xl space-y-8">
+        <div class="mt-6 space-y-6">
             <div v-if="$page.props.jetstream.canUpdateProfileInformation">
                 <UpdateProfileInformationForm :user="$page.props.auth.user" />
                 <SectionBorder />
@@ -43,23 +43,22 @@ defineProps<{
 
             <div v-if="$page.props.jetstream.canUpdatePassword">
                 <SectionBorder />
-                <UpdatePasswordForm class="mt-10 sm:mt-0" />
+                <UpdatePasswordForm />
                 <SectionBorder />
             </div>
 
             <div v-if="$page.props.jetstream.canManageTwoFactorAuthentication">
                 <TwoFactorAuthenticationForm
                     :requires-confirmation="confirmsTwoFactorAuthentication"
-                    class="mt-10 sm:mt-0"
                 />
                 <SectionBorder />
             </div>
 
-            <LogoutOtherBrowserSessionsForm :sessions="sessions" class="mt-10 sm:mt-0" />
+            <LogoutOtherBrowserSessionsForm :sessions="sessions" />
 
             <template v-if="$page.props.jetstream.hasAccountDeletionFeatures">
                 <SectionBorder />
-                <DeleteUserForm class="mt-10 sm:mt-0" />
+                <DeleteUserForm />
             </template>
         </div>
     </AppLayout>
