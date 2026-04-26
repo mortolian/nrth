@@ -59,9 +59,12 @@ export default defineConfig({
         tailwindcss(),
     ],
     resolve: {
-        alias: {
-            '@': path.resolve(__dirname, 'resources/js'),
-        },
+        alias: [
+            // Actual dirs are Stores/Composables; lowercase imports work on macOS but fail in Linux Docker.
+            { find: '@/stores', replacement: path.resolve(__dirname, 'resources/js/Stores') },
+            { find: '@/composables', replacement: path.resolve(__dirname, 'resources/js/Composables') },
+            { find: '@', replacement: path.resolve(__dirname, 'resources/js') },
+        ],
     },
     server: devServer(),
 });

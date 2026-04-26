@@ -11,6 +11,8 @@
         "noEmit": true,
         "baseUrl": ".",
         "paths": {
+            "@/stores/*": ["resources/js/Stores/*"],
+            "@/composables/*": ["resources/js/Composables/*"],
             "@/*": ["resources/js/*"]
         },
         "types": ["vite/client"]
