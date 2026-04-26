@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Web\Accounting\AccountStatementController;
+use App\Http\Controllers\Web\Accounting\ChartOfAccountsController;
+use App\Http\Controllers\Web\Accounting\GeneralLedgerController;
 use App\Http\Controllers\Web\Accounting\TransactionController;
 use App\Http\Controllers\Web\BudgetingController;
 use App\Http\Controllers\Web\Contracting\ContractController;
@@ -51,6 +53,8 @@ Route::middleware([
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
     Route::get('/accounting/transactions', [TransactionController::class, 'index'])->name('accounting.transactions.index');
+    Route::get('/accounting/journal', GeneralLedgerController::class)->name('accounting.journal.index');
+    Route::get('/accounting/accounts', ChartOfAccountsController::class)->name('accounting.accounts.index');
     Route::get('/accounting/accounts/{account}/statement', AccountStatementController::class)->name('accounting.accounts.statement');
     Route::get('/budgeting', [BudgetingController::class, 'index'])->name('budgeting.index');
     Route::get('/budgeting/create', [BudgetingController::class, 'create'])->name('budgeting.create');

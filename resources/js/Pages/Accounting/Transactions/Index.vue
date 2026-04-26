@@ -78,7 +78,7 @@ const toggleExpanded = (id: number) => {
             { label: 'Transactions' },
         ]"
     >
-        <PageHeader title="Master Ledger" subtitle="All financial events across invoices, payments, and expenses">
+        <PageHeader title="Transactions" subtitle="All financial events across invoices, payments, and expenses">
             <template #actions>
                 <AppButton variant="secondary">Export to Excel</AppButton>
             </template>

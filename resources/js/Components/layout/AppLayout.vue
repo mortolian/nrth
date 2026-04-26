@@ -81,7 +81,7 @@ const navItems: MenuItem[] = [
         label: 'Accounting',
         href: route('accounting.transactions.index'),
         icon: BookOpen,
-        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'Journal', href: '#' }, { label: 'Chart Of Accounts', href: '#' }] }],
+        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'General Ledger', href: route('accounting.journal.index') }, { label: 'Chart of Accounts', href: route('accounting.accounts.index') }] }],
     },
     { label: 'Planning', href: route('budgeting.index'), icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }] },
     {
