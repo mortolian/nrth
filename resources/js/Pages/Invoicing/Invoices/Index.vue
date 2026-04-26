@@ -100,6 +100,10 @@ const rowActionItems = (invoice: InvoiceRow) => {
 const onAction = (invoice: InvoiceRow, actionId: string) => {
     if (actionId === 'view') {
         router.visit(route('invoicing.invoices.show', invoice.id));
+    } else if (actionId === 'send') {
+        router.post(route('invoicing.invoices.send', invoice.id));
+    } else if (actionId === 'void') {
+        router.post(route('invoicing.invoices.void', invoice.id));
     } else if (actionId === 'record_payment') {
         selectedInvoice.value = invoice;
         paymentDrawerOpen.value = true;
@@ -125,7 +129,7 @@ const toggleSelected = (id: number, checked: boolean) => {
     >
         <PageHeader title="Invoices" subtitle="Track and manage money in">
             <template #actions>
-                <AppButton variant="primary">New Invoice</AppButton>
+                <AppButton variant="primary" @click="router.visit(route('invoicing.invoices.create'))">New Invoice</AppButton>
             </template>
         </PageHeader>
 
@@ -288,7 +292,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                                 description="Try adjusting your filters or create a new invoice."
                             >
                                 <template #action>
-                                    <AppButton variant="primary">New Invoice</AppButton>
+                                    <AppButton variant="primary" @click="router.visit(route('invoicing.invoices.create'))">New Invoice</AppButton>
                                 </template>
                             </EmptyState>
                         </td>

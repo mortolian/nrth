@@ -60,13 +60,13 @@ const navItems: MenuItem[] = [
         label: 'Money In',
         href: route('invoicing.invoices.index'),
         icon: Wallet,
-        group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Quotes', href: '#' }, { label: 'Clients', href: '#' }] }],
+        group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Quotes', href: '#' }, { label: 'Clients', href: route('invoicing.clients.index') }] }],
     },
     {
         label: 'Money Out',
-        href: '#',
+        href: route('expenses.index'),
         icon: Landmark,
-        group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: '#' }, { label: 'Suppliers', href: '#' }] }],
+        group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: '#' }] }],
     },
     {
         label: 'Accounting',
