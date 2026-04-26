@@ -8,8 +8,11 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useAppDisplayName } from '@/lib/appName';
 
-const STORAGE_KEY = 'spennies_onboarding_v1';
+const STORAGE_KEY = 'pennies_onboarding_v1';
+
+const appDisplayName = useAppDisplayName();
 
 type Industry = { value: string; label: string };
 type MonthOpt = { value: number; label: string };
@@ -282,7 +285,7 @@ const liveInvoicePreview = computed(() => {
             <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
                 <Link href="/" class="flex items-center gap-2 text-slate-200 hover:text-white">
                     <ApplicationMark class="h-8 w-8" />
-                    <span class="text-sm font-semibold tracking-tight">Spennies</span>
+                    <span class="text-sm font-semibold tracking-tight">{{ appDisplayName }}</span>
                 </Link>
                 <div class="flex items-center gap-3">
                     <span class="text-xs text-slate-500">Step {{ step }} of 5</span>
@@ -312,9 +315,9 @@ const liveInvoicePreview = computed(() => {
                 <!-- Step 1 -->
                 <div v-if="step === 1" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">Welcome to Spennies</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight text-white">Welcome to {{ appDisplayName }}</h1>
                         <p class="mt-3 text-sm leading-relaxed text-slate-400">
-                            Spennies helps South African small businesses invoice clients, track expenses, stay on top of
+                            {{ appDisplayName }} helps South African small businesses invoice clients, track expenses, stay on top of
                             VAT and provisional tax, and understand profit with clear reports — without spreadsheet chaos.
                         </p>
                     </div>
@@ -466,7 +469,7 @@ const liveInvoicePreview = computed(() => {
                     </div>
 
                     <p class="text-xs leading-relaxed text-slate-500">
-                        You can add detailed opening balances from Chart of Accounts later.
+                        You can add detailed opening balances from Chart Of Accounts later.
                     </p>
 
                     <div class="flex justify-between gap-3">

@@ -20,8 +20,9 @@ import DateDisplay from '@/Components/DateDisplay.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import ConfirmDialog from '@/Components/ConfirmDialog.vue';
+import { readAppNameFromMeta } from '@/lib/appNameCore';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = (import.meta.env.VITE_APP_NAME || readAppNameFromMeta() || 'Laravel').trim();
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

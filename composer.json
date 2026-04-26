@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "spennies/spennies",
+    "name": "pennies/pennies",
     "type": "project",
-    "description": "Spennies — contractor accounting and finance (Laravel 13 + Jetstream + Inertia).",
+    "description": "Contractor accounting and finance (Laravel 13 + Jetstream + Inertia).",
     "keywords": ["laravel", "inertia", "jetstream", "accounting"],
     "license": "MIT",
     "require": {

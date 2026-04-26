@@ -1,6 +1,6 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
-    "name": "spennies",
+    "name": "pennies",
     "private": true,
     "type": "module",
     "engines": {

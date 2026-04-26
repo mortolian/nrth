@@ -14,7 +14,7 @@ class AppUpdateCommand extends Command
 
     public function handle(): int
     {
-        $this->components->info('Spennies application update');
+        $this->components->info(config('app.name').' application update');
         $this->newLine();
 
         try {

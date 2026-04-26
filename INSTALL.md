@@ -1,6 +1,6 @@
-# Spennies Self-Hosted Installation Guide
+# Self-hosted installation guide
 
-This guide covers production installation for Spennies.
+This guide covers production deployment. Set `APP_NAME` in `.env` for the application display name in the UI.
 
 ## Requirements
 
@@ -17,23 +17,23 @@ This guide covers production installation for Spennies.
 ### 1) Prepare host
 
 - Install Docker Engine + Docker Compose plugin.
-- Create a deployment directory, for example `/opt/spennies`.
+- Create a deployment directory, for example `/opt/pennies`.
 
 ### 2) Deploy release archive
 
 1. Copy release files:
-   - `spennies-<version>.tar.gz`
-   - `spennies-<version>.tar.gz.sha256`
+   - `pennies-<version>.tar.gz`
+   - `pennies-<version>.tar.gz.sha256`
 2. Verify checksum:
    ```bash
-   ARCHIVE="spennies-<version>.tar.gz"
+   ARCHIVE="pennies-<version>.tar.gz"
    EXPECTED="$(cat "${ARCHIVE}.sha256")"
    ACTUAL="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
    [ "$EXPECTED" = "$ACTUAL" ] && echo "Checksum OK"
    ```
 3. Extract:
    ```bash
-   tar -xzf spennies-<version>.tar.gz
+   tar -xzf pennies-<version>.tar.gz
    ```
 
 ### 3) Configure environment
@@ -93,12 +93,12 @@ php artisan app:install
   - `php artisan queue:work --sleep=1 --tries=3 --timeout=120`
 - Add cron entry for scheduler:
   ```cron
-  * * * * * cd /path/to/spennies && php artisan schedule:run >> /dev/null 2>&1
+  * * * * * cd /path/to/pennies && php artisan schedule:run >> /dev/null 2>&1
   ```
 
 ## Backups
 
-Spennies includes `spatie/laravel-backup`.
+This project includes `spatie/laravel-backup`.
 
 ### 1) Configure backup destinations
 

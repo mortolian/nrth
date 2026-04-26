@@ -1,5 +1,5 @@
 x-laravel-env: &laravel-env
-  APP_NAME: Spennies
+  APP_NAME: "${APP_NAME:-Laravel}"
   APP_ENV: production
   APP_DEBUG: 'false'
   # Replace in production (`php artisan key:generate --show`). Shared by app, worker, and scheduler.
@@ -8,9 +8,9 @@ x-laravel-env: &laravel-env
   DB_CONNECTION: pgsql
   DB_HOST: postgres
   DB_PORT: '5432'
-  DB_DATABASE: spennies
-  DB_USERNAME: spennies
-  DB_PASSWORD: spennies
+  DB_DATABASE: pennies
+  DB_USERNAME: pennies
+  DB_PASSWORD: pennies
   SESSION_DRIVER: redis
   CACHE_STORE: redis
   QUEUE_CONNECTION: redis
@@ -21,7 +21,7 @@ x-laravel-env: &laravel-env
   AWS_ACCESS_KEY_ID: minio
   AWS_SECRET_ACCESS_KEY: miniosecretchange
   AWS_DEFAULT_REGION: us-east-1
-  AWS_BUCKET: spennies
+  AWS_BUCKET: pennies
   AWS_ENDPOINT: 'http://minio:9000'
   AWS_URL: 'http://localhost:9000'
   AWS_USE_PATH_STYLE_ENDPOINT: 'true'
@@ -31,14 +31,14 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: spennies
-      POSTGRES_PASSWORD: spennies
-      POSTGRES_DB: spennies
+      POSTGRES_USER: pennies
+      POSTGRES_PASSWORD: pennies
+      POSTGRES_DB: pennies
     volumes:
       # Prompt 1.2 names this volume "mysql data"; this stack uses PostgreSQL.
       - mysql_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U spennies -d spennies']
+      test: ['CMD-SHELL', 'pg_isready -U pennies -d pennies']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -85,14 +85,17 @@ services:
         until mc alias set local http://minio:9000 minio miniosecretchange; do
           sleep 2
         done
-        mc mb local/spennies --ignore-existing
+        mc mb local/pennies --ignore-existing
     restart: 'no'
 
   app:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: spennies:local
+      args:
+        VITE_APP_NAME: "${APP_NAME:-Laravel}"
+        APP_TITLE: "${APP_NAME:-Laravel}"
+    image: pennies:local
     ports:
       - '8000:8000'
     environment:
@@ -118,7 +121,7 @@ services:
       start_period: 45s
 
   worker:
-    image: spennies:local
+    image: pennies:local
     environment:
       <<: *laravel-env
       DOCKER_ROLE: worker
@@ -144,7 +147,7 @@ services:
       start_period: 60s
 
   scheduler:
-    image: spennies:local
+    image: pennies:local
     environment:
       <<: *laravel-env
       DOCKER_ROLE: worker

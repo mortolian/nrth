@@ -25,7 +25,7 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-APP_NAME="$(php -r '$json=json_decode(file_get_contents("composer.json"), true); $name=$json["name"] ?? "spennies"; echo preg_replace("/[^a-zA-Z0-9._-]+/", "-", basename($name));')"
+APP_NAME="$(php -r '$json=json_decode(file_get_contents("composer.json"), true); $name=$json["name"] ?? "pennies"; echo preg_replace("/[^a-zA-Z0-9._-]+/", "-", basename($name));')"
 VERSION="${1:-$(git describe --tags --always --dirty 2>/dev/null || date +%Y%m%d%H%M%S)}"
 RELEASE_DIR="$ROOT_DIR/releases"
 ARCHIVE_NAME="${APP_NAME}-${VERSION}.tar.gz"

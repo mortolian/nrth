@@ -237,7 +237,7 @@ class OnboardingController extends Controller
 
         $request->session()->forget(['onboarding_wizard', 'onboarding_step']);
 
-        return redirect()->route('dashboard')->with('success', 'You are ready to use Spennies.');
+        return redirect()->route('dashboard')->with('success', 'You are ready to use '.config('app.name').'.');
     }
 
     private function zarToCents(?string $value): int

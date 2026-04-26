@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Pause, Play, RotateCcw } from 'lucide-vue-next';
 
-const STORAGE_KEY = 'spennies_time_tracker_v1';
+const STORAGE_KEY = 'pennies_time_tracker_v1';
 
 type Stored = { accumulatedMs: number; startedAt: number | null; label: string };
 

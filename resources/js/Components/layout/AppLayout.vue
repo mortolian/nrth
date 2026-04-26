@@ -29,6 +29,7 @@ import Banner from '@/Components/Banner.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
+import { useAppDisplayName } from '@/lib/appName';
 
 type Breadcrumb = { label: string; href?: string };
 type NavChild = { label: string; href: string };
@@ -55,6 +56,8 @@ const mobileOpen = ref(false);
 const quickAddOpen = ref(false);
 const commandPaletteOpen = ref(false);
 
+const appDisplayName = useAppDisplayName();
+
 const currentTeam = computed(() => page.props.auth?.user?.current_team);
 const teams = computed(() => page.props.auth?.user?.all_teams ?? []);
 const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeatures));
@@ -78,7 +81,7 @@ const navItems: MenuItem[] = [
         label: 'Accounting',
         href: route('accounting.transactions.index'),
         icon: BookOpen,
-        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'Journal', href: '#' }, { label: 'Chart of Accounts', href: '#' }] }],
+        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'Journal', href: '#' }, { label: 'Chart Of Accounts', href: '#' }] }],
     },
     { label: 'Planning', href: route('budgeting.index'), icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }] },
     {
@@ -97,7 +100,7 @@ const navItems: MenuItem[] = [
         label: 'Reports',
         href: route('reports.profit-loss'),
         icon: ChartColumnBig,
-        group: [{ title: 'Reports', items: [{ label: 'P&L', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
+        group: [{ title: 'Reports', items: [{ label: 'Profit And Loss', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
     },
 ];
 
@@ -147,7 +150,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 <div class="border-b border-slate-800 px-4 py-4">
                     <Link :href="route('dashboard')" class="flex items-center gap-3">
                         <ApplicationMark class="h-8 w-8 shrink-0" />
-                        <span v-if="!collapsed" class="font-semibold">Spennies</span>
+                        <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
                     </Link>
 
                     <div v-if="hasTeamFeatures && !collapsed" class="mt-4">

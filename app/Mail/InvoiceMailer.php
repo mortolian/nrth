@@ -6,6 +6,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -24,7 +25,7 @@ class InvoiceMailer extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Invoice '.$this->invoice->number.' from '.($this->invoice->team?->name ?? 'Spennies'),
+            subject: 'Invoice '.$this->invoice->number.' from '.($this->invoice->team?->name ?? config('app.name')),
         );
     }
 
@@ -45,7 +46,7 @@ class InvoiceMailer extends Mailable implements ShouldQueue
         }
 
         return [
-            \Illuminate\Mail\Mailables\Attachment::fromStorageDisk(
+            Attachment::fromStorageDisk(
                 $this->pdfMedia->disk,
                 $this->pdfMedia->getPathRelativeToRoot(),
             )->as($this->pdfMedia->file_name),

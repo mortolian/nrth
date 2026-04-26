@@ -3,7 +3,10 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useAppDisplayName } from '@/lib/appName';
 import { CalendarClock, CircleDot, Download, Edit3, Mail, Wallet } from 'lucide-vue-next';
+
+const appDisplayName = useAppDisplayName();
 
 type PaymentMethodOption = { value: string; label: string };
 type InvoicePayload = {
@@ -162,7 +165,7 @@ const submitRecordPayment = () => {
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">From</p>
-                            <p class="mt-1 text-sm font-medium text-slate-900">Spennies</p>
+                            <p class="mt-1 text-sm font-medium text-slate-900">{{ appDisplayName }}</p>
                             <p class="text-sm text-slate-600">South Africa</p>
                         </div>
                         <div>

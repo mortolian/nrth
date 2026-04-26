@@ -23,7 +23,7 @@ class AppInstallCommand extends Command
 
     public function handle(): int
     {
-        $this->components->info('Spennies self-hosted installation');
+        $this->components->info(config('app.name').' self-hosted installation');
         $this->newLine();
 
         if (! $this->checkSystemRequirements()) {

@@ -16,13 +16,14 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 COPY --from=vendor /app/vendor ./vendor
-ARG VITE_APP_NAME=Spennies
+ARG VITE_APP_NAME=Laravel
 ENV VITE_APP_NAME=${VITE_APP_NAME}
 RUN npm run build
 
 FROM php:8.4-cli-bookworm
 
-LABEL org.opencontainers.image.title="Spennies"
+ARG APP_TITLE=Laravel
+LABEL org.opencontainers.image.title="${APP_TITLE}"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
