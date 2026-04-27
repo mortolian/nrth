@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { Building2, ImagePlus, Trash2 } from 'lucide-vue-next';
 
@@ -18,9 +18,12 @@ const props = defineProps<{
     bank_account_types: Array<{ value: string; label: string }>;
 }>();
 
-const tab = ref<'profile' | 'contact' | 'invoice' | 'tax' | 'banking'>('profile');
+type CompanyTab = 'profile' | 'contact' | 'invoice' | 'tax' | 'banking';
+const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'tax', 'banking'];
+const initialTab = new URLSearchParams(window.location.search).get('tab');
+const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
 
-const form = ref({
+const form = useForm({
     name: props.team.name,
     trading_name: String(props.settings.trading_name ?? ''),
     registration_number: String(props.settings.registration_number ?? ''),
@@ -65,9 +68,9 @@ const removeLogo = ref(false);
 
 const liveInvoicePreview = computed(() => {
     const y = new Date().getFullYear();
-    const raw = (form.value.invoice_prefix || 'INV').trim().replace(/-+$/, '');
+    const raw = (form.invoice_prefix || 'INV').trim().replace(/-+$/, '');
     const base = raw || 'INV';
-    const seq = Math.max(1, Number(form.value.invoice_next_sequence) || 1);
+    const seq = Math.max(1, Number(form.invoice_next_sequence) || 1);
     return `${base}-${y}-${String(seq).padStart(4, '0')}`;
 });
 
@@ -82,33 +85,33 @@ const displayLogo = computed(() => {
 });
 
 watch(
-    () => form.value.postal_same_as_physical,
+    () => form.postal_same_as_physical,
     (same) => {
         if (same) {
-            form.value.postal_street = form.value.physical_street;
-            form.value.postal_city = form.value.physical_city;
-            form.value.postal_province = form.value.physical_province;
-            form.value.postal_postal_code = form.value.physical_postal_code;
-            form.value.postal_country = form.value.physical_country;
+            form.postal_street = form.physical_street;
+            form.postal_city = form.physical_city;
+            form.postal_province = form.physical_province;
+            form.postal_postal_code = form.physical_postal_code;
+            form.postal_country = form.physical_country;
         }
     },
 );
 
 watch(
     () => [
-        form.value.physical_street,
-        form.value.physical_city,
-        form.value.physical_province,
-        form.value.physical_postal_code,
-        form.value.physical_country,
+        form.physical_street,
+        form.physical_city,
+        form.physical_province,
+        form.physical_postal_code,
+        form.physical_country,
     ],
     () => {
-        if (form.value.postal_same_as_physical) {
-            form.value.postal_street = form.value.physical_street;
-            form.value.postal_city = form.value.physical_city;
-            form.value.postal_province = form.value.physical_province;
-            form.value.postal_postal_code = form.value.physical_postal_code;
-            form.value.postal_country = form.value.physical_country;
+        if (form.postal_same_as_physical) {
+            form.postal_street = form.physical_street;
+            form.postal_city = form.physical_city;
+            form.postal_province = form.physical_province;
+            form.postal_postal_code = form.physical_postal_code;
+            form.postal_country = form.physical_country;
         }
     },
 );
@@ -140,61 +143,64 @@ const tabs = [
     { id: 'banking' as const, label: 'Banking' },
 ];
 
-const appendForm = (body: FormData) => {
-    const f = form.value;
-    body.set('name', f.name);
-    body.set('trading_name', f.trading_name);
-    body.set('registration_number', f.registration_number);
-    body.set('vat_number', f.vat_number);
-    body.set('tax_reference', f.tax_reference);
-    body.set('industry', f.industry);
-    body.set('financial_year_end_month', String(f.financial_year_end_month));
-    body.set('physical_street', f.physical_street);
-    body.set('physical_city', f.physical_city);
-    body.set('physical_province', f.physical_province);
-    body.set('physical_postal_code', f.physical_postal_code);
-    body.set('physical_country', f.physical_country);
-    body.set('postal_same_as_physical', f.postal_same_as_physical ? '1' : '0');
-    body.set('postal_street', f.postal_street);
-    body.set('postal_city', f.postal_city);
-    body.set('postal_province', f.postal_province);
-    body.set('postal_postal_code', f.postal_postal_code);
-    body.set('postal_country', f.postal_country);
-    body.set('company_email', f.company_email);
-    body.set('company_phone', f.company_phone);
-    body.set('company_website', f.company_website);
-    body.set('invoice_default_payment_terms_days', String(f.invoice_default_payment_terms_days));
-    body.set('invoice_prefix', f.invoice_prefix);
-    body.set('invoice_next_sequence', String(f.invoice_next_sequence));
-    body.set('invoice_default_notes', f.invoice_default_notes);
-    body.set('invoice_default_footer', f.invoice_default_footer);
-    body.set('invoice_email_subject_template', f.invoice_email_subject_template);
-    body.set('invoice_email_body_template', f.invoice_email_body_template);
-    body.set('vat_registered', f.vat_registered ? '1' : '0');
-    body.set('vat_period_type', f.vat_period_type);
-    body.set('default_tax_rate_id', f.default_tax_rate_id ? String(f.default_tax_rate_id) : '');
-    body.set('bank_name', f.bank_name);
-    body.set('bank_account_holder', f.bank_account_holder);
-    body.set('bank_account_number', f.bank_account_number);
-    body.set('bank_branch_code', f.bank_branch_code);
-    body.set('bank_account_type', f.bank_account_type);
-    if (removeLogo.value) {
-        body.set('remove_logo', '1');
-    }
-    if (logoFile.value) {
-        body.set('logo', logoFile.value);
-    }
-};
-
-const saving = ref(false);
+const validTaxRateIds = computed(() => new Set(props.tax_rates.map((rate) => String(rate.id))));
 const submit = () => {
-    saving.value = true;
-    const body = new FormData();
-    appendForm(body);
-    router.post(route('settings.company.update'), body, {
+    const selectedTaxRateId = form.default_tax_rate_id ? String(form.default_tax_rate_id) : '';
+
+    const payload: Record<string, unknown> = {
+        name: form.name,
+        trading_name: form.trading_name,
+        registration_number: form.registration_number,
+        vat_number: form.vat_number,
+        tax_reference: form.tax_reference,
+        industry: form.industry,
+        financial_year_end_month: form.financial_year_end_month,
+        physical_street: form.physical_street,
+        physical_city: form.physical_city,
+        physical_province: form.physical_province,
+        physical_postal_code: form.physical_postal_code,
+        physical_country: form.physical_country,
+        postal_same_as_physical: form.postal_same_as_physical,
+        postal_street: form.postal_street,
+        postal_city: form.postal_city,
+        postal_province: form.postal_province,
+        postal_postal_code: form.postal_postal_code,
+        postal_country: form.postal_country,
+        company_email: form.company_email,
+        company_phone: form.company_phone,
+        company_website: form.company_website,
+        invoice_default_payment_terms_days: form.invoice_default_payment_terms_days,
+        invoice_prefix: form.invoice_prefix,
+        invoice_next_sequence: form.invoice_next_sequence,
+        invoice_default_notes: form.invoice_default_notes,
+        invoice_default_footer: form.invoice_default_footer,
+        invoice_email_subject_template: form.invoice_email_subject_template,
+        invoice_email_body_template: form.invoice_email_body_template,
+        vat_registered: form.vat_registered,
+        vat_period_type: form.vat_period_type,
+        default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
+        bank_name: form.bank_name,
+        bank_account_holder: form.bank_account_holder,
+        bank_account_number: form.bank_account_number,
+        bank_branch_code: form.bank_branch_code,
+        bank_account_type: form.bank_account_type,
+        remove_logo: removeLogo.value ? 1 : 0,
+    };
+
+    if (logoFile.value) {
+        payload.logo = logoFile.value;
+    }
+
+    payload.tab = tab.value;
+
+    form.transform(() => payload).post(route('settings.company.update', { tab: tab.value }), {
+        preserveState: true,
         preserveScroll: true,
-        onFinish: () => {
-            saving.value = false;
+        forceFormData: Boolean(logoFile.value),
+        onError: (errors) => {
+            if (errors.vat_number && tab.value !== 'profile' && tab.value !== 'tax') {
+                tab.value = 'tax';
+            }
         },
     });
 };
@@ -208,13 +214,7 @@ const submit = () => {
             { label: 'Company' },
         ]"
     >
-        <PageHeader title="Company settings" subtitle="Profile, invoicing, tax, and banking details for your business">
-            <template #actions>
-                <AppButton variant="primary" :disabled="saving" @click="submit">
-                    Save changes
-                </AppButton>
-            </template>
-        </PageHeader>
+        <PageHeader title="Company settings" subtitle="Profile, invoicing, tax, and banking details for your business" />
 
         <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
             <button
@@ -230,6 +230,13 @@ const submit = () => {
         </div>
 
         <div class="mt-5 space-y-6">
+            <div v-if="Object.keys(form.errors).length" class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                <p class="font-medium">Could not save company settings.</p>
+                <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                    <li v-for="(message, field) in form.errors" :key="field">{{ message }}</li>
+                </ul>
+            </div>
+
             <AppCard v-show="tab === 'profile'">
                 <h3 class="text-base font-semibold text-slate-900">Company profile</h3>
                 <div class="mt-4 grid gap-4 md:grid-cols-2">
@@ -249,6 +256,7 @@ const submit = () => {
                         <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
                         <AppInput v-model="form.vat_number" placeholder="4XXXXXXXXX" maxlength="10" />
                         <p class="mt-1 text-xs text-slate-500">South African VAT numbers are 10 digits starting with 4.</p>
+                        <p v-if="form.errors.vat_number" class="mt-1 text-xs text-rose-600">{{ form.errors.vat_number }}</p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Tax reference (SARS)</label>
@@ -435,6 +443,7 @@ const submit = () => {
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
                         <AppInput v-model="form.vat_number" :disabled="!form.vat_registered" placeholder="4XXXXXXXXX" maxlength="10" />
+                        <p v-if="form.errors.vat_number" class="mt-1 text-xs text-rose-600">{{ form.errors.vat_number }}</p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">VAT period type</label>
@@ -492,9 +501,15 @@ const submit = () => {
         </div>
 
         <div class="mt-8 flex justify-end border-t border-slate-200 pt-6">
-            <AppButton variant="primary" :disabled="saving" @click="submit">
-                Save changes
-            </AppButton>
+            <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="form.processing"
+                @click="submit"
+            >
+                {{ form.processing ? 'Saving…' : 'Save changes' }}
+            </button>
+            <span v-if="form.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
         </div>
     </AppLayout>
 </template>

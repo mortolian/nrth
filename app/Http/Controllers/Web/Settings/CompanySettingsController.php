@@ -82,6 +82,12 @@ class CompanySettingsController extends Controller
 
         $teamId = (int) $team->id;
 
+        if ($request->filled('vat_number')) {
+            $request->merge([
+                'vat_number' => preg_replace('/\D+/', '', (string) $request->input('vat_number')),
+            ]);
+        }
+
         if ($request->input('default_tax_rate_id') === '' || $request->input('default_tax_rate_id') === null) {
             $request->merge(['default_tax_rate_id' => null]);
         }
@@ -190,6 +196,11 @@ class CompanySettingsController extends Controller
             );
         }
 
-        return to_route('settings.company')->with('success', 'Company settings saved.');
+        $tab = (string) $request->input('tab', 'profile');
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'tax', 'banking'], true)) {
+            $tab = 'profile';
+        }
+
+        return to_route('settings.company', ['tab' => $tab])->with('success', 'Company settings saved.');
     }
 }

@@ -16,6 +16,10 @@ const props = withDefaults(defineProps<{
     disabled: false,
 });
 
+const emit = defineEmits<{
+    (e: 'click', event: MouseEvent): void;
+}>();
+
 const variantClass = {
     primary: 'bg-brand-500 text-white hover:bg-brand-400',
     secondary: 'bg-white text-slate-900 border border-slate-300 hover:bg-slate-50',
@@ -37,6 +41,7 @@ const sizeClass = {
         :type="type"
         :disabled="disabled"
         :class="cn('inline-flex items-center justify-center rounded-md font-medium transition disabled:cursor-not-allowed disabled:opacity-50', variantClass[variant], sizeClass[size])"
+        @click="emit('click', $event)"
     >
         <slot />
     </Primitive>
