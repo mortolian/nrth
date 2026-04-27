@@ -20,6 +20,7 @@ use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
 use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
+use App\Http\Controllers\Web\Tax\VatRateController;
 use App\Http\Controllers\Web\Tax\VATController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -60,6 +61,10 @@ Route::middleware([
     Route::get('/budgeting/{budget}/edit', [BudgetingController::class, 'edit'])->name('budgeting.edit');
     Route::put('/budgeting/{budget}', [BudgetingController::class, 'update'])->name('budgeting.update');
     Route::get('/tax/vat', [VATController::class, 'index'])->name('tax.vat.index');
+    Route::get('/tax/vat-rates', [VatRateController::class, 'index'])->name('tax.vat-rates.index');
+    Route::post('/tax/vat-rates', [VatRateController::class, 'store'])->name('tax.vat-rates.store');
+    Route::put('/tax/vat-rates/{taxRate}', [VatRateController::class, 'update'])->name('tax.vat-rates.update');
+    Route::delete('/tax/vat-rates/{taxRate}', [VatRateController::class, 'destroy'])->name('tax.vat-rates.destroy');
     Route::post('/tax/vat/periods/{period}/submit', [VATController::class, 'submit'])->name('tax.vat.submit');
     Route::get('/tax/provisional', [ProvisionalTaxController::class, 'index'])->name('tax.provisional.index');
     Route::get('/tax/documents', TaxDocumentsController::class)->name('tax.documents.index');

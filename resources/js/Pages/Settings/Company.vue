@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import ActionMessage from '@/Components/ActionMessage.vue';
 import { Building2, ImagePlus, Trash2 } from 'lucide-vue-next';
 
 type Settings = Record<string, unknown>;
@@ -11,7 +12,16 @@ const props = defineProps<{
     settings: Settings;
     logo_url: string | null;
     invoice_next_sequence: number;
-    tax_rates: Array<{ id: number; name: string; rate: number }>;
+    tax_rates: Array<{
+        id: number;
+        name: string;
+        code: string;
+        rate: number;
+        rate_percent: number;
+        is_default: boolean;
+        is_exempt: boolean;
+        is_active: boolean;
+    }>;
     industries: Array<{ value: string; label: string }>;
     financial_year_months: Array<{ value: number; label: string }>;
     vat_period_types: Array<{ value: string; label: string }>;
@@ -143,7 +153,8 @@ const tabs = [
     { id: 'banking' as const, label: 'Banking' },
 ];
 
-const validTaxRateIds = computed(() => new Set(props.tax_rates.map((rate) => String(rate.id))));
+const activeTaxRates = computed(() => props.tax_rates.filter((rate) => rate.is_active));
+const validTaxRateIds = computed(() => new Set(activeTaxRates.value.map((rate) => String(rate.id))));
 const submit = () => {
     const selectedTaxRateId = form.default_tax_rate_id ? String(form.default_tax_rate_id) : '';
 
@@ -460,7 +471,7 @@ const submit = () => {
                             :model-value="form.default_tax_rate_id"
                             :options="[
                                 { label: '— None —', value: '' },
-                                ...tax_rates.map((r) => ({ label: `${r.name} (${(r.rate * 100).toFixed(0)}%)`, value: String(r.id) })),
+                                ...activeTaxRates.map((r) => ({ label: `${r.name} (${(r.rate * 100).toFixed(0)}%)`, value: String(r.id) })),
                             ]"
                             :disabled="!form.vat_registered"
                             @update:model-value="form.default_tax_rate_id = $event"
@@ -501,6 +512,9 @@ const submit = () => {
         </div>
 
         <div class="mt-8 flex justify-end border-t border-slate-200 pt-6">
+            <ActionMessage :on="form.recentlySuccessful" class="me-3">
+                Saved.
+            </ActionMessage>
             <button
                 type="button"
                 class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
@@ -509,7 +523,6 @@ const submit = () => {
             >
                 {{ form.processing ? 'Saving…' : 'Save changes' }}
             </button>
-            <span v-if="form.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
         </div>
     </AppLayout>
 </template>

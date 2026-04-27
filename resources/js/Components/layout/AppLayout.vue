@@ -114,7 +114,15 @@ const navItems: MenuItem[] = [
         label: 'Tax',
         href: route('tax.vat.index'),
         icon: Calculator,
-        group: [{ title: 'Tax', items: [{ label: 'VAT Returns', href: route('tax.vat.index') }, { label: 'Tax Periods', href: route('tax.provisional.index') }, { label: 'Documents', href: route('tax.documents.index') }] }],
+        group: [{
+            title: 'Tax',
+            items: [
+                { label: 'VAT Returns', href: route('tax.vat.index') },
+                { label: 'Manage VAT rates', href: route('tax.vat-rates.index') },
+                { label: 'Tax Periods', href: route('tax.provisional.index') },
+                { label: 'Documents', href: route('tax.documents.index') },
+            ],
+        }],
     },
     {
         label: 'Contracting',
