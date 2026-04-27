@@ -139,7 +139,7 @@ const tabs = [
     { id: 'profile' as const, label: 'Company profile' },
     { id: 'contact' as const, label: 'Contact' },
     { id: 'invoice' as const, label: 'Invoice defaults' },
-    { id: 'tax' as const, label: 'Tax' },
+    { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
 ];
 
@@ -434,7 +434,7 @@ const submit = () => {
             </AppCard>
 
             <AppCard v-show="tab === 'tax'">
-                <h3 class="text-base font-semibold text-slate-900">Tax settings</h3>
+                <h3 class="text-base font-semibold text-slate-900">VAT settings</h3>
                 <label class="mt-4 flex items-center gap-2 text-sm text-slate-700">
                     <input v-model="form.vat_registered" type="checkbox" class="rounded border-slate-300">
                     VAT registered
