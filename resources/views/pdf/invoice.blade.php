@@ -51,16 +51,7 @@
         ])->filter()->implode(', '))
         : '';
 
-    $logoUrl = ($team && method_exists($team, 'getFirstMediaUrl')) ? $team->getFirstMediaUrl('logo') : null;
-
-    $statusValue = $invoice->status?->value ?? 'draft';
-    $statusLabel = strtoupper(str_replace('_', ' ', $statusValue));
-    $statusClass = match ($statusValue) {
-        'paid' => '',
-        'sent' => 'warn',
-        'overdue', 'void' => 'danger',
-        default => 'warn',
-    };
+    $logoSrc = $team?->logoDataUriForPdf();
 
     $subtotal = (int) ($invoice->getRawOriginal('subtotal_cents') ?? 0);
     $vatTotal = (int) ($invoice->getRawOriginal('vat_amount_cents') ?? 0);
@@ -79,8 +70,8 @@
 <table class="brand">
     <tr>
         <td class="logo-cell">
-            @if($logoUrl)
-                <img src="{{ $logoUrl }}" alt="" style="max-width: 200px; max-height: 70px; margin-bottom: 6px;">
+            @if($logoSrc)
+                <img src="{{ $logoSrc }}" alt="" style="max-width: 200px; max-height: 70px; object-fit: contain; margin-bottom: 6px;">
             @endif
             <div class="company-name">{{ $companyName }}</div>
             @if($physical)<div class="company-line">{{ $physical }}</div>@endif
@@ -96,7 +87,6 @@
         </td>
         <td class="doc-cell">
             <h1>{{ $documentTitle }}</h1>
-            <div class="pill {{ $statusClass }}">{{ $statusLabel }}</div>
             <div class="doc-meta">
                 <div><span class="label">Invoice #</span> &nbsp; <span class="b">{{ $invoice->number }}</span></div>
                 @if($invoice->reference)

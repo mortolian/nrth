@@ -21,22 +21,17 @@ class InvoicePdfController extends Controller
     {
         abort_unless($invoice->team_id === auth()->user()->current_team_id, 403);
 
-        $invoice->loadMissing('client', 'lineItems', 'team');
+        try {
+            $media = $this->invoicePdfService->generate($invoice);
+        } catch (Throwable $e) {
+            Log::warning('Invoice PDF download failed; missing PDF generator', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
 
-        $media = $invoice->getFirstMedia('invoice-pdfs');
-        if ($media === null) {
-            try {
-                $media = $this->invoicePdfService->generate($invoice);
-            } catch (Throwable $e) {
-                Log::warning('Invoice PDF download failed; missing PDF generator', [
-                    'invoice_id' => $invoice->id,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return redirect()
-                    ->back()
-                    ->with('error', 'PDF generation is not configured on this server. Ask an admin to install spatie/browsershot and headless Chromium.');
-            }
+            return redirect()
+                ->back()
+                ->with('error', 'The invoice PDF could not be generated. Please try again or contact support.');
         }
 
         $disk = Storage::disk($media->disk);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Invoicing;
 use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Invoicing\Actions\CreateInvoiceAction;
+use App\Domain\Invoicing\Actions\MarkInvoiceSentAction;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\SendInvoiceAction;
 use App\Domain\Invoicing\Actions\UnvoidInvoiceAction;
@@ -196,6 +197,14 @@ class InvoiceController extends Controller
     {
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $sendInvoiceAction->execute($invoice);
+
+        return to_route('invoicing.invoices.show', $invoice->fresh());
+    }
+
+    public function markSent(Request $request, Invoice $invoice, MarkInvoiceSentAction $markInvoiceSentAction): RedirectResponse
+    {
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+        $markInvoiceSentAction->execute($invoice);
 
         return to_route('invoicing.invoices.show', $invoice->fresh());
     }
@@ -404,6 +413,7 @@ class InvoiceController extends Controller
             'can' => [
                 'edit' => $invoice->status !== InvoiceStatus::Void,
                 'send' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent, InvoiceStatus::Partial], true),
+                'mark_sent' => $invoice->status === InvoiceStatus::Draft,
                 'void' => $invoice->status === InvoiceStatus::Sent,
                 'unvoid' => $invoice->status === InvoiceStatus::Void,
                 'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),

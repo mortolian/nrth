@@ -11,7 +11,10 @@ class QuotePdfService
 {
     public function generate(Quote $quote): Media
     {
-        $quote->loadMissing(['team', 'client']);
+        $quote = $quote->fresh(['team', 'client']);
+        if ($quote === null) {
+            throw new \RuntimeException('Quote not found.');
+        }
 
         $tmpPath = storage_path('app/tmp/quote-'.$quote->id.'-'.uniqid().'.pdf');
         File::ensureDirectoryExists(dirname($tmpPath));

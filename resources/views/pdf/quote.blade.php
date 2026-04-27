@@ -46,7 +46,7 @@
         ])->filter()->implode(', '))
         : '';
 
-    $logoUrl = ($team && method_exists($team, 'getFirstMediaUrl')) ? $team->getFirstMediaUrl('logo') : null;
+    $logoSrc = $team?->logoDataUriForPdf();
 
     $statusValue = $quote->status?->value ?? 'draft';
     $statusLabel = strtoupper(str_replace('_', ' ', $statusValue));
@@ -83,8 +83,8 @@
 <table class="brand">
     <tr>
         <td class="logo-cell">
-            @if($logoUrl)
-                <img src="{{ $logoUrl }}" alt="" style="max-width: 200px; max-height: 70px; margin-bottom: 6px;">
+            @if($logoSrc)
+                <img src="{{ $logoSrc }}" alt="" style="max-width: 200px; max-height: 70px; object-fit: contain; margin-bottom: 6px;">
             @endif
             <div class="company-name">{{ $companyName }}</div>
             @if($physical)<div class="company-line">{{ $physical }}</div>@endif

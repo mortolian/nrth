@@ -8,7 +8,7 @@
         line-height: 1.45;
         margin: 0;
     }
-    .accent { color: #00754d; }
+    .accent { color: #0f172a; }
     .muted { color: #64748b; }
     .small { font-size: 9px; }
     .xsmall { font-size: 8.5px; }
@@ -24,7 +24,7 @@
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 22px;
-        border-bottom: 2px solid #00a86b;
+        border-bottom: none;
         padding-bottom: 12px;
     }
     table.brand td { vertical-align: top; padding: 0; }
@@ -79,13 +79,13 @@
     }
     .meta-strip td {
         padding: 10px 14px;
-        background: #e6f7ef;
-        border: 1px solid #99e1bd;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
         font-size: 9.5px;
-        color: #00402b;
+        color: #334155;
     }
-    .meta-strip .key { color: #00754d; text-transform: uppercase; letter-spacing: 0.06em; font-size: 8.5px; }
-    .meta-strip .val { color: #00402b; font-weight: 700; font-size: 11px; }
+    .meta-strip .key { color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; font-size: 8.5px; }
+    .meta-strip .val { color: #0f172a; font-weight: 700; font-size: 11px; }
 
     /* Line items */
     table.lines {
@@ -130,21 +130,21 @@
         font-size: 13px;
         color: #0f172a;
     }
-    .totals .grand .value { color: #00754d; }
+    .totals .grand .value { color: #0f172a; }
 
     /* Sections */
     .section {
         margin-top: 18px;
         padding: 12px 14px;
         background: #f8fafc;
-        border-left: 3px solid #00a86b;
+        border-left: none;
     }
     .section h3 {
         margin: 0 0 6px;
         font-size: 9.5px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: #00754d;
+        color: #475569;
     }
     .section p { margin: 0 0 4px; color: #334155; font-size: 10px; }
 
@@ -167,9 +167,9 @@
         text-transform: uppercase;
         font-weight: 700;
         border-radius: 999px;
-        background: #e6f7ef;
-        color: #00754d;
-        border: 1px solid #99e1bd;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
     }
     .pill.warn { background: #fffbeb; color: #b45309; border-color: #fde68a; }
     .pill.danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }

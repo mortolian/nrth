@@ -21,22 +21,17 @@ class QuotePdfController extends Controller
     {
         abort_unless($quote->team_id === auth()->user()->current_team_id, 403);
 
-        $quote->loadMissing('client', 'team');
+        try {
+            $media = $this->quotePdfService->generate($quote);
+        } catch (Throwable $e) {
+            Log::warning('Quote PDF download failed; missing PDF generator', [
+                'quote_id' => $quote->id,
+                'error' => $e->getMessage(),
+            ]);
 
-        $media = $quote->getFirstMedia('quote-pdfs');
-        if ($media === null) {
-            try {
-                $media = $this->quotePdfService->generate($quote);
-            } catch (Throwable $e) {
-                Log::warning('Quote PDF download failed; missing PDF generator', [
-                    'quote_id' => $quote->id,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return redirect()
-                    ->back()
-                    ->with('error', 'PDF generation is not configured on this server. Ask an admin to install spatie/browsershot and headless Chromium.');
-            }
+            return redirect()
+                ->back()
+                ->with('error', 'The quote PDF could not be generated. Please try again or contact support.');
         }
 
         $disk = Storage::disk($media->disk);

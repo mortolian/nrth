@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Tax\Models\TaxRate;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
 use Laravel\Jetstream\Events\TeamUpdated;
@@ -57,6 +58,44 @@ class Team extends JetstreamTeam implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('logo')->singleFile();
+    }
+
+    /**
+     * Data URI for embedding the team logo in DomPDF (HTTP URLs are often unreliable: relative paths, localhost, SSL).
+     */
+    public function logoDataUriForPdf(): ?string
+    {
+        $media = $this->getFirstMedia('logo');
+        if ($media === null) {
+            return null;
+        }
+
+        $binary = null;
+        $path = $media->getPath();
+        if ($path !== '' && @is_readable($path)) {
+            $binary = @file_get_contents($path);
+        }
+
+        if ($binary === false || $binary === null || $binary === '') {
+            $relative = $media->getPathRelativeToRoot();
+            if ($relative !== '') {
+                $disk = Storage::disk($media->disk);
+                if ($disk->exists($relative)) {
+                    $binary = $disk->get($relative);
+                }
+            }
+        }
+
+        if (! is_string($binary) || $binary === '') {
+            return null;
+        }
+
+        $mime = $media->mime_type;
+        if ($mime === null || $mime === '') {
+            $mime = 'image/png';
+        }
+
+        return 'data:'.$mime.';base64,'.base64_encode($binary);
     }
 
     /**

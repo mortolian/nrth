@@ -11,7 +11,10 @@ class InvoicePdfService
 {
     public function generate(Invoice $invoice): Media
     {
-        $invoice->loadMissing(['team', 'client', 'lineItems']);
+        $invoice = $invoice->fresh(['team', 'client', 'lineItems']);
+        if ($invoice === null) {
+            throw new \RuntimeException('Invoice not found.');
+        }
 
         $tmpPath = storage_path('app/tmp/invoice-'.$invoice->id.'-'.uniqid().'.pdf');
         File::ensureDirectoryExists(dirname($tmpPath));

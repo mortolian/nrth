@@ -4,7 +4,7 @@ import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useAppDisplayName } from '@/lib/appName';
-import { CalendarClock, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
+import { CalendarClock, CheckCircle2, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
 
 const appDisplayName = useAppDisplayName();
 
@@ -65,6 +65,7 @@ const props = defineProps<{
     can: {
         edit: boolean;
         send: boolean;
+        mark_sent: boolean;
         void: boolean;
         unvoid: boolean;
         record_payment: boolean;
@@ -101,6 +102,7 @@ const timeline = computed(() => ([
 ]));
 
 const sendInvoice = () => router.post(route('invoicing.invoices.send', props.invoice.id));
+const markAsSent = () => router.post(route('invoicing.invoices.mark-sent', props.invoice.id));
 const voidInvoice = () => router.post(route('invoicing.invoices.void', props.invoice.id));
 const unvoidInvoice = () => router.post(route('invoicing.invoices.unvoid', props.invoice.id));
 
@@ -154,6 +156,9 @@ const submitRecordPayment = () => {
                     </AppButton>
                     <AppButton v-if="can.send" variant="primary" @click="sendInvoice">
                         <Mail class="mr-1 h-4 w-4" /> {{ invoice.status === 'draft' ? 'Send invoice' : 'Resend invoice' }}
+                    </AppButton>
+                    <AppButton v-if="can.mark_sent" variant="secondary" @click="markAsSent">
+                        <CheckCircle2 class="mr-1 h-4 w-4" /> Mark as sent
                     </AppButton>
                     <AppButton v-if="can.delete" variant="ghost" class="text-red-600 hover:text-red-700" @click="deleteInvoice">
                         <Trash2 class="mr-1 h-4 w-4" /> Delete
