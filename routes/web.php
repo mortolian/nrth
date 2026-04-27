@@ -11,6 +11,7 @@ use App\Http\Controllers\Web\ExpensesController;
 use App\Http\Controllers\Web\InvoicePdfController;
 use App\Http\Controllers\Web\Invoicing\ClientController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
+use App\Http\Controllers\Web\Invoicing\QuoteController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\CompanySettingsController;
@@ -74,6 +75,8 @@ Route::middleware([
         Route::post('/contracts/{contract}/generate-invoice', [ContractController::class, 'generateInvoice'])->name('contracts.generate-invoice');
     });
     Route::prefix('invoicing')->name('invoicing.')->group(function () {
+        Route::get('/quotes', [QuoteController::class, 'index'])->name('quotes.index');
+
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
         Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');
         Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
