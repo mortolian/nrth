@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Domain\Invoicing\Models\Invoice;
-use App\Domain\Invoicing\Services\InvoicePdfService;
+use App\Domain\Invoicing\Models\Quote;
+use App\Domain\Invoicing\Services\QuotePdfService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
@@ -11,25 +11,25 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
-class InvoicePdfController extends Controller
+class QuotePdfController extends Controller
 {
     public function __construct(
-        private readonly InvoicePdfService $invoicePdfService,
+        private readonly QuotePdfService $quotePdfService,
     ) {}
 
-    public function download(Invoice $invoice): StreamedResponse|RedirectResponse
+    public function download(Quote $quote): StreamedResponse|RedirectResponse
     {
-        abort_unless($invoice->team_id === auth()->user()->current_team_id, 403);
+        abort_unless($quote->team_id === auth()->user()->current_team_id, 403);
 
-        $invoice->loadMissing('client', 'lineItems', 'team');
+        $quote->loadMissing('client', 'team');
 
-        $media = $invoice->getFirstMedia('invoice-pdfs');
+        $media = $quote->getFirstMedia('quote-pdfs');
         if ($media === null) {
             try {
-                $media = $this->invoicePdfService->generate($invoice);
+                $media = $this->quotePdfService->generate($quote);
             } catch (Throwable $e) {
-                Log::warning('Invoice PDF download failed; missing PDF generator', [
-                    'invoice_id' => $invoice->id,
+                Log::warning('Quote PDF download failed; missing PDF generator', [
+                    'quote_id' => $quote->id,
                     'error' => $e->getMessage(),
                 ]);
 
@@ -53,3 +53,4 @@ class InvoicePdfController extends Controller
         ]);
     }
 }
+

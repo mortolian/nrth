@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
-import draggable from 'vuedraggable';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
+import { Plus, Trash2 } from 'lucide-vue-next';
 
 type ClientOption = { id: number; name: string; payment_terms_days: number };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
@@ -53,6 +52,9 @@ const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)
 const newClientHref = computed(() => route('invoicing.clients.create', {
     return: '/invoicing/invoices/create',
 }));
+const goToCreateClient = () => {
+    window.location.assign(String(newClientHref.value));
+};
 
 const hasClients = computed(() => props.clients.length > 0);
 const canSaveInvoice = computed(() => props.isEditing || hasClients.value);
@@ -122,6 +124,12 @@ const { setErrors, values, setFieldValue } = useForm({
     },
 });
 
+/**
+ * vee-validate `values` can be returned as either a ref-like wrapper or a reactive object
+ * depending on version/build. Normalize once so watcher getters never crash.
+ */
+const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
+
 const clientMap = computed<Record<number, ClientOption>>(() => (
     props.clients.reduce((acc, client) => {
         acc[client.id] = client;
@@ -130,7 +138,7 @@ const clientMap = computed<Record<number, ClientOption>>(() => (
 ));
 
 watch(
-    () => [values.value.client_id, values.value.issue_date],
+    () => [formValues.value?.client_id, formValues.value?.issue_date],
     ([clientId, issueDate]) => {
         if (!issueDate || !clientId) return;
         const client = clientMap.value[Number(clientId)];
@@ -147,7 +155,7 @@ const lineVat = (line: InvoiceLine) => Math.round(lineSubtotal(line) * (Number(l
 const lineTotal = (line: InvoiceLine) => lineSubtotal(line) + lineVat(line);
 
 const totals = computed(() => {
-    const lines = values.value.line_items ?? [];
+    const lines = formValues.value.line_items ?? [];
     const subtotal = lines.reduce((sum, line) => sum + lineSubtotal(line as InvoiceLine), 0);
     const vat = lines.reduce((sum, line) => sum + lineVat(line as InvoiceLine), 0);
     const total = subtotal + vat;
@@ -168,7 +176,7 @@ const totals = computed(() => {
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
 const addLine = () => {
-    const next = [...(values.value.line_items ?? []), {
+    const next = [...(formValues.value.line_items ?? []), {
         row_key: makeRowKey(),
         description: '',
         quantity: 1,
@@ -179,8 +187,15 @@ const addLine = () => {
     setFieldValue('line_items', next);
 };
 
+const updateLine = (index: number, field: keyof InvoiceLine, value: any) => {
+    const next = (formValues.value.line_items ?? []).map((line: InvoiceLine, i: number) => (
+        i === index ? { ...line, [field]: value } : line
+    ));
+    setFieldValue('line_items', next);
+};
+
 const removeLine = (index: number) => {
-    const next = [...(values.value.line_items ?? [])];
+    const next = [...(formValues.value.line_items ?? [])];
     next.splice(index, 1);
     setFieldValue('line_items', next.length ? next : [{
         row_key: makeRowKey(),
@@ -200,7 +215,7 @@ const openPreview = () => {
 const onSubmit = (submitAction: 'draft' | 'send') => {
     // Read `values` directly: nested line rows use v-model on shared objects; vee-validate's
     // handleSubmit() can pass a stale snapshot that omits those edits.
-    const result = invoiceSchema.safeParse(values.value);
+    const result = invoiceSchema.safeParse(formValues.value);
     if (!result.success) {
         const mapped: Record<string, string> = {};
         for (const issue of result.error.issues) {
@@ -267,12 +282,13 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                             >
                                 <p class="font-medium">You need at least one client</p>
                                 <p class="mt-1 text-amber-900/90">Create a client first, then you can fill in this invoice.</p>
-                                <Link
-                                    :href="newClientHref"
-                                    class="mt-2 inline-block text-sm font-medium text-emerald-800 underline hover:text-emerald-900"
+                                <button
+                                    type="button"
+                                    class="mt-2 inline-block text-sm font-medium text-brand-700 underline hover:text-brand-800"
+                                    @click="goToCreateClient"
                                 >
                                     Create a client
-                                </Link>
+                                </button>
                             </div>
                             <template v-else>
                                 <AppSelect
@@ -281,12 +297,13 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                     placeholder="Select client"
                                     @update:model-value="setFieldValue('client_id', Number($event))"
                                 />
-                                <Link
-                                    :href="newClientHref"
-                                    class="mt-2 inline-block text-xs text-emerald-700 hover:underline"
+                                <button
+                                    type="button"
+                                    class="mt-2 inline-block text-xs text-brand-700 hover:underline"
+                                    @click="goToCreateClient"
                                 >
                                     + Add new client
-                                </Link>
+                                </button>
                             </template>
                         </div>
                         <div>
@@ -323,7 +340,6 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                         <table class="min-w-full divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                 <tr>
-                                    <th class="px-3 py-2 text-left"> </th>
                                     <th class="px-3 py-2 text-left">Description</th>
                                     <th class="px-3 py-2 text-left">Qty</th>
                                     <th class="px-3 py-2 text-left">Unit Price</th>
@@ -333,50 +349,54 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                     <th class="px-3 py-2 text-left">Delete</th>
                                 </tr>
                             </thead>
-                            <draggable
-                                :model-value="values.line_items"
-                                tag="tbody"
-                                item-key="row_key"
-                                handle=".drag-handle"
-                                class="divide-y divide-slate-100"
-                                @update:model-value="setFieldValue('line_items', $event)"
-                            >
-                                <template #item="{ element: line, index }">
-                                    <tr>
-                                        <td class="px-3 py-2 text-slate-400">
-                                            <GripVertical class="drag-handle h-4 w-4 cursor-grab" />
-                                        </td>
-                                        <td class="px-3 py-2">
-                                            <div class="space-y-2">
-                                                <AppInput v-model="line.description" placeholder="Line description" />
-                                                <AppSelect
-                                                    v-if="accounts.length"
-                                                    :model-value="line.account_id ? String(line.account_id) : ''"
-                                                    :options="accounts.map((account) => ({ label: account.name, value: String(account.id) }))"
-                                                    placeholder="Map income account"
-                                                    @update:model-value="line.account_id = Number($event)"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td class="px-3 py-2"><AppInput v-model="line.quantity" type="number" /></td>
-                                        <td class="px-3 py-2"><AppInput v-model="line.unit_price" type="number" /></td>
-                                        <td class="px-3 py-2">
-                                            <AppSelect
-                                                :model-value="String(line.vat_rate)"
-                                                :options="taxRateSelectOptions"
-                                                @update:model-value="line.vat_rate = Number($event)"
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="(line, index) in (values.line_items as InvoiceLine[])" :key="line.row_key">
+                                    <td class="px-3 py-2">
+                                        <div class="space-y-2">
+                                            <AppInput
+                                                :model-value="line.description"
+                                                placeholder="Line description"
+                                                @update:model-value="updateLine(index, 'description', $event)"
                                             />
-                                        </td>
-                                        <td class="px-3 py-2">{{ formatCents(lineVat(line)) }}</td>
-                                        <td class="px-3 py-2 font-medium">{{ formatCents(lineTotal(line)) }}</td>
-                                        <td class="px-3 py-2">
-                                            <button class="rounded p-1 text-rose-600 hover:bg-rose-50" type="button" @click="removeLine(index)">
-                                                <Trash2 class="h-4 w-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </draggable>
+                                            <AppSelect
+                                                v-if="accounts.length"
+                                                :model-value="line.account_id ? String(line.account_id) : ''"
+                                                :options="accounts.map((account) => ({ label: account.name, value: String(account.id) }))"
+                                                placeholder="Map income account"
+                                                @update:model-value="updateLine(index, 'account_id', Number($event))"
+                                            />
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <AppInput
+                                            :model-value="line.quantity"
+                                            type="number"
+                                            @update:model-value="updateLine(index, 'quantity', Number($event))"
+                                        />
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <AppInput
+                                            :model-value="line.unit_price"
+                                            type="number"
+                                            @update:model-value="updateLine(index, 'unit_price', Number($event))"
+                                        />
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <AppSelect
+                                            :model-value="String(line.vat_rate)"
+                                            :options="taxRateSelectOptions"
+                                            @update:model-value="updateLine(index, 'vat_rate', Number($event))"
+                                        />
+                                    </td>
+                                    <td class="px-3 py-2">{{ formatCents(lineVat(line)) }}</td>
+                                    <td class="px-3 py-2 font-medium">{{ formatCents(lineTotal(line)) }}</td>
+                                    <td class="px-3 py-2">
+                                        <button class="rounded p-1 text-rose-600 hover:bg-rose-50" type="button" @click="removeLine(index)">
+                                            <Trash2 class="h-4 w-4" />
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
                         </table>
                     </div>
                 </AppCard>

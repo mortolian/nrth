@@ -75,7 +75,7 @@ const chartOptions = computed(() => ({
             name: 'Revenue',
             type: 'bar',
             data: props.revenue_chart.map((row) => row.revenue) ?? [],
-            itemStyle: { color: '#059669' },
+            itemStyle: { color: '#00a86b' },
         },
         {
             name: 'Expenses',
@@ -233,7 +233,7 @@ const openRecordPayment = (invoice) => {
                                 <div
                                     :class="[
                                         'h-2 rounded-full',
-                                        item.percentage < 75 ? 'bg-emerald-600' : item.percentage <= 90 ? 'bg-amber-500' : 'bg-rose-500',
+                                        item.percentage < 75 ? 'bg-brand-500' : item.percentage <= 90 ? 'bg-amber-500' : 'bg-rose-500',
                                     ]"
                                     :style="{ width: `${Math.min(item.percentage, 100)}%` }"
                                 />

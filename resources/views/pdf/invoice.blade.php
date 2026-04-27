@@ -2,117 +2,203 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice {{ $invoice->number }}</title>
-    <style>
-        body { font-family: Arial, sans-serif; color: #1f2937; font-size: 12px; margin: 28px; }
-        .header { display: table; width: 100%; margin-bottom: 20px; }
-        .col { display: table-cell; vertical-align: top; width: 50%; }
-        .right { text-align: right; }
-        h1 { margin: 0 0 8px; font-size: 24px; color: #0f172a; }
-        h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; color: #334155; }
-        .meta p, .details p { margin: 3px 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-        th, td { border-bottom: 1px solid #e2e8f0; padding: 8px 6px; text-align: left; }
-        th { background: #f8fafc; color: #334155; font-size: 11px; text-transform: uppercase; }
-        .num { text-align: right; white-space: nowrap; }
-        .totals { margin-top: 14px; width: 42%; margin-left: auto; }
-        .totals td { border: none; padding: 5px 0; }
-        .totals .label { color: #475569; }
-        .totals .value { text-align: right; }
-        .totals .grand td { border-top: 1px solid #cbd5e1; font-weight: bold; padding-top: 8px; }
-        .block { margin-top: 20px; }
-        .footer { margin-top: 26px; color: #64748b; font-size: 10px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
-    </style>
+    @include('pdf._styles')
 </head>
 <body>
-    <div class="header">
-        <div class="col">
-            @php($logo = ($invoice->team && method_exists($invoice->team, 'getFirstMediaUrl')) ? $invoice->team->getFirstMediaUrl('logo') : null)
-            @if($logo)
-                <img src="{{ $logo }}" alt="Company Logo" style="max-width: 180px; max-height: 60px; margin-bottom: 8px;">
+@php
+    $team = $invoice->team;
+    $client = $invoice->client;
+    $settings = method_exists($team, 'mergedCompanySettings') ? $team->mergedCompanySettings() : [];
+
+    $companyName = $settings['trading_name'] ?? ($team?->name ?? config('app.name'));
+    $companyVat = $settings['vat_number'] ?? null;
+    $companyReg = $settings['registration_number'] ?? null;
+    $companyEmail = $settings['company_email'] ?? null;
+    $companyPhone = $settings['company_phone'] ?? null;
+    $companyWebsite = $settings['company_website'] ?? null;
+
+    $bank = [
+        'name' => $settings['bank_name'] ?? null,
+        'holder' => $settings['bank_account_holder'] ?? null,
+        'account' => $settings['bank_account_number'] ?? null,
+        'branch' => $settings['bank_branch_code'] ?? null,
+        'type' => $settings['bank_account_type'] ?? null,
+    ];
+    $hasBankDetails = collect($bank)->filter()->isNotEmpty();
+
+    $physical = trim(collect([
+        $settings['physical_street'] ?? null,
+        $settings['physical_city'] ?? null,
+        $settings['physical_province'] ?? null,
+        $settings['physical_postal_code'] ?? null,
+        $settings['physical_country'] ?? null,
+    ])->filter()->implode(', '));
+
+    $clientAddress = is_array($client?->address)
+        ? trim(collect([
+            $client->address['street'] ?? null,
+            $client->address['city'] ?? null,
+            $client->address['province'] ?? null,
+            $client->address['postal_code'] ?? null,
+            $client->address['country'] ?? null,
+        ])->filter()->implode(', '))
+        : '';
+
+    $logoUrl = ($team && method_exists($team, 'getFirstMediaUrl')) ? $team->getFirstMediaUrl('logo') : null;
+
+    $statusValue = $invoice->status?->value ?? 'draft';
+    $statusLabel = strtoupper(str_replace('_', ' ', $statusValue));
+    $statusClass = match ($statusValue) {
+        'paid' => '',
+        'sent' => 'warn',
+        'overdue', 'void' => 'danger',
+        default => 'warn',
+    };
+
+    $subtotal = (int) ($invoice->getRawOriginal('subtotal_cents') ?? 0);
+    $vatTotal = (int) ($invoice->getRawOriginal('vat_amount_cents') ?? 0);
+    $total = (int) ($invoice->getRawOriginal('total_cents') ?? 0);
+    $paid = (int) ($invoice->getRawOriginal('amount_paid_cents') ?? 0);
+    $due = max(0, $total - $paid);
+@endphp
+
+<table class="brand">
+    <tr>
+        <td class="logo-cell">
+            @if($logoUrl)
+                <img src="{{ $logoUrl }}" alt="" style="max-width: 200px; max-height: 70px; margin-bottom: 6px;">
             @endif
-            <h2>From</h2>
-            <div class="details">
-                <p><strong>{{ $invoice->team?->name ?? 'Your Company' }}</strong></p>
-                <p>Reg no: {{ $invoice->client?->registration_number ?? 'N/A' }}</p>
-                <p>VAT no: {{ $invoice->client?->vat_number ?? 'N/A' }}</p>
+            <div class="company-name">{{ $companyName }}</div>
+            @if($physical)<div class="company-line">{{ $physical }}</div>@endif
+            <div class="company-line">
+                @if($companyEmail){{ $companyEmail }}@endif
+                @if($companyPhone) &middot; {{ $companyPhone }}@endif
+                @if($companyWebsite) &middot; {{ $companyWebsite }}@endif
             </div>
-        </div>
-        <div class="col right">
+            <div class="company-line small">
+                @if($companyReg)Reg: {{ $companyReg }}@endif
+                @if($companyVat) &middot; VAT: {{ $companyVat }}@endif
+            </div>
+        </td>
+        <td class="doc-cell">
             <h1>Tax Invoice</h1>
-            <div class="meta">
-                <p><strong>Invoice #:</strong> {{ $invoice->number }}</p>
-                <p><strong>Issue date:</strong> {{ optional($invoice->issue_date)->format('d M Y') }}</p>
-                <p><strong>Due date:</strong> {{ optional($invoice->due_date)->format('d M Y') }}</p>
+            <div class="pill {{ $statusClass }}">{{ $statusLabel }}</div>
+            <div class="doc-meta">
+                <div><span class="label">Invoice #</span> &nbsp; <span class="b">{{ $invoice->number }}</span></div>
+                @if($invoice->reference)
+                    <div><span class="label">Reference</span> &nbsp; {{ $invoice->reference }}</div>
+                @endif
+                <div><span class="label">Issued</span> &nbsp; {{ optional($invoice->issue_date)->format('d M Y') }}</div>
+                <div><span class="label">Due</span> &nbsp; {{ optional($invoice->due_date)->format('d M Y') }}</div>
             </div>
-            <div class="block">
-                <h2>Bill To</h2>
-                <p><strong>{{ $invoice->client?->name ?? 'Client' }}</strong></p>
-                <p>{{ $invoice->client?->email }}</p>
-                <p>{{ $invoice->client?->phone }}</p>
-            </div>
-        </div>
-    </div>
+        </td>
+    </tr>
+</table>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Description</th>
-                <th class="num">Qty</th>
-                <th class="num">Unit Price</th>
-                <th class="num">VAT</th>
-                <th class="num">Total</th>
+<table class="parties">
+    <tr>
+        <td>
+            <div class="label">Billed to</div>
+            <div class="name">{{ $client?->name ?? 'Client' }}</div>
+            @if($client?->contact_name)<p>{{ $client->contact_name }}</p>@endif
+            @if($clientAddress)<p>{{ $clientAddress }}</p>@endif
+            @if($client?->email)<p>{{ $client->email }}</p>@endif
+            @if($client?->phone)<p>{{ $client->phone }}</p>@endif
+            @if($client?->vat_number)<p class="small muted">VAT: {{ $client->vat_number }}</p>@endif
+            @if($client?->registration_number)<p class="small muted">Reg: {{ $client->registration_number }}</p>@endif
+        </td>
+        <td class="spacer"></td>
+        <td>
+            <div class="label">Amount due</div>
+            <div class="name accent" style="font-size: 22px;">R {{ number_format($due / 100, 2) }}</div>
+            <p class="small muted">Total invoiced: R {{ number_format($total / 100, 2) }}</p>
+            @if($paid > 0)
+                <p class="small muted">Paid to date: R {{ number_format($paid / 100, 2) }}</p>
+            @endif
+            <p class="small muted pad-top-12">Please use <span class="b">{{ $invoice->number }}</span> as your payment reference.</p>
+        </td>
+    </tr>
+</table>
+
+<table class="lines">
+    <thead>
+        <tr>
+            <th style="width: 48%;">Description</th>
+            <th class="num" style="width: 8%;">Qty</th>
+            <th class="num" style="width: 14%;">Unit</th>
+            <th class="num" style="width: 10%;">VAT %</th>
+            <th class="num" style="width: 10%;">VAT</th>
+            <th class="num" style="width: 14%;">Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($invoice->lineItems as $i => $line)
+            @php
+                $unit = (int) $line->unit_price_cents;
+                $qty = (float) $line->quantity;
+                $rate = (float) $line->vat_rate;
+                $lineVat = (int) $line->vat_amount_cents;
+                $lineTotal = (int) $line->total_cents;
+            @endphp
+            <tr @if($i % 2 === 1) class="zebra" @endif>
+                <td>{{ $line->description }}</td>
+                <td class="num">{{ rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.') ?: '0' }}</td>
+                <td class="num">R {{ number_format($unit / 100, 2) }}</td>
+                <td class="num">{{ number_format($rate * 100, 0) }}%</td>
+                <td class="num">R {{ number_format($lineVat / 100, 2) }}</td>
+                <td class="num b">R {{ number_format($lineTotal / 100, 2) }}</td>
             </tr>
-        </thead>
-        <tbody>
-            @foreach($invoice->lineItems as $line)
-                @php
-                    $subtotal = (float) $line->quantity * (int) $line->unit_price_cents;
-                    $lineVat = (int) $line->vat_amount_cents;
-                @endphp
-                <tr>
-                    <td>{{ $line->description }}</td>
-                    <td class="num">{{ number_format((float) $line->quantity, 2) }}</td>
-                    <td class="num">R {{ number_format(((int) $line->unit_price_cents) / 100, 2) }}</td>
-                    <td class="num">R {{ number_format($lineVat / 100, 2) }}</td>
-                    <td class="num">R {{ number_format(((int) $line->total_cents) / 100, 2) }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+        @endforeach
+    </tbody>
+</table>
 
-    <table class="totals">
-        <tr>
-            <td class="label">Subtotal</td>
-            <td class="value">R {{ number_format(((int) $invoice->getRawOriginal('subtotal_cents')) / 100, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="label">VAT</td>
-            <td class="value">R {{ number_format(((int) $invoice->getRawOriginal('vat_amount_cents')) / 100, 2) }}</td>
-        </tr>
-        <tr class="grand">
-            <td class="label">Total Due</td>
-            <td class="value">R {{ number_format(((int) $invoice->getRawOriginal('total_cents')) / 100, 2) }}</td>
-        </tr>
-    </table>
+<table class="totals">
+    <tr>
+        <td class="label">Subtotal (excl. VAT)</td>
+        <td class="value">R {{ number_format($subtotal / 100, 2) }}</td>
+    </tr>
+    <tr>
+        <td class="label">VAT</td>
+        <td class="value">R {{ number_format($vatTotal / 100, 2) }}</td>
+    </tr>
+    <tr class="grand">
+        <td class="label">Total due</td>
+        <td class="value">R {{ number_format($due / 100, 2) }}</td>
+    </tr>
+</table>
 
-    <div class="block">
-        <h2>Payment Terms</h2>
-        <p>{{ $invoice->notes ?: 'Payment due by the due date shown above.' }}</p>
-        <p><strong>Banking details:</strong> Please use invoice number {{ $invoice->number }} as payment reference.</p>
+@if($hasBankDetails)
+    <div class="section">
+        <h3>Banking details</h3>
+        <table style="width: 100%;">
+            <tr>
+                @if($bank['name'])<td style="padding-right: 14px;"><span class="muted small">Bank</span><br><span class="b">{{ $bank['name'] }}</span></td>@endif
+                @if($bank['holder'])<td style="padding-right: 14px;"><span class="muted small">Account holder</span><br><span class="b">{{ $bank['holder'] }}</span></td>@endif
+                @if($bank['account'])<td style="padding-right: 14px;"><span class="muted small">Account #</span><br><span class="b">{{ $bank['account'] }}</span></td>@endif
+                @if($bank['branch'])<td style="padding-right: 14px;"><span class="muted small">Branch</span><br><span class="b">{{ $bank['branch'] }}</span></td>@endif
+                @if($bank['type'])<td><span class="muted small">Type</span><br><span class="b">{{ ucfirst($bank['type']) }}</span></td>@endif
+            </tr>
+        </table>
     </div>
+@endif
 
-    @if($invoice->footer)
-        <div class="block">
-            <h2>Additional Notes</h2>
-            <p>{{ $invoice->footer }}</p>
-        </div>
-    @endif
-
-    <div class="footer">
-        Registration number: {{ $invoice->client?->registration_number ?? 'N/A' }} ·
-        VAT number: {{ $invoice->client?->vat_number ?? 'N/A' }}
+@if($invoice->notes)
+    <div class="section">
+        <h3>Notes</h3>
+        <p>{!! nl2br(e($invoice->notes)) !!}</p>
     </div>
+@endif
+
+@if($invoice->footer)
+    <div class="section">
+        <h3>Terms &amp; conditions</h3>
+        <p>{!! nl2br(e($invoice->footer)) !!}</p>
+    </div>
+@endif
+
+<div class="footer">
+    {{ $companyName }} &middot; Invoice {{ $invoice->number }} &middot; Generated {{ now()->format('d M Y') }}
+</div>
 </body>
 </html>

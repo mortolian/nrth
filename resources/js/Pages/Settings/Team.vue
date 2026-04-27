@@ -183,7 +183,7 @@ const deleteTeam = () => {
                 <AppButton variant="primary" :disabled="updateTeamNameForm.processing" @click="submitTeamName">
                     Save name
                 </AppButton>
-                <span v-if="updateTeamNameForm.recentlySuccessful" class="text-sm text-emerald-600">Saved.</span>
+                <span v-if="updateTeamNameForm.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
             </div>
         </AppCard>
 
@@ -266,7 +266,7 @@ const deleteTeam = () => {
                         <button
                             v-if="permissions.canUpdateTeamMembers && !m.is_owner && available_roles.length"
                             type="button"
-                            class="text-sm text-emerald-700 underline"
+                            class="text-sm text-brand-700 underline"
                             @click="openRoleModal(m)"
                         >
                             {{ m.role_label }}
@@ -357,7 +357,7 @@ const deleteTeam = () => {
                         :key="r.key"
                         type="button"
                         class="w-full rounded-md border px-3 py-2 text-left text-sm transition"
-                        :class="updateRoleForm.role === r.key ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'"
+                        :class="updateRoleForm.role === r.key ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:bg-slate-50'"
                         @click="updateRoleForm.role = r.key"
                     >
                         <span class="font-medium">{{ r.name }}</span>

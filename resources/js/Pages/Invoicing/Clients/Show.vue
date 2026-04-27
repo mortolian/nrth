@@ -95,7 +95,7 @@ const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 
                     :last-page="1"
                 >
                     <tr v-for="invoice in invoice_history" :key="invoice.id" class="cursor-pointer hover:bg-slate-50" @click="router.visit(route('invoicing.invoices.show', invoice.id))">
-                        <td class="px-4 py-3 font-medium text-emerald-700">{{ invoice.number }}</td>
+                        <td class="px-4 py-3 font-medium text-brand-700">{{ invoice.number }}</td>
                         <td class="px-4 py-3">{{ invoice.issue_date || '-' }}</td>
                         <td class="px-4 py-3">{{ invoice.due_date || '-' }}</td>
                         <td class="px-4 py-3">{{ formatCents(invoice.total_cents) }}</td>

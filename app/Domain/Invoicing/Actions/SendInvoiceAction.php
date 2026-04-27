@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Throwable;
 
 class SendInvoiceAction
 {
@@ -27,7 +29,11 @@ class SendInvoiceAction
 
         return DB::transaction(function () use ($invoice): Invoice {
             $invoice->loadMissing(['client', 'team', 'lineItems']);
-            $pdfMedia = $this->invoicePdfService->generate($invoice);
+
+            // PDF generation depends on browsershot/headless chromium which may not be available
+            // in every environment. Don't let it block the send action — we still queue the email
+            // (without attachment) and mark the invoice as sent.
+            $pdfMedia = $this->safelyGeneratePdf($invoice);
 
             $invoice->status = InvoiceStatus::Sent;
             $invoice->sent_at = now();
@@ -41,7 +47,8 @@ class SendInvoiceAction
                 'invoice_id' => $invoice->id,
                 'team_id' => $invoice->team_id,
                 'client_id' => $invoice->client_id,
-                'pdf_media_id' => $pdfMedia->id,
+                'pdf_media_id' => $pdfMedia?->id,
+                'pdf_attached' => $pdfMedia !== null,
             ]);
 
             if (function_exists('activity')) {
@@ -53,5 +60,19 @@ class SendInvoiceAction
 
             return $invoice->refresh();
         });
+    }
+
+    private function safelyGeneratePdf(Invoice $invoice): ?Media
+    {
+        try {
+            return $this->invoicePdfService->generate($invoice);
+        } catch (Throwable $e) {
+            Log::warning('Invoice PDF generation failed; sending without attachment', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

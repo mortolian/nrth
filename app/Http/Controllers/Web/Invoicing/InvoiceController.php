@@ -445,7 +445,20 @@ class InvoiceController extends Controller
     {
         $teamId = (int) $request->user()->current_team_id;
         $team = $request->user()->currentTeam;
-        $settings = $team->mergedCompanySettings();
+        $settings = $team?->mergedCompanySettings() ?? [];
+        if ($teamId <= 0 || $team === null) {
+            return [
+                'clients' => [],
+                'tax_rates' => [],
+                'accounts' => [],
+                'next_number' => 'INV-'.now()->format('Y').'-0001',
+                'defaults' => [
+                    'payment_terms_days' => 30,
+                    'notes' => '',
+                    'footer' => '',
+                ],
+            ];
+        }
         $year = (int) now()->format('Y');
         $next = InvoiceNumberSequence::query()
             ->where('team_id', $teamId)

@@ -255,20 +255,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
         <div class="min-h-screen bg-white text-slate-900 lg:pl-0">
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-800/80 bg-[#0f1117] text-slate-100 lg:flex lg:flex-col transition-all',
+                    'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-900/10 bg-[#F8FAFD] text-slate-900 lg:flex lg:flex-col transition-all',
                     collapsed ? 'w-20' : 'w-[260px]',
                 ]"
             >
-                <div class="border-b border-slate-800 px-4 py-4">
+                <div class="border-b border-slate-900/10 px-4 py-4">
                     <Link :href="route('dashboard')" class="flex items-center gap-3">
-                        <ApplicationMark class="h-10 w-10 shrink-0" />
+                        <ApplicationMark class="h-10 w-10 shrink-0 text-brand-700" />
                         <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
                     </Link>
 
                     <div v-if="hasTeamFeatures && !collapsed" class="mt-4">
                         <Dropdown align="left" width="60">
                             <template #trigger>
-                                <button class="flex w-full items-center justify-between rounded-md bg-slate-800 px-3 py-2 text-sm hover:bg-slate-700">
+                                <button class="flex w-full items-center justify-between rounded-md bg-white/50 px-3 py-2 text-sm hover:bg-white/70">
                                     <span class="truncate">{{ currentTeam?.name ?? 'Team' }}</span>
                                     <ChevronRight class="h-4 w-4" />
                                 </button>
@@ -302,8 +302,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 :class="[
                                     'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
                                     isActive(item.href)
-                                        ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
-                                        : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
+                                        ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
+                                        : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
                                 ]"
                             >
                                 <component :is="item.icon" class="h-4 w-4 shrink-0" />
@@ -318,8 +318,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
                                     collapsed ? 'justify-center' : '',
                                     isNavItemOrChildActive(item)
-                                        ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
-                                        : 'border-l-transparent text-slate-300 hover:bg-slate-800/60 hover:text-white',
+                                        ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
+                                        : 'border-l-transparent text-slate-700 hover:bg-white/30 hover:text-slate-900',
                                 ]"
                                 :aria-expanded="!collapsed && isNavSectionExpanded(item)"
                                 :aria-controls="navSectionDomId(item.label)"
@@ -329,7 +329,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ item.label }}</span>
                                 <ChevronDown
                                     v-if="!collapsed"
-                                    class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                                    class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
                                     :class="isNavSectionExpanded(item) ? 'rotate-180' : ''"
                                 />
                             </button>
@@ -337,7 +337,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <div
                                 :id="navSectionDomId(item.label)"
                                 v-show="isNavSectionExpanded(item) && !collapsed"
-                                class="ml-9 mt-1 space-y-1 border-l border-slate-700/80 pl-2"
+                                class="ml-9 mt-1 space-y-1 border-l border-slate-900/20 pl-2"
                             >
                                 <Link
                                     v-for="sub in item.group[0].items"
@@ -346,8 +346,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     :class="[
                                         'block rounded px-2 py-1 text-xs transition',
                                         isActivePath(sub.href)
-                                            ? 'bg-slate-800 font-medium text-emerald-300'
-                                            : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                                            ? 'bg-brand-500/30 font-medium text-brand-800'
+                                            : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
                                     ]"
                                 >
                                     {{ sub.label }}
@@ -357,15 +357,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     </template>
                 </nav>
 
-                <div class="border-t border-slate-800 p-2">
+                <div class="border-t border-slate-900/10 p-2">
                     <button
                         type="button"
                         :class="[
                             'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
                             collapsed ? 'justify-center' : '',
                             isSettingsSectionActive
-                                ? 'border-l-[#00a86b] bg-emerald-500/15 text-emerald-300'
-                                : 'border-l-transparent text-slate-300 hover:bg-slate-800 hover:text-white',
+                                ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
+                                : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
                         ]"
                         :aria-expanded="!collapsed && isSettingsSectionExpanded"
                         :aria-controls="navSectionDomId(SETTINGS_SECTION_LABEL)"
@@ -375,22 +375,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ SETTINGS_SECTION_LABEL }}</span>
                         <ChevronDown
                             v-if="!collapsed"
-                            class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                            class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
                             :class="isSettingsSectionExpanded ? 'rotate-180' : ''"
                         />
                     </button>
                     <div
                         :id="navSectionDomId(SETTINGS_SECTION_LABEL)"
                         v-show="isSettingsSectionExpanded && !collapsed"
-                        class="ml-9 mt-1 space-y-1 border-l border-slate-700/80 pl-2"
+                        class="ml-9 mt-1 space-y-1 border-l border-slate-900/20 pl-2"
                     >
                         <Link
                             :href="route('profile.show')"
                             :class="[
                                 'block rounded px-2 py-1 text-xs transition',
                                 isActivePath(route('profile.show'))
-                                    ? 'bg-slate-800 font-medium text-emerald-300'
-                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                                    ? 'bg-brand-500/30 font-medium text-brand-800'
+                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
                             ]"
                         >
                             Profile
@@ -400,8 +400,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             :class="[
                                 'block rounded px-2 py-1 text-xs transition',
                                 isActivePath(route('settings.company'))
-                                    ? 'bg-slate-800 font-medium text-emerald-300'
-                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                                    ? 'bg-brand-500/30 font-medium text-brand-800'
+                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
                             ]"
                         >
                             Company
@@ -411,8 +411,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             :class="[
                                 'block rounded px-2 py-1 text-xs transition',
                                 isTeamSettingsPath
-                                    ? 'bg-slate-800 font-medium text-emerald-300'
-                                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+                                    ? 'bg-brand-500/30 font-medium text-brand-800'
+                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
                             ]"
                         >
                             Teams and Members
@@ -493,13 +493,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             <div v-if="mobileOpen" class="fixed inset-0 z-50 bg-black/50 lg:hidden" @click="mobileOpen = false" />
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-[#0f1117] p-4 text-slate-100 shadow-xl transition-transform lg:hidden',
+                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-[#F8FAFD] p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
                     mobileOpen ? 'translate-x-0' : '-translate-x-full',
                 ]"
             >
                 <div class="mb-4 flex items-center justify-between">
                     <span class="font-semibold">Menu</span>
-                    <button class="rounded-md p-2 hover:bg-slate-800" @click="mobileOpen = false">
+                    <button class="rounded-md p-2 hover:bg-white/40" @click="mobileOpen = false">
                         <X class="h-4 w-4" />
                     </button>
                 </div>
@@ -508,7 +508,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <div v-if="!item.group">
                             <Link
                                 :href="item.href"
-                                class="block rounded-md px-3 py-2 text-sm hover:bg-slate-800"
+                                class="block rounded-md px-3 py-2 text-sm hover:bg-white/40"
                                 @click="mobileOpen = false"
                             >
                                 {{ item.label }}
@@ -517,27 +517,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <div v-else>
                             <button
                                 type="button"
-                                class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-slate-800/50"
+                                class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-white/30"
                                 :aria-expanded="isNavSectionExpanded(item)"
                                 :aria-controls="'m-' + navSectionDomId(item.label)"
                                 @click="toggleNavSection(item.label)"
                             >
                                 <span class="min-w-0 flex-1">{{ item.label }}</span>
                                 <ChevronDown
-                                    class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                                    class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
                                     :class="isNavSectionExpanded(item) ? 'rotate-180' : ''"
                                 />
                             </button>
                             <div
                                 :id="'m-' + navSectionDomId(item.label)"
                                 v-show="isNavSectionExpanded(item)"
-                                class="ml-3 mt-1 space-y-0.5 border-l border-slate-600 pl-2"
+                                class="ml-3 mt-1 space-y-0.5 border-l border-slate-900/20 pl-2"
                             >
                                 <Link
                                     v-for="sub in item.group[0].items"
                                     :key="`m-${item.label}-${sub.label}`"
                                     :href="sub.href"
-                                    class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                                    class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
                                     @click="mobileOpen = false"
                                 >
                                     {{ sub.label }}
@@ -547,39 +547,39 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     </template>
                     <button
                         type="button"
-                        class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-slate-800/50"
+                        class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-white/30"
                         :aria-expanded="isSettingsSectionExpanded"
                         :aria-controls="'m-' + navSectionDomId(SETTINGS_SECTION_LABEL)"
                         @click="toggleSettingsSection"
                     >
                         <span class="min-w-0 flex-1">{{ SETTINGS_SECTION_LABEL }}</span>
                         <ChevronDown
-                            class="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                            class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
                             :class="isSettingsSectionExpanded ? 'rotate-180' : ''"
                         />
                     </button>
                     <div
                         :id="'m-' + navSectionDomId(SETTINGS_SECTION_LABEL)"
                         v-show="isSettingsSectionExpanded"
-                        class="ml-3 mt-1 space-y-0.5 border-l border-slate-600 pl-2"
+                        class="ml-3 mt-1 space-y-0.5 border-l border-slate-900/20 pl-2"
                     >
                         <Link
                             :href="route('profile.show')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
                             @click="mobileOpen = false"
                         >
                             Profile
                         </Link>
                         <Link
                             :href="route('settings.company')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
                             @click="mobileOpen = false"
                         >
                             Company
                         </Link>
                         <a
                             :href="route('settings.team')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
                             @click="mobileOpen = false"
                         >
                             Teams and Members
@@ -596,7 +596,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         :href="route('dashboard')"
                         :class="[
                             'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
-                            isActivePath(route('dashboard')) ? 'text-emerald-700' : 'text-slate-600',
+                            isActivePath(route('dashboard')) ? 'text-brand-700' : 'text-slate-600',
                         ]"
                     >
                         <Home class="h-5 w-5 shrink-0" />
@@ -606,7 +606,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         :href="route('invoicing.invoices.index')"
                         :class="[
                             'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
-                            isActivePath(route('invoicing.invoices.index')) ? 'text-emerald-700' : 'text-slate-600',
+                            isActivePath(route('invoicing.invoices.index')) ? 'text-brand-700' : 'text-slate-600',
                         ]"
                     >
                         <FileText class="h-5 w-5 shrink-0" />
@@ -615,7 +615,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     <div class="flex justify-center">
                         <button
                             type="button"
-                            class="relative -top-5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg ring-4 ring-white"
+                            class="relative -top-5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg ring-4 ring-white"
                             aria-label="Quick add"
                             @click="quickAddOpen = true"
                         >
@@ -626,7 +626,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         :href="route('reports.profit-loss')"
                         :class="[
                             'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
-                            isActivePath(route('reports.profit-loss')) ? 'text-emerald-700' : 'text-slate-600',
+                            isActivePath(route('reports.profit-loss')) ? 'text-brand-700' : 'text-slate-600',
                         ]"
                     >
                         <ChartColumnBig class="h-5 w-5 shrink-0" />
@@ -665,7 +665,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"
                         >
-                            <Receipt class="h-5 w-5 shrink-0 text-emerald-700" />
+                            <Receipt class="h-5 w-5 shrink-0 text-brand-700" />
                             New expense
                         </Link>
                         <Link
@@ -673,7 +673,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"
                         >
-                            <FileText class="h-5 w-5 shrink-0 text-emerald-700" />
+                            <FileText class="h-5 w-5 shrink-0 text-brand-700" />
                             New invoice
                         </Link>
                         <Link
@@ -681,7 +681,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"
                         >
-                            <CreditCard class="h-5 w-5 shrink-0 text-emerald-700" />
+                            <CreditCard class="h-5 w-5 shrink-0 text-brand-700" />
                             Record payment
                         </Link>
                         <Link
@@ -689,7 +689,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"
                         >
-                            <Clock class="h-5 w-5 shrink-0 text-emerald-700" />
+                            <Clock class="h-5 w-5 shrink-0 text-brand-700" />
                             Start timer
                         </Link>
                     </div>

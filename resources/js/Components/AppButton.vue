@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 
 const props = withDefaults(defineProps<{
     as?: string;
-    variant?: 'primary' | 'secondary' | 'ghost';
+    variant?: 'primary' | 'secondary' | 'ghost' | 'dark';
     size?: 'sm' | 'md' | 'lg' | 'touch';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
@@ -17,9 +17,10 @@ const props = withDefaults(defineProps<{
 });
 
 const variantClass = {
-    primary: 'bg-slate-900 text-white hover:bg-slate-700',
+    primary: 'bg-brand-500 text-white hover:bg-brand-400',
     secondary: 'bg-white text-slate-900 border border-slate-300 hover:bg-slate-50',
     ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
+    dark: 'bg-slate-900 text-white hover:bg-slate-700',
 };
 
 const sizeClass = {

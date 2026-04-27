@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6-dev \
     libpq-dev \
     libzip-dev \
+    libexif-dev \
     zlib1g-dev \
     procps \
     postgresql-client \
@@ -45,6 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
     bcmath \
+    exif \
     gd \
     intl \
     opcache \

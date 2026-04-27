@@ -106,7 +106,7 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
                     <div class="border-t border-slate-200 pt-2" />
                     <div class="flex items-center justify-between text-base font-bold">
                         <span class="text-slate-900">Net VAT {{ vat_summary.net_vat >= 0 ? 'payable to SARS' : 'refund due from SARS' }}</span>
-                        <span :class="vat_summary.net_vat >= 0 ? 'text-slate-900' : 'text-emerald-700'">
+                        <span :class="vat_summary.net_vat >= 0 ? 'text-slate-900' : 'text-brand-700'">
                             {{ formatCents(Math.abs(vat_summary.net_vat)) }}
                         </span>
                     </div>

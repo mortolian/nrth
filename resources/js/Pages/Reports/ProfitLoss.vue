@@ -118,7 +118,7 @@ const drilldown = (line: Line) => {
                             {{ formatCents(comparisonMap.income[line.account_id] || 0) }}
                         </td>
                         <td v-if="comparison" class="px-2 py-2 text-right">
-                            <span :class="line.amount - (comparisonMap.income[line.account_id] || 0) >= 0 ? 'text-emerald-700' : 'text-rose-600'">
+                            <span :class="line.amount - (comparisonMap.income[line.account_id] || 0) >= 0 ? 'text-brand-700' : 'text-rose-600'">
                                 {{ formatCents(line.amount - (comparisonMap.income[line.account_id] || 0)) }}
                             </span>
                         </td>
@@ -147,7 +147,7 @@ const drilldown = (line: Line) => {
                             {{ formatCents(comparisonMap.expenses[line.account_id] || 0) }}
                         </td>
                         <td v-if="comparison" class="px-2 py-2 text-right">
-                            <span :class="line.amount - (comparisonMap.expenses[line.account_id] || 0) <= 0 ? 'text-emerald-700' : 'text-rose-600'">
+                            <span :class="line.amount - (comparisonMap.expenses[line.account_id] || 0) <= 0 ? 'text-brand-700' : 'text-rose-600'">
                                 {{ formatCents(line.amount - (comparisonMap.expenses[line.account_id] || 0)) }}
                             </span>
                         </td>
@@ -163,7 +163,7 @@ const drilldown = (line: Line) => {
 
             <div class="mt-6 border-t-2 border-slate-900 pt-4">
                 <p class="text-lg font-semibold">NET PROFIT / (LOSS)</p>
-                <p :class="report.totals.net_profit >= 0 ? 'text-emerald-700' : 'text-rose-600'" class="text-3xl font-bold">
+                <p :class="report.totals.net_profit >= 0 ? 'text-brand-700' : 'text-rose-600'" class="text-3xl font-bold">
                     {{ formatCents(report.totals.net_profit) }}
                 </p>
             </div>

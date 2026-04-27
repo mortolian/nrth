@@ -129,7 +129,7 @@ const submit = () => {
         <AppCard class="mt-5">
             <div class="mb-5 flex flex-col gap-3 sm:flex-row md:mb-6">
                 <label
-                    class="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-emerald-600 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900 shadow-sm active:bg-emerald-100"
+                    class="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-brand-500 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-900 shadow-sm active:bg-brand-100"
                 >
                     <Camera class="h-5 w-5 shrink-0" />
                     Take photo

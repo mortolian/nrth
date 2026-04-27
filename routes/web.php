@@ -9,6 +9,7 @@ use App\Http\Controllers\Web\Contracting\ContractController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ExpensesController;
 use App\Http\Controllers\Web\InvoicePdfController;
+use App\Http\Controllers\Web\QuotePdfController;
 use App\Http\Controllers\Web\Invoicing\ClientController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\Invoicing\QuoteController;
@@ -76,6 +77,16 @@ Route::middleware([
     });
     Route::prefix('invoicing')->name('invoicing.')->group(function () {
         Route::get('/quotes', [QuoteController::class, 'index'])->name('quotes.index');
+        Route::get('/quotes/create', [QuoteController::class, 'create'])->name('quotes.create');
+        Route::post('/quotes', [QuoteController::class, 'store'])->name('quotes.store');
+        Route::get('/quotes/{quote}', [QuoteController::class, 'show'])->name('quotes.show');
+        Route::get('/quotes/{quote}/edit', [QuoteController::class, 'edit'])->name('quotes.edit');
+        Route::put('/quotes/{quote}', [QuoteController::class, 'update'])->name('quotes.update');
+        Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
+        Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
+        Route::post('/quotes/{quote}/decline', [QuoteController::class, 'decline'])->name('quotes.decline');
+        Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convert'])->name('quotes.convert');
+        Route::get('/quotes/{quote}/pdf', [QuotePdfController::class, 'download'])->name('quotes.pdf.download');
 
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
         Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');

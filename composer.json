@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "barryvdh/laravel-dompdf": "^3.1",
         "brick/money": "^0.11.2",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/cashier": "^16.5",
@@ -21,7 +22,6 @@
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-backup": "^10.2",
         "spatie/laravel-medialibrary": "^11.21",
-        "spatie/laravel-pdf": "^2.7",
         "spatie/laravel-permission": "^7.3",
         "tightenco/ziggy": "^2.0"
     },

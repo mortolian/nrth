@@ -91,7 +91,7 @@ const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 
             <AppCard
                 v-for="client in clients.data"
                 :key="client.id"
-                class="cursor-pointer hover:border-emerald-300"
+                class="cursor-pointer hover:border-brand-300"
                 @click="goToClient(client.id)"
             >
                 <div class="flex items-start justify-between">

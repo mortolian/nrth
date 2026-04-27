@@ -170,7 +170,7 @@ const toggleExpanded = (id: number) => {
                         <td class="px-4 py-3">{{ transaction.date || '-' }}</td>
                         <td class="px-4 py-3"><AppBadge variant="info">{{ transaction.type }}</AppBadge></td>
                         <td class="px-4 py-3">
-                            <a class="text-emerald-700 hover:underline" href="#" @click.stop>{{ transaction.reference || '—' }}</a>
+                            <a class="text-brand-700 hover:underline" href="#" @click.stop>{{ transaction.reference || '—' }}</a>
                         </td>
                         <td class="px-4 py-3">{{ transaction.description || '—' }}</td>
                         <td class="px-4 py-3">{{ transaction.accounts_affected }}</td>

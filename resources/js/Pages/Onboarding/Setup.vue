@@ -304,7 +304,7 @@ const liveInvoicePreview = computed(() => {
                         v-for="s in 5"
                         :key="s"
                         class="h-1 flex-1 rounded-full transition-colors"
-                        :class="s <= step ? 'bg-emerald-500' : 'bg-slate-800'"
+                        :class="s <= step ? 'bg-brand-500' : 'bg-slate-800'"
                     />
                 </div>
             </div>
@@ -322,7 +322,7 @@ const liveInvoicePreview = computed(() => {
                         </p>
                     </div>
                     <div class="flex justify-end gap-3">
-                        <PrimaryButton type="button" class="!bg-emerald-600 !tracking-normal hover:!bg-emerald-500" @click="next">
+                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
                             Let&rsquo;s set up your company
                         </PrimaryButton>
                     </div>
@@ -407,7 +407,7 @@ const liveInvoicePreview = computed(() => {
                         >
                             Back
                         </button>
-                        <PrimaryButton type="button" class="!bg-emerald-600 !tracking-normal hover:!bg-emerald-500" @click="next">
+                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
                             Continue
                         </PrimaryButton>
                     </div>
@@ -480,7 +480,7 @@ const liveInvoicePreview = computed(() => {
                         >
                             Back
                         </button>
-                        <PrimaryButton type="button" class="!bg-emerald-600 !tracking-normal hover:!bg-emerald-500" @click="next">
+                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
                             Continue
                         </PrimaryButton>
                     </div>
@@ -622,7 +622,7 @@ const liveInvoicePreview = computed(() => {
                         >
                             Back
                         </button>
-                        <PrimaryButton type="button" class="!bg-emerald-600 !tracking-normal hover:!bg-emerald-500" @click="next">
+                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
                             Continue
                         </PrimaryButton>
                     </div>
@@ -698,7 +698,7 @@ const liveInvoicePreview = computed(() => {
                         </button>
                         <PrimaryButton
                             type="button"
-                            class="!bg-emerald-600 !tracking-normal hover:!bg-emerald-500 disabled:opacity-50"
+                            class="!bg-brand-500 !tracking-normal hover:!bg-brand-400 disabled:opacity-50"
                             :disabled="finishing"
                             @click="finish"
                         >

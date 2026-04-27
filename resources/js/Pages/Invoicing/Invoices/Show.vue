@@ -230,7 +230,7 @@ const submitRecordPayment = () => {
                     </div>
                     <div class="mt-4 space-y-2">
                         <div v-for="step in timeline" :key="step.label" class="flex items-start gap-2 text-sm">
-                            <CircleDot :class="step.done ? 'text-emerald-600' : 'text-slate-300'" class="mt-0.5 h-4 w-4" />
+                            <CircleDot :class="step.done ? 'text-brand-500' : 'text-slate-300'" class="mt-0.5 h-4 w-4" />
                             <div>
                                 <p class="font-medium text-slate-800">{{ step.label }}</p>
                                 <p class="text-xs text-slate-500">{{ step.at ? new Date(step.at).toLocaleString() : 'Pending' }}</p>
@@ -275,7 +275,7 @@ const submitRecordPayment = () => {
                     <h3 class="text-base font-semibold text-slate-900">Attachments</h3>
                     <ul v-if="invoice.attachments.length" class="mt-2 space-y-1 text-sm">
                         <li v-for="attachment in invoice.attachments" :key="attachment.id">
-                            <a :href="attachment.url" class="text-emerald-700 hover:underline">{{ attachment.name }}</a>
+                            <a :href="attachment.url" class="text-brand-700 hover:underline">{{ attachment.name }}</a>
                         </li>
                     </ul>
                     <p v-else class="mt-3 text-sm text-slate-500">No attachments.</p>

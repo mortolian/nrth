@@ -8,7 +8,7 @@ const props = withDefaults(defineProps<{
 });
 
 const className = computed(() => ({
-    success: 'bg-emerald-100 text-emerald-800',
+    success: 'bg-brand-100 text-brand-800',
     warning: 'bg-amber-100 text-amber-800',
     danger: 'bg-rose-100 text-rose-800',
     info: 'bg-sky-100 text-sky-800',

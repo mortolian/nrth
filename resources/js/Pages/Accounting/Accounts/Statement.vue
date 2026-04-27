@@ -133,7 +133,7 @@ const presetLastMonth = () => {
                     <td class="px-4 py-3">{{ entry.debit > 0 ? formatCents(entry.debit) : '—' }}</td>
                     <td class="px-4 py-3">{{ entry.credit > 0 ? formatCents(entry.credit) : '—' }}</td>
                     <td class="px-4 py-3">
-                        <span :class="entry.is_normal_balance ? 'text-emerald-700' : 'text-rose-600'">
+                        <span :class="entry.is_normal_balance ? 'text-brand-700' : 'text-rose-600'">
                             {{ formatCents(entry.running_balance) }}
                         </span>
                     </td>

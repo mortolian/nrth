@@ -222,7 +222,7 @@ const submit = () => {
                 :key="t.id"
                 type="button"
                 class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-                :class="tab === t.id ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                :class="tab === t.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
                 @click="tab = t.id"
             >
                 {{ t.label }}
@@ -398,7 +398,7 @@ const submit = () => {
                         <textarea
                             v-model="form.invoice_default_notes"
                             rows="3"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
                     <div class="md:col-span-2">
@@ -406,7 +406,7 @@ const submit = () => {
                         <textarea
                             v-model="form.invoice_default_footer"
                             rows="4"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
                     <div class="md:col-span-2">
@@ -419,7 +419,7 @@ const submit = () => {
                         <textarea
                             v-model="form.invoice_email_body_template"
                             rows="5"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
                 </div>

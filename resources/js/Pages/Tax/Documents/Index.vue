@@ -93,19 +93,19 @@ const generateTaxPack = () => {
             <div class="mt-3 grid gap-3 md:grid-cols-3">
                 <div class="rounded-md border border-slate-200 p-3">
                     <p class="text-sm font-medium text-slate-900">Annual Income Statement</p>
-                    <p class="mt-1 text-xs" :class="tax_year_summary.income_statement_ready ? 'text-emerald-700' : 'text-slate-500'">
+                    <p class="mt-1 text-xs" :class="tax_year_summary.income_statement_ready ? 'text-brand-700' : 'text-slate-500'">
                         {{ tax_year_summary.income_statement_ready ? 'Ready' : 'Pending data' }}
                     </p>
                 </div>
                 <div class="rounded-md border border-slate-200 p-3">
                     <p class="text-sm font-medium text-slate-900">Full Year Trial Balance</p>
-                    <p class="mt-1 text-xs" :class="tax_year_summary.trial_balance_ready ? 'text-emerald-700' : 'text-slate-500'">
+                    <p class="mt-1 text-xs" :class="tax_year_summary.trial_balance_ready ? 'text-brand-700' : 'text-slate-500'">
                         {{ tax_year_summary.trial_balance_ready ? 'Ready' : 'Pending setup' }}
                     </p>
                 </div>
                 <div class="rounded-md border border-slate-200 p-3">
                     <p class="text-sm font-medium text-slate-900">VAT Summary (all periods)</p>
-                    <p class="mt-1 text-xs" :class="tax_year_summary.vat_summary_ready ? 'text-emerald-700' : 'text-slate-500'">
+                    <p class="mt-1 text-xs" :class="tax_year_summary.vat_summary_ready ? 'text-brand-700' : 'text-slate-500'">
                         {{ tax_year_summary.vat_summary_ready ? 'Ready' : 'Pending submissions' }}
                     </p>
                 </div>
@@ -113,7 +113,7 @@ const generateTaxPack = () => {
             <p class="mt-3 text-xs text-slate-500">Ready sections: {{ taxPackReadyCount }}/3</p>
             <div v-if="generating" class="mt-3">
                 <div class="h-2 w-full rounded-full bg-slate-100">
-                    <div class="h-2 rounded-full bg-emerald-500 transition-all" :style="{ width: `${generationProgress}%` }" />
+                    <div class="h-2 rounded-full bg-brand-500 transition-all" :style="{ width: `${generationProgress}%` }" />
                 </div>
                 <p class="mt-1 text-xs text-slate-500">Generating tax pack... {{ generationProgress }}%</p>
             </div>
@@ -133,19 +133,19 @@ const generateTaxPack = () => {
             <div class="space-y-2 text-sm">
                 <div class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
                     <span>Expenses without receipts</span>
-                    <span :class="checklist.expenses_without_receipts > 0 ? 'font-semibold text-rose-600' : 'text-emerald-700'">
+                    <span :class="checklist.expenses_without_receipts > 0 ? 'font-semibold text-rose-600' : 'text-brand-700'">
                         {{ checklist.expenses_without_receipts }}
                     </span>
                 </div>
                 <div class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
                     <span>Invoices without signed contracts</span>
-                    <span :class="checklist.invoices_without_contracts > 0 ? 'font-semibold text-rose-600' : 'text-emerald-700'">
+                    <span :class="checklist.invoices_without_contracts > 0 ? 'font-semibold text-rose-600' : 'text-brand-700'">
                         {{ checklist.invoices_without_contracts }}
                     </span>
                 </div>
                 <div class="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
                     <span>Missing bank statement months</span>
-                    <span :class="checklist.bank_statements_missing_months > 0 ? 'font-semibold text-rose-600' : 'text-emerald-700'">
+                    <span :class="checklist.bank_statements_missing_months > 0 ? 'font-semibold text-rose-600' : 'text-brand-700'">
                         {{ checklist.bank_statements_missing_months }}
                     </span>
                 </div>

@@ -66,7 +66,7 @@ const typeBadgeClass: Record<string, string> = {
     asset: 'bg-blue-100 text-blue-700',
     liability: 'bg-rose-100 text-rose-700',
     equity: 'bg-purple-100 text-purple-700',
-    income: 'bg-emerald-100 text-emerald-700',
+    income: 'bg-brand-100 text-brand-700',
     expense: 'bg-amber-100 text-amber-700',
 };
 
@@ -152,7 +152,7 @@ const navigateTo = (url: string) => router.get(url, { from: period.value.from, t
                             <span v-else class="text-slate-300">—</span>
                         </td>
                         <td class="px-4 py-3 tabular-nums text-sm font-semibold">
-                            <span :class="account.closing_balance_cents < 0 ? 'text-rose-600' : 'text-emerald-700'">
+                            <span :class="account.closing_balance_cents < 0 ? 'text-rose-600' : 'text-brand-700'">
                                 {{ formatCents(Math.abs(account.closing_balance_cents)) }}
                                 <span v-if="account.closing_balance_cents < 0" class="text-xs font-normal ml-1 text-rose-400">abnormal</span>
                             </span>

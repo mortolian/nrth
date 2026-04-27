@@ -125,7 +125,7 @@ const openStatement = (line: Line) => {
 
         <AppCard class="mt-5">
             <div
-                :class="props.report.is_balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+                :class="props.report.is_balanced ? 'bg-brand-50 text-brand-700' : 'bg-rose-50 text-rose-700'"
                 class="rounded-md px-4 py-3 text-sm font-semibold"
             >
                 {{ props.report.is_balanced ? 'Books are balanced ✓' : 'WARNING: Books are not balanced ✗' }}

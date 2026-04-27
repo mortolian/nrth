@@ -199,16 +199,16 @@ const generateRetainerInvoice = () => {
                         v-if="contract?.signed_contract_url"
                         :href="contract.signed_contract_url"
                         target="_blank"
-                        class="mt-2 inline-block text-sm text-emerald-700 hover:underline"
+                        class="mt-2 inline-block text-sm text-brand-700 hover:underline"
                     >
                         View current signed contract
                     </a>
                 </div>
             </div>
 
-            <div v-if="values.billing_type === 'retainer'" class="mt-5 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
-                <p class="font-medium text-emerald-900">Retainer invoicing</p>
-                <p class="mt-1 text-emerald-800">Next invoice due date: {{ contract?.next_invoice_due_date || 'Will be set on save' }}</p>
+            <div v-if="values.billing_type === 'retainer'" class="mt-5 rounded-md border border-brand-200 bg-brand-50 p-3 text-sm">
+                <p class="font-medium text-brand-900">Retainer invoicing</p>
+                <p class="mt-1 text-brand-800">Next invoice due date: {{ contract?.next_invoice_due_date || 'Will be set on save' }}</p>
                 <AppButton
                     v-if="isEditing"
                     class="mt-2"

@@ -23,7 +23,7 @@ const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZA
 const progressColor = (percentage) => {
     if (percentage >= 100) return 'bg-rose-500';
     if (percentage >= 80) return 'bg-amber-500';
-    return 'bg-emerald-500';
+    return 'bg-brand-500';
 };
 
 const chartOptions = computed(() => ({
@@ -99,7 +99,7 @@ const chartOptions = computed(() => ({
                         <div v-for="row in active_budget.categories" :key="row.category" class="rounded-lg border border-slate-200 p-3">
                             <div class="flex items-start justify-between">
                                 <p class="font-medium text-slate-900">{{ row.category }}</p>
-                                <span class="inline-flex items-center gap-1 text-xs" :class="row.trend === 'faster' ? 'text-rose-600' : 'text-emerald-600'">
+                                <span class="inline-flex items-center gap-1 text-xs" :class="row.trend === 'faster' ? 'text-rose-600' : 'text-brand-600'">
                                     <ArrowUpRight v-if="row.trend === 'faster'" class="h-3.5 w-3.5" />
                                     <ArrowDownRight v-else class="h-3.5 w-3.5" />
                                     {{ row.trend === 'faster' ? 'Faster' : 'Slower' }}

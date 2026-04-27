@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
                 <p class="font-mono text-5xl font-semibold tabular-nums tracking-tight text-slate-900 md:text-6xl">
                     {{ elapsedLabel }}
                 </p>
-                <p v-if="isRunning" class="mt-3 text-sm text-emerald-700">
+                <p v-if="isRunning" class="mt-3 text-sm text-brand-700">
                     Timer running
                 </p>
                 <p v-else class="mt-3 text-sm text-slate-500">

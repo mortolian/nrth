@@ -17,7 +17,7 @@ const props = withDefaults(defineProps<{
 });
 
 const trendMeta = computed(() => ({
-    up: { color: 'text-emerald-600', bg: 'bg-emerald-50', icon: ArrowUpRight, sign: '+' },
+    up: { color: 'text-brand-600', bg: 'bg-brand-50', icon: ArrowUpRight, sign: '+' },
     down: { color: 'text-rose-600', bg: 'bg-rose-50', icon: ArrowDownRight, sign: '' },
     neutral: { color: 'text-slate-500', bg: 'bg-slate-100', icon: ArrowRight, sign: '' },
 }[props.trend]));

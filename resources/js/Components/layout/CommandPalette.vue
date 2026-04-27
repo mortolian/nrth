@@ -200,7 +200,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown));
                                 type="button"
                                 :class="[
                                     'flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition',
-                                    visibleItems[selectedIndex]?.id === item.id ? 'bg-emerald-50 text-emerald-900' : 'hover:bg-slate-50',
+                                    visibleItems[selectedIndex]?.id === item.id ? 'bg-brand-50 text-brand-900' : 'hover:bg-slate-50',
                                 ]"
                                 @click="navigateToItem(item)"
                                 @mouseenter="selectedIndex = visibleItems.findIndex((i) => i.id === item.id)"
@@ -221,7 +221,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown));
                                 type="button"
                                 :class="[
                                     'flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition',
-                                    visibleItems[selectedIndex]?.id === item.id ? 'bg-emerald-50 text-emerald-900' : 'hover:bg-slate-50',
+                                    visibleItems[selectedIndex]?.id === item.id ? 'bg-brand-50 text-brand-900' : 'hover:bg-slate-50',
                                 ]"
                                 @click="navigateToItem(item)"
                                 @mouseenter="selectedIndex = visibleItems.findIndex((i) => i.id === item.id)"
@@ -242,7 +242,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown));
                                 type="button"
                                 :class="[
                                     'flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition',
-                                    visibleItems[selectedIndex]?.id === item.id ? 'bg-emerald-50 text-emerald-900' : 'hover:bg-slate-50',
+                                    visibleItems[selectedIndex]?.id === item.id ? 'bg-brand-50 text-brand-900' : 'hover:bg-slate-50',
                                 ]"
                                 @click="navigateToItem(item)"
                                 @mouseenter="selectedIndex = visibleItems.findIndex((i) => i.id === item.id)"

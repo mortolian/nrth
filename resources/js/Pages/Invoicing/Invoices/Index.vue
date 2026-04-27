@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { Filter, X } from 'lucide-vue-next';
@@ -129,7 +129,12 @@ const toggleSelected = (id: number, checked: boolean) => {
     >
         <PageHeader title="Invoices" subtitle="Track and manage money in">
             <template #actions>
-                <AppButton variant="primary" @click="router.visit(route('invoicing.invoices.create'))">New Invoice</AppButton>
+                <Link
+                    :href="route('invoicing.invoices.create')"
+                    class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400"
+                >
+                    New Invoice
+                </Link>
             </template>
         </PageHeader>
 
@@ -154,7 +159,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                             :class="[
                                 'min-h-11 rounded-md border px-3 py-2 text-sm transition md:min-h-0 md:py-1.5',
                                 localFilters.status === status.value
-                                    ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                                    ? 'border-brand-500 bg-brand-50 text-brand-700'
                                     : 'border-slate-200 text-slate-600 hover:bg-slate-50',
                             ]"
                             @click="localFilters.status = status.value"
@@ -290,7 +295,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                         <td class="px-4 py-3">
                             <a
                                 :href="route('invoicing.invoices.show', invoice.id)"
-                                class="font-medium text-emerald-700 hover:underline"
+                                class="font-medium text-brand-700 hover:underline"
                                 @click.stop
                             >
                                 {{ invoice.number }}
@@ -338,7 +343,12 @@ const toggleSelected = (id: number, checked: boolean) => {
                                 description="Try adjusting your filters or create a new invoice."
                             >
                                 <template #action>
-                                    <AppButton variant="primary" @click="router.visit(route('invoicing.invoices.create'))">New Invoice</AppButton>
+                                    <Link
+                                        :href="route('invoicing.invoices.create')"
+                                        class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400"
+                                    >
+                                        New Invoice
+                                    </Link>
                                 </template>
                             </EmptyState>
                         </td>

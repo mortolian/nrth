@@ -106,7 +106,7 @@ const apply = () => {
 
         <AppCard class="mt-5">
             <div
-                :class="report.totals.is_balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'"
+                :class="report.totals.is_balanced ? 'bg-brand-50 text-brand-700' : 'bg-rose-50 text-rose-700'"
                 class="rounded-md px-4 py-4 text-xl font-bold"
             >
                 <span v-if="report.totals.is_balanced">✓ Balanced</span>

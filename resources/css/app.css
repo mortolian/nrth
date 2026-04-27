@@ -12,6 +12,17 @@
 @theme {
     --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-brand-50: #e6f7ef;
+    --color-brand-100: #ccefdf;
+    --color-brand-200: #99e1bd;
+    --color-brand-300: #66d39c;
+    --color-brand-400: #33c47b;
+    --color-brand-500: #00a86b;
+    --color-brand-600: #008f5c;
+    --color-brand-700: #00754d;
+    --color-brand-800: #005a3c;
+    --color-brand-900: #00402b;
 }
 
 [x-cloak] {

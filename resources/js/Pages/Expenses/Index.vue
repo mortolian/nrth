@@ -142,7 +142,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                         :class="[
                             'rounded-md border px-2 py-1 text-xs',
                             filters.categories.includes(category)
-                                ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                                ? 'border-brand-500 bg-brand-50 text-brand-700'
                                 : 'border-slate-200 text-slate-600',
                         ]"
                         @click="toggleCategory(category)"
@@ -202,7 +202,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                     <td class="px-4 py-3">{{ expense.description || '-' }}</td>
                     <td class="px-4 py-3">{{ formatCents(expense.amount) }}</td>
                     <td class="px-4 py-3">
-                        <span :class="expense.vat_amount > 0 ? 'font-medium text-emerald-600' : 'text-slate-500'">
+                        <span :class="expense.vat_amount > 0 ? 'font-medium text-brand-600' : 'text-slate-500'">
                             {{ formatCents(expense.vat_amount) }}
                         </span>
                     </td>
