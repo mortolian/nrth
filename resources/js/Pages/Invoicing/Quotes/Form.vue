@@ -138,13 +138,22 @@ const submit = (submitAction: 'draft' | 'send') => {
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
                     <div class="space-y-3">
                         <div v-for="(row, idx) in lineItems" :key="idx" class="grid gap-2 md:grid-cols-12">
-                            <AppInput v-model="row.description" class="md:col-span-5" placeholder="Description" />
+                            <AppInput
+                                v-model="row.description"
+                                :class="chargesVat ? 'md:col-span-5' : 'md:col-span-6'"
+                                placeholder="Description"
+                            />
                             <AppInput v-model.number="row.quantity" type="number" class="md:col-span-2" placeholder="Qty" />
-                            <AppInput v-model.number="row.unit_price_cents" type="number" class="md:col-span-3" placeholder="Unit cents" />
+                            <AppInput
+                                v-model.number="row.unit_price_cents"
+                                type="number"
+                                :class="chargesVat ? 'md:col-span-3' : 'md:col-span-4'"
+                                placeholder="Unit cents"
+                            />
                             <AppSelect
+                                v-if="chargesVat"
                                 :model-value="String(row.vat_rate)"
                                 :options="vatSelectOptions"
-                                :disabled="!chargesVat"
                                 class="md:col-span-2"
                                 @update:model-value="row.vat_rate = Number($event)"
                             />
@@ -174,7 +183,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                     <h3 class="text-base font-semibold text-slate-900">Totals</h3>
                     <div class="mt-3 space-y-2 text-sm">
                         <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span>{{ money(totals.subtotal) }}</span></div>
-                        <div class="flex justify-between"><span class="text-slate-500">VAT</span><span>{{ money(totals.vat) }}</span></div>
+                        <div v-if="chargesVat" class="flex justify-between"><span class="text-slate-500">VAT</span><span>{{ money(totals.vat) }}</span></div>
                         <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ money(totals.total) }}</span></div>
                     </div>
                 </AppCard>

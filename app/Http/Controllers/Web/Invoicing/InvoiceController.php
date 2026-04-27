@@ -410,6 +410,7 @@ class InvoiceController extends Controller
                 ],
                 PaymentMethod::cases()
             ),
+            'charges_vat' => request()->user()->currentTeam?->chargesVat() ?? false,
         ]);
     }
 

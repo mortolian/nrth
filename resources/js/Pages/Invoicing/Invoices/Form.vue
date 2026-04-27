@@ -352,8 +352,8 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                     <th class="px-3 py-2 text-left">Description</th>
                                     <th class="px-3 py-2 text-left">Qty</th>
                                     <th class="px-3 py-2 text-left">Unit Price</th>
-                                    <th class="px-3 py-2 text-left">VAT Rate</th>
-                                    <th class="px-3 py-2 text-left">VAT Amount</th>
+                                    <th v-if="chargesVat" class="px-3 py-2 text-left">VAT Rate</th>
+                                    <th v-if="chargesVat" class="px-3 py-2 text-left">VAT Amount</th>
                                     <th class="px-3 py-2 text-left">Total</th>
                                     <th class="px-3 py-2 text-left">Delete</th>
                                 </tr>
@@ -390,15 +390,14 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                             @update:model-value="updateLine(index, 'unit_price', Number($event))"
                                         />
                                     </td>
-                                    <td class="px-3 py-2">
+                                    <td v-if="chargesVat" class="px-3 py-2">
                                         <AppSelect
                                             :model-value="String(line.vat_rate)"
                                             :options="taxRateSelectOptions"
-                                            :disabled="!chargesVat"
                                             @update:model-value="updateLine(index, 'vat_rate', Number($event))"
                                         />
                                     </td>
-                                    <td class="px-3 py-2">{{ formatCents(lineVat(line)) }}</td>
+                                    <td v-if="chargesVat" class="px-3 py-2">{{ formatCents(lineVat(line)) }}</td>
                                     <td class="px-3 py-2 font-medium">{{ formatCents(lineTotal(line)) }}</td>
                                     <td class="px-3 py-2">
                                         <button class="rounded p-1 text-rose-600 hover:bg-rose-50" type="button" @click="removeLine(index)">
@@ -420,12 +419,20 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                 <AppCard>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Totals</h3>
                     <div class="space-y-2 text-sm text-slate-700">
-                        <div class="flex items-center justify-between"><span>Subtotal (excl VAT)</span><span>{{ formatCents(totals.subtotal) }}</span></div>
-                        <div v-for="(amount, key) in totals.vatBreakdown" :key="key" class="flex items-center justify-between">
-                            <span>VAT {{ key }}</span>
-                            <span>{{ formatCents(amount) }}</span>
+                        <div class="flex items-center justify-between">
+                            <span>{{ chargesVat ? 'Subtotal (excl VAT)' : 'Subtotal' }}</span>
+                            <span>{{ formatCents(totals.subtotal) }}</span>
                         </div>
-                        <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total (incl VAT)</span><span>{{ formatCents(totals.total) }}</span></div>
+                        <template v-if="chargesVat">
+                            <div v-for="(amount, key) in totals.vatBreakdown" :key="key" class="flex items-center justify-between">
+                                <span>VAT {{ key }}</span>
+                                <span>{{ formatCents(amount) }}</span>
+                            </div>
+                        </template>
+                        <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold">
+                            <span>{{ chargesVat ? 'Total (incl VAT)' : 'Total' }}</span>
+                            <span>{{ formatCents(totals.total) }}</span>
+                        </div>
                         <div v-if="isEditing" class="flex items-center justify-between"><span>Amount paid</span><span>{{ formatCents(totals.amountPaid) }}</span></div>
                         <div class="flex items-center justify-between text-base font-bold text-slate-900"><span>Amount due</span><span>{{ formatCents(totals.amountDue) }}</span></div>
                     </div>

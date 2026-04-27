@@ -30,6 +30,8 @@ type Quote = {
 
 const props = defineProps<{
     quote: Quote;
+    /** When false, VAT rows are hidden in totals (company not VAT-registered / no default rate). */
+    charges_vat: boolean;
     convert_defaults: {
         invoice_due_date: string;
         invoice_footer: string;
@@ -129,7 +131,7 @@ const submitConvert = () => {
                                     <th class="px-3 py-2 text-left">Description</th>
                                     <th class="px-3 py-2 text-left">Qty</th>
                                     <th class="px-3 py-2 text-left">Unit</th>
-                                    <th class="px-3 py-2 text-left">VAT</th>
+                                    <th v-if="charges_vat" class="px-3 py-2 text-left">VAT</th>
                                     <th class="px-3 py-2 text-left">Line total</th>
                                 </tr>
                             </thead>
@@ -138,7 +140,7 @@ const submitConvert = () => {
                                     <td class="px-3 py-2">{{ line.description }}</td>
                                     <td class="px-3 py-2">{{ line.quantity }}</td>
                                     <td class="px-3 py-2">{{ currency(line.unit_price_cents) }}</td>
-                                    <td class="px-3 py-2">{{ Math.round(line.vat_rate * 100) }}%</td>
+                                    <td v-if="charges_vat" class="px-3 py-2">{{ Math.round(line.vat_rate * 100) }}%</td>
                                     <td class="px-3 py-2">{{ currency(Math.round(line.quantity * line.unit_price_cents * (1 + line.vat_rate))) }}</td>
                                 </tr>
                             </tbody>
@@ -147,7 +149,7 @@ const submitConvert = () => {
 
                     <div class="ml-auto w-full max-w-sm space-y-2 text-sm">
                         <div class="flex items-center justify-between"><span class="text-slate-500">Subtotal</span><span>{{ currency(quote.subtotal_cents) }}</span></div>
-                        <div class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ currency(quote.vat_amount_cents) }}</span></div>
+                        <div v-if="charges_vat" class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ currency(quote.vat_amount_cents) }}</span></div>
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ currency(quote.total_cents) }}</span></div>
                     </div>
 
@@ -166,7 +168,7 @@ const submitConvert = () => {
                 <AppCard>
                     <h3 class="text-base font-semibold text-slate-900">Quote total</h3>
                     <p class="mt-1 text-2xl font-bold text-slate-900">{{ currency(quote.total_cents) }}</p>
-                    <p class="mt-2 text-xs text-slate-500">Incl VAT estimate</p>
+                    <p v-if="charges_vat" class="mt-2 text-xs text-slate-500">Incl VAT estimate</p>
                 </AppCard>
                 <AppCard>
                     <h3 class="text-base font-semibold text-slate-900">Next actions</h3>

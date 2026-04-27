@@ -61,6 +61,8 @@
     $total = (int) ($invoice->getRawOriginal('total_cents') ?? 0);
     $paid = (int) ($invoice->getRawOriginal('amount_paid_cents') ?? 0);
     $due = max(0, $total - $paid);
+
+    $chargesVat = $team && method_exists($team, 'chargesVat') ? $team->chargesVat() : false;
 @endphp
 
 <table class="brand">
@@ -124,12 +126,14 @@
 <table class="lines">
     <thead>
         <tr>
-            <th style="width: 48%;">Description</th>
+            <th style="width: {{ $chargesVat ? '48%' : '58%' }};">Description</th>
             <th class="num" style="width: 8%;">Qty</th>
-            <th class="num" style="width: 14%;">Unit</th>
-            <th class="num" style="width: 10%;">VAT %</th>
-            <th class="num" style="width: 10%;">VAT</th>
-            <th class="num" style="width: 14%;">Total</th>
+            <th class="num" style="width: {{ $chargesVat ? '14%' : '22%' }};">Unit</th>
+            @if($chargesVat)
+                <th class="num" style="width: 10%;">VAT %</th>
+                <th class="num" style="width: 10%;">VAT</th>
+            @endif
+            <th class="num" style="width: {{ $chargesVat ? '14%' : '12%' }};">Total</th>
         </tr>
     </thead>
     <tbody>
@@ -145,8 +149,10 @@
                 <td>{{ $line->description }}</td>
                 <td class="num">{{ rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="num">R {{ number_format($unit / 100, 2) }}</td>
-                <td class="num">{{ number_format($rate * 100, 0) }}%</td>
-                <td class="num">R {{ number_format($lineVat / 100, 2) }}</td>
+                @if($chargesVat)
+                    <td class="num">{{ number_format($rate * 100, 0) }}%</td>
+                    <td class="num">R {{ number_format($lineVat / 100, 2) }}</td>
+                @endif
                 <td class="num b">R {{ number_format($lineTotal / 100, 2) }}</td>
             </tr>
         @endforeach
@@ -155,13 +161,15 @@
 
 <table class="totals">
     <tr>
-        <td class="label">Subtotal (excl. VAT)</td>
+        <td class="label">{{ $chargesVat ? 'Subtotal (excl. VAT)' : 'Subtotal' }}</td>
         <td class="value">R {{ number_format($subtotal / 100, 2) }}</td>
     </tr>
+    @if($chargesVat)
     <tr>
         <td class="label">VAT</td>
         <td class="value">R {{ number_format($vatTotal / 100, 2) }}</td>
     </tr>
+    @endif
     <tr class="grand">
         <td class="label">Total due</td>
         <td class="value">R {{ number_format($due / 100, 2) }}</td>

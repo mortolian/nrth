@@ -117,6 +117,7 @@ class QuoteController extends Controller
 
         return Inertia::render('Invoicing/Quotes/Show', [
             'quote' => $this->serializeQuote($quote->loadMissing('client')),
+            'charges_vat' => $request->user()->currentTeam?->chargesVat() ?? false,
             'convert_defaults' => [
                 'invoice_due_date' => now()->addDays(30)->toDateString(),
                 'invoice_footer' => (string) ($quote->terms ?? ''),

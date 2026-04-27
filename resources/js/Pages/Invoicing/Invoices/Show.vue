@@ -64,6 +64,8 @@ type InvoicePayload = {
 };
 
 const props = defineProps<{
+    /** Mirrors company VAT settings: when false, VAT is not shown in totals. */
+    charges_vat: boolean;
     invoice: InvoicePayload;
     can: {
         edit: boolean;
@@ -192,7 +194,7 @@ const submitRecordPayment = () => {
                                     <th class="px-3 py-2 text-left">Description</th>
                                     <th class="px-3 py-2 text-left">Qty</th>
                                     <th class="px-3 py-2 text-left">Unit Price</th>
-                                    <th class="px-3 py-2 text-left">VAT</th>
+                                    <th v-if="charges_vat" class="px-3 py-2 text-left">VAT</th>
                                     <th class="px-3 py-2 text-left">Total</th>
                                 </tr>
                             </thead>
@@ -201,7 +203,7 @@ const submitRecordPayment = () => {
                                     <td class="px-3 py-2">{{ line.description }}</td>
                                     <td class="px-3 py-2">{{ line.quantity }}</td>
                                     <td class="px-3 py-2">{{ formatCents(line.unit_price_cents) }}</td>
-                                    <td class="px-3 py-2">{{ formatCents(line.vat_amount_cents) }}</td>
+                                    <td v-if="charges_vat" class="px-3 py-2">{{ formatCents(line.vat_amount_cents) }}</td>
                                     <td class="px-3 py-2 font-medium">{{ formatCents(line.total_cents) }}</td>
                                 </tr>
                             </tbody>
@@ -210,7 +212,7 @@ const submitRecordPayment = () => {
 
                     <div class="ml-auto w-full max-w-sm space-y-2 text-sm">
                         <div class="flex items-center justify-between"><span class="text-slate-500">Subtotal</span><span>{{ formatCents(invoice.subtotal_cents) }}</span></div>
-                        <div class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ formatCents(invoice.vat_amount_cents) }}</span></div>
+                        <div v-if="charges_vat" class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ formatCents(invoice.vat_amount_cents) }}</span></div>
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ formatCents(invoice.total_cents) }}</span></div>
                     </div>
 
