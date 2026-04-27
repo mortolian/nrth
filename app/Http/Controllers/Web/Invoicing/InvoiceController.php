@@ -258,6 +258,8 @@ class InvoiceController extends Controller
             if ($status === 'overdue') {
                 $query->whereDate('due_date', '<', $today)
                     ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value]);
+            } elseif ($status === InvoiceStatus::Sent->value) {
+                $query->whereIn('status', [InvoiceStatus::Sent->value, InvoiceStatus::Viewed->value]);
             } else {
                 $query->where('status', $status);
             }
@@ -314,7 +316,9 @@ class InvoiceController extends Controller
             });
 
         $base = Invoice::queryWithoutTeamScope()->where('team_id', $teamId);
-        $overdueRows = $base
+
+        // Clone before overdue filters — otherwise $base is mutated and draft/sent counts inherit wrong constraints.
+        $overdueRows = (clone $base)
             ->whereDate('due_date', '<', $today)
             ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value])
             ->get();

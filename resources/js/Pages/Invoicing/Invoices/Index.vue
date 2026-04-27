@@ -83,6 +83,12 @@ const clearFilters = () => {
     applyFilters();
 };
 
+/** Summary cards: apply matching status filter and reload the list. */
+const applyStatFilter = (status: string) => {
+    localFilters.value.status = status;
+    applyFilters();
+};
+
 const navigateToPage = (page: number) => {
     router.get(route('invoicing.invoices.index'), {
         ...localFilters.value,
@@ -152,13 +158,37 @@ const toggleSelected = (id: number, checked: boolean) => {
 
         <div class="space-y-6">
             <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
-                <StatCard title="Draft" :value="String(summary.draft_count)" hint="Awaiting send" trend="neutral" />
-                <StatCard title="Sent" :value="String(summary.sent_count)" hint="Awaiting payment" trend="neutral" />
-                <StatCard title="Overdue" :value="String(summary.overdue_count)" hint="Invoices past due" trend="down" />
-                <AppCard>
-                    <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue Total</p>
-                    <p class="mt-1 text-2xl font-semibold text-rose-600">{{ formatCents(summary.overdue_total) }}</p>
-                </AppCard>
+                <button
+                    type="button"
+                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                    @click="applyStatFilter('draft')"
+                >
+                    <StatCard title="Draft" :value="String(summary.draft_count)" hint="Awaiting send" trend="neutral" />
+                </button>
+                <button
+                    type="button"
+                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                    @click="applyStatFilter('sent')"
+                >
+                    <StatCard title="Sent" :value="String(summary.sent_count)" hint="Awaiting payment" trend="neutral" />
+                </button>
+                <button
+                    type="button"
+                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                    @click="applyStatFilter('overdue')"
+                >
+                    <StatCard title="Overdue" :value="String(summary.overdue_count)" hint="Invoices past due" trend="down" />
+                </button>
+                <button
+                    type="button"
+                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                    @click="applyStatFilter('overdue')"
+                >
+                    <AppCard class="h-full">
+                        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue total</p>
+                        <p class="mt-1 text-2xl font-semibold text-rose-600">{{ formatCents(summary.overdue_total) }}</p>
+                    </AppCard>
+                </button>
             </div>
 
             <AppCard>
