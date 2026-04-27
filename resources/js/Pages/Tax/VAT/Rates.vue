@@ -94,13 +94,13 @@ const removeVatRate = (rateId: number) => {
 
 <template>
     <AppLayout
-        title="Manage VAT rates"
+        title="VAT rates"
         :breadcrumbs="[
             { label: 'Tax' },
-            { label: 'Manage VAT rates' },
+            { label: 'VAT rates' },
         ]"
     >
-        <PageHeader title="Manage VAT rates" subtitle="Create and maintain VAT options used across invoices and expenses" />
+        <PageHeader title="VAT rates" subtitle="Create and maintain VAT options used across invoices and expenses" />
 
         <AppCard class="mt-5">
             <div class="grid gap-3 md:grid-cols-6">

@@ -17,23 +17,23 @@ This guide covers production deployment. Set `APP_NAME` in `.env` for the applic
 ### 1) Prepare host
 
 - Install Docker Engine + Docker Compose plugin.
-- Create a deployment directory, for example `/opt/pennies`.
+- Create a deployment directory, for example `/opt/nrth`.
 
 ### 2) Deploy release archive
 
 1. Copy release files:
-   - `pennies-<version>.tar.gz`
-   - `pennies-<version>.tar.gz.sha256`
+   - `nrth-<version>.tar.gz`
+   - `nrth-<version>.tar.gz.sha256`
 2. Verify checksum:
    ```bash
-   ARCHIVE="pennies-<version>.tar.gz"
+   ARCHIVE="nrth-<version>.tar.gz"
    EXPECTED="$(cat "${ARCHIVE}.sha256")"
    ACTUAL="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
    [ "$EXPECTED" = "$ACTUAL" ] && echo "Checksum OK"
    ```
 3. Extract:
    ```bash
-   tar -xzf pennies-<version>.tar.gz
+   tar -xzf nrth-<version>.tar.gz
    ```
 
 ### 3) Configure environment
@@ -93,7 +93,7 @@ php artisan app:install
   - `php artisan queue:work --sleep=1 --tries=3 --timeout=120`
 - Add cron entry for scheduler:
   ```cron
-  * * * * * cd /path/to/pennies && php artisan schedule:run >> /dev/null 2>&1
+  * * * * * cd /path/to/nrth && php artisan schedule:run >> /dev/null 2>&1
   ```
 
 ## Backups

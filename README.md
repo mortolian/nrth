@@ -55,7 +55,7 @@ npx shadcn-vue@latest add button
 
 ## Docker Compose (self-hosted)
 
-One image (`docker/Dockerfile`, PHP **8.4** + **Swoole**, **Redis**, **pgsql**, **GD**, **Horizon**) powers **app** (Laravel **Octane** on port **8000**), **worker** (**Supervisor** + **Horizon**), and **scheduler** (`php artisan schedule:work`). Data services: **PostgreSQL 16**, **Redis 7**, **MinIO** (S3 API **9000**, console **9001**). The `createbuckets` one-shot service creates the `pennies` bucket.
+One image (`docker/Dockerfile`, PHP **8.4** + **Swoole**, **Redis**, **pgsql**, **GD**, **Horizon**) powers **app** (Laravel **Octane** on port **8000**), **worker** (**Supervisor** + **Horizon**), and **scheduler** (`php artisan schedule:work`). Data services: **PostgreSQL 16**, **Redis 7**, **MinIO** (S3 API **9000**, console **9001**). The `createbuckets` one-shot service creates the `nrth` bucket.
 
 ```bash
 docker compose build
@@ -66,7 +66,7 @@ Replace the example `APP_KEY` and MinIO credentials in `compose.yaml` (or inject
 
 ## Laravel Sail (local)
 
-[Sail](https://laravel.com/docs/sail) uses **`compose.sail.yaml`** so it does not replace the production **`compose.yaml`**. Services mirror that stack: **PostgreSQL 16**, **Redis 7**, **MinIO** (API **9000**, console **9001**), **Mailpit** (SMTP **1025**, UI **8025**), plus **`createbuckets`** for the `pennies` bucket. The app container is **`laravel.test`** (PHP **8.4** + Swoole from Sail’s runtime).
+[Sail](https://laravel.com/docs/sail) uses **`compose.sail.yaml`** so it does not replace the production **`compose.yaml`**. Services mirror that stack: **PostgreSQL 16**, **Redis 7**, **MinIO** (API **9000**, console **9001**), **Mailpit** (SMTP **1025**, UI **8025**), plus **`createbuckets`** for the `nrth` bucket. The app container is **`laravel.test`** (PHP **8.4** + Swoole from Sail’s runtime).
 
 ```bash
 composer sail -- up -d

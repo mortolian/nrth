@@ -10,7 +10,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { useAppDisplayName } from '@/lib/appName';
 
-const STORAGE_KEY = 'pennies_onboarding_v1';
+const STORAGE_KEY = 'nrth_onboarding_v1';
 
 const appDisplayName = useAppDisplayName();
 

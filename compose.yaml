@@ -137,7 +137,7 @@ services:
       args:
         VITE_APP_NAME: "${VITE_APP_NAME}"
         APP_TITLE: "${APP_NAME}"
-    image: pennies:local
+    image: nrth:local
     ports:
       - "${APP_PORT:-8000}:8000"
       - "${VITE_PORT:-5173}:5173"
@@ -179,7 +179,7 @@ services:
       start_period: 120s
 
   worker:
-    image: pennies:local
+    image: nrth:local
     environment:
       <<: *laravel-env
       DB_HOST: postgres
@@ -212,7 +212,7 @@ services:
       start_period: 60s
 
   scheduler:
-    image: pennies:local
+    image: nrth:local
     environment:
       <<: *laravel-env
       DB_HOST: postgres

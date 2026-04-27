@@ -32,7 +32,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
 import { useAppDisplayName } from '@/lib/appName';
 
-const NAV_SECTIONS_EXPANDED_KEY = 'pennies:nav-sections-expanded:v1';
+const NAV_SECTIONS_EXPANDED_KEY = 'nrth:nav-sections-expanded:v1';
 const SETTINGS_SECTION_LABEL = 'Settings';
 
 function loadNavSectionsExpanded(): Record<string, boolean> {
@@ -118,7 +118,7 @@ const navItems: MenuItem[] = [
             title: 'Tax',
             items: [
                 { label: 'VAT Returns', href: route('tax.vat.index') },
-                { label: 'Manage VAT rates', href: route('tax.vat-rates.index') },
+                { label: 'VAT rates', href: route('tax.vat-rates.index') },
                 { label: 'Tax Periods', href: route('tax.provisional.index') },
                 { label: 'Documents', href: route('tax.documents.index') },
             ],

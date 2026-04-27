@@ -1,6 +1,6 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "pennies/pennies",
+    "name": "nrth/nrth",
     "type": "project",
     "description": "Contractor accounting and finance (Laravel 13 + Jetstream + Inertia).",
     "keywords": ["laravel", "inertia", "jetstream", "accounting"],

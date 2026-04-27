@@ -59,7 +59,7 @@ if [ "${DOCKER_ROLE:-app}" = "app" ]; then
         echo "Waiting for PostgreSQL..."
         tries=60
         while [ "$tries" -gt 0 ]; do
-            if pg_isready -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "${DB_USERNAME:-pennies}" -d "${DB_DATABASE:-pennies}" >/dev/null 2>&1; then
+            if pg_isready -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "${DB_USERNAME:-nrth}" -d "${DB_DATABASE:-nrth}" >/dev/null 2>&1; then
                 break
             fi
             tries=$((tries - 1))
