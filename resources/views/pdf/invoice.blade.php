@@ -5,14 +5,24 @@
 @php
     $team = $invoice->team;
     $client = $invoice->client;
-    $settings = method_exists($team, 'mergedCompanySettings') ? $team->mergedCompanySettings() : [];
+    $settings = $team ? $team->mergedCompanySettings() : \App\Models\Team::defaultCompanySettings();
 
-    $companyName = $settings['trading_name'] ?? ($team?->name ?? config('app.name'));
-    $companyVat = $settings['vat_number'] ?? null;
-    $companyReg = $settings['registration_number'] ?? null;
-    $companyEmail = $settings['company_email'] ?? null;
-    $companyPhone = $settings['company_phone'] ?? null;
-    $companyWebsite = $settings['company_website'] ?? null;
+    $issuer = $team ? $team->issuerForInvoicingDocuments() : [
+        'name' => config('app.name'),
+        'address' => null,
+        'email' => null,
+        'phone' => null,
+        'website' => null,
+        'registration_number' => null,
+        'vat_number' => null,
+    ];
+    $companyName = $issuer['name'];
+    $companyVat = $issuer['vat_number'];
+    $companyReg = $issuer['registration_number'];
+    $companyEmail = $issuer['email'];
+    $companyPhone = $issuer['phone'];
+    $companyWebsite = $issuer['website'];
+    $physical = $issuer['address'] ?? '';
 
     $bank = [
         'name' => $settings['bank_name'] ?? null,
@@ -22,24 +32,6 @@
         'type' => $settings['bank_account_type'] ?? null,
     ];
     $hasBankDetails = collect($bank)->filter()->isNotEmpty();
-
-    $showStreetOnPdf = (bool) ($settings['invoice_show_street_address'] ?? true);
-    $physical = trim(collect(
-        $showStreetOnPdf
-            ? [
-                $settings['physical_street'] ?? null,
-                $settings['physical_city'] ?? null,
-                $settings['physical_province'] ?? null,
-                $settings['physical_postal_code'] ?? null,
-                $settings['physical_country'] ?? null,
-            ]
-            : [
-                $settings['physical_city'] ?? null,
-                $settings['physical_province'] ?? null,
-                $settings['physical_postal_code'] ?? null,
-                $settings['physical_country'] ?? null,
-            ]
-    )->filter()->implode(', '));
 
     $clientAddress = is_array($client?->address)
         ? trim(collect([
@@ -75,11 +67,9 @@
             @endif
             <div class="company-name">{{ $companyName }}</div>
             @if($physical)<div class="company-line">{{ $physical }}</div>@endif
-            <div class="company-line">
-                @if($companyEmail){{ $companyEmail }}@endif
-                @if($companyPhone) &middot; {{ $companyPhone }}@endif
-                @if($companyWebsite) &middot; {{ $companyWebsite }}@endif
-            </div>
+            @if($companyEmail)<div class="company-line">{{ $companyEmail }}</div>@endif
+            @if($companyPhone)<div class="company-line">{{ $companyPhone }}</div>@endif
+            @if($companyWebsite)<div class="company-line">{{ $companyWebsite }}</div>@endif
             <div class="company-line small">
                 @if($companyReg)Reg: {{ $companyReg }}@endif
                 @if($companyVat) &middot; VAT: {{ $companyVat }}@endif

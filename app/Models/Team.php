@@ -156,6 +156,64 @@ class Team extends JetstreamTeam implements HasMedia
     }
 
     /**
+     * Issuer / "from" block for invoices, quotes, previews, PDFs, and client-facing emails.
+     *
+     * @return array{
+     *     name: string,
+     *     address: string|null,
+     *     email: string|null,
+     *     phone: string|null,
+     *     website: string|null,
+     *     registration_number: string|null,
+     *     vat_number: string|null,
+     * }
+     */
+    public function issuerForInvoicingDocuments(): array
+    {
+        $settings = $this->mergedCompanySettings();
+
+        $trading = trim((string) ($settings['trading_name'] ?? ''));
+        $name = $trading !== '' ? $trading : (string) $this->name;
+
+        $showStreet = (bool) ($settings['invoice_show_street_address'] ?? true);
+        $physicalParts = $showStreet
+            ? [
+                $settings['physical_street'] ?? null,
+                $settings['physical_city'] ?? null,
+                $settings['physical_province'] ?? null,
+                $settings['physical_postal_code'] ?? null,
+                $settings['physical_country'] ?? null,
+            ]
+            : [
+                $settings['physical_city'] ?? null,
+                $settings['physical_province'] ?? null,
+                $settings['physical_postal_code'] ?? null,
+                $settings['physical_country'] ?? null,
+            ];
+
+        $address = trim(collect($physicalParts)->filter()->implode(', '));
+        $address = $address !== '' ? $address : null;
+
+        $nullIfEmpty = static function (mixed $v): ?string {
+            if ($v === null || $v === '') {
+                return null;
+            }
+
+            return (string) $v;
+        };
+
+        return [
+            'name' => $name,
+            'address' => $address,
+            'email' => $nullIfEmpty($settings['company_email'] ?? null),
+            'phone' => $nullIfEmpty($settings['company_phone'] ?? null),
+            'website' => $nullIfEmpty($settings['company_website'] ?? null),
+            'registration_number' => $nullIfEmpty($settings['registration_number'] ?? null),
+            'vat_number' => $nullIfEmpty($settings['vat_number'] ?? null),
+        ];
+    }
+
+    /**
      * Whether invoices/quotes may apply VAT: VAT-registered in settings and a valid default VAT rate is configured.
      */
     public function chargesVat(): bool

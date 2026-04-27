@@ -346,7 +346,7 @@ class InvoiceController extends Controller
     {
         abort_unless($invoice->team_id === request()->user()->current_team_id, 403);
 
-        $invoice->loadMissing(['client', 'lineItems', 'payments.transaction']);
+        $invoice->loadMissing(['team', 'client', 'lineItems', 'payments.transaction']);
 
         $totalCents = (int) $invoice->getRawOriginal('total_cents');
         $paidCents = (int) $invoice->getRawOriginal('amount_paid_cents');
@@ -363,7 +363,20 @@ class InvoiceController extends Controller
                 ->get();
         }
 
+        $issuer = $invoice->team !== null
+            ? $invoice->team->issuerForInvoicingDocuments()
+            : [
+                'name' => (string) config('app.name'),
+                'address' => null,
+                'email' => null,
+                'phone' => null,
+                'website' => null,
+                'registration_number' => null,
+                'vat_number' => null,
+            ];
+
         return Inertia::render('Invoicing/Invoices/Show', [
+            'issuer' => $issuer,
             'invoice' => [
                 'id' => $invoice->id,
                 'number' => $invoice->number,
@@ -435,7 +448,7 @@ class InvoiceController extends Controller
                 ],
                 PaymentMethod::cases()
             ),
-            'charges_vat' => request()->user()->currentTeam?->chargesVat() ?? false,
+            'charges_vat' => $invoice->team?->chargesVat() ?? false,
         ]);
     }
 

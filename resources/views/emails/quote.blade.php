@@ -20,7 +20,7 @@
         <p><strong>Notes:</strong> {{ $quote->notes }}</p>
     @endif
 
-    <p>Kind regards,<br>{{ $quote->team?->name ?? config('app.name') }}</p>
+    <p>Kind regards,<br>{{ $issuer_name }}</p>
 </body>
 </html>
 

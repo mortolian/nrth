@@ -21,6 +21,6 @@
         If you need any help, reply to this email.
     </p>
 
-    <p>Kind regards,<br>{{ $invoice->team?->name ?? config('app.name') }}</p>
+    <p>Kind regards,<br>{{ $issuer_name }}</p>
 </body>
 </html>

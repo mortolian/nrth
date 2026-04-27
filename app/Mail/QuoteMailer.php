@@ -24,16 +24,29 @@ class QuoteMailer extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $this->quote->loadMissing('team');
+        $fromName = $this->quote->team !== null
+            ? $this->quote->team->issuerForInvoicingDocuments()['name']
+            : config('app.name');
+
         return new Envelope(
-            subject: 'Quote '.$this->quote->number.' from '.($this->quote->team?->name ?? config('app.name')),
+            subject: 'Quote '.$this->quote->number.' from '.$fromName,
         );
     }
 
     public function content(): Content
     {
+        $this->quote->loadMissing('team');
+        $issuerName = $this->quote->team !== null
+            ? $this->quote->team->issuerForInvoicingDocuments()['name']
+            : config('app.name');
+
         return new Content(
             view: 'emails.quote',
-            with: ['quote' => $this->quote],
+            with: [
+                'quote' => $this->quote,
+                'issuer_name' => $issuerName,
+            ],
         );
     }
 
@@ -51,4 +64,3 @@ class QuoteMailer extends Mailable implements ShouldQueue
         ];
     }
 }
-

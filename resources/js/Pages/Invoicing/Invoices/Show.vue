@@ -3,10 +3,17 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { useAppDisplayName } from '@/lib/appName';
 import { CalendarClock, CheckCircle2, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
 
-const appDisplayName = useAppDisplayName();
+type Issuer = {
+    name: string;
+    address: string | null;
+    email: string | null;
+    phone: string | null;
+    website: string | null;
+    registration_number: string | null;
+    vat_number: string | null;
+};
 
 type PaymentMethodOption = { value: string; label: string };
 type InvoicePayload = {
@@ -59,6 +66,7 @@ type InvoicePayload = {
 };
 
 const props = defineProps<{
+    issuer: Issuer;
     /** Mirrors company VAT settings: when false, VAT is not shown in totals. */
     charges_vat: boolean;
     invoice: InvoicePayload;
@@ -86,6 +94,17 @@ const paymentForm = ref({
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
 const documentTitle = computed(() => (props.charges_vat ? 'Tax invoice' : 'Invoice'));
+
+const issuerRegLine = computed(() => {
+    const parts: string[] = [];
+    if (props.issuer.registration_number) {
+        parts.push(`Reg: ${props.issuer.registration_number}`);
+    }
+    if (props.issuer.vat_number) {
+        parts.push(`VAT: ${props.issuer.vat_number}`);
+    }
+    return parts.length ? parts.join(' · ') : null;
+});
 
 const statusBadgeVariant = computed(() => {
     if (props.invoice.status === 'paid') return 'success';
@@ -205,8 +224,12 @@ const submitRecordPayment = () => {
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">From</p>
-                            <p class="mt-1 text-sm font-medium text-slate-900">{{ appDisplayName }}</p>
-                            <p class="text-sm text-slate-600">South Africa</p>
+                            <p class="mt-1 text-sm font-medium text-slate-900">{{ issuer.name }}</p>
+                            <p v-if="issuer.address" class="text-sm text-slate-600">{{ issuer.address }}</p>
+                            <p v-if="issuer.email" class="text-sm text-slate-600">{{ issuer.email }}</p>
+                            <p v-if="issuer.phone" class="text-sm text-slate-600">{{ issuer.phone }}</p>
+                            <p v-if="issuer.website" class="text-sm text-slate-600">{{ issuer.website }}</p>
+                            <p v-if="issuerRegLine" class="mt-0.5 text-xs text-slate-500">{{ issuerRegLine }}</p>
                         </div>
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">Bill To</p>
