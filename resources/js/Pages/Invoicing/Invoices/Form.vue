@@ -21,6 +21,8 @@ type InvoiceLine = {
 };
 
 const props = defineProps<{
+    /** When false, VAT is not applied (company not VAT-registered or no default VAT rate). */
+    charges_vat: boolean;
     isEditing: boolean;
     invoice: null | {
         id: number;
@@ -46,7 +48,14 @@ const props = defineProps<{
     };
 }>();
 
-const defaultVatRate = computed(() => props.tax_rates.find((rate) => rate.is_default)?.rate ?? 0.15);
+const chargesVat = computed(() => props.charges_vat);
+
+const defaultVatRate = computed(() => {
+    if (!chargesVat.value) {
+        return 0;
+    }
+    return props.tax_rates.find((rate) => rate.is_default)?.rate ?? props.tax_rates[0]?.rate ?? 0;
+});
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
 const newClientHref = computed(() => route('invoicing.clients.create', {
@@ -93,13 +102,16 @@ const inertiaErrors = computed(() => {
     });
 });
 
-/** Options for VAT select; default rate when team has no tax_rates rows yet. */
+/** Options for VAT select when VAT applies. */
 const taxRateSelectOptions = computed(() => {
+    if (!chargesVat.value) {
+        return [{ label: 'No VAT', value: '0' }];
+    }
     if (props.tax_rates.length) {
         return props.tax_rates.map((rate) => ({ label: rate.name, value: String(rate.rate) }));
     }
 
-    return [{ label: '15%', value: String(defaultVatRate.value) }];
+    return [{ label: 'No VAT', value: '0' }];
 });
 
 const { setErrors, values, setFieldValue } = useForm({
@@ -328,6 +340,9 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                 </AppCard>
 
                 <AppCard>
+                    <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        VAT is not applied on this invoice. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
+                    </p>
                     <div class="mb-3 flex items-center justify-between">
                         <h3 class="text-base font-semibold text-slate-900">Line items</h3>
                         <AppButton size="sm" variant="secondary" @click="addLine">
@@ -385,6 +400,7 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                         <AppSelect
                                             :model-value="String(line.vat_rate)"
                                             :options="taxRateSelectOptions"
+                                            :disabled="!chargesVat"
                                             @update:model-value="updateLine(index, 'vat_rate', Number($event))"
                                         />
                                     </td>

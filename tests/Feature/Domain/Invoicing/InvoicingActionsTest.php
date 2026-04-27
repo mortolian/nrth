@@ -25,6 +25,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Services\InvoicePdfService;
 use App\Mail\InvoiceMailer;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
+use App\Domain\Tax\Models\TaxRate;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,6 +50,17 @@ class InvoicingActionsTest extends TestCase
         $team = $user->currentTeam;
         $this->actingTeamContext($user, $team);
         $client = Client::factory()->for($team)->create();
+
+        $taxRate = TaxRate::factory()->for($team)->create([
+            'is_default' => true,
+            'rate' => 0.15,
+        ]);
+        $team->forceFill([
+            'company_settings' => array_replace($team->company_settings ?? [], [
+                'vat_registered' => true,
+                'default_tax_rate_id' => $taxRate->id,
+            ]),
+        ])->save();
 
         $dto = new CreateInvoiceDTO(
             teamId: $team->id,

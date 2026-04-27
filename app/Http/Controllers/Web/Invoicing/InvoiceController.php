@@ -51,6 +51,7 @@ class InvoiceController extends Controller
         $invoice->loadMissing(['lineItems', 'payments']);
         $amountPaid = (int) $invoice->getRawOriginal('amount_paid_cents');
         $amountDue = max(0, (int) $invoice->getRawOriginal('total_cents') - $amountPaid);
+        $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
 
         return Inertia::render('Invoicing/Invoices/Form', [
             'isEditing' => true,
@@ -74,7 +75,7 @@ class InvoiceController extends Controller
                     'description' => $item->description,
                     'quantity' => (float) $item->quantity,
                     'unit_price' => round(((int) $item->unit_price_cents) / 100, 2),
-                    'vat_rate' => (float) $item->vat_rate,
+                    'vat_rate' => $chargesVat ? (float) $item->vat_rate : 0.0,
                 ])->values()->all(),
             ],
             ...$this->formMeta($request),
@@ -115,7 +116,11 @@ class InvoiceController extends Controller
 
         $payload = $this->validateInvoice($request, $invoice);
 
-        DB::transaction(function () use ($invoice, $payload): void {
+        $team = $request->user()->currentTeam;
+        $chargesVat = $team?->chargesVat() ?? false;
+        $defaultVatRate = $team?->defaultVatRateForInvoicing() ?? 0.0;
+
+        DB::transaction(function () use ($invoice, $payload, $chargesVat, $defaultVatRate): void {
             $issueDate = Carbon::parse((string) $payload['issue_date']);
             $dueDate = Carbon::parse((string) $payload['due_date']);
 
@@ -138,7 +143,9 @@ class InvoiceController extends Controller
             foreach ($payload['line_items'] as $index => $line) {
                 $quantity = (float) $line['quantity'];
                 $unitPriceCents = (int) $line['unit_price_cents'];
-                $vatRate = isset($line['vat_rate']) ? (float) $line['vat_rate'] : 0.0;
+                $vatRate = $chargesVat
+                    ? (float) ($line['vat_rate'] ?? $defaultVatRate)
+                    : 0.0;
 
                 $lineSubtotal = (int) round($quantity * $unitPriceCents);
                 $lineVat = (int) round($lineSubtotal * $vatRate);
@@ -461,6 +468,7 @@ class InvoiceController extends Controller
                 'clients' => [],
                 'tax_rates' => [],
                 'accounts' => [],
+                'charges_vat' => false,
                 'next_number' => 'INV-'.now()->format('Y').'-0001',
                 'defaults' => [
                     'payment_terms_days' => 30,
@@ -478,6 +486,8 @@ class InvoiceController extends Controller
         $numberService = app(InvoiceNumberService::class);
         $nextNumber = $numberService->formatNumber($teamId, $year, $next?->next_number ?? 1, now());
 
+        $chargesVat = $team->chargesVat();
+
         return [
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
@@ -490,19 +500,22 @@ class InvoiceController extends Controller
                     'payment_terms_days' => (int) $client->payment_terms_days,
                 ])
                 ->all(),
-            'tax_rates' => TaxRate::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('is_active', true)
-                ->orderByDesc('is_default')
-                ->orderBy('name')
-                ->get(['id', 'name', 'rate', 'is_default'])
-                ->map(fn (TaxRate $taxRate) => [
-                    'id' => $taxRate->id,
-                    'name' => $taxRate->name,
-                    'rate' => $taxRate->rate !== null ? (float) $taxRate->rate : 0.0,
-                    'is_default' => (bool) $taxRate->is_default,
-                ])
-                ->all(),
+            'tax_rates' => $chargesVat
+                ? TaxRate::queryWithoutTeamScope()
+                    ->where('team_id', $teamId)
+                    ->where('is_active', true)
+                    ->orderByDesc('is_default')
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'rate', 'is_default'])
+                    ->map(fn (TaxRate $taxRate) => [
+                        'id' => $taxRate->id,
+                        'name' => $taxRate->name,
+                        'rate' => $taxRate->rate !== null ? (float) $taxRate->rate : 0.0,
+                        'is_default' => (bool) $taxRate->is_default,
+                    ])
+                    ->all()
+                : [],
+            'charges_vat' => $chargesVat,
             'accounts' => Account::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('type', AccountType::Income->value)

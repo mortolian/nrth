@@ -8,7 +8,9 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Quote;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
+use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +69,8 @@ class QuoteController extends Controller
     {
         $teamId = (int) $request->user()->current_team_id;
 
+        $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
+
         return Inertia::render('Invoicing/Quotes/Form', [
             'isEditing' => false,
             'quote' => null,
@@ -78,6 +82,8 @@ class QuoteController extends Controller
                 ->map(fn (Client $client) => ['id' => $client->id, 'name' => $client->name])
                 ->values()
                 ->all(),
+            'tax_rates' => $this->taxRatesForQuoteForm($teamId, $chargesVat),
+            'charges_vat' => $chargesVat,
             'next_number' => $this->nextQuoteNumber($teamId),
         ]);
     }
@@ -86,10 +92,11 @@ class QuoteController extends Controller
     {
         abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
         $teamId = (int) $request->user()->current_team_id;
+        $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
 
         return Inertia::render('Invoicing/Quotes/Form', [
             'isEditing' => true,
-            'quote' => $this->serializeQuote($quote->loadMissing('client')),
+            'quote' => $this->serializeQuote($quote->loadMissing('client'), $chargesVat),
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
@@ -98,6 +105,8 @@ class QuoteController extends Controller
                 ->map(fn (Client $client) => ['id' => $client->id, 'name' => $client->name])
                 ->values()
                 ->all(),
+            'tax_rates' => $this->taxRatesForQuoteForm($teamId, $chargesVat),
+            'charges_vat' => $chargesVat,
             'next_number' => $this->nextQuoteNumber($teamId),
         ]);
     }
@@ -120,7 +129,9 @@ class QuoteController extends Controller
     {
         $payload = $this->validateQuote($request, null);
         $teamId = (int) $request->user()->current_team_id;
-        [$subtotal, $vat, $total] = $this->calculateTotals($payload['line_items']);
+        $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
+        $lineItems = $this->normalizeQuoteLineItemsVat($payload['line_items'], $chargesVat);
+        [$subtotal, $vat, $total] = $this->calculateTotals($lineItems);
 
         $submitAction = (string) ($payload['submit_action'] ?? 'draft');
         $quote = Quote::query()->create([
@@ -134,7 +145,7 @@ class QuoteController extends Controller
             'vat_amount_cents' => $vat,
             'total_cents' => $total,
             'currency' => 'ZAR',
-            'line_items' => $payload['line_items'],
+            'line_items' => $lineItems,
             'notes' => $payload['notes'] ?? null,
             'terms' => $payload['terms'] ?? null,
             'sent_at' => null,
@@ -151,7 +162,9 @@ class QuoteController extends Controller
     {
         abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
         $payload = $this->validateQuote($request, $quote);
-        [$subtotal, $vat, $total] = $this->calculateTotals($payload['line_items']);
+        $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
+        $lineItems = $this->normalizeQuoteLineItemsVat($payload['line_items'], $chargesVat);
+        [$subtotal, $vat, $total] = $this->calculateTotals($lineItems);
 
         $quote->update([
             'client_id' => (int) $payload['client_id'],
@@ -161,7 +174,7 @@ class QuoteController extends Controller
             'subtotal_cents' => $subtotal,
             'vat_amount_cents' => $vat,
             'total_cents' => $total,
-            'line_items' => $payload['line_items'],
+            'line_items' => $lineItems,
             'notes' => $payload['notes'] ?? null,
             'terms' => $payload['terms'] ?? null,
         ]);
@@ -208,6 +221,10 @@ class QuoteController extends Controller
         ]);
 
         $invoice = DB::transaction(function () use ($quote, $invoiceNumberService, $payload): Invoice {
+            $team = Team::query()->findOrFail((int) $quote->team_id);
+            $chargesVat = $team->chargesVat();
+            $defaultVatRate = $team->defaultVatRateForInvoicing();
+
             $invoice = Invoice::query()->create([
                 'team_id' => $quote->team_id,
                 'client_id' => $quote->client_id,
@@ -216,19 +233,24 @@ class QuoteController extends Controller
                 'reference' => 'Converted from '.$quote->number,
                 'issue_date' => now()->toDateString(),
                 'due_date' => (string) $payload['invoice_due_date'],
-                'subtotal_cents' => (int) $quote->getRawOriginal('subtotal_cents'),
-                'vat_amount_cents' => (int) $quote->getRawOriginal('vat_amount_cents'),
-                'total_cents' => (int) $quote->getRawOriginal('total_cents'),
+                'subtotal_cents' => 0,
+                'vat_amount_cents' => 0,
+                'total_cents' => 0,
                 'amount_paid_cents' => 0,
                 'currency' => $quote->currency ?? 'ZAR',
                 'notes' => $payload['invoice_notes'] ?? null,
                 'footer' => $payload['invoice_footer'] ?? null,
             ]);
 
+            $subtotalCents = 0;
+            $vatCents = 0;
+
             foreach ((array) $quote->line_items as $index => $line) {
                 $quantity = (float) ($line['quantity'] ?? 1);
                 $unitPriceCents = (int) ($line['unit_price_cents'] ?? 0);
-                $vatRate = (float) ($line['vat_rate'] ?? 0);
+                $vatRate = $chargesVat
+                    ? (float) ($line['vat_rate'] ?? $defaultVatRate)
+                    : 0.0;
                 $lineSubtotal = (int) round($quantity * $unitPriceCents);
                 $lineVat = (int) round($lineSubtotal * $vatRate);
 
@@ -241,14 +263,23 @@ class QuoteController extends Controller
                     'total_cents' => $lineSubtotal + $lineVat,
                     'sort_order' => $index,
                 ]);
+
+                $subtotalCents += $lineSubtotal;
+                $vatCents += $lineVat;
             }
+
+            $invoice->update([
+                'subtotal_cents' => $subtotalCents,
+                'vat_amount_cents' => $vatCents,
+                'total_cents' => $subtotalCents + $vatCents,
+            ]);
 
             $quote->update([
                 'status' => QuoteStatus::Converted,
                 'converted_invoice_id' => $invoice->id,
             ]);
 
-            return $invoice;
+            return $invoice->fresh();
         });
 
         return to_route('invoicing.invoices.show', $invoice);
@@ -305,10 +336,59 @@ class QuoteController extends Controller
     }
 
     /**
+     * @param  array<int, array<string, mixed>>  $lineItems
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeQuoteLineItemsVat(array $lineItems, bool $chargesVat): array
+    {
+        return collect($lineItems)
+            ->map(function (array $line) use ($chargesVat): array {
+                $line['vat_rate'] = $chargesVat ? (float) ($line['vat_rate'] ?? 0) : 0.0;
+
+                return $line;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, name: string, rate: float, is_default: bool}>
+     */
+    private function taxRatesForQuoteForm(int $teamId, bool $chargesVat): array
+    {
+        if (! $chargesVat) {
+            return [];
+        }
+
+        return TaxRate::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get(['id', 'name', 'rate', 'is_default'])
+            ->map(fn (TaxRate $taxRate) => [
+                'id' => $taxRate->id,
+                'name' => $taxRate->name,
+                'rate' => $taxRate->rate !== null ? (float) $taxRate->rate : 0.0,
+                'is_default' => (bool) $taxRate->is_default,
+            ])
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function serializeQuote(Quote $quote): array
+    private function serializeQuote(Quote $quote, bool $teamChargesVat = true): array
     {
+        $lines = collect($quote->line_items ?? [])->map(function ($line) use ($teamChargesVat) {
+            $row = is_array($line) ? $line : (array) $line;
+            if (! $teamChargesVat) {
+                $row['vat_rate'] = 0.0;
+            }
+
+            return $row;
+        })->values()->all();
+
         return [
             'id' => $quote->id,
             'number' => $quote->number,
@@ -320,7 +400,7 @@ class QuoteController extends Controller
             'subtotal_cents' => (int) $quote->getRawOriginal('subtotal_cents'),
             'vat_amount_cents' => (int) $quote->getRawOriginal('vat_amount_cents'),
             'status' => $quote->status->value,
-            'line_items' => $quote->line_items ?? [],
+            'line_items' => $lines,
             'notes' => $quote->notes,
             'terms' => $quote->terms,
             'converted_invoice_id' => $quote->converted_invoice_id,

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Tax\Models\TaxRate;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Jetstream\Events\TeamCreated;
@@ -112,5 +113,44 @@ class Team extends JetstreamTeam implements HasMedia
             self::defaultCompanySettings(),
             $this->company_settings ?? []
         );
+    }
+
+    /**
+     * Whether invoices/quotes may apply VAT: VAT-registered in settings and a valid default VAT rate is configured.
+     */
+    public function chargesVat(): bool
+    {
+        $settings = $this->mergedCompanySettings();
+        if (! filter_var($settings['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
+        $taxRateId = $settings['default_tax_rate_id'] ?? null;
+        if ($taxRateId === null || $taxRateId === '' || (int) $taxRateId <= 0) {
+            return false;
+        }
+
+        return TaxRate::queryWithoutTeamScope()
+            ->where('team_id', $this->id)
+            ->whereKey((int) $taxRateId)
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    /** Effective default VAT rate (0–1) for new line items; 0 when VAT must not be charged. */
+    public function defaultVatRateForInvoicing(): float
+    {
+        if (! $this->chargesVat()) {
+            return 0.0;
+        }
+
+        $settings = $this->mergedCompanySettings();
+        $taxRateId = (int) ($settings['default_tax_rate_id'] ?? 0);
+        $rate = TaxRate::queryWithoutTeamScope()
+            ->where('team_id', $this->id)
+            ->whereKey($taxRateId)
+            ->value('rate');
+
+        return $rate !== null ? (float) $rate : 0.0;
     }
 }

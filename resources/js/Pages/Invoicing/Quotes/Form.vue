@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
@@ -7,6 +7,7 @@ import AppCard from '@/Components/AppCard.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 type ClientOption = { id: number; name: string };
+type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
 type QuoteLine = { description: string; quantity: number; unit_price_cents: number; vat_rate: number };
 type QuotePayload = {
     id: number;
@@ -23,8 +24,33 @@ const props = defineProps<{
     isEditing: boolean;
     quote: QuotePayload | null;
     clients: ClientOption[];
+    tax_rates: TaxRateOption[];
+    charges_vat: boolean;
     next_number: string;
 }>();
+
+const chargesVat = computed(() => props.charges_vat);
+
+const defaultLineVat = computed(() => {
+    if (!chargesVat.value) {
+        return 0;
+    }
+    const def = props.tax_rates.find((r) => r.is_default);
+    if (def) {
+        return def.rate;
+    }
+    return props.tax_rates[0]?.rate ?? 0;
+});
+
+const vatSelectOptions = computed(() => {
+    if (!chargesVat.value) {
+        return [{ label: 'No VAT', value: '0' }];
+    }
+    if (props.tax_rates.length) {
+        return props.tax_rates.map((r) => ({ label: `${r.name} (${(r.rate * 100).toFixed(0)}%)`, value: String(r.rate) }));
+    }
+    return [{ label: 'No VAT', value: '0' }];
+});
 
 const form = ref({
     client_id: props.quote?.client_id ?? props.clients[0]?.id ?? 0,
@@ -38,7 +64,17 @@ const form = ref({
 const lineItems = ref<QuoteLine[]>(
     props.quote?.line_items?.length
         ? props.quote.line_items.map((row) => ({ ...row }))
-        : [{ description: '', quantity: 1, unit_price_cents: 0, vat_rate: 0.15 }],
+        : [{ description: '', quantity: 1, unit_price_cents: 0, vat_rate: defaultLineVat.value }],
+);
+
+watch(
+    chargesVat,
+    (on) => {
+        if (!on) {
+            lineItems.value = lineItems.value.map((row) => ({ ...row, vat_rate: 0 }));
+        }
+    },
+    { immediate: true },
 );
 
 const totals = computed(() => {
@@ -96,9 +132,18 @@ const submit = (submitAction: 'draft' | 'send') => {
                 </AppCard>
 
                 <AppCard>
+                    <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        VAT is not applied on this quote. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
+                    </p>
                     <div class="mb-3 flex items-center justify-between">
                         <h3 class="text-base font-semibold text-slate-900">Line items</h3>
-                        <AppButton size="sm" variant="secondary" @click="lineItems.push({ description: '', quantity: 1, unit_price_cents: 0, vat_rate: 0.15 })">Add line</AppButton>
+                        <AppButton
+                            size="sm"
+                            variant="secondary"
+                            @click="lineItems.push({ description: '', quantity: 1, unit_price_cents: 0, vat_rate: defaultLineVat })"
+                        >
+                            Add line
+                        </AppButton>
                     </div>
                     <div class="space-y-3">
                         <div v-for="(row, idx) in lineItems" :key="idx" class="grid gap-2 md:grid-cols-12">
@@ -107,7 +152,8 @@ const submit = (submitAction: 'draft' | 'send') => {
                             <AppInput v-model.number="row.unit_price_cents" type="number" class="md:col-span-3" placeholder="Unit cents" />
                             <AppSelect
                                 :model-value="String(row.vat_rate)"
-                                :options="[{ label: '0%', value: '0' }, { label: '15%', value: '0.15' }]"
+                                :options="vatSelectOptions"
+                                :disabled="!chargesVat"
                                 class="md:col-span-2"
                                 @update:model-value="row.vat_rate = Number($event)"
                             />

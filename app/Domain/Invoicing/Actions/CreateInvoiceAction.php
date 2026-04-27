@@ -8,6 +8,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceLineItem;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
+use App\Models\Team;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -46,13 +47,19 @@ class CreateInvoiceAction
                 'footer' => $dto->footer,
             ]);
 
+            $team = Team::query()->findOrFail($dto->teamId);
+            $chargesVat = $team->chargesVat();
+            $defaultLineVatRate = $team->defaultVatRateForInvoicing();
+
             $subtotalCents = 0;
             $vatAmountCents = 0;
 
             foreach ($dto->lineItems as $index => $line) {
                 $quantity = (float) $line['quantity'];
                 $unitPriceCents = (int) $line['unit_price_cents'];
-                $vatRate = array_key_exists('vat_rate', $line) ? (float) $line['vat_rate'] : 0.15;
+                $vatRate = $chargesVat
+                    ? (array_key_exists('vat_rate', $line) ? (float) $line['vat_rate'] : $defaultLineVatRate)
+                    : 0.0;
 
                 $lineSubtotal = (int) round($quantity * $unitPriceCents);
                 $lineVat = (int) round($lineSubtotal * $vatRate);
