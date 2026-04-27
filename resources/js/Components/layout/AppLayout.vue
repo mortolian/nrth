@@ -275,7 +275,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </template>
                             <template #content>
                                 <div class="w-60">
-                                    <DropdownLink :href="route('settings.team')">Team and Member Settings</DropdownLink>
+                                    <a
+                                        :href="route('settings.team')"
+                                        class="block px-4 py-2 text-sm leading-5 text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+                                    >
+                                        Team and Member Settings
+                                    </a>
                                     <DropdownLink v-if="$page.props.jetstream.canCreateTeams" :href="route('teams.create')">Create Team</DropdownLink>
                                     <div class="my-2 border-t border-slate-200" />
                                     <template v-for="team in teams" :key="team.id">
@@ -401,7 +406,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         >
                             Company
                         </Link>
-                        <Link
+                        <a
                             :href="route('settings.team')"
                             :class="[
                                 'block rounded px-2 py-1 text-xs transition',
@@ -411,7 +416,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             ]"
                         >
                             Teams and Members
-                        </Link>
+                        </a>
                     </div>
                 </div>
             </aside>
@@ -572,13 +577,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         >
                             Company
                         </Link>
-                        <Link
+                        <a
                             :href="route('settings.team')"
                             class="block rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
                             @click="mobileOpen = false"
                         >
                             Teams and Members
-                        </Link>
+                        </a>
                     </div>
                 </div>
             </aside>
