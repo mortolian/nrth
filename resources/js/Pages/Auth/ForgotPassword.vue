@@ -25,7 +25,9 @@ const submit = () => {
 
     <AuthenticationCard>
         <template #logo>
-            <AuthenticationCardLogo />
+            <div class="mx-auto w-24 shrink-0 sm:w-28">
+                <AuthenticationCardLogo />
+            </div>
         </template>
 
         <div class="mb-4 text-sm text-gray-600">
@@ -53,7 +55,7 @@ const submit = () => {
 
             <div class="flex items-center justify-end mt-4">
                 <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Email Password Reset Link
+                    Email password reset link
                 </PrimaryButton>
             </div>
         </form>

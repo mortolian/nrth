@@ -94,6 +94,7 @@ const rowActionItems = (invoice: InvoiceRow) => {
     if (invoice.status === 'draft') actions.push({ id: 'send', label: 'Send' });
     if (invoice.status !== 'paid' && invoice.status !== 'void') actions.push({ id: 'record_payment', label: 'Record Payment' });
     if (invoice.status === 'draft' || invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
+    if (invoice.status === 'void') actions.push({ id: 'unvoid', label: 'Restore' });
     return actions;
 };
 
@@ -104,6 +105,8 @@ const onAction = (invoice: InvoiceRow, actionId: string) => {
         router.post(route('invoicing.invoices.send', invoice.id));
     } else if (actionId === 'void') {
         router.post(route('invoicing.invoices.void', invoice.id));
+    } else if (actionId === 'unvoid') {
+        router.post(route('invoicing.invoices.unvoid', invoice.id));
     } else if (actionId === 'record_payment') {
         selectedInvoice.value = invoice;
         paymentDrawerOpen.value = true;

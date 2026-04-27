@@ -7,6 +7,7 @@ use App\Domain\Accounting\Models\Account;
 use App\Domain\Invoicing\Actions\CreateInvoiceAction;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\SendInvoiceAction;
+use App\Domain\Invoicing\Actions\UnvoidInvoiceAction;
 use App\Domain\Invoicing\Actions\VoidInvoiceAction;
 use App\Domain\Invoicing\DTOs\CreateInvoiceDTO;
 use App\Domain\Invoicing\DTOs\RecordPaymentDTO;
@@ -183,6 +184,14 @@ class InvoiceController extends Controller
     {
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $voidInvoiceAction->execute($invoice, 'Voided from invoice UI');
+
+        return to_route('invoicing.invoices.index');
+    }
+
+    public function unvoid(Request $request, Invoice $invoice, UnvoidInvoiceAction $unvoidInvoiceAction): RedirectResponse
+    {
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+        $unvoidInvoiceAction->execute($invoice);
 
         return to_route('invoicing.invoices.index');
     }
@@ -379,6 +388,7 @@ class InvoiceController extends Controller
                 'edit' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent, InvoiceStatus::Partial], true),
                 'send' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent, InvoiceStatus::Partial], true),
                 'void' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent], true),
+                'unvoid' => $invoice->status === InvoiceStatus::Void,
                 'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
             ],
             'payment_methods' => array_map(

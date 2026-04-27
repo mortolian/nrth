@@ -69,6 +69,7 @@ const props = defineProps<{
         edit: boolean;
         send: boolean;
         void: boolean;
+        unvoid: boolean;
         record_payment: boolean;
     };
     payment_methods: PaymentMethodOption[];
@@ -101,6 +102,7 @@ const timeline = computed(() => ([
 
 const sendInvoice = () => router.post(route('invoicing.invoices.send', props.invoice.id));
 const voidInvoice = () => router.post(route('invoicing.invoices.void', props.invoice.id));
+const unvoidInvoice = () => router.post(route('invoicing.invoices.unvoid', props.invoice.id));
 const openRecordPayment = () => {
     paymentForm.value.amount = ((props.invoice.amount_due_cents || 0) / 100).toFixed(2);
     paymentDrawerOpen.value = true;
@@ -146,6 +148,7 @@ const submitRecordPayment = () => {
                     </AppButton>
                     <AppButton v-if="['sent', 'partial'].includes(invoice.status)" variant="secondary">Send Reminder</AppButton>
                     <AppButton v-if="invoice.status === 'sent' && can.void" variant="ghost" @click="voidInvoice">Void</AppButton>
+                    <AppButton v-if="invoice.status === 'void' && can.unvoid" variant="secondary" @click="unvoidInvoice">Restore</AppButton>
 
                     <AppButton v-if="invoice.status === 'paid'" variant="secondary" @click="router.visit(route('invoices.pdf.download', invoice.id))">
                         <Download class="mr-1 h-4 w-4" /> Download PDF
