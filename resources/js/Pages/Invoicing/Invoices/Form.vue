@@ -343,13 +343,7 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         VAT is not applied on this invoice. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
                     </p>
-                    <div class="mb-3 flex items-center justify-between">
-                        <h3 class="text-base font-semibold text-slate-900">Line items</h3>
-                        <AppButton size="sm" variant="secondary" @click="addLine">
-                            <Plus class="mr-1 h-4 w-4" />
-                            Add line item
-                        </AppButton>
-                    </div>
+                    <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
 
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -414,6 +408,12 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <div class="mt-3 flex justify-center border-t border-slate-200 pt-3">
+                        <AppButton size="sm" variant="secondary" @click="addLine">
+                            <Plus class="mr-1 h-4 w-4" />
+                            Add line item
+                        </AppButton>
                     </div>
                 </AppCard>
 

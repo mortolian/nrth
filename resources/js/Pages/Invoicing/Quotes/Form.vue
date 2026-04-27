@@ -135,16 +135,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         VAT is not applied on this quote. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
                     </p>
-                    <div class="mb-3 flex items-center justify-between">
-                        <h3 class="text-base font-semibold text-slate-900">Line items</h3>
-                        <AppButton
-                            size="sm"
-                            variant="secondary"
-                            @click="lineItems.push({ description: '', quantity: 1, unit_price_cents: 0, vat_rate: defaultLineVat })"
-                        >
-                            Add line
-                        </AppButton>
-                    </div>
+                    <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
                     <div class="space-y-3">
                         <div v-for="(row, idx) in lineItems" :key="idx" class="grid gap-2 md:grid-cols-12">
                             <AppInput v-model="row.description" class="md:col-span-5" placeholder="Description" />
@@ -158,6 +149,15 @@ const submit = (submitAction: 'draft' | 'send') => {
                                 @update:model-value="row.vat_rate = Number($event)"
                             />
                         </div>
+                    </div>
+                    <div class="mt-3 flex justify-center border-t border-slate-200 pt-3">
+                        <AppButton
+                            size="sm"
+                            variant="secondary"
+                            @click="lineItems.push({ description: '', quantity: 1, unit_price_cents: 0, vat_rate: defaultLineVat })"
+                        >
+                            Add line
+                        </AppButton>
                     </div>
                 </AppCard>
 
