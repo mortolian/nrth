@@ -139,7 +139,7 @@ const toggleSelected = (id: number, checked: boolean) => {
             { label: 'Invoices' },
         ]"
     >
-        <PageHeader title="Invoices" subtitle="Track and manage money in">
+        <PageHeader title="Invoices">
             <template #actions>
                 <Link
                     :href="route('invoicing.invoices.create')"

@@ -145,36 +145,59 @@ const submitRecordPayment = () => {
             { label: invoice.number },
         ]"
     >
-        <PageHeader :title="invoice.number" :subtitle="`${documentTitle} · Issued ${invoice.issue_date ?? '-'}`">
-            <template #actions>
-                <div class="flex flex-wrap items-center gap-2">
-                    <AppButton variant="secondary" @click="downloadPdf">
-                        <Download class="mr-1 h-4 w-4" /> Download PDF
-                    </AppButton>
-                    <AppButton v-if="can.edit" variant="secondary" @click="router.visit(route('invoicing.invoices.edit', invoice.id))">
-                        <Edit3 class="mr-1 h-4 w-4" /> Edit
-                    </AppButton>
-                    <AppButton v-if="can.send" variant="primary" @click="sendInvoice">
-                        <Mail class="mr-1 h-4 w-4" /> {{ invoice.status === 'draft' ? 'Send invoice' : 'Resend invoice' }}
-                    </AppButton>
-                    <AppButton v-if="can.mark_sent" variant="secondary" @click="markAsSent">
-                        <CheckCircle2 class="mr-1 h-4 w-4" /> Mark as sent
-                    </AppButton>
-                    <AppButton v-if="can.delete" variant="ghost" class="text-red-600 hover:text-red-700" @click="deleteInvoice">
-                        <Trash2 class="mr-1 h-4 w-4" /> Delete
-                    </AppButton>
-
-                    <AppButton v-if="['sent', 'partial', 'overdue'].includes(invoice.status) && can.record_payment" variant="primary" @click="openRecordPayment">
-                        <Wallet class="mr-1 h-4 w-4" /> Record Payment
-                    </AppButton>
-                    <AppButton v-if="['sent', 'partial'].includes(invoice.status)" variant="secondary">Send Reminder</AppButton>
-                    <AppButton v-if="invoice.status === 'sent' && can.void" variant="ghost" @click="voidInvoice">Void</AppButton>
-                    <AppButton v-if="invoice.status === 'void' && can.unvoid" variant="secondary" @click="unvoidInvoice">Restore</AppButton>
-
-                    <AppButton v-if="['paid', 'void'].includes(invoice.status)" variant="secondary" @click="router.visit(route('invoicing.invoices.create'))">Duplicate</AppButton>
-                </div>
-            </template>
-        </PageHeader>
+        <header class="mb-6 min-w-0">
+            <h1 class="truncate whitespace-nowrap text-2xl font-semibold text-slate-900">{{ invoice.number }}</h1>
+            <p class="mt-1 truncate whitespace-nowrap text-base text-slate-500">
+                {{ documentTitle }} · Issued {{ invoice.issue_date ?? '—' }}
+            </p>
+            <div class="mt-4 flex min-w-0 flex-nowrap justify-end gap-2 overflow-x-auto pb-1">
+                <AppButton class="shrink-0" variant="secondary" @click="downloadPdf">
+                    <Download class="mr-1 h-4 w-4 shrink-0" /> Download PDF
+                </AppButton>
+                <AppButton
+                    v-if="can.edit"
+                    class="shrink-0"
+                    variant="secondary"
+                    @click="router.visit(route('invoicing.invoices.edit', invoice.id))"
+                >
+                    <Edit3 class="mr-1 h-4 w-4 shrink-0" /> Edit
+                </AppButton>
+                <AppButton v-if="can.send" class="shrink-0" variant="secondary" @click="sendInvoice">
+                    <Mail class="mr-1 h-4 w-4 shrink-0" /> {{ invoice.status === 'draft' ? 'Send invoice' : 'Resend invoice' }}
+                </AppButton>
+                <AppButton v-if="can.mark_sent" class="shrink-0" variant="secondary" @click="markAsSent">
+                    <CheckCircle2 class="mr-1 h-4 w-4 shrink-0" /> Mark as sent
+                </AppButton>
+                <AppButton
+                    v-if="['sent', 'partial', 'overdue'].includes(invoice.status) && can.record_payment"
+                    class="shrink-0"
+                    variant="secondary"
+                    @click="openRecordPayment"
+                >
+                    <Wallet class="mr-1 h-4 w-4 shrink-0" /> Record payment
+                </AppButton>
+                <AppButton v-if="['sent', 'partial'].includes(invoice.status)" class="shrink-0" variant="secondary" type="button">
+                    Send reminder
+                </AppButton>
+                <AppButton v-if="invoice.status === 'sent' && can.void" class="shrink-0" variant="secondary" @click="voidInvoice">
+                    Void
+                </AppButton>
+                <AppButton v-if="invoice.status === 'void' && can.unvoid" class="shrink-0" variant="secondary" @click="unvoidInvoice">
+                    Restore
+                </AppButton>
+                <AppButton
+                    v-if="['paid', 'void'].includes(invoice.status)"
+                    class="shrink-0"
+                    variant="secondary"
+                    @click="router.visit(route('invoicing.invoices.create'))"
+                >
+                    Duplicate
+                </AppButton>
+                <AppButton v-if="can.delete" class="shrink-0" variant="secondary" @click="deleteInvoice">
+                    <Trash2 class="mr-1 h-4 w-4 shrink-0" /> Delete
+                </AppButton>
+            </div>
+        </header>
 
         <div class="mt-5 grid gap-6 xl:grid-cols-3">
             <section class="xl:col-span-2">
