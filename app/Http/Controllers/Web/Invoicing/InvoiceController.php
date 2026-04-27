@@ -466,7 +466,7 @@ class InvoiceController extends Controller
             ->first();
 
         $numberService = app(InvoiceNumberService::class);
-        $nextNumber = $numberService->formatNumber($teamId, $year, $next?->next_number ?? 1);
+        $nextNumber = $numberService->formatNumber($teamId, $year, $next?->next_number ?? 1, now());
 
         return [
             'clients' => Client::queryWithoutTeamScope()

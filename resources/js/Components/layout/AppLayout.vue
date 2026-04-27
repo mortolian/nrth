@@ -10,7 +10,6 @@ import {
     ChartColumnBig,
     ChevronDown,
     ChevronRight,
-    Clock,
     CreditCard,
     FileText,
     FolderKanban,
@@ -128,7 +127,7 @@ const navItems: MenuItem[] = [
         label: 'Contracting',
         href: route('contracting.contracts.index'),
         icon: Briefcase,
-        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }, { label: 'Time tracking', href: route('time.index') }] }],
+        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }] }],
     },
     {
         label: 'Reports',
@@ -691,14 +690,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         >
                             <CreditCard class="h-5 w-5 shrink-0 text-brand-700" />
                             Record payment
-                        </Link>
-                        <Link
-                            :href="route('time.index')"
-                            class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
-                            @click="quickAddOpen = false"
-                        >
-                            <Clock class="h-5 w-5 shrink-0 text-brand-700" />
-                            Start timer
                         </Link>
                     </div>
                     <button

@@ -86,6 +86,8 @@ class Team extends JetstreamTeam implements HasMedia
             'company_website' => null,
             'invoice_default_payment_terms_days' => 30,
             'invoice_prefix' => 'INV',
+            'invoice_number_include_month' => false,
+            'invoice_number_use_random_suffix' => false,
             'invoice_default_notes' => null,
             'invoice_default_footer' => null,
             'invoice_email_subject_template' => 'Invoice {{number}} from {{company}}',

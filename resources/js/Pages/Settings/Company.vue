@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ActionMessage from '@/Components/ActionMessage.vue';
+import AppButton from '@/Components/AppButton.vue';
 import { Building2, ImagePlus, Trash2 } from 'lucide-vue-next';
 
 type Settings = Record<string, unknown>;
@@ -57,6 +58,8 @@ const form = useForm({
     company_website: String(props.settings.company_website ?? ''),
     invoice_default_payment_terms_days: Number(props.settings.invoice_default_payment_terms_days ?? 30),
     invoice_prefix: String(props.settings.invoice_prefix ?? 'INV'),
+    invoice_number_include_month: Boolean(props.settings.invoice_number_include_month ?? false),
+    invoice_number_use_random_suffix: Boolean(props.settings.invoice_number_use_random_suffix ?? false),
     invoice_next_sequence: props.invoice_next_sequence,
     invoice_default_notes: String(props.settings.invoice_default_notes ?? ''),
     invoice_default_footer: String(props.settings.invoice_default_footer ?? ''),
@@ -77,11 +80,16 @@ const logoPreview = ref<string | null>(null);
 const removeLogo = ref(false);
 
 const liveInvoicePreview = computed(() => {
-    const y = new Date().getFullYear();
+    const now = new Date();
+    const y = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
     const raw = (form.invoice_prefix || 'INV').trim().replace(/-+$/, '');
     const base = raw || 'INV';
     const seq = Math.max(1, Number(form.invoice_next_sequence) || 1);
-    return `${base}-${y}-${String(seq).padStart(4, '0')}`;
+    const suffix = form.invoice_number_use_random_suffix ? 'sdfg' : String(seq).padStart(4, '0');
+    return form.invoice_number_include_month
+        ? `${base}-${y}-${month}-${suffix}`
+        : `${base}-${y}-${suffix}`;
 });
 
 const displayLogo = computed(() => {
@@ -182,6 +190,8 @@ const submit = () => {
         company_website: form.company_website,
         invoice_default_payment_terms_days: form.invoice_default_payment_terms_days,
         invoice_prefix: form.invoice_prefix,
+        invoice_number_include_month: form.invoice_number_include_month,
+        invoice_number_use_random_suffix: form.invoice_number_use_random_suffix,
         invoice_next_sequence: form.invoice_next_sequence,
         invoice_default_notes: form.invoice_default_notes,
         invoice_default_footer: form.invoice_default_footer,
@@ -405,12 +415,20 @@ const submit = () => {
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Invoice prefix</label>
                         <AppInput v-model="form.invoice_prefix" placeholder="INV" />
-                        <p class="mt-1 text-xs text-slate-500">Numbers format as {{ form.invoice_prefix || 'INV' }}-YEAR-####</p>
+                        <p class="mt-1 text-xs text-slate-500">Numbers format preview: {{ liveInvoicePreview }}</p>
                     </div>
+                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
+                        <input v-model="form.invoice_number_include_month" type="checkbox" class="rounded border-slate-300">
+                        Include month number in invoice number
+                    </label>
+                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
+                        <input v-model="form.invoice_number_use_random_suffix" type="checkbox" class="rounded border-slate-300">
+                        Use random 4-character suffix instead of sequence
+                    </label>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Next sequence number (this year)</label>
-                        <AppInput v-model="form.invoice_next_sequence" type="number" min="1" />
-                        <p class="mt-1 text-xs text-slate-500">Preview: {{ liveInvoicePreview }}</p>
+                        <AppInput v-model="form.invoice_next_sequence" type="number" min="1" :disabled="form.invoice_number_use_random_suffix" />
+                        <p class="mt-1 text-xs text-slate-500">Used only when random suffix is disabled.</p>
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-medium text-slate-500">Default notes (new invoices)</label>
@@ -511,18 +529,13 @@ const submit = () => {
             </AppCard>
         </div>
 
-        <div class="mt-8 flex justify-end border-t border-slate-200 pt-6">
+        <div class="mt-8 flex items-center justify-end border-t border-slate-200 pt-6">
             <ActionMessage :on="form.recentlySuccessful" class="me-3">
                 Saved.
             </ActionMessage>
-            <button
-                type="button"
-                class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="form.processing"
-                @click="submit"
-            >
-                {{ form.processing ? 'Saving…' : 'Save changes' }}
-            </button>
+            <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing" @click="submit">
+                {{ form.processing ? 'Saving…' : 'Save' }}
+            </AppButton>
         </div>
     </AppLayout>
 </template>
