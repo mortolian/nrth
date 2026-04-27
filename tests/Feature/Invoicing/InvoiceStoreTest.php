@@ -39,7 +39,6 @@ class InvoiceStoreTest extends TestCase
             'due_date' => $due,
             'notes' => null,
             'footer' => null,
-            'submit_action' => 'draft',
             'line_items' => [
                 [
                     'description' => 'Consulting',
@@ -50,10 +49,9 @@ class InvoiceStoreTest extends TestCase
             ],
         ]);
 
-        $response->assertRedirect(route('invoicing.invoices.index'));
-
         $invoice = Invoice::query()->where('team_id', $team->id)->first();
         $this->assertNotNull($invoice);
+        $response->assertRedirect(route('invoicing.invoices.show', $invoice));
         $this->assertSame($client->id, $invoice->client_id);
         $this->assertSame(100000, (int) $invoice->getRawOriginal('subtotal_cents'));
     }

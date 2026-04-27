@@ -91,6 +91,7 @@ class Team extends JetstreamTeam implements HasMedia
             'invoice_number_use_random_suffix' => false,
             'invoice_default_notes' => null,
             'invoice_default_footer' => null,
+            'invoice_show_street_address' => true,
             'invoice_email_subject_template' => 'Invoice {{number}} from {{company}}',
             'invoice_email_body_template' => "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{company}}",
             'vat_registered' => true,

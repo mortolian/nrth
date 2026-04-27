@@ -4,7 +4,7 @@ import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useAppDisplayName } from '@/lib/appName';
-import { CalendarClock, CircleDot, Download, Edit3, Mail, Wallet } from 'lucide-vue-next';
+import { CalendarClock, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
 
 const appDisplayName = useAppDisplayName();
 
@@ -56,11 +56,6 @@ type InvoicePayload = {
         event: string | null;
         created_at: string | null;
     }>;
-    attachments: Array<{
-        id: number;
-        name: string;
-        url: string;
-    }>;
 };
 
 const props = defineProps<{
@@ -73,6 +68,7 @@ const props = defineProps<{
         void: boolean;
         unvoid: boolean;
         record_payment: boolean;
+        delete: boolean;
     };
     payment_methods: PaymentMethodOption[];
 }>();
@@ -87,6 +83,8 @@ const paymentForm = ref({
 });
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+
+const documentTitle = computed(() => (props.charges_vat ? 'Tax invoice' : 'Invoice'));
 
 const statusBadgeVariant = computed(() => {
     if (props.invoice.status === 'paid') return 'success';
@@ -105,6 +103,17 @@ const timeline = computed(() => ([
 const sendInvoice = () => router.post(route('invoicing.invoices.send', props.invoice.id));
 const voidInvoice = () => router.post(route('invoicing.invoices.void', props.invoice.id));
 const unvoidInvoice = () => router.post(route('invoicing.invoices.unvoid', props.invoice.id));
+
+const deleteInvoice = () => {
+    if (!window.confirm('Permanently delete this invoice? This cannot be undone.')) {
+        return;
+    }
+    router.delete(route('invoicing.invoices.destroy', props.invoice.id));
+};
+
+const downloadPdf = () => {
+    window.location.assign(route('invoices.pdf.download', props.invoice.id));
+};
 const openRecordPayment = () => {
     paymentForm.value.amount = ((props.invoice.amount_due_cents || 0) / 100).toFixed(2);
     paymentDrawerOpen.value = true;
@@ -134,16 +143,21 @@ const submitRecordPayment = () => {
             { label: invoice.number },
         ]"
     >
-        <PageHeader :title="invoice.number" :subtitle="`Issued ${invoice.issue_date ?? '-'}`">
+        <PageHeader :title="invoice.number" :subtitle="`${documentTitle} · Issued ${invoice.issue_date ?? '-'}`">
             <template #actions>
                 <div class="flex flex-wrap items-center gap-2">
-                    <AppButton v-if="invoice.status === 'draft' && can.edit" variant="secondary" @click="router.visit(route('invoicing.invoices.edit', invoice.id))">
+                    <AppButton variant="secondary" @click="downloadPdf">
+                        <Download class="mr-1 h-4 w-4" /> Download PDF
+                    </AppButton>
+                    <AppButton v-if="can.edit" variant="secondary" @click="router.visit(route('invoicing.invoices.edit', invoice.id))">
                         <Edit3 class="mr-1 h-4 w-4" /> Edit
                     </AppButton>
-                    <AppButton v-if="invoice.status === 'draft' && can.send" variant="primary" @click="sendInvoice">
-                        <Mail class="mr-1 h-4 w-4" /> Send Invoice
+                    <AppButton v-if="can.send" variant="primary" @click="sendInvoice">
+                        <Mail class="mr-1 h-4 w-4" /> {{ invoice.status === 'draft' ? 'Send invoice' : 'Resend invoice' }}
                     </AppButton>
-                    <AppButton v-if="invoice.status === 'draft' && can.void" variant="ghost" @click="voidInvoice">Delete</AppButton>
+                    <AppButton v-if="can.delete" variant="ghost" class="text-red-600 hover:text-red-700" @click="deleteInvoice">
+                        <Trash2 class="mr-1 h-4 w-4" /> Delete
+                    </AppButton>
 
                     <AppButton v-if="['sent', 'partial', 'overdue'].includes(invoice.status) && can.record_payment" variant="primary" @click="openRecordPayment">
                         <Wallet class="mr-1 h-4 w-4" /> Record Payment
@@ -152,9 +166,6 @@ const submitRecordPayment = () => {
                     <AppButton v-if="invoice.status === 'sent' && can.void" variant="ghost" @click="voidInvoice">Void</AppButton>
                     <AppButton v-if="invoice.status === 'void' && can.unvoid" variant="secondary" @click="unvoidInvoice">Restore</AppButton>
 
-                    <AppButton v-if="invoice.status === 'paid'" variant="secondary" @click="router.visit(route('invoices.pdf.download', invoice.id))">
-                        <Download class="mr-1 h-4 w-4" /> Download PDF
-                    </AppButton>
                     <AppButton v-if="['paid', 'void'].includes(invoice.status)" variant="secondary" @click="router.visit(route('invoicing.invoices.create'))">Duplicate</AppButton>
                 </div>
             </template>
@@ -163,10 +174,6 @@ const submitRecordPayment = () => {
         <div class="mt-5 grid gap-6 xl:grid-cols-3">
             <section class="xl:col-span-2">
                 <AppCard class="space-y-5">
-                    <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        This is a preview - download PDF for the official document.
-                    </div>
-
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">From</p>
@@ -276,15 +283,6 @@ const submitRecordPayment = () => {
                     <p v-else class="mt-3 text-sm text-slate-500">No activity logged yet.</p>
                 </AppCard>
 
-                <AppCard>
-                    <h3 class="text-base font-semibold text-slate-900">Attachments</h3>
-                    <ul v-if="invoice.attachments.length" class="mt-2 space-y-1 text-sm">
-                        <li v-for="attachment in invoice.attachments" :key="attachment.id">
-                            <a :href="attachment.url" class="text-brand-700 hover:underline">{{ attachment.name }}</a>
-                        </li>
-                    </ul>
-                    <p v-else class="mt-3 text-sm text-slate-500">No attachments.</p>
-                </AppCard>
             </aside>
         </div>
 

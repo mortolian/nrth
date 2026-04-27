@@ -47,6 +47,7 @@ class InvoiceController extends Controller
     public function edit(Request $request, Invoice $invoice): Response
     {
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+        abort_if($invoice->status === InvoiceStatus::Void, 403);
 
         $invoice->loadMissing(['lineItems', 'payments']);
         $amountPaid = (int) $invoice->getRawOriginal('amount_paid_cents');
@@ -82,7 +83,7 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function store(Request $request, CreateInvoiceAction $createInvoiceAction, SendInvoiceAction $sendInvoiceAction): RedirectResponse
+    public function store(Request $request, CreateInvoiceAction $createInvoiceAction): RedirectResponse
     {
         $payload = $this->validateInvoice($request, null);
         $teamId = (int) $request->user()->current_team_id;
@@ -103,16 +104,13 @@ class InvoiceController extends Controller
             $invoice->update(['number' => (string) $payload['number']]);
         }
 
-        if (($payload['submit_action'] ?? 'draft') === 'send') {
-            $sendInvoiceAction->execute($invoice);
-        }
-
-        return to_route('invoicing.invoices.index');
+        return to_route('invoicing.invoices.show', $invoice->fresh());
     }
 
-    public function update(Request $request, Invoice $invoice, SendInvoiceAction $sendInvoiceAction): RedirectResponse
+    public function update(Request $request, Invoice $invoice): RedirectResponse
     {
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+        abort_if($invoice->status === InvoiceStatus::Void, 403);
 
         $payload = $this->validateInvoice($request, $invoice);
 
@@ -172,9 +170,24 @@ class InvoiceController extends Controller
             ]);
         });
 
-        if (($payload['submit_action'] ?? 'draft') === 'send') {
-            $sendInvoiceAction->execute($invoice->fresh());
+        return to_route('invoicing.invoices.show', $invoice->fresh());
+    }
+
+    public function destroy(Request $request, Invoice $invoice): RedirectResponse
+    {
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+
+        if ($invoice->payments()->exists()) {
+            return to_route('invoicing.invoices.show', $invoice)
+                ->withErrors([
+                    'delete' => __('Invoices with recorded payments cannot be deleted.'),
+                ]);
         }
+
+        DB::transaction(function () use ($invoice): void {
+            $invoice->clearMediaCollection('invoice-pdfs');
+            $invoice->delete();
+        });
 
         return to_route('invoicing.invoices.index');
     }
@@ -184,7 +197,7 @@ class InvoiceController extends Controller
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $sendInvoiceAction->execute($invoice);
 
-        return to_route('invoicing.invoices.index');
+        return to_route('invoicing.invoices.show', $invoice->fresh());
     }
 
     public function void(Request $request, Invoice $invoice, VoidInvoiceAction $voidInvoiceAction): RedirectResponse
@@ -262,6 +275,7 @@ class InvoiceController extends Controller
         }
 
         $invoices = $query
+            ->withCount('payments')
             ->orderByDesc('issue_date')
             ->paginate(15)
             ->withQueryString()
@@ -286,6 +300,7 @@ class InvoiceController extends Controller
                     'days_overdue' => $isOverdue
                         ? abs(Carbon::parse($invoice->due_date)->diffInDays(Carbon::parse($today)))
                         : 0,
+                    'can_delete' => (int) $invoice->payments_count === 0,
                 ];
             });
 
@@ -385,18 +400,14 @@ class InvoiceController extends Controller
                     'event' => $activity->event,
                     'created_at' => optional($activity->created_at)?->toIso8601String(),
                 ])->values()->all(),
-                'attachments' => $invoice->pdfs()->map(fn ($media) => [
-                    'id' => $media->id,
-                    'name' => $media->file_name,
-                    'url' => route('invoices.pdf.download', $invoice),
-                ])->values()->all(),
             ],
             'can' => [
-                'edit' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent, InvoiceStatus::Partial], true),
+                'edit' => $invoice->status !== InvoiceStatus::Void,
                 'send' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent, InvoiceStatus::Partial], true),
-                'void' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent], true),
+                'void' => $invoice->status === InvoiceStatus::Sent,
                 'unvoid' => $invoice->status === InvoiceStatus::Void,
                 'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
+                'delete' => ! $invoice->payments()->exists(),
             ],
             'payment_methods' => array_map(
                 fn (PaymentMethod $method) => [
@@ -559,7 +570,6 @@ class InvoiceController extends Controller
             'due_date' => ['required', 'date', 'after_or_equal:issue_date'],
             'notes' => ['nullable', 'string'],
             'footer' => ['nullable', 'string'],
-            'submit_action' => ['nullable', Rule::in(['draft', 'send'])],
             'line_items' => ['required', 'array', 'min:1'],
             'line_items.*.description' => ['required', 'string', 'max:65535'],
             'line_items.*.quantity' => ['required', 'numeric', 'gt:0'],

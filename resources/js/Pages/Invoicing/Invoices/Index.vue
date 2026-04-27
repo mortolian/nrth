@@ -16,6 +16,7 @@ type InvoiceRow = {
     status: string;
     is_overdue: boolean;
     days_overdue: number;
+    can_delete: boolean;
 };
 
 const props = defineProps<{
@@ -93,8 +94,9 @@ const rowActionItems = (invoice: InvoiceRow) => {
     const actions = [{ id: 'view', label: 'View' }];
     if (invoice.status === 'draft') actions.push({ id: 'send', label: 'Send' });
     if (invoice.status !== 'paid' && invoice.status !== 'void') actions.push({ id: 'record_payment', label: 'Record Payment' });
-    if (invoice.status === 'draft' || invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
+    if (invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
     if (invoice.status === 'void') actions.push({ id: 'unvoid', label: 'Restore' });
+    if (invoice.can_delete) actions.push({ id: 'delete', label: 'Delete' });
     return actions;
 };
 
@@ -110,6 +112,13 @@ const onAction = (invoice: InvoiceRow, actionId: string) => {
     } else if (actionId === 'record_payment') {
         selectedInvoice.value = invoice;
         paymentDrawerOpen.value = true;
+    } else if (actionId === 'delete') {
+        if (!window.confirm(`Permanently delete invoice ${invoice.number}? This cannot be undone.`)) {
+            return;
+        }
+        router.delete(route('invoicing.invoices.destroy', invoice.id), {
+            preserveScroll: true,
+        });
     }
 };
 
@@ -250,6 +259,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                                 size="sm"
                                 variant="secondary"
                                 class="min-h-10"
+                                :class="action.id === 'delete' ? 'text-red-600 hover:text-red-700' : ''"
                                 @click="onAction(invoice, action.id)"
                             >
                                 {{ action.label }}
@@ -332,6 +342,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                                     :key="`${invoice.id}-${action.id}`"
                                     size="sm"
                                     variant="ghost"
+                                    :class="action.id === 'delete' ? 'text-red-600 hover:text-red-700' : ''"
                                     @click="onAction(invoice, action.id)"
                                 >
                                     {{ action.label }}

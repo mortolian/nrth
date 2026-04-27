@@ -32,6 +32,9 @@ const props = defineProps<{
     quote: Quote;
     /** When false, VAT rows are hidden in totals (company not VAT-registered / no default rate). */
     charges_vat: boolean;
+    can: {
+        delete: boolean;
+    };
     convert_defaults: {
         invoice_due_date: string;
         invoice_footer: string;
@@ -63,6 +66,17 @@ const submitConvert = () => {
         },
     });
 };
+
+const downloadPdf = () => {
+    window.location.assign(route('invoicing.quotes.pdf.download', props.quote.id));
+};
+
+const deleteQuote = () => {
+    if (!window.confirm('Permanently delete this quote? This cannot be undone.')) {
+        return;
+    }
+    router.delete(route('invoicing.quotes.destroy', props.quote.id));
+};
 </script>
 
 <template>
@@ -80,7 +94,7 @@ const submitConvert = () => {
             <template #actions>
                 <div class="flex gap-2">
                     <AppButton variant="secondary" @click="router.visit(route('invoicing.quotes.edit', quote.id))">Edit quote</AppButton>
-                    <AppButton variant="secondary" @click="router.visit(route('invoicing.quotes.pdf.download', quote.id))">Download PDF</AppButton>
+                    <AppButton variant="secondary" @click="downloadPdf">Download PDF</AppButton>
                     <AppButton v-if="quote.status === 'draft'" variant="secondary" @click="router.post(route('invoicing.quotes.send', quote.id))">Send</AppButton>
                     <AppButton v-if="quote.status === 'sent'" variant="secondary" @click="router.post(route('invoicing.quotes.accept', quote.id))">Mark accepted</AppButton>
                     <AppButton v-if="quote.status === 'sent'" variant="ghost" @click="router.post(route('invoicing.quotes.decline', quote.id))">Decline</AppButton>
@@ -97,6 +111,14 @@ const submitConvert = () => {
                         @click="router.visit(route('invoicing.invoices.show', quote.converted_invoice_id))"
                     >
                         View invoice
+                    </AppButton>
+                    <AppButton
+                        v-if="can.delete"
+                        variant="ghost"
+                        class="text-red-600 hover:text-red-700"
+                        @click="deleteQuote"
+                    >
+                        Delete
                     </AppButton>
                 </div>
             </template>

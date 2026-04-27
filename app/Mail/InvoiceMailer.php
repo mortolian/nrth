@@ -24,17 +24,23 @@ class InvoiceMailer extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $this->invoice->loadMissing('team');
+        $prefix = $this->invoice->team?->chargesVat() ? 'Tax invoice' : 'Invoice';
+
         return new Envelope(
-            subject: 'Invoice '.$this->invoice->number.' from '.($this->invoice->team?->name ?? config('app.name')),
+            subject: $prefix.' '.$this->invoice->number.' from '.($this->invoice->team?->name ?? config('app.name')),
         );
     }
 
     public function content(): Content
     {
+        $this->invoice->loadMissing('team');
+
         return new Content(
             view: 'emails.invoice',
             with: [
                 'invoice' => $this->invoice,
+                'is_tax_invoice' => $this->invoice->team?->chargesVat() ?? false,
             ],
         );
     }

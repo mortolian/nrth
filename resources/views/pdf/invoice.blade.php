@@ -2,10 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Invoice {{ $invoice->number }}</title>
-    @include('pdf._styles')
-</head>
-<body>
 @php
     $team = $invoice->team;
     $client = $invoice->client;
@@ -27,13 +23,23 @@
     ];
     $hasBankDetails = collect($bank)->filter()->isNotEmpty();
 
-    $physical = trim(collect([
-        $settings['physical_street'] ?? null,
-        $settings['physical_city'] ?? null,
-        $settings['physical_province'] ?? null,
-        $settings['physical_postal_code'] ?? null,
-        $settings['physical_country'] ?? null,
-    ])->filter()->implode(', '));
+    $showStreetOnPdf = (bool) ($settings['invoice_show_street_address'] ?? true);
+    $physical = trim(collect(
+        $showStreetOnPdf
+            ? [
+                $settings['physical_street'] ?? null,
+                $settings['physical_city'] ?? null,
+                $settings['physical_province'] ?? null,
+                $settings['physical_postal_code'] ?? null,
+                $settings['physical_country'] ?? null,
+            ]
+            : [
+                $settings['physical_city'] ?? null,
+                $settings['physical_province'] ?? null,
+                $settings['physical_postal_code'] ?? null,
+                $settings['physical_country'] ?? null,
+            ]
+    )->filter()->implode(', '));
 
     $clientAddress = is_array($client?->address)
         ? trim(collect([
@@ -63,7 +69,12 @@
     $due = max(0, $total - $paid);
 
     $chargesVat = $team && method_exists($team, 'chargesVat') ? $team->chargesVat() : false;
+    $documentTitle = $chargesVat ? 'Tax Invoice' : 'Invoice';
 @endphp
+    <title>{{ $documentTitle }} {{ $invoice->number }}</title>
+    @include('pdf._styles')
+</head>
+<body>
 
 <table class="brand">
     <tr>
@@ -84,7 +95,7 @@
             </div>
         </td>
         <td class="doc-cell">
-            <h1>Tax Invoice</h1>
+            <h1>{{ $documentTitle }}</h1>
             <div class="pill {{ $statusClass }}">{{ $statusLabel }}</div>
             <div class="doc-meta">
                 <div><span class="label">Invoice #</span> &nbsp; <span class="b">{{ $invoice->number }}</span></div>
@@ -206,7 +217,7 @@
 @endif
 
 <div class="footer">
-    {{ $companyName }} &middot; Invoice {{ $invoice->number }} &middot; Generated {{ now()->format('d M Y') }}
+    {{ $companyName }} &middot; {{ $documentTitle }} {{ $invoice->number }} &middot; Generated {{ now()->format('d M Y') }}
 </div>
 </body>
 </html>

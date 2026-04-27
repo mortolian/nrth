@@ -117,6 +117,9 @@ class QuoteController extends Controller
 
         return Inertia::render('Invoicing/Quotes/Show', [
             'quote' => $this->serializeQuote($quote->loadMissing('client')),
+            'can' => [
+                'delete' => true,
+            ],
             'charges_vat' => $request->user()->currentTeam?->chargesVat() ?? false,
             'convert_defaults' => [
                 'invoice_due_date' => now()->addDays(30)->toDateString(),
@@ -284,6 +287,18 @@ class QuoteController extends Controller
         });
 
         return to_route('invoicing.invoices.show', $invoice);
+    }
+
+    public function destroy(Request $request, Quote $quote): RedirectResponse
+    {
+        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
+
+        DB::transaction(function () use ($quote): void {
+            $quote->clearMediaCollection('quote-pdfs');
+            $quote->delete();
+        });
+
+        return to_route('invoicing.quotes.index');
     }
 
     /**

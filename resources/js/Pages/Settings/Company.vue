@@ -60,6 +60,7 @@ const form = useForm({
     invoice_prefix: String(props.settings.invoice_prefix ?? 'INV'),
     invoice_number_include_month: Boolean(props.settings.invoice_number_include_month ?? false),
     invoice_number_use_random_suffix: Boolean(props.settings.invoice_number_use_random_suffix ?? false),
+    invoice_show_street_address: Boolean(props.settings.invoice_show_street_address ?? true),
     invoice_next_sequence: props.invoice_next_sequence,
     invoice_default_notes: String(props.settings.invoice_default_notes ?? ''),
     invoice_default_footer: String(props.settings.invoice_default_footer ?? ''),
@@ -192,6 +193,7 @@ const submit = () => {
         invoice_prefix: form.invoice_prefix,
         invoice_number_include_month: form.invoice_number_include_month,
         invoice_number_use_random_suffix: form.invoice_number_use_random_suffix,
+        invoice_show_street_address: form.invoice_show_street_address,
         invoice_next_sequence: form.invoice_next_sequence,
         invoice_default_notes: form.invoice_default_notes,
         invoice_default_footer: form.invoice_default_footer,
@@ -424,6 +426,15 @@ const submit = () => {
                     <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
                         <input v-model="form.invoice_number_use_random_suffix" type="checkbox" class="rounded border-slate-300">
                         Use random 4-character suffix instead of sequence
+                    </label>
+                    <label class="mt-6 flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
+                        <input v-model="form.invoice_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300">
+                        <span>
+                            Show street address on invoice and quote PDFs
+                            <span class="mt-0.5 block text-xs font-normal text-slate-500">
+                                When unchecked, only city, province, postal code and country appear under your company name. Email, phone and website on those PDFs are unchanged.
+                            </span>
+                        </span>
                     </label>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Next sequence number (this year)</label>

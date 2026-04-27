@@ -219,12 +219,7 @@ const removeLine = (index: number) => {
     }]);
 };
 
-const openPreview = () => {
-    if (!props.isEditing || !props.invoice?.id) return;
-    window.open(route('invoices.pdf.download', props.invoice.id), '_blank');
-};
-
-const onSubmit = (submitAction: 'draft' | 'send') => {
+const onSave = () => {
     // Read `values` directly: nested line rows use v-model on shared objects; vee-validate's
     // handleSubmit() can pass a stale snapshot that omits those edits.
     const result = invoiceSchema.safeParse(formValues.value);
@@ -240,7 +235,6 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
     const { line_items: lineItems, ...rest } = result.data;
     const payload = {
         ...rest,
-        submit_action: submitAction,
         line_items: lineItems.map((line) => ({
             description: line.description,
             quantity: Number(line.quantity),
@@ -459,13 +453,6 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
                                 @input="setFieldValue('footer', ($event.target as HTMLTextAreaElement).value)"
                             />
                         </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Attachments</label>
-                            <p class="text-xs leading-relaxed text-slate-500">
-                                PDFs are generated when you download or send an invoice from its detail page. Uploading extra files here is not supported yet.
-                            </p>
-                        </div>
-                        <AppButton :disabled="!isEditing" variant="secondary" @click="openPreview">Invoice preview (PDF)</AppButton>
                     </div>
                 </AppCard>
             </div>
@@ -474,8 +461,7 @@ const onSubmit = (submitAction: 'draft' | 'send') => {
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
             <div class="flex items-center justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('invoicing.invoices.index'))">Cancel</AppButton>
-                <AppButton variant="secondary" :disabled="!canSaveInvoice" @click="onSubmit('draft')">Save as Draft</AppButton>
-                <AppButton variant="primary" :disabled="!canSaveInvoice" @click="onSubmit('send')">Save and Send</AppButton>
+                <AppButton variant="primary" :disabled="!canSaveInvoice" @click="onSave">Save</AppButton>
             </div>
         </div>
     </AppLayout>

@@ -18,13 +18,23 @@
     $companyPhone = $settings['company_phone'] ?? null;
     $companyWebsite = $settings['company_website'] ?? null;
 
-    $physical = trim(collect([
-        $settings['physical_street'] ?? null,
-        $settings['physical_city'] ?? null,
-        $settings['physical_province'] ?? null,
-        $settings['physical_postal_code'] ?? null,
-        $settings['physical_country'] ?? null,
-    ])->filter()->implode(', '));
+    $showStreetOnPdf = (bool) ($settings['invoice_show_street_address'] ?? true);
+    $physical = trim(collect(
+        $showStreetOnPdf
+            ? [
+                $settings['physical_street'] ?? null,
+                $settings['physical_city'] ?? null,
+                $settings['physical_province'] ?? null,
+                $settings['physical_postal_code'] ?? null,
+                $settings['physical_country'] ?? null,
+            ]
+            : [
+                $settings['physical_city'] ?? null,
+                $settings['physical_province'] ?? null,
+                $settings['physical_postal_code'] ?? null,
+                $settings['physical_country'] ?? null,
+            ]
+    )->filter()->implode(', '));
 
     $clientAddress = is_array($client?->address)
         ? trim(collect([
