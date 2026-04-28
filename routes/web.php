@@ -9,21 +9,21 @@ use App\Http\Controllers\Web\Contracting\ContractController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ExpensesController;
 use App\Http\Controllers\Web\InvoicePdfController;
-use App\Http\Controllers\Web\QuotePdfController;
 use App\Http\Controllers\Web\Invoicing\ClientController;
+use App\Http\Controllers\Web\Invoicing\ExchangeRateController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\Invoicing\QuoteController;
 use App\Http\Controllers\Web\OnboardingController;
+use App\Http\Controllers\Web\QuotePdfController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\CompanySettingsController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
 use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
-use App\Http\Controllers\Web\Tax\VatRateController;
 use App\Http\Controllers\Web\Tax\VATController;
+use App\Http\Controllers\Web\Tax\VatRateController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/', function () {
     return auth()->check()
@@ -98,6 +98,7 @@ Route::middleware([
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
 
+        Route::get('/exchange-rate', ExchangeRateController::class)->name('exchange-rate');
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
         Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');

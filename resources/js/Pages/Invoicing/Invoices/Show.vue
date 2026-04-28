@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { CalendarClock, CheckCircle2, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
 
@@ -68,6 +69,8 @@ type InvoicePayload = {
 
 const props = defineProps<{
     issuer: Issuer;
+    /** Company default currency (settings); for internal FX hint only. */
+    company_currency: string;
     /** Mirrors company VAT settings: when false, VAT is not shown in totals. */
     charges_vat: boolean;
     invoice: InvoicePayload;
@@ -308,6 +311,14 @@ const submitRecordPayment = () => {
                         <div v-if="charges_vat" class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ formatCents(invoice.vat_amount_cents) }}</span></div>
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ formatCents(invoice.total_cents) }}</span></div>
                     </div>
+
+                    <InvoiceInternalCurrencyApprox
+                        class="mt-3"
+                        :invoice-currency="invoice.currency"
+                        :company-currency="company_currency"
+                        :total-cents="invoice.total_cents"
+                        :amount-due-cents="invoice.amount_due_cents"
+                    />
 
                     <div v-if="invoice.notes" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Notes</p>

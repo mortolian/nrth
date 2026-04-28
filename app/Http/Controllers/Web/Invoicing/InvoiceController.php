@@ -379,8 +379,13 @@ class InvoiceController extends Controller
                 'vat_number' => null,
             ];
 
+        $companyCurrency = Iso4217Currencies::normalize(
+            (string) ($invoice->team?->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+        );
+
         return Inertia::render('Invoicing/Invoices/Show', [
             'issuer' => $issuer,
+            'company_currency' => $companyCurrency,
             'invoice' => [
                 'id' => $invoice->id,
                 'number' => $invoice->number,

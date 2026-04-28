@@ -5,6 +5,7 @@ import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
@@ -531,6 +532,13 @@ const onSave = () => {
                         <div v-if="isEditing" class="flex items-center justify-between"><span>Amount paid</span><span>{{ formatCents(totals.amountPaid) }}</span></div>
                         <div class="flex items-center justify-between text-base font-bold text-slate-900"><span>Amount due</span><span>{{ formatCents(totals.amountDue) }}</span></div>
                     </div>
+                    <InvoiceInternalCurrencyApprox
+                        class="mt-3"
+                        :invoice-currency="displayCurrency"
+                        :company-currency="default_currency"
+                        :total-cents="totals.total"
+                        :amount-due-cents="totals.amountDue"
+                    />
                 </AppCard>
             </div>
 
