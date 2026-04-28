@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { Filter, X } from 'lucide-vue-next';
 
@@ -197,13 +198,13 @@ const toggleSelected = (id: number, checked: boolean) => {
 
             <AppCard>
                 <div class="flex flex-col gap-4">
-                    <div class="flex flex-wrap items-center gap-2">
+                    <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
                         <button
                             v-for="status in statusOptions"
                             :key="status.value"
                             type="button"
                             :class="[
-                                'min-h-11 rounded-md border px-3 py-2 text-sm transition md:min-h-0 md:py-1.5',
+                                'shrink-0 whitespace-nowrap rounded-md border px-3 py-2 text-sm transition md:py-1.5',
                                 localFilters.status === status.value
                                     ? 'border-brand-500 bg-brand-50 text-brand-700'
                                     : 'border-slate-200 text-slate-600 hover:bg-slate-50',
@@ -268,15 +269,22 @@ const toggleSelected = (id: number, checked: boolean) => {
                         @click="onAction(invoice, 'view')"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <div>
+                            <div class="min-w-0 flex-1">
                                 <p class="font-semibold text-slate-900">{{ invoice.number }}</p>
                                 <p class="text-sm text-slate-600">{{ invoice.client_name }}</p>
                             </div>
-                            <AppBadge
-                                :variant="invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : invoice.is_overdue ? 'danger' : 'info'"
-                            >
-                                {{ invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void' ? 'overdue' : invoice.status }}
-                            </AppBadge>
+                            <div class="flex shrink-0 items-center gap-1.5">
+                                <AppBadge
+                                    :variant="invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : invoice.is_overdue ? 'danger' : 'info'"
+                                >
+                                    {{ invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void' ? 'overdue' : invoice.status }}
+                                </AppBadge>
+                                <InvoiceRowActionsMenu
+                                    :actions="rowActionItems(invoice)"
+                                    :aria-label="`Actions for ${invoice.number}`"
+                                    @select="(id) => onAction(invoice, id)"
+                                />
+                            </div>
                         </div>
                         <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
                             <span>Due <DateDisplay :value="invoice.due_date" /></span>
@@ -286,19 +294,6 @@ const toggleSelected = (id: number, checked: boolean) => {
                             <span class="text-slate-500">Due</span>
                             <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">{{ formatRowCents(invoice.amount_due, invoice.currency) }}</span>
                         </div>
-                        <div class="mt-3 flex flex-wrap gap-2" @click.stop>
-                            <AppButton
-                                v-for="action in rowActionItems(invoice)"
-                                :key="`m-${invoice.id}-${action.id}`"
-                                size="sm"
-                                variant="secondary"
-                                class="min-h-10"
-                                :class="action.id === 'delete' ? 'text-red-600 hover:text-red-700' : ''"
-                                @click="onAction(invoice, action.id)"
-                            >
-                                {{ action.label }}
-                            </AppButton>
-                        </div>
                     </button>
                     <div v-if="!invoices.data.length" class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
                         No invoices match. Try filters or create a new invoice.
@@ -307,16 +302,17 @@ const toggleSelected = (id: number, checked: boolean) => {
 
                 <div class="hidden md:block">
                     <AppTable
+                    table-class="min-w-[920px]"
                     :columns="[
-                        { key: 'select', label: '' },
-                        { key: 'number', label: 'Number', sortable: true },
-                        { key: 'client', label: 'Client name', sortable: true },
-                        { key: 'issue', label: 'Issue date', sortable: true },
-                        { key: 'due', label: 'Due date', sortable: true },
-                        { key: 'total', label: 'Total', sortable: true },
-                        { key: 'amount_due', label: 'Amount Due', sortable: true },
-                        { key: 'status', label: 'Status', sortable: true },
-                        { key: 'actions', label: 'Actions' },
+                        { key: 'select', label: '', widthClass: 'w-10 shrink-0' },
+                        { key: 'number', label: 'Invoice #', sortable: true, widthClass: 'whitespace-nowrap' },
+                        { key: 'client', label: 'Client', sortable: true, widthClass: 'w-[11rem] min-w-[8rem] max-w-[13rem]' },
+                        { key: 'issue', label: 'Issued', sortable: true, widthClass: 'whitespace-nowrap' },
+                        { key: 'due', label: 'Due', sortable: true, widthClass: 'whitespace-nowrap' },
+                        { key: 'total', label: 'Total', sortable: true, widthClass: 'whitespace-nowrap text-right tabular-nums' },
+                        { key: 'amount_due', label: 'Outstanding', sortable: true, widthClass: 'whitespace-nowrap text-right tabular-nums' },
+                        { key: 'status', label: 'Status', sortable: true, widthClass: 'whitespace-nowrap' },
+                        { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
                     ]"
                     :page="invoices.current_page"
                     :last-page="invoices.last_page"
@@ -331,7 +327,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                         ]"
                         @click="onAction(invoice, 'view')"
                     >
-                        <td class="px-4 py-3" @click.stop>
+                        <td class="px-3 py-3 align-middle" @click.stop>
                             <input
                                 type="checkbox"
                                 :checked="selected.includes(invoice.id)"
@@ -339,7 +335,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                                 @change="toggleSelected(invoice.id, ($event.target as HTMLInputElement).checked)"
                             >
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="whitespace-nowrap px-3 py-3 align-middle">
                             <a
                                 :href="route('invoicing.invoices.show', invoice.id)"
                                 class="font-medium text-brand-700 hover:underline"
@@ -348,39 +344,36 @@ const toggleSelected = (id: number, checked: boolean) => {
                                 {{ invoice.number }}
                             </a>
                         </td>
-                        <td class="px-4 py-3">{{ invoice.client_name }}</td>
-                        <td class="px-4 py-3"><DateDisplay :value="invoice.issue_date" /></td>
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-2">
-                                <DateDisplay :value="invoice.due_date" />
+                        <td class="max-w-[13rem] px-3 py-3 align-middle">
+                            <span class="block truncate text-slate-700" :title="invoice.client_name">{{ invoice.client_name }}</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 align-middle text-slate-700"><DateDisplay :value="invoice.issue_date" /></td>
+                        <td class="whitespace-nowrap px-3 py-3 align-middle">
+                            <div class="flex flex-nowrap items-center gap-1.5">
+                                <span class="text-slate-700"><DateDisplay :value="invoice.due_date" /></span>
                                 <AppBadge v-if="invoice.is_overdue" variant="danger">{{ invoice.days_overdue }}d</AppBadge>
                             </div>
                         </td>
-                        <td class="px-4 py-3">{{ formatRowCents(invoice.total, invoice.currency) }}</td>
-                        <td class="px-4 py-3">
+                        <td class="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums text-slate-700">{{ formatRowCents(invoice.total, invoice.currency) }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums">
                             <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">
                                 {{ formatRowCents(invoice.amount_due, invoice.currency) }}
                             </span>
                         </td>
-                        <td class="px-4 py-3">
+                        <td class="whitespace-nowrap px-3 py-3 align-middle">
                             <AppBadge
                                 :variant="invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : invoice.is_overdue ? 'danger' : 'info'"
                             >
                                 {{ invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void' ? 'overdue' : invoice.status }}
                             </AppBadge>
                         </td>
-                        <td class="px-4 py-3" @click.stop>
-                            <div class="flex flex-wrap gap-1">
-                                <AppButton
-                                    v-for="action in rowActionItems(invoice)"
-                                    :key="`${invoice.id}-${action.id}`"
-                                    size="sm"
-                                    variant="ghost"
-                                    :class="action.id === 'delete' ? 'text-red-600 hover:text-red-700' : ''"
-                                    @click="onAction(invoice, action.id)"
-                                >
-                                    {{ action.label }}
-                                </AppButton>
+                        <td class="px-3 py-3 text-right align-middle" @click.stop>
+                            <div class="inline-flex justify-end">
+                                <InvoiceRowActionsMenu
+                                    :actions="rowActionItems(invoice)"
+                                    :aria-label="`Actions for ${invoice.number}`"
+                                    @select="(id) => onAction(invoice, id)"
+                                />
                             </div>
                         </td>
                     </tr>

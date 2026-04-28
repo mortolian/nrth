@@ -15,12 +15,15 @@ const props = withDefaults(defineProps<{
     lastPage?: number;
     loading?: boolean;
     clickableRows?: boolean;
+    /** Merged onto `<table>` (e.g. `min-w-[920px]` so dense tables scroll instead of wrapping). */
+    tableClass?: string;
 }>(), {
     columns: () => [],
     page: 1,
     lastPage: 1,
     loading: false,
     clickableRows: false,
+    tableClass: '',
 });
 
 const emit = defineEmits<{
@@ -63,7 +66,7 @@ const prevPage = () => {
 <template>
     <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-slate-200">
+            <table :class="['min-w-full divide-y divide-slate-200', tableClass]">
                 <thead v-if="normalizedColumns.length" class="bg-slate-50">
                     <tr>
                         <th
