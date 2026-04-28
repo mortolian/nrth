@@ -22,6 +22,7 @@ use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -79,6 +80,7 @@ class InvoiceController extends Controller
                     'unit_price' => round(((int) $item->unit_price_cents) / 100, 2),
                     'vat_rate' => $chargesVat ? (float) $item->vat_rate : 0.0,
                 ])->values()->all(),
+                'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
             ],
             ...$this->formMeta($request),
         ]);
@@ -94,7 +96,7 @@ class InvoiceController extends Controller
             clientId: (int) $payload['client_id'],
             issueDate: (string) $payload['issue_date'],
             dueDate: (string) $payload['due_date'],
-            currency: 'ZAR',
+            currency: Iso4217Currencies::normalize((string) $payload['currency']),
             reference: $payload['reference'] ?? null,
             notes: $payload['notes'] ?? null,
             footer: $payload['footer'] ?? null,
@@ -131,6 +133,7 @@ class InvoiceController extends Controller
                 'due_date' => $dueDate->toDateString(),
                 'notes' => $payload['notes'] ?? null,
                 'footer' => $payload['footer'] ?? null,
+                'currency' => Iso4217Currencies::normalize((string) $payload['currency']),
             ]);
             $invoice->save();
 
@@ -304,6 +307,7 @@ class InvoiceController extends Controller
                     'number' => $invoice->number,
                     'issue_date' => optional($invoice->issue_date)->toDateString(),
                     'due_date' => optional($invoice->due_date)->toDateString(),
+                    'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
                     'total' => $total,
                     'amount_due' => $amountDue,
                     'status' => $invoice->status->value,
@@ -386,6 +390,7 @@ class InvoiceController extends Controller
                 'due_date' => optional($invoice->due_date)->toDateString(),
                 'notes' => $invoice->notes,
                 'footer' => $invoice->footer,
+                'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
                 'subtotal_cents' => (int) $invoice->getRawOriginal('subtotal_cents'),
                 'vat_amount_cents' => (int) $invoice->getRawOriginal('vat_amount_cents'),
                 'total_cents' => $totalCents,
@@ -470,7 +475,7 @@ class InvoiceController extends Controller
             amountCents: (int) $payload['amount_cents'],
             paymentDate: (string) $payload['payment_date'],
             method: PaymentMethod::from((string) $payload['method']),
-            currency: 'ZAR',
+            currency: Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
             reference: $payload['reference'] ?? null,
             notes: $payload['notes'] ?? null,
             createdBy: (int) $request->user()->id,
@@ -509,6 +514,7 @@ class InvoiceController extends Controller
                 'accounts' => [],
                 'charges_vat' => false,
                 'next_number' => 'INV-'.now()->format('Y').'-0001',
+                'default_currency' => 'ZAR',
                 'defaults' => [
                     'payment_terms_days' => 30,
                     'notes' => '',
@@ -532,13 +538,15 @@ class InvoiceController extends Controller
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name', 'payment_terms_days'])
+                ->get(['id', 'name', 'payment_terms_days', 'currency'])
                 ->map(fn (Client $client) => [
                     'id' => $client->id,
                     'name' => $client->name,
                     'payment_terms_days' => (int) $client->payment_terms_days,
+                    'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
                 ])
                 ->all(),
+            'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $chargesVat
                 ? TaxRate::queryWithoutTeamScope()
                     ->where('team_id', $teamId)
@@ -595,6 +603,7 @@ class InvoiceController extends Controller
             'reference' => ['nullable', 'string', 'max:255'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['required', 'date', 'after_or_equal:issue_date'],
+            'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'notes' => ['nullable', 'string'],
             'footer' => ['nullable', 'string'],
             'line_items' => ['required', 'array', 'min:1'],

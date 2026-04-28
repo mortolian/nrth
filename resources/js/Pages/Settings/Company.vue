@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ActionMessage from '@/Components/ActionMessage.vue';
 import AppButton from '@/Components/AppButton.vue';
@@ -30,6 +30,11 @@ const props = defineProps<{
 }>();
 
 type CompanyTab = 'profile' | 'contact' | 'invoice' | 'tax' | 'banking';
+const page = usePage();
+const currencyOptions = computed(
+    () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
+);
+
 const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'tax', 'banking'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
@@ -57,6 +62,7 @@ const form = useForm({
     company_phone: String(props.settings.company_phone ?? ''),
     company_website: String(props.settings.company_website ?? ''),
     invoice_default_payment_terms_days: Number(props.settings.invoice_default_payment_terms_days ?? 30),
+    invoice_default_currency: String(props.settings.invoice_default_currency ?? 'ZAR'),
     invoice_prefix: String(props.settings.invoice_prefix ?? 'INV'),
     invoice_number_include_month: Boolean(props.settings.invoice_number_include_month ?? false),
     invoice_number_use_random_suffix: Boolean(props.settings.invoice_number_use_random_suffix ?? false),
@@ -190,6 +196,7 @@ const submit = () => {
         company_phone: form.company_phone,
         company_website: form.company_website,
         invoice_default_payment_terms_days: form.invoice_default_payment_terms_days,
+        invoice_default_currency: form.invoice_default_currency,
         invoice_prefix: form.invoice_prefix,
         invoice_number_include_month: form.invoice_number_include_month,
         invoice_number_use_random_suffix: form.invoice_number_use_random_suffix,
@@ -413,6 +420,17 @@ const submit = () => {
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Default payment terms (days)</label>
                         <AppInput v-model="form.invoice_default_payment_terms_days" type="number" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Default invoice &amp; quote currency</label>
+                        <AppSelect
+                            :model-value="form.invoice_default_currency"
+                            :options="currencyOptions"
+                            @update:model-value="form.invoice_default_currency = $event"
+                        />
+                        <p class="mt-1 text-xs text-slate-500">
+                            Used for new invoices and quotes until you pick a client (client currency applies) or choose another currency on the document.
+                        </p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Invoice prefix</label>

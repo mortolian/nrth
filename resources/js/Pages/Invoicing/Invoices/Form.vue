@@ -8,7 +8,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
-type ClientOption = { id: number; name: string; payment_terms_days: number };
+type ClientOption = { id: number; name: string; payment_terms_days: number; currency: string };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
 type AccountOption = { id: number; name: string };
 type InvoiceLine = {
@@ -36,12 +36,15 @@ const props = defineProps<{
         footer: string | null;
         amount_paid_cents: number;
         amount_due_cents: number;
+        currency: string;
         line_items: InvoiceLine[];
     };
     clients: ClientOption[];
     tax_rates: TaxRateOption[];
     accounts: AccountOption[];
     next_number: string;
+    /** Company default when no client or before client selection. */
+    default_currency: string;
     defaults?: {
         payment_terms_days: number;
         notes: string;
@@ -69,12 +72,26 @@ const goToCreateClient = () => {
 const hasClients = computed(() => props.clients.length > 0);
 const canSaveInvoice = computed(() => props.isEditing || hasClients.value);
 
+const initialClientId = props.invoice?.client_id ?? props.clients[0]?.id ?? null;
+const clientForInitialCurrency = initialClientId
+    ? props.clients.find((c) => c.id === initialClientId)
+    : null;
+const initialInvoiceCurrency =
+    props.invoice?.currency
+    ?? clientForInitialCurrency?.currency
+    ?? props.default_currency
+    ?? 'ZAR';
+
 const invoiceSchema = z.object({
     client_id: z.coerce.number().int().positive('Client is required'),
     number: z.string().min(1, 'Invoice number is required'),
     reference: z.string().optional(),
     issue_date: z.string().min(1, 'Issue date is required'),
     due_date: z.string().min(1, 'Due date is required'),
+    currency: z
+        .string()
+        .length(3, 'Select a currency')
+        .regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
     notes: z.string().optional(),
     footer: z.string().optional(),
     line_items: z.array(z.object({
@@ -87,6 +104,9 @@ const invoiceSchema = z.object({
 });
 
 const page = usePage();
+const currencyOptions = computed(
+    () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
+);
 
 const inertiaErrors = computed(() => {
     const raw = page.props.errors as Record<string, string | string[] | undefined>;
@@ -117,11 +137,12 @@ const taxRateSelectOptions = computed(() => {
 
 const { setErrors, values, setFieldValue } = useForm({
     initialValues: {
-        client_id: props.invoice?.client_id ?? (props.clients[0]?.id ?? null),
+        client_id: initialClientId,
         number: props.invoice?.number ?? props.next_number,
         reference: props.invoice?.reference ?? '',
         issue_date: props.invoice?.issue_date ?? new Date().toISOString().slice(0, 10),
         due_date: props.invoice?.due_date ?? new Date().toISOString().slice(0, 10),
+        currency: initialInvoiceCurrency,
         notes: props.invoice?.notes ?? props.defaults?.notes ?? '',
         footer: props.invoice?.footer ?? props.defaults?.footer ?? '',
         line_items: props.invoice?.line_items?.length
@@ -207,6 +228,17 @@ watch(
     { immediate: true },
 );
 
+watch(
+    () => formValues.value?.client_id,
+    (clientId) => {
+        if (clientId == null) return;
+        const client = clientMap.value[Number(clientId)];
+        if (client?.currency) {
+            setFieldValue('currency', client.currency);
+        }
+    },
+);
+
 const lineSubtotal = (line: InvoiceLine) => Math.round((Number(line.quantity) || 0) * (Number(line.unit_price) || 0) * 100);
 const lineVat = (line: InvoiceLine) => Math.round(lineSubtotal(line) * (Number(line.vat_rate) || 0));
 const lineTotal = (line: InvoiceLine) => lineSubtotal(line) + lineVat(line);
@@ -230,7 +262,9 @@ const totals = computed(() => {
     return { subtotal, vat, total, amountPaid, amountDue, vatBreakdown };
 });
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const displayCurrency = computed(() => (formValues.value.currency as string) || 'ZAR');
+const formatCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, displayCurrency.value);
 
 const addLine = () => {
     const next = [...(formValues.value.line_items ?? []), {
@@ -374,6 +408,17 @@ const onSave = () => {
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Due date</label>
                                 <AppInput type="date" :model-value="values.due_date as string" @update:model-value="setFieldValue('due_date', $event)" />
                             </div>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Invoice currency</label>
+                            <AppSelect
+                                :model-value="values.currency as string"
+                                :options="currencyOptions"
+                                @update:model-value="setFieldValue('currency', $event)"
+                            />
+                            <p class="mt-1 text-xs text-slate-500">
+                                Defaults to the selected client&rsquo;s currency; change here to override for this invoice only.
+                            </p>
                         </div>
                     </div>
                 </AppCard>

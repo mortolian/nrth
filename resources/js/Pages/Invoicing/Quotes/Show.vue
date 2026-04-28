@@ -16,6 +16,7 @@ type Quote = {
     subtotal_cents: number;
     vat_amount_cents: number;
     total_cents: number;
+    currency: string;
     status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
     notes: string | null;
     terms: string | null;
@@ -49,7 +50,7 @@ const convertForm = ref({
     invoice_notes: props.convert_defaults.invoice_notes,
 });
 
-const currency = (cents: number) => useFormatCurrency(cents / 100, 'ZAR');
+const currency = (cents: number) => useFormatCurrency(cents / 100, props.quote.currency || 'ZAR');
 
 const badgeVariant = () => {
     if (props.quote.status === 'accepted') return 'success';

@@ -13,6 +13,7 @@ type QuoteRow = {
     issue_date: string;
     expiry_date: string;
     total_cents: number;
+    currency: string;
     status: 'draft' | 'sent' | 'accepted' | 'expired' | 'converted';
 };
 
@@ -41,7 +42,7 @@ const applyFilters = () => {
     }, { preserveState: true, preserveScroll: true, replace: true });
 };
 
-const currency = (cents: number) => useFormatCurrency(cents / 100, 'ZAR');
+const formatQuoteTotal = (cents: number, code: string) => useFormatCurrency(cents / 100, code || 'ZAR');
 
 const badgeVariant = (value: QuoteRow['status']) => {
     if (value === 'accepted') return 'success';
@@ -126,7 +127,7 @@ const badgeVariant = (value: QuoteRow['status']) => {
                         <td class="px-4 py-3">{{ quote.client_name }}</td>
                         <td class="px-4 py-3">{{ quote.issue_date }}</td>
                         <td class="px-4 py-3">{{ quote.expiry_date }}</td>
-                        <td class="px-4 py-3">{{ currency(quote.total_cents) }}</td>
+                        <td class="px-4 py-3">{{ formatQuoteTotal(quote.total_cents, quote.currency) }}</td>
                         <td class="px-4 py-3">
                             <AppBadge :variant="badgeVariant(quote.status)">{{ quote.status }}</AppBadge>
                         </td>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Settings;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -115,6 +116,7 @@ class CompanySettingsController extends Controller
             'company_phone' => ['nullable', 'string', 'max:64'],
             'company_website' => ['nullable', 'string', 'max:255'],
             'invoice_default_payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
+            'invoice_default_currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'invoice_prefix' => ['required', 'string', 'max:32'],
             'invoice_number_include_month' => ['required', 'boolean'],
             'invoice_number_use_random_suffix' => ['required', 'boolean'],
@@ -146,7 +148,7 @@ class CompanySettingsController extends Controller
             'physical_postal_code', 'physical_country', 'postal_same_as_physical',
             'postal_street', 'postal_city', 'postal_province', 'postal_postal_code', 'postal_country',
             'company_email', 'company_phone', 'company_website',
-            'invoice_default_payment_terms_days', 'invoice_prefix',
+            'invoice_default_payment_terms_days', 'invoice_default_currency', 'invoice_prefix',
             'invoice_number_include_month', 'invoice_number_use_random_suffix',
             'invoice_show_street_address',
             'invoice_default_notes', 'invoice_default_footer',

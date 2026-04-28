@@ -11,6 +11,7 @@ use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +51,7 @@ class QuoteController extends Controller
                 'issue_date' => optional($quote->issue_date)->toDateString(),
                 'expiry_date' => optional($quote->expiry_date)->toDateString(),
                 'total_cents' => (int) $quote->getRawOriginal('total_cents'),
+                'currency' => Iso4217Currencies::normalize((string) ($quote->currency ?? 'ZAR')),
                 'status' => $quote->status->value,
             ])->values()->all(),
             'summary' => [
@@ -70,6 +72,7 @@ class QuoteController extends Controller
         $teamId = (int) $request->user()->current_team_id;
 
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
+        $settings = $request->user()->currentTeam?->mergedCompanySettings() ?? [];
 
         return Inertia::render('Invoicing/Quotes/Form', [
             'isEditing' => false,
@@ -78,10 +81,15 @@ class QuoteController extends Controller
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Client $client) => ['id' => $client->id, 'name' => $client->name])
+                ->get(['id', 'name', 'currency'])
+                ->map(fn (Client $client) => [
+                    'id' => $client->id,
+                    'name' => $client->name,
+                    'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
+                ])
                 ->values()
                 ->all(),
+            'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $this->taxRatesForQuoteForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
             'next_number' => $this->nextQuoteNumber($teamId),
@@ -93,6 +101,7 @@ class QuoteController extends Controller
         abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
+        $settings = $request->user()->currentTeam?->mergedCompanySettings() ?? [];
 
         return Inertia::render('Invoicing/Quotes/Form', [
             'isEditing' => true,
@@ -101,10 +110,15 @@ class QuoteController extends Controller
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Client $client) => ['id' => $client->id, 'name' => $client->name])
+                ->get(['id', 'name', 'currency'])
+                ->map(fn (Client $client) => [
+                    'id' => $client->id,
+                    'name' => $client->name,
+                    'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
+                ])
                 ->values()
                 ->all(),
+            'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $this->taxRatesForQuoteForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
             'next_number' => $this->nextQuoteNumber($teamId),
@@ -148,7 +162,7 @@ class QuoteController extends Controller
             'subtotal_cents' => $subtotal,
             'vat_amount_cents' => $vat,
             'total_cents' => $total,
-            'currency' => 'ZAR',
+            'currency' => Iso4217Currencies::normalize((string) $payload['currency']),
             'line_items' => $lineItems,
             'notes' => $payload['notes'] ?? null,
             'terms' => $payload['terms'] ?? null,
@@ -178,6 +192,7 @@ class QuoteController extends Controller
             'subtotal_cents' => $subtotal,
             'vat_amount_cents' => $vat,
             'total_cents' => $total,
+            'currency' => Iso4217Currencies::normalize((string) $payload['currency']),
             'line_items' => $lineItems,
             'notes' => $payload['notes'] ?? null,
             'terms' => $payload['terms'] ?? null,
@@ -307,6 +322,7 @@ class QuoteController extends Controller
     private function validateQuote(Request $request, ?Quote $quote): array
     {
         $teamId = (int) $request->user()->current_team_id;
+
         return $request->validate([
             'client_id' => ['required', 'integer', Rule::exists('clients', 'id')->where('team_id', $teamId)],
             'number' => [
@@ -319,6 +335,7 @@ class QuoteController extends Controller
             ],
             'issue_date' => ['required', 'date'],
             'expiry_date' => ['required', 'date', 'after_or_equal:issue_date'],
+            'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'notes' => ['nullable', 'string'],
             'terms' => ['nullable', 'string'],
             'submit_action' => ['nullable', Rule::in(['draft', 'send'])],
@@ -419,6 +436,7 @@ class QuoteController extends Controller
             'line_items' => $lines,
             'notes' => $quote->notes,
             'terms' => $quote->terms,
+            'currency' => Iso4217Currencies::normalize((string) ($quote->currency ?? 'ZAR')),
             'converted_invoice_id' => $quote->converted_invoice_id,
         ];
     }
@@ -434,4 +452,3 @@ class QuoteController extends Controller
         return sprintf('Q-%d-%04d', $year, $count);
     }
 }
-

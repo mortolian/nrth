@@ -34,6 +34,7 @@ type InvoicePayload = {
     sent_at: string | null;
     viewed_at: string | null;
     paid_at: string | null;
+    currency: string;
     client: {
         id: number | null;
         name: string | null;
@@ -111,7 +112,9 @@ const paymentRecordErrors = computed(() => {
     });
 });
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const invoiceCurrency = computed(() => props.invoice.currency || 'ZAR');
+const formatCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, invoiceCurrency.value);
 
 const documentTitle = computed(() => (props.charges_vat ? 'Tax invoice' : 'Invoice'));
 

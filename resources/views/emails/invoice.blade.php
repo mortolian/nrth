@@ -13,7 +13,7 @@
     <p>
         <strong>Issue date:</strong> {{ optional($invoice->issue_date)->format('d M Y') }}<br>
         <strong>Due date:</strong> {{ optional($invoice->due_date)->format('d M Y') }}<br>
-        <strong>Total due:</strong> R {{ number_format(((int) $invoice->getRawOriginal('total_cents')) / 100, 2) }}
+        <strong>Total due:</strong> {{ \App\Support\FormatMoney::minorUnits((int) $invoice->getRawOriginal('total_cents'), (string) ($invoice->currency ?? 'ZAR')) }}
     </p>
 
     <p>

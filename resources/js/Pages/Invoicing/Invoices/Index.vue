@@ -11,6 +11,7 @@ type InvoiceRow = {
     number: string;
     issue_date: string | null;
     due_date: string | null;
+    currency: string;
     total: number;
     amount_due: number;
     status: string;
@@ -63,7 +64,10 @@ const statusOptions = [
     { label: 'Void', value: 'void' },
 ];
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+/** Overdue summary sums cents across invoices; amounts may mix currencies — display as ZAR for compatibility. */
+const formatZar = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const formatRowCents = (cents: number, currency: string) =>
+    useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 
 const applyFilters = () => {
     router.get(route('invoicing.invoices.index'), {
@@ -186,7 +190,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                 >
                     <AppCard class="h-full">
                         <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue total</p>
-                        <p class="mt-1 text-2xl font-semibold text-rose-600">{{ formatCents(summary.overdue_total) }}</p>
+                        <p class="mt-1 text-2xl font-semibold text-rose-600">{{ formatZar(summary.overdue_total) }}</p>
                     </AppCard>
                 </button>
             </div>
@@ -280,7 +284,7 @@ const toggleSelected = (id: number, checked: boolean) => {
                         </div>
                         <div class="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-sm">
                             <span class="text-slate-500">Due</span>
-                            <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">{{ formatCents(invoice.amount_due) }}</span>
+                            <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">{{ formatRowCents(invoice.amount_due, invoice.currency) }}</span>
                         </div>
                         <div class="mt-3 flex flex-wrap gap-2" @click.stop>
                             <AppButton
@@ -352,10 +356,10 @@ const toggleSelected = (id: number, checked: boolean) => {
                                 <AppBadge v-if="invoice.is_overdue" variant="danger">{{ invoice.days_overdue }}d</AppBadge>
                             </div>
                         </td>
-                        <td class="px-4 py-3">{{ formatCents(invoice.total) }}</td>
+                        <td class="px-4 py-3">{{ formatRowCents(invoice.total, invoice.currency) }}</td>
                         <td class="px-4 py-3">
                             <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">
-                                {{ formatCents(invoice.amount_due) }}
+                                {{ formatRowCents(invoice.amount_due, invoice.currency) }}
                             </span>
                         </td>
                         <td class="px-4 py-3">

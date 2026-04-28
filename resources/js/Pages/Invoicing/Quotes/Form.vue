@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
-type ClientOption = { id: number; name: string };
+type ClientOption = { id: number; name: string; currency: string };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
 type QuoteLine = { description: string; quantity: number; unit_price_cents: number; vat_rate: number };
 type QuotePayload = {
@@ -15,6 +15,7 @@ type QuotePayload = {
     number: string;
     issue_date: string;
     expiry_date: string;
+    currency: string;
     notes: string | null;
     terms: string | null;
     line_items: QuoteLine[];
@@ -27,7 +28,13 @@ const props = defineProps<{
     tax_rates: TaxRateOption[];
     charges_vat: boolean;
     next_number: string;
+    default_currency: string;
 }>();
+
+const page = usePage();
+const currencyOptions = computed(
+    () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
+);
 
 const chargesVat = computed(() => props.charges_vat);
 
@@ -52,11 +59,19 @@ const vatSelectOptions = computed(() => {
     return [{ label: 'No VAT', value: '0' }];
 });
 
+const initialQuoteClientId = props.quote?.client_id ?? props.clients[0]?.id ?? 0;
+const initialQuoteCurrency =
+    props.quote?.currency
+    ?? props.clients.find((c) => c.id === initialQuoteClientId)?.currency
+    ?? props.default_currency
+    ?? 'ZAR';
+
 const form = ref({
-    client_id: props.quote?.client_id ?? props.clients[0]?.id ?? 0,
+    client_id: initialQuoteClientId,
     number: props.quote?.number ?? props.next_number,
     issue_date: props.quote?.issue_date ?? new Date().toISOString().slice(0, 10),
     expiry_date: props.quote?.expiry_date ?? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+    currency: initialQuoteCurrency,
     notes: props.quote?.notes ?? '',
     terms: props.quote?.terms ?? '50% deposit on acceptance. Balance due on delivery.',
 });
@@ -77,13 +92,23 @@ watch(
     { immediate: true },
 );
 
+watch(
+    () => form.value.client_id,
+    (clientId) => {
+        const c = props.clients.find((x) => x.id === clientId);
+        if (c?.currency) {
+            form.value.currency = c.currency;
+        }
+    },
+);
+
 const totals = computed(() => {
     const subtotal = lineItems.value.reduce((acc, row) => acc + Math.round(row.quantity * row.unit_price_cents), 0);
     const vat = lineItems.value.reduce((acc, row) => acc + Math.round(row.quantity * row.unit_price_cents * row.vat_rate), 0);
     return { subtotal, vat, total: subtotal + vat };
 });
 
-const money = (cents: number) => useFormatCurrency(cents / 100, 'ZAR');
+const money = (cents: number) => useFormatCurrency(cents / 100, form.value.currency || 'ZAR');
 
 const submit = (submitAction: 'draft' | 'send') => {
     const payload = {
@@ -128,6 +153,17 @@ const submit = (submitAction: 'draft' | 'send') => {
                         <div><label class="mb-1 block text-xs font-medium text-slate-500">Quote number</label><AppInput v-model="form.number" /></div>
                         <div><label class="mb-1 block text-xs font-medium text-slate-500">Issue date</label><AppInput v-model="form.issue_date" type="date" /></div>
                         <div><label class="mb-1 block text-xs font-medium text-slate-500">Expiry date</label><AppInput v-model="form.expiry_date" type="date" /></div>
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Quote currency</label>
+                            <AppSelect
+                                :model-value="form.currency"
+                                :options="currencyOptions"
+                                @update:model-value="form.currency = $event"
+                            />
+                            <p class="mt-1 text-xs text-slate-500">
+                                Defaults to the client&rsquo;s currency; change to override for this quote only.
+                            </p>
+                        </div>
                     </div>
                 </AppCard>
 

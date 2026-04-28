@@ -125,6 +125,7 @@ class Team extends JetstreamTeam implements HasMedia
             'company_phone' => null,
             'company_website' => null,
             'invoice_default_payment_terms_days' => 30,
+            'invoice_default_currency' => 'ZAR',
             'invoice_prefix' => 'INV',
             'invoice_number_include_month' => false,
             'invoice_number_use_random_suffix' => false,

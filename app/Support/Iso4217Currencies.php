@@ -65,4 +65,19 @@ final class Iso4217Currencies
 
         return self::$selectOptions = $options;
     }
+
+    /** Resolve a stored code to a valid ISO current currency, otherwise ZAR. */
+    public static function normalize(?string $code): string
+    {
+        if ($code === null || $code === '') {
+            return 'ZAR';
+        }
+
+        $upper = strtoupper(trim($code));
+        if (strlen($upper) === 3 && in_array($upper, self::allowedCodes(), true)) {
+            return $upper;
+        }
+
+        return 'ZAR';
+    }
 }

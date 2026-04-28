@@ -37,6 +37,7 @@ class InvoiceStoreTest extends TestCase
             'reference' => null,
             'issue_date' => $issue,
             'due_date' => $due,
+            'currency' => 'ZAR',
             'notes' => null,
             'footer' => null,
             'line_items' => [
