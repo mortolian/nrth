@@ -38,9 +38,11 @@ const props = defineProps<{
         from: string | null;
         to: string | null;
         client: string | null;
+        client_id: number | null;
         min_amount: number | null;
         max_amount: number | null;
     };
+    filter_client: { id: number; name: string } | null;
 }>();
 
 const selected = ref<number[]>([]);
@@ -52,9 +54,25 @@ const localFilters = ref({
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
     client: props.filters.client ?? '',
+    client_id: props.filters.client_id != null ? String(props.filters.client_id) : '',
     min_amount: props.filters.min_amount?.toString() ?? '',
     max_amount: props.filters.max_amount?.toString() ?? '',
 });
+
+const buildInvoiceIndexQuery = (extra: Record<string, string | number> = {}) => {
+    const q: Record<string, string | number> = {
+        status: localFilters.value.status,
+        ...extra,
+    };
+    if (localFilters.value.from) q.from = localFilters.value.from;
+    if (localFilters.value.to) q.to = localFilters.value.to;
+    if (localFilters.value.client) q.client = localFilters.value.client;
+    if (localFilters.value.client_id) q.client_id = Number(localFilters.value.client_id);
+    if (localFilters.value.min_amount) q.min_amount = Number(localFilters.value.min_amount);
+    if (localFilters.value.max_amount) q.max_amount = Number(localFilters.value.max_amount);
+
+    return q;
+};
 
 const statusOptions = [
     { label: 'All', value: 'all' },
@@ -71,9 +89,11 @@ const formatRowCents = (cents: number, currency: string) =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 
 const applyFilters = () => {
-    router.get(route('invoicing.invoices.index'), {
-        ...localFilters.value,
-    }, { preserveState: true, preserveScroll: true, replace: true });
+    router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery(), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 };
 
 const clearFilters = () => {
@@ -82,9 +102,15 @@ const clearFilters = () => {
         from: '',
         to: '',
         client: '',
+        client_id: '',
         min_amount: '',
         max_amount: '',
     };
+    applyFilters();
+};
+
+const clearClientScope = () => {
+    localFilters.value.client_id = '';
     applyFilters();
 };
 
@@ -95,10 +121,11 @@ const applyStatFilter = (status: string) => {
 };
 
 const navigateToPage = (page: number) => {
-    router.get(route('invoicing.invoices.index'), {
-        ...localFilters.value,
-        page,
-    }, { preserveState: true, preserveScroll: true, replace: true });
+    router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery({ page }), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 };
 
 const rowActionItems = (invoice: InvoiceRow) => {
@@ -160,6 +187,22 @@ const toggleSelected = (id: number, checked: boolean) => {
                 </Link>
             </template>
         </PageHeader>
+
+        <div
+            v-if="filter_client"
+            class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950"
+        >
+            <span>
+                Showing invoices for <strong>{{ filter_client.name }}</strong>
+            </span>
+            <button
+                type="button"
+                class="font-medium text-brand-700 underline decoration-brand-600/40 underline-offset-2 hover:text-brand-600"
+                @click="clearClientScope"
+            >
+                Show all clients
+            </button>
+        </div>
 
         <div class="space-y-6">
             <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-4">

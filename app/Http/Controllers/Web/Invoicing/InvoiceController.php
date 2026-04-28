@@ -253,6 +253,7 @@ class InvoiceController extends Controller
                     'overdue_total' => 0,
                 ],
                 'filters' => $this->activeFilters($request),
+                'filter_client' => null,
             ]);
         }
 
@@ -279,8 +280,25 @@ class InvoiceController extends Controller
         $from = (string) $request->string('from')->toString();
         $to = (string) $request->string('to')->toString();
         $client = trim((string) $request->string('client')->toString());
+        $clientId = (int) $request->integer('client_id');
         $min = (int) $request->integer('min_amount');
         $max = (int) $request->integer('max_amount');
+
+        $filterClientContext = null;
+        if ($clientId > 0) {
+            $filterClient = Client::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->whereKey($clientId)
+                ->first(['id', 'name']);
+            abort_if($filterClient === null, 404);
+            $query->where('client_id', $clientId);
+            $filterClientContext = [
+                'id' => $filterClient->id,
+                'name' => $filterClient->name,
+            ];
+        } elseif ($client !== '') {
+            $query->whereHas('client', fn ($q) => $q->where('name', 'like', '%'.$client.'%'));
+        }
 
         if ($status !== '' && $status !== 'all') {
             if ($status === 'overdue') {
@@ -299,10 +317,6 @@ class InvoiceController extends Controller
 
         if ($to !== '') {
             $query->whereDate('issue_date', '<=', $to);
-        }
-
-        if ($client !== '') {
-            $query->whereHas('client', fn ($q) => $q->where('name', 'like', '%'.$client.'%'));
         }
 
         if ($min > 0) {
@@ -370,6 +384,7 @@ class InvoiceController extends Controller
                 'overdue_total' => $overdueTotal,
             ],
             'filters' => $this->activeFilters($request),
+            'filter_client' => $filterClientContext,
         ]);
     }
 
@@ -531,11 +546,14 @@ class InvoiceController extends Controller
      */
     private function activeFilters(Request $request): array
     {
+        $clientId = (int) $request->integer('client_id');
+
         return [
             'status' => $request->string('status')->toString() ?: 'all',
             'from' => $request->string('from')->toString() ?: null,
             'to' => $request->string('to')->toString() ?: null,
             'client' => $request->string('client')->toString() ?: null,
+            'client_id' => $clientId > 0 ? $clientId : null,
             'min_amount' => $request->integer('min_amount') ?: null,
             'max_amount' => $request->integer('max_amount') ?: null,
         ];

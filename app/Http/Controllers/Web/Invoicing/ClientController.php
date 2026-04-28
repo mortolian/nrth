@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -111,35 +112,86 @@ class ClientController extends Controller
     {
         abort_unless($client->team_id === $request->user()->current_team_id, 403);
 
-        $client->loadMissing(['invoices' => fn ($q) => $q->latest('issue_date')]);
+        $teamId = (int) $client->team_id;
+        $today = now()->toDateString();
+        $statusesWherePastDueMatters = [
+            InvoiceStatus::Sent,
+            InvoiceStatus::Viewed,
+            InvoiceStatus::Partial,
+            InvoiceStatus::Overdue,
+        ];
 
-        $history = $client->invoices->map(function (Invoice $invoice): array {
-            $total = (int) $invoice->getRawOriginal('total_cents');
-            $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+        $invoiceHistory = Invoice::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('client_id', $client->id)
+            ->orderByDesc('issue_date')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(function (Invoice $invoice) use ($today, $statusesWherePastDueMatters): array {
+                $total = (int) $invoice->getRawOriginal('total_cents');
+                $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+                $amountDue = max(0, $total - $paid);
+                $dueDate = optional($invoice->due_date)?->toDateString();
+                $isOverdue = in_array($invoice->status, $statusesWherePastDueMatters, true)
+                    && $dueDate !== null
+                    && $dueDate < $today
+                    && $amountDue > 0;
 
-            return [
-                'id' => $invoice->id,
-                'number' => $invoice->number,
-                'issue_date' => optional($invoice->issue_date)->toDateString(),
-                'due_date' => optional($invoice->due_date)->toDateString(),
-                'total_cents' => $total,
-                'amount_due_cents' => max(0, $total - $paid),
-                'status' => $invoice->status->value,
+                return [
+                    'id' => $invoice->id,
+                    'number' => $invoice->number,
+                    'issue_date' => optional($invoice->issue_date)->toDateString(),
+                    'due_date' => optional($invoice->due_date)->toDateString(),
+                    'total_cents' => $total,
+                    'amount_due_cents' => $amountDue,
+                    'status' => $invoice->status->value,
+                    'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
+                    'is_overdue' => $isOverdue,
+                    'days_overdue' => $isOverdue
+                        ? abs(Carbon::parse($invoice->due_date)->diffInDays(Carbon::parse($today)))
+                        : 0,
+                ];
+            });
+
+        $statsRows = Invoice::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('client_id', $client->id)
+            ->get(['currency', 'status', 'total_cents', 'amount_paid_cents']);
+
+        /** @var array<string, array{outstanding_cents: int, invoiced_cents: int, paid_cents: int}> $byCurrency */
+        $byCurrency = [];
+        foreach ($statsRows as $inv) {
+            $code = Iso4217Currencies::normalize((string) ($inv->currency ?? 'ZAR'));
+            if (! isset($byCurrency[$code])) {
+                $byCurrency[$code] = [
+                    'outstanding_cents' => 0,
+                    'invoiced_cents' => 0,
+                    'paid_cents' => 0,
+                ];
+            }
+            $total = (int) $inv->getRawOriginal('total_cents');
+            $paid = (int) $inv->getRawOriginal('amount_paid_cents');
+            $byCurrency[$code]['invoiced_cents'] += $total;
+            $byCurrency[$code]['paid_cents'] += $paid;
+            if (! in_array($inv->status, [InvoiceStatus::Paid, InvoiceStatus::Void], true)) {
+                $byCurrency[$code]['outstanding_cents'] += max(0, $total - $paid);
+            }
+        }
+        ksort($byCurrency);
+        $statsByCurrency = [];
+        foreach ($byCurrency as $currency => $amounts) {
+            $statsByCurrency[] = [
+                'currency' => $currency,
+                'outstanding_cents' => $amounts['outstanding_cents'],
+                'invoiced_cents' => $amounts['invoiced_cents'],
+                'paid_cents' => $amounts['paid_cents'],
             ];
-        })->values()->all();
-
-        $totalInvoiced = $client->invoices->sum(fn (Invoice $invoice): int => (int) $invoice->getRawOriginal('total_cents'));
-        $totalPaid = $client->invoices->sum(fn (Invoice $invoice): int => (int) $invoice->getRawOriginal('amount_paid_cents'));
-        $outstanding = max(0, $totalInvoiced - $totalPaid);
+        }
 
         return Inertia::render('Invoicing/Clients/Show', [
             'client' => $this->serializeClient($client),
-            'invoice_history' => $history,
-            'stats' => [
-                'outstanding_balance_cents' => $outstanding,
-                'total_invoiced_cents' => $totalInvoiced,
-                'total_paid_cents' => $totalPaid,
-            ],
+            'invoice_history' => $invoiceHistory,
+            'stats_by_currency' => $statsByCurrency,
         ]);
     }
 
@@ -225,7 +277,7 @@ class ClientController extends Controller
                 'postal_code' => '',
                 'country' => 'South Africa',
             ],
-            'currency' => $client->currency ?? 'ZAR',
+            'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
             'payment_terms_days' => (int) $client->payment_terms_days,
             'notes' => $client->notes,
             'is_active' => (bool) $client->is_active,

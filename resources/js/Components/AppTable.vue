@@ -17,6 +17,8 @@ const props = withDefaults(defineProps<{
     clickableRows?: boolean;
     /** Merged onto `<table>` (e.g. `min-w-[920px]` so dense tables scroll instead of wrapping). */
     tableClass?: string;
+    /** When false, hides the page footer (e.g. embedded lists with a single page). */
+    showPagination?: boolean;
 }>(), {
     columns: () => [],
     page: 1,
@@ -24,6 +26,7 @@ const props = withDefaults(defineProps<{
     loading: false,
     clickableRows: false,
     tableClass: '',
+    showPagination: true,
 });
 
 const emit = defineEmits<{
@@ -103,7 +106,10 @@ const prevPage = () => {
                 </tbody>
             </table>
         </div>
-        <div class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+        <div
+            v-if="showPagination"
+            class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"
+        >
             <p>Page {{ page }} of {{ lastPage }}</p>
             <div class="flex items-center gap-2">
                 <button class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50" :disabled="page <= 1" @click="prevPage">Previous</button>
