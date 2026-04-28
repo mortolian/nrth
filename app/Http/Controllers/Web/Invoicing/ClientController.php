@@ -6,6 +6,7 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Http\Controllers\Controller;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -179,7 +180,7 @@ class ClientController extends Controller
             'address.province' => ['nullable', 'string', 'max:255'],
             'address.postal_code' => ['nullable', 'string', 'max:30'],
             'address.country' => ['nullable', 'string', 'max:100'],
-            'currency' => ['required', Rule::in(['ZAR'])],
+            'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],

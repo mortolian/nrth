@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -28,6 +28,11 @@ const props = defineProps<{
     import_lines: Array<{ account_id: number; monthly_amount_cents: number }>;
 }>();
 
+const page = usePage();
+const currencyOptions = computed(
+    () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
+);
+
 const today = new Date().toISOString().slice(0, 10);
 const { values } = useForm({
     initialValues: {
@@ -53,7 +58,10 @@ const schema = z.object({
     period_type: z.enum(['monthly', 'quarterly', 'annual', 'custom']),
     start_date: z.string().min(1),
     end_date: z.string().min(1),
-    currency: z.literal('ZAR'),
+    currency: z
+        .string()
+        .length(3, 'Select a currency')
+        .regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
     set_active: z.boolean().optional(),
     lines: z.array(z.object({
         account_id: z.number().int().positive(),
@@ -61,7 +69,9 @@ const schema = z.object({
     })).min(1),
 });
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const budgetCurrency = computed(() => values.value.currency || 'ZAR');
+const formatCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, budgetCurrency.value);
 
 const totalMonthly = computed(() => values.value.lines.reduce((sum, line) => sum + Number(line.monthly_amount_cents || 0), 0));
 const totalAnnual = computed(() => values.value.lines.reduce((sum, line) => sum + Number(line.annual_total_cents || 0), 0));
@@ -164,7 +174,7 @@ const submit = () => {
                     <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
                     <AppSelect
                         :model-value="values.currency"
-                        :options="[{ label: 'ZAR', value: 'ZAR' }]"
+                        :options="currencyOptions"
                         @update:model-value="values.currency = $event"
                     />
                 </div>

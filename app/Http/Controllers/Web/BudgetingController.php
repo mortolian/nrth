@@ -10,6 +10,7 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Budgeting\Models\Budget;
 use App\Domain\Budgeting\Models\BudgetLine;
 use App\Http\Controllers\Controller;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -278,7 +279,7 @@ class BudgetingController extends Controller
             'period_type' => ['required', Rule::in(['monthly', 'quarterly', 'annual', 'custom'])],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-            'currency' => ['required', Rule::in(['ZAR'])],
+            'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'set_active' => ['nullable', 'boolean'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.account_id' => ['required', 'integer', Rule::exists('accounts', 'id')->where('team_id', $teamId)],

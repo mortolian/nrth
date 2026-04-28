@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -30,6 +30,11 @@ const props = defineProps<{
         is_active: boolean;
     };
 }>();
+
+const page = usePage();
+const currencyOptions = computed(
+    () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
+);
 
 const { values, setFieldValue } = useForm({
     initialValues: {
@@ -73,7 +78,10 @@ const schema = z.object({
         postal_code: z.string().optional(),
         country: z.string().optional(),
     }),
-    currency: z.literal('ZAR'),
+    currency: z
+        .string()
+        .length(3, 'Select a currency')
+        .regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
     payment_terms_days: z.coerce.number().int().min(0).max(365),
     notes: z.string().optional(),
     is_active: z.boolean(),
@@ -145,7 +153,7 @@ const submit = () => {
                     <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
                     <AppSelect
                         :model-value="values.currency"
-                        :options="[{ label: 'ZAR', value: 'ZAR' }]"
+                        :options="currencyOptions"
                         @update:model-value="setFieldValue('currency', $event)"
                     />
                 </div>

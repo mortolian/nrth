@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
@@ -42,6 +43,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'appName' => fn () => (string) config('app.name'),
+            'currencyOptions' => fn () => Iso4217Currencies::selectOptions(),
             'commandPalette' => fn () => $this->commandPaletteData($request),
         ];
     }
