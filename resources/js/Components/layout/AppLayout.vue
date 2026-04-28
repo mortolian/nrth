@@ -203,13 +203,10 @@ const isSettingsSectionActive = computed(
     () => isActivePath(route('profile.show')) || isActivePath(route('settings.company')) || isTeamSettingsPath.value,
 );
 
-const isSettingsSectionExpanded = computed(() => {
-    const override = navManualOverride.value[SETTINGS_SECTION_LABEL];
-    if (isSettingsSectionActive.value) {
-        return override !== false;
-    }
-    return override === true;
-});
+/** Collapsed unless the user explicitly opens the section (not auto-expanded on settings routes). */
+const isSettingsSectionExpanded = computed(
+    () => navManualOverride.value[SETTINGS_SECTION_LABEL] === true,
+);
 
 function toggleSettingsSection(): void {
     const next = !isSettingsSectionExpanded.value;
