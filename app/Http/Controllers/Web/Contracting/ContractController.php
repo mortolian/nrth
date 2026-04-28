@@ -6,6 +6,7 @@ use App\Domain\Contracting\Models\Contract;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -170,6 +171,9 @@ class ContractController extends Controller
             'total_cents' => $amount,
             'sort_order' => 0,
         ]);
+
+        $invoice->refresh();
+        app(InvoiceCompanyCurrencySnapshot::class)->sync($invoice);
 
         $contract->next_invoice_due_date = now()->addMonth()->startOfMonth();
         $contract->save();

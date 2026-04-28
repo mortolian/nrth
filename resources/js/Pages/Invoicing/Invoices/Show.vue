@@ -36,6 +36,10 @@ type InvoicePayload = {
     viewed_at: string | null;
     paid_at: string | null;
     currency: string;
+    company_currency_code?: string | null;
+    fx_rate_invoice_to_company?: string | null;
+    fx_rate_date?: string | null;
+    total_company_currency_cents?: number | null;
     client: {
         id: number | null;
         name: string | null;
@@ -85,6 +89,26 @@ const props = defineProps<{
     };
     payment_methods: PaymentMethodOption[];
 }>();
+
+const bookCurrencySnapshot = computed(() => {
+    const inv = props.invoice;
+    if (
+        inv.fx_rate_invoice_to_company == null
+        || inv.fx_rate_date == null
+        || inv.total_company_currency_cents == null
+    ) {
+        return null;
+    }
+    const r = Number(inv.fx_rate_invoice_to_company);
+    if (!Number.isFinite(r) || r <= 0) {
+        return null;
+    }
+    return {
+        fx_rate: r,
+        fx_rate_date: inv.fx_rate_date,
+        total_company_currency_cents: inv.total_company_currency_cents,
+    };
+});
 
 const page = usePage();
 
@@ -318,6 +342,7 @@ const submitRecordPayment = () => {
                         :company-currency="company_currency"
                         :total-cents="invoice.total_cents"
                         :amount-due-cents="invoice.amount_due_cents"
+                        :book-snapshot="bookCurrencySnapshot"
                     />
 
                     <div v-if="invoice.notes" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">

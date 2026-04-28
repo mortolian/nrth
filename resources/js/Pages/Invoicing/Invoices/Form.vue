@@ -38,6 +38,10 @@ const props = defineProps<{
         amount_paid_cents: number;
         amount_due_cents: number;
         currency: string;
+        company_currency_code?: string | null;
+        fx_rate_invoice_to_company?: string | null;
+        fx_rate_date?: string | null;
+        total_company_currency_cents?: number | null;
         line_items: InvoiceLine[];
     };
     clients: ClientOption[];

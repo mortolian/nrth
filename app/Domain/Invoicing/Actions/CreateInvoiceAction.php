@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceLineItem;
+use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Models\Team;
 use Carbon\Carbon;
@@ -16,6 +17,7 @@ class CreateInvoiceAction
 {
     public function __construct(
         private readonly InvoiceNumberService $numberService,
+        private readonly InvoiceCompanyCurrencySnapshot $companyCurrencySnapshot,
     ) {}
 
     public function execute(CreateInvoiceDTO $dto): Invoice
@@ -85,6 +87,9 @@ class CreateInvoiceAction
                 'vat_amount_cents' => $vatAmountCents,
                 'total_cents' => $subtotalCents + $vatAmountCents,
             ]);
+
+            $invoice->refresh();
+            $this->companyCurrencySnapshot->sync($invoice);
 
             return $invoice->refresh();
         });

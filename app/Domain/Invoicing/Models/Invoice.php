@@ -23,6 +23,7 @@ class Invoice extends Model implements HasMedia
 {
     /** @use HasFactory<InvoiceFactory> */
     use HasFactory;
+
     use HasTeamScope;
     use InteractsWithMedia;
 
@@ -39,6 +40,10 @@ class Invoice extends Model implements HasMedia
         'total_cents',
         'amount_paid_cents',
         'currency',
+        'company_currency_code',
+        'fx_rate_invoice_to_company',
+        'fx_rate_date',
+        'total_company_currency_cents',
         'notes',
         'footer',
         'sent_at',
@@ -57,6 +62,7 @@ class Invoice extends Model implements HasMedia
             'status' => InvoiceStatus::class,
             'issue_date' => 'date',
             'due_date' => 'date',
+            'fx_rate_date' => 'date',
             'sent_at' => 'datetime',
             'viewed_at' => 'datetime',
             'paid_at' => 'datetime',

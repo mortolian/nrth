@@ -3,18 +3,18 @@
 namespace App\Http\Controllers\Web\Invoicing;
 
 use App\Http\Controllers\Controller;
+use App\Support\FrankfurterExchangeRates;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 use Throwable;
 
 class ExchangeRateController extends Controller
 {
     /**
-     * Latest rate from Frankfurter v2 (free, no API key; multiple central bank sources).
+     * Frankfurter v2 rate (free, no API key). Optional {@code date} (Y-m-d) for historical ECB-style rates.
      *
      * @see https://www.frankfurter.app/docs/
      */
@@ -23,52 +23,27 @@ class ExchangeRateController extends Controller
         $validated = $request->validate([
             'from' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'to' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
+            'date' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $from = strtoupper($validated['from']);
         $to = strtoupper($validated['to']);
+        $asOfDate = $validated['date'] ?? null;
 
         if ($from === $to) {
             return response()->json([
                 'rate' => 1.0,
-                'date' => now()->toDateString(),
+                'date' => $asOfDate ?? now()->toDateString(),
                 'source' => 'identity',
             ]);
         }
 
-        $cacheKey = 'frankfurter:v2:rate:'.$from.':'.$to;
+        $cacheKey = 'frankfurter:v2:rate:'.$from.':'.$to.':'.($asOfDate ?? 'latest');
 
         try {
-            $payload = Cache::remember($cacheKey, now()->addHour(), function () use ($from, $to): array {
-                $url = sprintf('https://api.frankfurter.dev/v2/rate/%s/%s', rawurlencode($from), rawurlencode($to));
-
-                $response = Http::timeout(12)
-                    ->acceptJson()
-                    ->get($url);
-
-                if (! $response->successful()) {
-                    throw new \RuntimeException('Frankfurter HTTP '.$response->status());
-                }
-
-                /** @var array<string, mixed>|null $data */
-                $data = $response->json();
-                if (! is_array($data)) {
-                    throw new \RuntimeException('Invalid Frankfurter payload');
-                }
-
-                if (! isset($data['rate'])) {
-                    throw new \RuntimeException('Missing rate in Frankfurter response');
-                }
-
-                $rate = (float) $data['rate'];
-                if ($rate <= 0 || ! is_finite($rate)) {
-                    throw new \RuntimeException('Invalid rate value');
-                }
-
-                return [
-                    'rate' => $rate,
-                    'date' => isset($data['date']) ? (string) $data['date'] : now()->toDateString(),
-                ];
+            /** @var array{rate: float, date: string} $payload */
+            $payload = Cache::remember($cacheKey, now()->addHour(), function () use ($from, $to, $asOfDate): array {
+                return FrankfurterExchangeRates::fetchPairRate($from, $to, $asOfDate);
             });
         } catch (Throwable) {
             return response()->json([

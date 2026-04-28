@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Enums\QuoteStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Quote;
+use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
@@ -292,6 +293,8 @@ class QuoteController extends Controller
                 'vat_amount_cents' => $vatCents,
                 'total_cents' => $subtotalCents + $vatCents,
             ]);
+            $invoice->refresh();
+            app(InvoiceCompanyCurrencySnapshot::class)->sync($invoice);
 
             $quote->update([
                 'status' => QuoteStatus::Converted,

@@ -19,6 +19,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceLineItem;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Invoicing\Models\Payment;
+use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
@@ -81,6 +82,16 @@ class InvoiceController extends Controller
                     'vat_rate' => $chargesVat ? (float) $item->vat_rate : 0.0,
                 ])->values()->all(),
                 'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
+                'company_currency_code' => $invoice->company_currency_code !== null
+                    ? Iso4217Currencies::normalize((string) $invoice->company_currency_code)
+                    : null,
+                'fx_rate_invoice_to_company' => $invoice->fx_rate_invoice_to_company !== null
+                    ? (string) $invoice->fx_rate_invoice_to_company
+                    : null,
+                'fx_rate_date' => optional($invoice->fx_rate_date)->toDateString(),
+                'total_company_currency_cents' => $invoice->total_company_currency_cents !== null
+                    ? (int) $invoice->getRawOriginal('total_company_currency_cents')
+                    : null,
             ],
             ...$this->formMeta($request),
         ]);
@@ -172,6 +183,8 @@ class InvoiceController extends Controller
                 'vat_amount_cents' => $vatAmountCents,
                 'total_cents' => $subtotalCents + $vatAmountCents,
             ]);
+            $invoice->refresh();
+            app(InvoiceCompanyCurrencySnapshot::class)->sync($invoice);
         });
 
         return to_route('invoicing.invoices.show', $invoice->fresh());
@@ -396,6 +409,16 @@ class InvoiceController extends Controller
                 'notes' => $invoice->notes,
                 'footer' => $invoice->footer,
                 'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
+                'company_currency_code' => $invoice->company_currency_code !== null
+                    ? Iso4217Currencies::normalize((string) $invoice->company_currency_code)
+                    : null,
+                'fx_rate_invoice_to_company' => $invoice->fx_rate_invoice_to_company !== null
+                    ? (string) $invoice->fx_rate_invoice_to_company
+                    : null,
+                'fx_rate_date' => optional($invoice->fx_rate_date)->toDateString(),
+                'total_company_currency_cents' => $invoice->total_company_currency_cents !== null
+                    ? (int) $invoice->getRawOriginal('total_company_currency_cents')
+                    : null,
                 'subtotal_cents' => (int) $invoice->getRawOriginal('subtotal_cents'),
                 'vat_amount_cents' => (int) $invoice->getRawOriginal('vat_amount_cents'),
                 'total_cents' => $totalCents,

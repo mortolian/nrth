@@ -23,13 +23,13 @@ use App\Domain\Invoicing\Enums\PaymentMethod;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Services\InvoicePdfService;
-use App\Mail\InvoiceMailer;
-use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
+use App\Mail\InvoiceMailer;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Mockery;
 use Tests\TestCase;
@@ -72,7 +72,7 @@ class InvoicingActionsTest extends TestCase
             ],
         );
 
-        $invoice = (new CreateInvoiceAction(new InvoiceNumberService))->execute($dto);
+        $invoice = app(CreateInvoiceAction::class)->execute($dto);
 
         $this->assertSame(InvoiceStatus::Draft, $invoice->status);
         $this->assertSame('INV-2026-0001', $invoice->number);
@@ -80,6 +80,54 @@ class InvoicingActionsTest extends TestCase
         $this->assertSame(110_00, (int) $invoice->getRawOriginal('subtotal_cents'));
         $this->assertSame(15_00, (int) $invoice->getRawOriginal('vat_amount_cents'));
         $this->assertSame(125_00, (int) $invoice->getRawOriginal('total_cents'));
+
+        $invoice->refresh();
+        $this->assertSame('ZAR', $invoice->company_currency_code);
+        $this->assertEquals(1.0, (float) $invoice->fx_rate_invoice_to_company);
+        $this->assertSame('2026-04-25', $invoice->fx_rate_date?->toDateString());
+        $this->assertSame(125_00, (int) $invoice->getRawOriginal('total_company_currency_cents'));
+    }
+
+    public function test_create_invoice_action_stores_fx_snapshot_for_foreign_currency(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->actingTeamContext($user, $team);
+        $client = Client::factory()->for($team)->create();
+
+        $team->forceFill([
+            'company_settings' => array_replace($team->company_settings ?? [], [
+                'invoice_default_currency' => 'ZAR',
+            ]),
+        ])->save();
+
+        Http::fake([
+            'https://api.frankfurter.dev/v2/rate/USD/ZAR?date=2026-04-25' => Http::response([
+                'date' => '2026-04-25',
+                'base' => 'USD',
+                'quote' => 'ZAR',
+                'rate' => 18.0,
+            ], 200),
+        ]);
+
+        $dto = new CreateInvoiceDTO(
+            teamId: $team->id,
+            clientId: $client->id,
+            issueDate: '2026-04-25',
+            dueDate: '2026-05-25',
+            currency: 'USD',
+            lineItems: [
+                ['description' => 'Item', 'quantity' => 1, 'unit_price_cents' => 100_00, 'vat_rate' => 0.0],
+            ],
+        );
+
+        $invoice = app(CreateInvoiceAction::class)->execute($dto);
+        $invoice->refresh();
+
+        $this->assertSame('ZAR', $invoice->company_currency_code);
+        $this->assertEquals(18.0, (float) $invoice->fx_rate_invoice_to_company);
+        $this->assertSame('2026-04-25', $invoice->fx_rate_date?->toDateString());
+        $this->assertSame(180_000, (int) $invoice->getRawOriginal('total_company_currency_cents'));
     }
 
     public function test_send_invoice_action_marks_invoice_as_sent(): void
