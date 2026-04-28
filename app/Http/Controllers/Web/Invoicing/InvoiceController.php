@@ -259,6 +259,18 @@ class InvoiceController extends Controller
         $teamId = (int) $request->user()->current_team_id;
         $today = now()->toDateString();
 
+        /** Past-due only applies once an invoice is out of draft (issued / awaiting payment). */
+        $statusesWherePastDueMatters = [
+            InvoiceStatus::Sent,
+            InvoiceStatus::Viewed,
+            InvoiceStatus::Partial,
+            InvoiceStatus::Overdue,
+        ];
+        $statusValuesWherePastDueMatters = array_map(
+            static fn (InvoiceStatus $s): string => $s->value,
+            $statusesWherePastDueMatters
+        );
+
         $query = Invoice::queryWithoutTeamScope()
             ->with('client:id,name')
             ->where('team_id', $teamId);
@@ -273,7 +285,7 @@ class InvoiceController extends Controller
         if ($status !== '' && $status !== 'all') {
             if ($status === 'overdue') {
                 $query->whereDate('due_date', '<', $today)
-                    ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value]);
+                    ->whereIn('status', $statusValuesWherePastDueMatters);
             } elseif ($status === InvoiceStatus::Sent->value) {
                 $query->whereIn('status', [InvoiceStatus::Sent->value, InvoiceStatus::Viewed->value]);
             } else {
@@ -306,12 +318,14 @@ class InvoiceController extends Controller
             ->orderByDesc('issue_date')
             ->paginate(15)
             ->withQueryString()
-            ->through(function (Invoice $invoice) use ($today): array {
+            ->through(function (Invoice $invoice) use ($today, $statusesWherePastDueMatters): array {
                 $total = (int) $invoice->getRawOriginal('total_cents');
                 $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
                 $amountDue = max(0, $total - $paid);
-                $isOverdue = Carbon::parse($invoice->due_date)->isPast()
-                    && ! in_array($invoice->status, [InvoiceStatus::Paid, InvoiceStatus::Void], true)
+                $dueDate = optional($invoice->due_date)?->toDateString();
+                $isOverdue = in_array($invoice->status, $statusesWherePastDueMatters, true)
+                    && $dueDate !== null
+                    && $dueDate < $today
                     && $amountDue > 0;
 
                 return [
@@ -337,7 +351,7 @@ class InvoiceController extends Controller
         // Clone before overdue filters — otherwise $base is mutated and draft/sent counts inherit wrong constraints.
         $overdueRows = (clone $base)
             ->whereDate('due_date', '<', $today)
-            ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value])
+            ->whereIn('status', $statusValuesWherePastDueMatters)
             ->get();
 
         $overdueTotal = $overdueRows->sum(function (Invoice $invoice): int {
