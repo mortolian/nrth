@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { CalendarClock, CheckCircle2, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
@@ -82,6 +82,8 @@ const props = defineProps<{
     payment_methods: PaymentMethodOption[];
 }>();
 
+const page = usePage();
+
 const paymentDrawerOpen = ref(false);
 const paymentForm = ref({
     amount: ((props.invoice.amount_due_cents || 0) / 100).toFixed(2),
@@ -89,6 +91,24 @@ const paymentForm = ref({
     method: 'eft',
     reference: '',
     notes: '',
+});
+
+const paymentRecordErrorKeys = ['amount_cents', 'payment_date', 'method', 'reference', 'notes', 'account', 'invoice_id'] as const;
+
+const paymentRecordErrors = computed(() => {
+    const raw = page.props.errors as Record<string, string | string[] | undefined> | undefined;
+    if (!raw || typeof raw !== 'object') {
+        return [] as { key: string; message: string }[];
+    }
+    return paymentRecordErrorKeys.flatMap((key) => {
+        const val = raw[key];
+        if (val === undefined || val === null) {
+            return [];
+        }
+        const message = Array.isArray(val) ? val.join(' ') : String(val);
+
+        return [{ key, message }];
+    });
 });
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -136,22 +156,34 @@ const downloadPdf = () => {
     window.location.assign(route('invoices.pdf.download', props.invoice.id));
 };
 const openRecordPayment = () => {
-    paymentForm.value.amount = ((props.invoice.amount_due_cents || 0) / 100).toFixed(2);
+    paymentForm.value = {
+        amount: ((props.invoice.amount_due_cents || 0) / 100).toFixed(2),
+        payment_date: new Date().toISOString().slice(0, 10),
+        method: 'eft',
+        reference: '',
+        notes: '',
+    };
     paymentDrawerOpen.value = true;
 };
 
 const submitRecordPayment = () => {
-    router.post(route('invoicing.invoices.payments.store', props.invoice.id), {
-        amount_cents: Math.round(Number(paymentForm.value.amount || 0) * 100),
-        payment_date: paymentForm.value.payment_date,
-        method: paymentForm.value.method,
-        reference: paymentForm.value.reference,
-        notes: paymentForm.value.notes,
-    }, {
-        onSuccess: () => {
-            paymentDrawerOpen.value = false;
+    const amountCents = Math.round(Number(String(paymentForm.value.amount).replace(',', '.')) * 100);
+    router.post(
+        route('invoicing.invoices.payments.store', props.invoice.id),
+        {
+            amount_cents: amountCents,
+            payment_date: paymentForm.value.payment_date,
+            method: paymentForm.value.method,
+            reference: paymentForm.value.reference || null,
+            notes: paymentForm.value.notes || null,
         },
-    });
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                paymentDrawerOpen.value = false;
+            },
+        },
+    );
 };
 </script>
 
@@ -349,9 +381,18 @@ const submitRecordPayment = () => {
                 <button class="rounded p-1 hover:bg-slate-100" @click="paymentDrawerOpen = false">✕</button>
             </div>
             <div class="space-y-4 px-5 py-4 text-sm">
+                <div
+                    v-if="paymentRecordErrors.length"
+                    class="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900"
+                >
+                    <p class="font-medium">Could not record payment</p>
+                    <ul class="mt-1 list-inside list-disc space-y-0.5 text-rose-800">
+                        <li v-for="err in paymentRecordErrors" :key="err.key">{{ err.message }}</li>
+                    </ul>
+                </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Amount</label>
-                    <AppInput v-model="paymentForm.amount" type="number" />
+                    <AppInput v-model="paymentForm.amount" type="number" inputmode="decimal" step="0.01" min="0.01" />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Payment date</label>
@@ -360,9 +401,8 @@ const submitRecordPayment = () => {
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Method</label>
                     <AppSelect
-                        :model-value="paymentForm.method"
+                        v-model="paymentForm.method"
                         :options="payment_methods.map((method) => ({ label: method.label, value: method.value }))"
-                        @update:model-value="paymentForm.method = $event"
                     />
                 </div>
                 <div>

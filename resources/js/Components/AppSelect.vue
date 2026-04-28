@@ -50,7 +50,7 @@ const selectModel = computed({
             <SelectValue :placeholder="props.placeholder" />
         </SelectTrigger>
         <SelectPortal>
-            <SelectContent class="z-50 min-w-[10rem] rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+            <SelectContent class="z-[200] min-w-[10rem] rounded-md border border-slate-200 bg-white p-1 shadow-sm">
                 <SelectViewport>
                     <SelectItem
                         v-for="option in normalizedOptions"

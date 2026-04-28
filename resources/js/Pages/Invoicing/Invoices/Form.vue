@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
+import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { Plus, Trash2 } from 'lucide-vue-next';
+import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
 type ClientOption = { id: number; name: string; payment_terms_days: number };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
@@ -141,6 +142,50 @@ const { setErrors, values, setFieldValue } = useForm({
  * depending on version/build. Normalize once so watcher getters never crash.
  */
 const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
+
+const lineItemsTbodyRef = ref<HTMLTableSectionElement | null>(null);
+let lineItemSortable: ReturnType<typeof Sortable.create> | null = null;
+
+const lineItemsOrderSignature = computed(() =>
+    ((formValues.value.line_items ?? []) as InvoiceLine[]).map((l) => l.row_key).join('|'),
+);
+
+const initLineItemSortable = () => {
+    lineItemSortable?.destroy();
+    lineItemSortable = null;
+    const el = lineItemsTbodyRef.value;
+    if (!el || el.querySelectorAll('tr').length === 0) {
+        return;
+    }
+    lineItemSortable = Sortable.create(el, {
+        animation: 150,
+        handle: '.line-drag-handle',
+        draggable: 'tr',
+        onEnd(evt) {
+            const { oldIndex, newIndex } = evt;
+            if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) {
+                return;
+            }
+            const lines = [...((formValues.value.line_items ?? []) as InvoiceLine[])];
+            const [moved] = lines.splice(oldIndex, 1);
+            lines.splice(newIndex, 0, moved);
+            setFieldValue('line_items', lines);
+        },
+    });
+};
+
+onMounted(() => {
+    nextTick(() => initLineItemSortable());
+});
+
+watch(lineItemsOrderSignature, () => {
+    nextTick(() => initLineItemSortable());
+}, { flush: 'post' });
+
+onBeforeUnmount(() => {
+    lineItemSortable?.destroy();
+    lineItemSortable = null;
+});
 
 const clientMap = computed<Record<number, ClientOption>>(() => (
     props.clients.reduce((acc, client) => {
@@ -343,6 +388,7 @@ const onSave = () => {
                         <table class="min-w-full divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                 <tr>
+                                    <th class="w-10 px-1 py-2 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
                                     <th class="px-3 py-2 text-left">Description</th>
                                     <th class="px-3 py-2 text-left">Qty</th>
                                     <th class="px-3 py-2 text-left">Unit Price</th>
@@ -352,8 +398,18 @@ const onSave = () => {
                                     <th class="px-3 py-2 text-left">Delete</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100">
+                            <tbody ref="lineItemsTbodyRef" class="divide-y divide-slate-100">
                                 <tr v-for="(line, index) in (values.line_items as InvoiceLine[])" :key="line.row_key">
+                                    <td class="w-10 px-1 py-2 align-middle">
+                                        <span
+                                            class="line-drag-handle inline-flex cursor-grab touch-manipulation rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                            role="button"
+                                            tabindex="0"
+                                            aria-label="Drag to reorder line"
+                                        >
+                                            <GripVertical class="h-4 w-4 shrink-0" />
+                                        </span>
+                                    </td>
                                     <td class="px-3 py-2">
                                         <div class="space-y-2">
                                             <AppInput
