@@ -49,7 +49,7 @@ const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 
             { label: 'Clients' },
         ]"
     >
-        <PageHeader title="Clients" subtitle="Manage companies and billing contacts">
+        <PageHeader title="Clients">
             <template #actions>
                 <AppButton variant="primary" @click="router.visit(route('invoicing.clients.create'))">New Client</AppButton>
             </template>
