@@ -4,6 +4,7 @@ import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 type QuoteRow = {
@@ -15,6 +16,7 @@ type QuoteRow = {
     total_cents: number;
     currency: string;
     status: 'draft' | 'sent' | 'accepted' | 'expired' | 'converted';
+    converted_invoice_id: number | null;
 };
 
 const props = defineProps<{
@@ -49,6 +51,54 @@ const badgeVariant = (value: QuoteRow['status']) => {
     if (value === 'expired') return 'danger';
     if (value === 'converted') return 'neutral';
     return 'info';
+};
+
+const quoteActionItems = (quote: QuoteRow) => {
+    const actions = [
+        { id: 'view', label: 'View' },
+        { id: 'edit', label: 'Edit' },
+        { id: 'download_pdf', label: 'Download PDF' },
+    ];
+
+    if (quote.status === 'draft') {
+        actions.push({ id: 'send', label: 'Send quote' });
+        actions.push({ id: 'mark_sent', label: 'Mark as sent' });
+    }
+    if (quote.status === 'sent') {
+        actions.push({ id: 'accept', label: 'Mark accepted' });
+        actions.push({ id: 'decline', label: 'Mark declined' });
+    }
+    if (quote.status === 'converted' && quote.converted_invoice_id) {
+        actions.push({ id: 'view_invoice', label: 'View invoice' });
+    }
+    actions.push({ id: 'delete', label: 'Delete quote' });
+
+    return actions;
+};
+
+const onAction = (quote: QuoteRow, actionId: string) => {
+    if (actionId === 'view') {
+        router.visit(route('invoicing.quotes.show', quote.id));
+    } else if (actionId === 'edit') {
+        router.visit(route('invoicing.quotes.edit', quote.id));
+    } else if (actionId === 'download_pdf') {
+        window.location.assign(route('invoicing.quotes.pdf.download', quote.id));
+    } else if (actionId === 'send') {
+        router.post(route('invoicing.quotes.send', quote.id));
+    } else if (actionId === 'mark_sent') {
+        router.post(route('invoicing.quotes.mark-sent', quote.id));
+    } else if (actionId === 'accept') {
+        router.post(route('invoicing.quotes.accept', quote.id));
+    } else if (actionId === 'decline') {
+        router.post(route('invoicing.quotes.decline', quote.id));
+    } else if (actionId === 'view_invoice' && quote.converted_invoice_id) {
+        router.visit(route('invoicing.invoices.show', quote.converted_invoice_id));
+    } else if (actionId === 'delete') {
+        if (!window.confirm(`Permanently delete quote ${quote.number}? This cannot be undone.`)) {
+            return;
+        }
+        router.delete(route('invoicing.quotes.destroy', quote.id), { preserveScroll: true });
+    }
 };
 </script>
 
@@ -132,11 +182,12 @@ const badgeVariant = (value: QuoteRow['status']) => {
                             <AppBadge :variant="badgeVariant(quote.status)">{{ quote.status }}</AppBadge>
                         </td>
                         <td class="px-4 py-3">
-                            <div class="flex gap-1">
-                                <AppButton size="sm" variant="ghost" @click="router.visit(route('invoicing.quotes.show', quote.id))">View</AppButton>
-                                <AppButton size="sm" variant="ghost" @click="router.visit(route('invoicing.quotes.edit', quote.id))">Edit</AppButton>
-                                <AppButton v-if="quote.status === 'draft'" size="sm" variant="ghost" @click="router.post(route('invoicing.quotes.send', quote.id))">Send quote</AppButton>
-                                <AppButton v-if="quote.status === 'draft'" size="sm" variant="ghost" @click="router.post(route('invoicing.quotes.mark-sent', quote.id))">Mark as sent</AppButton>
+                            <div class="inline-flex">
+                                <InvoiceRowActionsMenu
+                                    :actions="quoteActionItems(quote)"
+                                    :aria-label="`Actions for ${quote.number}`"
+                                    @select="(id) => onAction(quote, id)"
+                                />
                             </div>
                         </td>
                     </tr>

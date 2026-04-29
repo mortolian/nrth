@@ -55,6 +55,7 @@ class QuoteController extends Controller
                 'total_cents' => (int) $quote->getRawOriginal('total_cents'),
                 'currency' => Iso4217Currencies::normalize((string) ($quote->currency ?? 'ZAR')),
                 'status' => $quote->status->value,
+                'converted_invoice_id' => $quote->converted_invoice_id,
             ])->values()->all(),
             'summary' => [
                 'draft' => $quotes->filter(fn (Quote $q) => $q->status === QuoteStatus::Draft)->count(),
