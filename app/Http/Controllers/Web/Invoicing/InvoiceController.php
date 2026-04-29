@@ -251,6 +251,7 @@ class InvoiceController extends Controller
                     'sent_count' => 0,
                     'overdue_count' => 0,
                     'overdue_total' => 0,
+                    'overdue_totals_by_currency' => [],
                 ],
                 'filters' => $this->activeFilters($request),
                 'filter_client' => null,
@@ -375,6 +376,26 @@ class InvoiceController extends Controller
             return max(0, $total - $paid);
         });
 
+        /** @var array<string, int> */
+        $overdueTotalsByCurrency = [];
+        foreach ($overdueRows as $invoice) {
+            $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
+            $total = (int) $invoice->getRawOriginal('total_cents');
+            $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+            $amountDue = max(0, $total - $paid);
+
+            $overdueTotalsByCurrency[$currency] = ($overdueTotalsByCurrency[$currency] ?? 0) + $amountDue;
+        }
+
+        $overdueTotalsByCurrencyRows = collect($overdueTotalsByCurrency)
+            ->map(fn (int $totalCents, string $currencyCode): array => [
+                'currency' => $currencyCode,
+                'total_cents' => $totalCents,
+            ])
+            ->sortByDesc('total_cents')
+            ->values()
+            ->all();
+
         return Inertia::render('Invoicing/Invoices/Index', [
             'invoices' => $invoices,
             'summary' => [
@@ -382,6 +403,7 @@ class InvoiceController extends Controller
                 'sent_count' => (clone $base)->whereIn('status', [InvoiceStatus::Sent->value, InvoiceStatus::Viewed->value])->count(),
                 'overdue_count' => $overdueRows->count(),
                 'overdue_total' => $overdueTotal,
+                'overdue_totals_by_currency' => $overdueTotalsByCurrencyRows,
             ],
             'filters' => $this->activeFilters($request),
             'filter_client' => $filterClientContext,

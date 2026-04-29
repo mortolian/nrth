@@ -32,6 +32,7 @@ const props = defineProps<{
         sent_count: number;
         overdue_count: number;
         overdue_total: number;
+        overdue_totals_by_currency: Array<{ currency: string; total_cents: number }>;
     };
     filters: {
         status: string;
@@ -85,8 +86,6 @@ const statusOptions = [
     { label: 'Void', value: 'void' },
 ];
 
-/** Overdue summary sums cents across invoices; amounts may mix currencies — display as ZAR for compatibility. */
-const formatZar = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 const formatRowCents = (cents: number, currency: string) =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 
@@ -290,8 +289,24 @@ const exportSelectedPdfZip = async () => {
                     @click="applyStatFilter('overdue')"
                 >
                     <AppCard class="h-full">
-                        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue total</p>
-                        <p class="mt-1 text-2xl font-semibold text-rose-600">{{ formatZar(summary.overdue_total) }}</p>
+                        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue totals</p>
+                        <template v-if="summary.overdue_totals_by_currency.length === 1">
+                            <p class="mt-1 text-2xl font-semibold text-rose-600">
+                                {{ formatRowCents(summary.overdue_totals_by_currency[0].total_cents, summary.overdue_totals_by_currency[0].currency) }}
+                            </p>
+                        </template>
+                        <template v-else>
+                            <div class="mt-1 space-y-1">
+                                <div
+                                    v-for="t in summary.overdue_totals_by_currency"
+                                    :key="t.currency"
+                                    class="flex items-center justify-between gap-2"
+                                >
+                                    <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t.currency }}</span>
+                                    <span class="text-sm font-semibold text-rose-600">{{ formatRowCents(t.total_cents, t.currency) }}</span>
+                                </div>
+                            </div>
+                        </template>
                     </AppCard>
                 </button>
             </div>
