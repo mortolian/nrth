@@ -56,7 +56,7 @@ const badgeVariant = (value: QuoteRow['status']) => {
     <AppLayout title="Quotes" :breadcrumbs="[{ label: 'Money In' }, { label: 'Quotes' }]">
         <Head title="Quotes" />
 
-        <PageHeader title="Quotes" subtitle="Prepare proposals and track quote acceptance before invoicing.">
+        <PageHeader title="Quotes">
             <template #actions>
                 <AppButton variant="primary" @click="router.visit(route('invoicing.quotes.create'))">New Quote</AppButton>
             </template>
