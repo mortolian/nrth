@@ -431,7 +431,13 @@ const submitRecordPayment = () => {
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Amount</label>
-                    <AppInput v-model="paymentForm.amount" type="number" inputmode="decimal" step="0.01" min="0.01" />
+                    <AppInput
+                        v-model="paymentForm.amount"
+                        type="text"
+                        inputmode="decimal"
+                        step="0.01"
+                        pattern="^\\d*(\\.\\d{0,2})?$"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Payment date</label>

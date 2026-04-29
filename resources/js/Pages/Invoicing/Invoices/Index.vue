@@ -345,11 +345,21 @@ const exportSelectedPdfZip = async () => {
                         </div>
                         <div class="xl:col-span-1">
                             <label class="mb-1 block text-xs font-medium text-slate-500">Min amount</label>
-                            <AppInput v-model="localFilters.min_amount" type="number" placeholder="0" />
+                            <AppInput
+                                v-model="localFilters.min_amount"
+                                type="text"
+                                inputmode="decimal"
+                                placeholder="0.00"
+                            />
                         </div>
                         <div class="xl:col-span-1">
                             <label class="mb-1 block text-xs font-medium text-slate-500">Max amount</label>
-                            <AppInput v-model="localFilters.max_amount" type="number" placeholder="0" />
+                            <AppInput
+                                v-model="localFilters.max_amount"
+                                type="text"
+                                inputmode="decimal"
+                                placeholder="0.00"
+                            />
                         </div>
                     </div>
 

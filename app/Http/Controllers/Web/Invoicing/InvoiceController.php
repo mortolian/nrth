@@ -282,8 +282,18 @@ class InvoiceController extends Controller
         $to = (string) $request->string('to')->toString();
         $client = trim((string) $request->string('client')->toString());
         $clientId = (int) $request->integer('client_id');
-        $min = (int) $request->integer('min_amount');
-        $max = (int) $request->integer('max_amount');
+        $minCents = 0;
+        $maxCents = 0;
+
+        $minMajor = $request->input('min_amount');
+        if ($minMajor !== null && $minMajor !== '') {
+            $minCents = (int) round(((float) $minMajor) * 100);
+        }
+
+        $maxMajor = $request->input('max_amount');
+        if ($maxMajor !== null && $maxMajor !== '') {
+            $maxCents = (int) round(((float) $maxMajor) * 100);
+        }
 
         $filterClientContext = null;
         if ($clientId > 0) {
@@ -320,12 +330,12 @@ class InvoiceController extends Controller
             $query->whereDate('issue_date', '<=', $to);
         }
 
-        if ($min > 0) {
-            $query->where('total_cents', '>=', $min * 100);
+        if ($minCents > 0) {
+            $query->where('total_cents', '>=', $minCents);
         }
 
-        if ($max > 0) {
-            $query->where('total_cents', '<=', $max * 100);
+        if ($maxCents > 0) {
+            $query->where('total_cents', '<=', $maxCents);
         }
 
         $invoices = $query
@@ -576,8 +586,8 @@ class InvoiceController extends Controller
             'to' => $request->string('to')->toString() ?: null,
             'client' => $request->string('client')->toString() ?: null,
             'client_id' => $clientId > 0 ? $clientId : null,
-            'min_amount' => $request->integer('min_amount') ?: null,
-            'max_amount' => $request->integer('max_amount') ?: null,
+            'min_amount' => $request->filled('min_amount') ? (float) $request->input('min_amount') : null,
+            'max_amount' => $request->filled('max_amount') ? (float) $request->input('max_amount') : null,
         ];
     }
 

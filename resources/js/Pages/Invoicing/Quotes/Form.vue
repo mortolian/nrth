@@ -16,7 +16,7 @@ type QuoteLineForm = {
     description: string;
     quantity: number;
     /** Major units (e.g. rands) for inputs; converted to cents on save. */
-    unit_price: number;
+    unit_price: string;
     vat_rate: number;
 };
 type QuotePayload = {
@@ -94,14 +94,14 @@ const lineItems = ref<QuoteLineForm[]>(
             row_key: makeRowKey(),
             description: row.description ?? '',
             quantity: Number(row.quantity) || 1,
-            unit_price: (Number(row.unit_price_cents) || 0) / 100,
+            unit_price: (((Number(row.unit_price_cents) || 0) / 100)).toFixed(2),
             vat_rate: Number(row.vat_rate) || 0,
         }))
         : [{
             row_key: makeRowKey(),
             description: '',
             quantity: 1,
-            unit_price: 0,
+            unit_price: '0.00',
             vat_rate: defaultLineVat.value,
         }],
 );
@@ -190,12 +190,26 @@ const updateLine = (index: number, field: keyof QuoteLineForm, value: string | n
     lineItems.value = lineItems.value.map((line, i) => (i === index ? { ...line, [field]: value } : line));
 };
 
+const normalizeMoneyInput = (raw: unknown): string => {
+    const cleaned = String(raw ?? '').trim().replace(',', '.');
+    if (cleaned === '') return '0.00';
+    const parsed = Number(cleaned);
+    if (!Number.isFinite(parsed) || parsed < 0) return '0.00';
+    return parsed.toFixed(2);
+};
+
+const onUnitPriceBlur = (index: number) => {
+    const line = lineItems.value[index];
+    if (!line) return;
+    updateLine(index, 'unit_price', normalizeMoneyInput(line.unit_price));
+};
+
 const addLine = () => {
     lineItems.value = [...lineItems.value, {
         row_key: makeRowKey(),
         description: '',
         quantity: 1,
-        unit_price: 0,
+        unit_price: '0.00',
         vat_rate: defaultLineVat.value,
     }];
 };
@@ -207,7 +221,7 @@ const removeLine = (index: number) => {
         row_key: makeRowKey(),
         description: '',
         quantity: 1,
-        unit_price: 0,
+        unit_price: '0.00',
         vat_rate: defaultLineVat.value,
     }];
 };
@@ -327,9 +341,12 @@ const submit = (submitAction: 'draft' | 'send') => {
                                         <AppInput
                                             class="text-right tabular-nums"
                                             :model-value="line.unit_price"
-                                            type="number"
+                                            type="text"
                                             inputmode="decimal"
-                                            @update:model-value="updateLine(index, 'unit_price', Number($event))"
+                                            step="0.01"
+                                            pattern="^\\d*(\\.\\d{0,2})?$"
+                                            @update:model-value="updateLine(index, 'unit_price', $event)"
+                                            @blur="onUnitPriceBlur(index)"
                                         />
                                     </td>
                                     <td v-if="chargesVat" class="px-2 py-3 align-top">
@@ -387,8 +404,7 @@ const submit = (submitAction: 'draft' | 'send') => {
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
             <div class="flex justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('invoicing.quotes.index'))">Cancel</AppButton>
-                <AppButton variant="secondary" @click="submit('draft')">Save Draft</AppButton>
-                <AppButton variant="primary" @click="submit('send')">Save and Send</AppButton>
+                <AppButton variant="primary" @click="submit('draft')">Save</AppButton>
             </div>
         </div>
     </AppLayout>

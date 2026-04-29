@@ -91,14 +91,15 @@ const deleteQuote = () => {
     >
         <Head :title="quote.number" />
 
-        <PageHeader :title="quote.number" :subtitle="`Client: ${quote.client_name}`">
+        <PageHeader :title="quote.number">
             <template #actions>
                 <div class="flex gap-2">
-                    <AppButton variant="secondary" @click="router.visit(route('invoicing.quotes.edit', quote.id))">Edit quote</AppButton>
-                    <AppButton variant="secondary" @click="downloadPdf">Download PDF</AppButton>
-                    <AppButton v-if="quote.status === 'draft'" variant="secondary" @click="router.post(route('invoicing.quotes.send', quote.id))">Send</AppButton>
-                    <AppButton v-if="quote.status === 'sent'" variant="secondary" @click="router.post(route('invoicing.quotes.accept', quote.id))">Mark accepted</AppButton>
-                    <AppButton v-if="quote.status === 'sent'" variant="ghost" @click="router.post(route('invoicing.quotes.decline', quote.id))">Decline</AppButton>
+                    <AppButton variant="primary" @click="router.visit(route('invoicing.quotes.edit', quote.id))">Edit quote</AppButton>
+                    <AppButton variant="primary" @click="downloadPdf">Download PDF</AppButton>
+                    <AppButton v-if="quote.status === 'draft'" variant="primary" @click="router.post(route('invoicing.quotes.send', quote.id))">Send quote</AppButton>
+                    <AppButton v-if="quote.status === 'draft'" variant="primary" @click="router.post(route('invoicing.quotes.mark-sent', quote.id))">Mark as sent</AppButton>
+                    <AppButton v-if="quote.status === 'sent'" variant="primary" @click="router.post(route('invoicing.quotes.accept', quote.id))">Mark accepted</AppButton>
+                    <AppButton v-if="quote.status === 'sent'" variant="primary" @click="router.post(route('invoicing.quotes.decline', quote.id))">Mark declined</AppButton>
                     <AppButton
                         v-if="['accepted', 'sent'].includes(quote.status)"
                         variant="primary"
@@ -115,8 +116,7 @@ const deleteQuote = () => {
                     </AppButton>
                     <AppButton
                         v-if="can.delete"
-                        variant="ghost"
-                        class="text-red-600 hover:text-red-700"
+                        variant="primary"
                         @click="deleteQuote"
                     >
                         Delete

@@ -86,6 +86,7 @@ Route::middleware([
         Route::get('/quotes/{quote}/edit', [QuoteController::class, 'edit'])->name('quotes.edit');
         Route::put('/quotes/{quote}', [QuoteController::class, 'update'])->name('quotes.update');
         Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
+        Route::post('/quotes/{quote}/mark-sent', [QuoteController::class, 'markSent'])->name('quotes.mark-sent');
         Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
         Route::post('/quotes/{quote}/decline', [QuoteController::class, 'decline'])->name('quotes.decline');
         Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convert'])->name('quotes.convert');

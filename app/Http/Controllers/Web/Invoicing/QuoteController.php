@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Invoicing;
 
+use App\Domain\Invoicing\Actions\MarkQuoteSentAction;
 use App\Domain\Invoicing\Actions\SendQuoteAction;
 use App\Domain\Invoicing\Enums\QuoteStatus;
 use App\Domain\Invoicing\Models\Client;
@@ -210,6 +211,14 @@ class QuoteController extends Controller
     {
         abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
         $sendQuoteAction->execute($quote);
+
+        return back();
+    }
+
+    public function markSent(Request $request, Quote $quote, MarkQuoteSentAction $markQuoteSentAction): RedirectResponse
+    {
+        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
+        $markQuoteSentAction->execute($quote);
 
         return back();
     }

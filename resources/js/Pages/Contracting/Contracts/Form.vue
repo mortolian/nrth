@@ -170,17 +170,26 @@ const generateRetainerInvoice = () => {
                     <AppInput
                         v-if="values.billing_type === 'fixed'"
                         v-model="values.contract_value"
-                        type="number"
+                        type="text"
+                        inputmode="decimal"
+                        step="0.01"
+                        pattern="^\\d*(\\.\\d{0,2})?$"
                     />
                     <AppInput
                         v-else-if="values.billing_type === 'time_materials'"
                         v-model="values.hourly_rate"
-                        type="number"
+                        type="text"
+                        inputmode="decimal"
+                        step="0.01"
+                        pattern="^\\d*(\\.\\d{0,2})?$"
                     />
                     <AppInput
                         v-else
                         v-model="values.monthly_amount"
-                        type="number"
+                        type="text"
+                        inputmode="decimal"
+                        step="0.01"
+                        pattern="^\\d*(\\.\\d{0,2})?$"
                     />
                     <p class="mt-1 text-xs text-slate-500">{{ useFormatCurrency(selectedAmount, 'ZAR') }}</p>
                 </div>

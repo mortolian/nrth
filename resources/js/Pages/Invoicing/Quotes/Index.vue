@@ -135,7 +135,8 @@ const badgeVariant = (value: QuoteRow['status']) => {
                             <div class="flex gap-1">
                                 <AppButton size="sm" variant="ghost" @click="router.visit(route('invoicing.quotes.show', quote.id))">View</AppButton>
                                 <AppButton size="sm" variant="ghost" @click="router.visit(route('invoicing.quotes.edit', quote.id))">Edit</AppButton>
-                                <AppButton v-if="quote.status === 'draft'" size="sm" variant="ghost" @click="router.post(route('invoicing.quotes.send', quote.id))">Send</AppButton>
+                                <AppButton v-if="quote.status === 'draft'" size="sm" variant="ghost" @click="router.post(route('invoicing.quotes.send', quote.id))">Send quote</AppButton>
+                                <AppButton v-if="quote.status === 'draft'" size="sm" variant="ghost" @click="router.post(route('invoicing.quotes.mark-sent', quote.id))">Mark as sent</AppButton>
                             </div>
                         </td>
                     </tr>

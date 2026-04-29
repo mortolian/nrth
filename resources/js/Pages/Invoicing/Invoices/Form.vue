@@ -17,7 +17,7 @@ type InvoiceLine = {
     row_key: string;
     description: string;
     quantity: number;
-    unit_price: number;
+    unit_price: string;
     vat_rate: number;
     account_id?: number | null;
 };
@@ -155,11 +155,11 @@ const { setErrors, values, setFieldValue } = useForm({
                 row_key: makeRowKey(),
                 description: line.description,
                 quantity: Number(line.quantity) || 1,
-                unit_price: Number(line.unit_price) || 0,
+                unit_price: (Number(line.unit_price) || 0).toFixed(2),
                 vat_rate: Number(line.vat_rate) || defaultVatRate.value,
                 account_id: line.account_id ?? null,
             }))
-            : [{ row_key: makeRowKey(), description: '', quantity: 1, unit_price: 0, vat_rate: defaultVatRate.value, account_id: null }],
+            : [{ row_key: makeRowKey(), description: '', quantity: 1, unit_price: '0.00', vat_rate: defaultVatRate.value, account_id: null }],
     },
 });
 
@@ -276,7 +276,7 @@ const addLine = () => {
         row_key: makeRowKey(),
         description: '',
         quantity: 1,
-        unit_price: 0,
+        unit_price: '0.00',
         vat_rate: defaultVatRate.value,
         account_id: null,
     }];
@@ -290,6 +290,20 @@ const updateLine = (index: number, field: keyof InvoiceLine, value: any) => {
     setFieldValue('line_items', next);
 };
 
+const normalizeMoneyInput = (raw: unknown): string => {
+    const cleaned = String(raw ?? '').trim().replace(',', '.');
+    if (cleaned === '') return '0.00';
+    const parsed = Number(cleaned);
+    if (!Number.isFinite(parsed) || parsed < 0) return '0.00';
+    return parsed.toFixed(2);
+};
+
+const onUnitPriceBlur = (index: number) => {
+    const line = (formValues.value.line_items ?? [])[index] as InvoiceLine | undefined;
+    if (!line) return;
+    updateLine(index, 'unit_price', normalizeMoneyInput(line.unit_price));
+};
+
 const removeLine = (index: number) => {
     const next = [...(formValues.value.line_items ?? [])];
     next.splice(index, 1);
@@ -297,7 +311,7 @@ const removeLine = (index: number) => {
         row_key: makeRowKey(),
         description: '',
         quantity: 1,
-        unit_price: 0,
+        unit_price: '0.00',
         vat_rate: defaultVatRate.value,
         account_id: null,
     }]);
@@ -487,9 +501,12 @@ const onSave = () => {
                                         <AppInput
                                             class="text-right tabular-nums"
                                             :model-value="line.unit_price"
-                                            type="number"
+                                            type="text"
                                             inputmode="decimal"
-                                            @update:model-value="updateLine(index, 'unit_price', Number($event))"
+                                            step="0.01"
+                                            pattern="^\\d*(\\.\\d{0,2})?$"
+                                            @update:model-value="updateLine(index, 'unit_price', $event)"
+                                            @blur="onUnitPriceBlur(index)"
                                         />
                                     </td>
                                     <td v-if="chargesVat" class="px-2 py-3 align-top">
