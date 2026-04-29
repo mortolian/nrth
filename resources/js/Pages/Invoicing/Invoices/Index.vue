@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
@@ -45,7 +45,9 @@ const props = defineProps<{
     filter_client: { id: number; name: string } | null;
 }>();
 
+const page = usePage<{ csrf_token?: string }>();
 const selected = ref<number[]>([]);
+const exportingZip = ref(false);
 const paymentDrawerOpen = ref(false);
 const selectedInvoice = ref<InvoiceRow | null>(null);
 
@@ -129,8 +131,14 @@ const navigateToPage = (page: number) => {
 };
 
 const rowActionItems = (invoice: InvoiceRow) => {
-    const actions = [{ id: 'view', label: 'View' }];
-    if (invoice.status === 'draft') actions.push({ id: 'send', label: 'Send' });
+    const actions = [
+        { id: 'view', label: 'View' },
+        { id: 'download_pdf', label: 'Download PDF' },
+    ];
+    if (invoice.status === 'draft') {
+        actions.push({ id: 'send', label: 'Send' });
+        actions.push({ id: 'mark_sent', label: 'Mark as sent' });
+    }
     if (invoice.status !== 'paid' && invoice.status !== 'void') actions.push({ id: 'record_payment', label: 'Record Payment' });
     if (invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
     if (invoice.status === 'void') actions.push({ id: 'unvoid', label: 'Restore' });
@@ -141,8 +149,12 @@ const rowActionItems = (invoice: InvoiceRow) => {
 const onAction = (invoice: InvoiceRow, actionId: string) => {
     if (actionId === 'view') {
         router.visit(route('invoicing.invoices.show', invoice.id));
+    } else if (actionId === 'download_pdf') {
+        window.location.assign(route('invoices.pdf.download', invoice.id));
     } else if (actionId === 'send') {
         router.post(route('invoicing.invoices.send', invoice.id));
+    } else if (actionId === 'mark_sent') {
+        router.post(route('invoicing.invoices.mark-sent', invoice.id));
     } else if (actionId === 'void') {
         router.post(route('invoicing.invoices.void', invoice.id));
     } else if (actionId === 'unvoid') {
@@ -166,6 +178,51 @@ const toggleSelected = (id: number, checked: boolean) => {
         return;
     }
     selected.value = selected.value.filter((item) => item !== id);
+};
+
+const exportSelectedPdfZip = async () => {
+    if (selected.value.length === 0 || exportingZip.value) {
+        return;
+    }
+    const token = page.props.csrf_token;
+    if (!token) {
+        window.alert('Unable to export: missing security token. Refresh the page and try again.');
+        return;
+    }
+    exportingZip.value = true;
+    try {
+        const res = await fetch(route('invoicing.invoices.export-pdf-zip'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': token,
+            },
+            body: JSON.stringify({ invoice_ids: selected.value }),
+        });
+        if (!res.ok) {
+            const data = (await res.json().catch(() => null)) as { message?: string } | null;
+            window.alert(data?.message ?? 'Export failed. Please try again.');
+            return;
+        }
+        const blob = await res.blob();
+        const filename =
+            res.headers.get('Content-Disposition')?.match(/filename="?([^";]+)"?/)?.[1] ?? 'invoices.zip';
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch {
+        window.alert('Export failed. Please try again.');
+    } finally {
+        exportingZip.value = false;
+    }
 };
 </script>
 
@@ -298,8 +355,14 @@ const toggleSelected = (id: number, checked: boolean) => {
                 <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 class="text-lg font-semibold text-slate-900">Invoice list</h3>
                     <div class="hidden items-center gap-2 sm:flex">
-                        <AppButton variant="secondary" size="sm" :disabled="selected.length === 0">Export selected (PDF zip)</AppButton>
-                        <AppButton variant="secondary" size="sm" :disabled="selected.length === 0">Mark as sent</AppButton>
+                        <AppButton
+                            variant="secondary"
+                            size="sm"
+                            :disabled="selected.length === 0 || exportingZip"
+                            @click="exportSelectedPdfZip"
+                        >
+                            {{ exportingZip ? 'Preparing…' : 'Export selected (PDF zip)' }}
+                        </AppButton>
                     </div>
                 </div>
 

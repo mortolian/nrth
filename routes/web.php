@@ -99,6 +99,7 @@ Route::middleware([
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
 
         Route::get('/exchange-rate', ExchangeRateController::class)->name('exchange-rate');
+        Route::post('/invoices/export-pdf-zip', [InvoicePdfController::class, 'downloadZip'])->name('invoices.export-pdf-zip');
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
         Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('invoices.create');
         Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');

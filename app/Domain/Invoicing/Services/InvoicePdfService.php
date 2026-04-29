@@ -11,6 +11,29 @@ class InvoicePdfService
 {
     public function generate(Invoice $invoice): Media
     {
+        $tmpPath = $this->renderToTemporaryPath($invoice);
+        $invoice = $invoice->fresh();
+        if ($invoice === null) {
+            File::delete($tmpPath);
+            throw new \RuntimeException('Invoice not found.');
+        }
+
+        try {
+            return $invoice
+                ->addMedia($tmpPath)
+                ->usingName('Invoice '.$invoice->number)
+                ->usingFileName($invoice->number.'.pdf')
+                ->toMediaCollection('invoice-pdfs');
+        } finally {
+            File::delete($tmpPath);
+        }
+    }
+
+    /**
+     * Render the invoice PDF to a temp path. Caller must delete the file when done.
+     */
+    public function renderToTemporaryPath(Invoice $invoice): string
+    {
         $invoice = $invoice->fresh(['team', 'client', 'lineItems']);
         if ($invoice === null) {
             throw new \RuntimeException('Invoice not found.');
@@ -29,14 +52,6 @@ class InvoicePdfService
             ])
             ->save($tmpPath);
 
-        $media = $invoice
-            ->addMedia($tmpPath)
-            ->usingName('Invoice '.$invoice->number)
-            ->usingFileName($invoice->number.'.pdf')
-            ->toMediaCollection('invoice-pdfs');
-
-        File::delete($tmpPath);
-
-        return $media;
+        return $tmpPath;
     }
 }
