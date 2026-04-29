@@ -345,10 +345,7 @@ const onSave = () => {
             { label: isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <PageHeader
-            :title="isEditing ? `Edit ${invoice?.number}` : 'Create Invoice'"
-            subtitle="Create and manage invoice details, line items, and totals"
-        />
+        <PageHeader :title="isEditing ? `Edit ${invoice?.number}` : 'Create Invoice'" />
 
         <div
             v-if="inertiaErrors.length"
@@ -360,8 +357,7 @@ const onSave = () => {
             </ul>
         </div>
 
-        <div class="mt-5 grid gap-6 xl:grid-cols-3">
-            <div class="space-y-6 xl:col-span-2">
+        <div class="mt-5 space-y-6">
                 <AppCard>
                     <div class="grid gap-3 md:grid-cols-2">
                         <div>
@@ -434,25 +430,25 @@ const onSave = () => {
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
 
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <div class="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]">
+                        <table class="w-full min-w-[52rem] table-fixed divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                 <tr>
-                                    <th class="w-10 px-1 py-2 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
-                                    <th class="px-3 py-2 text-left">Description</th>
-                                    <th class="px-3 py-2 text-left">Qty</th>
-                                    <th class="px-3 py-2 text-left">Unit Price</th>
-                                    <th v-if="chargesVat" class="px-3 py-2 text-left">VAT Rate</th>
-                                    <th v-if="chargesVat" class="px-3 py-2 text-left">VAT Amount</th>
-                                    <th class="px-3 py-2 text-left">Total</th>
-                                    <th class="px-3 py-2 text-left">Delete</th>
+                                    <th class="w-10 px-1 py-2.5 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
+                                    <th class="w-[40%] min-w-[12rem] px-3 py-2.5 text-left font-medium">Description</th>
+                                    <th class="w-16 px-2 py-2.5 text-right font-medium">Qty</th>
+                                    <th class="w-28 px-2 py-2.5 text-right font-medium">Unit price</th>
+                                    <th v-if="chargesVat" class="w-32 px-2 py-2.5 text-left font-medium">VAT</th>
+                                    <th v-if="chargesVat" class="w-24 px-2 py-2.5 text-right font-medium">VAT amt</th>
+                                    <th class="w-28 px-2 py-2.5 text-right font-medium">Line total</th>
+                                    <th class="w-11 px-1 py-2.5 text-center font-medium"><span class="sr-only">Remove</span></th>
                                 </tr>
                             </thead>
                             <tbody ref="lineItemsTbodyRef" class="divide-y divide-slate-100">
                                 <tr v-for="(line, index) in (values.line_items as InvoiceLine[])" :key="line.row_key">
-                                    <td class="w-10 px-1 py-2 align-middle">
+                                    <td class="w-10 px-1 py-3 align-top">
                                         <span
-                                            class="line-drag-handle inline-flex cursor-grab touch-manipulation rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                            class="line-drag-handle mt-1 inline-flex cursor-grab touch-manipulation rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
                                             role="button"
                                             tabindex="0"
                                             aria-label="Drag to reorder line"
@@ -460,47 +456,62 @@ const onSave = () => {
                                             <GripVertical class="h-4 w-4 shrink-0" />
                                         </span>
                                     </td>
-                                    <td class="px-3 py-2">
+                                    <td class="px-3 py-3 align-top">
                                         <div class="space-y-2">
-                                            <AppInput
-                                                :model-value="line.description"
-                                                placeholder="Line description"
-                                                @update:model-value="updateLine(index, 'description', $event)"
+                                            <textarea
+                                                :value="line.description"
+                                                rows="3"
+                                                placeholder="What you delivered or sold"
+                                                class="min-h-[4.5rem] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
                                             />
                                             <AppSelect
                                                 v-if="accounts.length"
                                                 :model-value="line.account_id ? String(line.account_id) : ''"
                                                 :options="accounts.map((account) => ({ label: account.name, value: String(account.id) }))"
-                                                placeholder="Map income account"
+                                                placeholder="Income account"
                                                 @update:model-value="updateLine(index, 'account_id', Number($event))"
                                             />
                                         </div>
                                     </td>
-                                    <td class="px-3 py-2">
+                                    <td class="px-2 py-3 align-top">
                                         <AppInput
+                                            class="text-right tabular-nums"
                                             :model-value="line.quantity"
                                             type="number"
+                                            inputmode="decimal"
                                             @update:model-value="updateLine(index, 'quantity', Number($event))"
                                         />
                                     </td>
-                                    <td class="px-3 py-2">
+                                    <td class="px-2 py-3 align-top">
                                         <AppInput
+                                            class="text-right tabular-nums"
                                             :model-value="line.unit_price"
                                             type="number"
+                                            inputmode="decimal"
                                             @update:model-value="updateLine(index, 'unit_price', Number($event))"
                                         />
                                     </td>
-                                    <td v-if="chargesVat" class="px-3 py-2">
+                                    <td v-if="chargesVat" class="px-2 py-3 align-top">
                                         <AppSelect
                                             :model-value="String(line.vat_rate)"
                                             :options="taxRateSelectOptions"
                                             @update:model-value="updateLine(index, 'vat_rate', Number($event))"
                                         />
                                     </td>
-                                    <td v-if="chargesVat" class="px-3 py-2">{{ formatCents(lineVat(line)) }}</td>
-                                    <td class="px-3 py-2 font-medium">{{ formatCents(lineTotal(line)) }}</td>
-                                    <td class="px-3 py-2">
-                                        <button class="rounded p-1 text-rose-600 hover:bg-rose-50" type="button" @click="removeLine(index)">
+                                    <td v-if="chargesVat" class="px-2 py-3 align-top text-right tabular-nums text-slate-700">
+                                        {{ formatCents(lineVat(line)) }}
+                                    </td>
+                                    <td class="px-2 py-3 align-top text-right text-base font-semibold tabular-nums text-slate-900">
+                                        {{ formatCents(lineTotal(line)) }}
+                                    </td>
+                                    <td class="px-1 py-3 align-top text-center">
+                                        <button
+                                            class="mt-1 rounded p-1.5 text-rose-600 hover:bg-rose-50"
+                                            type="button"
+                                            :aria-label="`Remove line ${index + 1}`"
+                                            @click="removeLine(index)"
+                                        >
                                             <Trash2 class="h-4 w-4" />
                                         </button>
                                     </td>
@@ -544,12 +555,10 @@ const onSave = () => {
                         :amount-due-cents="totals.amountDue"
                     />
                 </AppCard>
-            </div>
 
-            <div class="space-y-6">
                 <AppCard>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Details</h3>
-                    <div class="space-y-3">
+                    <div class="grid gap-6 md:grid-cols-2">
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
                             <textarea
@@ -568,7 +577,6 @@ const onSave = () => {
                         </div>
                     </div>
                 </AppCard>
-            </div>
         </div>
 
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">

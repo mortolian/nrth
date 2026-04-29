@@ -7,11 +7,11 @@ defineProps<{
 
 <template>
     <div class="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div>
-            <h1 class="text-2xl font-semibold text-slate-900">{{ title }}</h1>
+        <div class="min-w-0 flex-1">
+            <h1 class="truncate text-2xl font-semibold tracking-tight text-slate-900" :title="title">{{ title }}</h1>
             <p v-if="subtitle" class="mt-1 text-sm text-slate-500">{{ subtitle }}</p>
         </div>
-        <div class="flex w-full flex-wrap items-center justify-end gap-2">
+        <div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
             <slot name="actions" />
         </div>
     </div>
