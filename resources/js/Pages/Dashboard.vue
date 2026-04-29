@@ -23,9 +23,25 @@ const props = defineProps({
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const daysOverdueInt = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.floor(n));
+};
 const paymentDrawerOpen = ref(false);
 const selectedInvoice = ref(null);
 const isLoading = computed(() => !props.kpis || !Object.keys(props.kpis).length);
+const isChartLoading = computed(() => {
+    if (isLoading.value) return true;
+    if (!props.revenue_chart || props.revenue_chart.length === 0) return true;
+
+    // If backend hasn't populated meaningful values yet, avoid rendering an empty chart.
+    return props.revenue_chart.every((row) => {
+        const revenue = Number(row?.revenue ?? 0);
+        const expenses = Number(row?.expenses ?? 0);
+        return revenue === 0 && expenses === 0;
+    });
+});
 
 const kpiRows = computed(() => {
     const base = [
@@ -114,7 +130,10 @@ const openRecordPayment = (invoice) => {
         </template>
 
         <div class="space-y-6">
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div
+                class="grid gap-4 sm:grid-cols-2"
+                :class="props.vat_enabled ? 'xl:grid-cols-4' : 'xl:grid-cols-3'"
+            >
                 <template v-if="isLoading">
                     <AppCard v-for="n in (props.vat_enabled ? 4 : 3)" :key="`kpi-skeleton-${n}`">
                         <div class="h-5 w-24 animate-pulse rounded bg-slate-100" />
@@ -138,8 +157,20 @@ const openRecordPayment = (invoice) => {
             <div class="grid gap-6 xl:grid-cols-3">
                 <AppCard class="xl:col-span-2">
                     <h3 class="mb-3 text-base font-semibold text-slate-900 sm:mb-4 sm:text-lg">Revenue vs Expenses</h3>
-                    <div v-if="isLoading" class="h-56 animate-pulse rounded bg-slate-100 md:h-80" />
-                    <VChart v-else class="h-56 w-full md:h-80" :option="chartOptions" autoresize />
+                    <div
+                        v-if="isChartLoading"
+                        class="flex h-56 items-center justify-center rounded-md border-2 border-dashed border-slate-200 bg-slate-50 px-4 text-center md:h-80"
+                    >
+                        <div class="space-y-2">
+                            <p class="text-sm font-medium text-slate-700">No chart data yet</p>
+                            <p class="text-xs text-slate-500">
+                                Revenue vs Expenses will appear once there are posted transactions for this period.
+                            </p>
+                        </div>
+                    </div>
+                    <div v-else class="h-56 w-full md:h-80">
+                        <VChart class="h-full w-full" :option="chartOptions" autoresize />
+                    </div>
                 </AppCard>
 
                 <AppCard v-if="props.vat_enabled">
@@ -176,16 +207,16 @@ const openRecordPayment = (invoice) => {
                             class="rounded-xl border border-slate-200 bg-slate-50/80 p-4"
                         >
                             <div class="flex items-start justify-between gap-2">
-                                <div>
-                                    <p class="font-medium text-slate-900">{{ invoice.client }}</p>
-                                    <p class="text-sm text-slate-600">{{ invoice.number }}</p>
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium text-slate-900">{{ invoice.client }}</p>
+                                    <p class="truncate text-sm text-slate-600">{{ invoice.number }}</p>
                                 </div>
-                                <AppBadge :variant="invoice.days_overdue > 0 ? 'danger' : 'neutral'">
-                                    {{ invoice.days_overdue > 0 ? `${invoice.days_overdue}d` : 'OK' }}
+                                <AppBadge :variant="daysOverdueInt(invoice.days_overdue) > 0 ? 'danger' : 'neutral'" class="whitespace-nowrap">
+                                    {{ daysOverdueInt(invoice.days_overdue) > 0 ? `${daysOverdueInt(invoice.days_overdue)}d` : 'OK' }}
                                 </AppBadge>
                             </div>
                             <div class="mt-2 flex items-center justify-between text-sm">
-                                <span class="text-slate-500">Due <DateDisplay :value="invoice.due_date" /></span>
+                                <span class="text-slate-500 whitespace-nowrap">Due <DateDisplay :value="invoice.due_date" /></span>
                                 <span class="font-semibold">{{ formatCents(invoice.amount) }}</span>
                             </div>
                             <AppButton class="mt-3 w-full min-h-11" variant="secondary" @click="openRecordPayment(invoice)">Record Payment</AppButton>
@@ -202,6 +233,7 @@ const openRecordPayment = (invoice) => {
                             { key: 'days_overdue', label: 'Days Overdue' },
                             { key: 'action', label: 'Action' },
                         ]"
+                        table-class="min-w-[820px]"
                         :page="outstanding_invoices.current_page ?? 1"
                         :last-page="outstanding_invoices.last_page ?? 1"
                         :loading="isLoading"
@@ -211,16 +243,16 @@ const openRecordPayment = (invoice) => {
                             :key="invoice.id"
                             :class="[
                                 'text-sm text-slate-700',
-                                invoice.days_overdue > 0 ? 'border-l-2 border-l-rose-300' : '',
+                                daysOverdueInt(invoice.days_overdue) > 0 ? 'border-l-2 border-l-rose-300' : '',
                             ]"
                         >
-                            <td class="px-4 py-3">{{ invoice.client }}</td>
-                            <td class="px-4 py-3 font-medium">{{ invoice.number }}</td>
-                            <td class="px-4 py-3">{{ formatCents(invoice.amount) }}</td>
-                            <td class="px-4 py-3"><DateDisplay :value="invoice.due_date" /></td>
+                            <td class="px-4 py-3 whitespace-nowrap">{{ invoice.client }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap font-medium">{{ invoice.number }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">{{ formatCents(invoice.amount) }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap"><DateDisplay :value="invoice.due_date" /></td>
                             <td class="px-4 py-3">
-                                <AppBadge :variant="invoice.days_overdue > 0 ? 'danger' : 'neutral'">
-                                    {{ invoice.days_overdue > 0 ? `${invoice.days_overdue} days` : 'Current' }}
+                                <AppBadge :variant="daysOverdueInt(invoice.days_overdue) > 0 ? 'danger' : 'neutral'" class="whitespace-nowrap">
+                                    {{ daysOverdueInt(invoice.days_overdue) > 0 ? `${daysOverdueInt(invoice.days_overdue)} days` : 'Current' }}
                                 </AppBadge>
                             </td>
                             <td class="px-4 py-3">
