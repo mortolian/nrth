@@ -45,22 +45,33 @@ class DashboardController extends Controller
         $outstandingInvoices = $this->getOutstandingInvoices($team, $now);
         $outstandingRows = $outstandingInvoices->items();
         $outstandingTotal = array_sum(array_column($outstandingRows, 'amount'));
+        $vatEnabled = $team->chargesVat();
 
-        $vatDueCurrent = $this->vatService
-            ->calculateNetVAT($team, $monthStart, $monthEnd)
-            ->getMinorAmount()
-            ->toInt();
-
-        $vatOutputCurrent = $this->vatService->calculateOutputVAT($team, $monthStart, $monthEnd)->getMinorAmount()->toInt();
-        $vatInputCurrent = $this->vatService->calculateInputVAT($team, $monthStart, $monthEnd)->getMinorAmount()->toInt();
+        $vatDueCurrent = 0;
+        $vatOutputCurrent = 0;
+        $vatInputCurrent = 0;
+        $vatTrend = null;
+        if ($vatEnabled) {
+            $vatDueCurrent = $this->vatService
+                ->calculateNetVAT($team, $monthStart, $monthEnd)
+                ->getMinorAmount()
+                ->toInt();
+            $vatOutputCurrent = $this->vatService->calculateOutputVAT($team, $monthStart, $monthEnd)->getMinorAmount()->toInt();
+            $vatInputCurrent = $this->vatService->calculateInputVAT($team, $monthStart, $monthEnd)->getMinorAmount()->toInt();
+            $vatTrend = $this->trend(
+                $vatDueCurrent,
+                $this->vatService->calculateNetVAT($team, $lastMonthStart, $lastMonthEnd)->getMinorAmount()->toInt()
+            );
+        }
 
         return Inertia::render('Dashboard', [
             'kpis' => [
                 'revenue_mtd' => $this->kpiPayload($currentRevenue, $this->trend($currentRevenue, $lastRevenue)),
                 'outstanding_invoices' => $this->kpiPayload($outstandingTotal, $this->trend($outstandingTotal, $this->getOutstandingInvoicesTotal($team, $lastMonthEnd))),
-                'vat_liability' => $this->kpiPayload($vatDueCurrent, $this->trend($vatDueCurrent, $this->vatService->calculateNetVAT($team, $lastMonthStart, $lastMonthEnd)->getMinorAmount()->toInt())),
+                'vat_liability' => $this->kpiPayload($vatDueCurrent, $vatTrend),
                 'net_profit_mtd' => $this->kpiPayload($netProfitCurrent, $this->trend($netProfitCurrent, $netProfitLast)),
             ],
+            'vat_enabled' => $vatEnabled,
             'revenue_chart' => $this->revenueChart($team),
             'outstanding_invoices' => $outstandingInvoices,
             'recent_transactions' => $this->recentTransactions($team),

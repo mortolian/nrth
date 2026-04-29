@@ -19,6 +19,7 @@ const props = defineProps({
     recent_transactions: { type: Array, default: () => [] },
     budget_progress: { type: Array, default: () => [] },
     vat_summary: { type: Object, default: () => ({}) },
+    vat_enabled: { type: Boolean, default: true },
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -26,38 +27,45 @@ const paymentDrawerOpen = ref(false);
 const selectedInvoice = ref(null);
 const isLoading = computed(() => !props.kpis || !Object.keys(props.kpis).length);
 
-const kpiRows = computed(() => [
-    {
-        key: 'revenue_mtd',
-        title: 'Revenue MTD',
-        icon: CircleDollarSign,
-        ...props.kpis.revenue_mtd,
-    },
-    {
-        key: 'outstanding_invoices',
-        title: 'Outstanding Invoices',
-        icon: HandCoins,
-        ...props.kpis.outstanding_invoices,
-    },
-    {
-        key: 'vat_liability',
-        title: 'VAT Liability',
-        icon: Landmark,
-        ...props.kpis.vat_liability,
-    },
-    {
-        key: 'net_profit_mtd',
-        title: 'Net Profit MTD',
-        icon: TrendingUp,
-        ...props.kpis.net_profit_mtd,
-    },
-].map((item) => ({
+const kpiRows = computed(() => {
+    const base = [
+        {
+            key: 'revenue_mtd',
+            title: 'Revenue MTD',
+            icon: CircleDollarSign,
+            ...props.kpis.revenue_mtd,
+        },
+        {
+            key: 'outstanding_invoices',
+            title: 'Outstanding Invoices',
+            icon: HandCoins,
+            ...props.kpis.outstanding_invoices,
+        },
+        {
+            key: 'net_profit_mtd',
+            title: 'Net Profit MTD',
+            icon: TrendingUp,
+            ...props.kpis.net_profit_mtd,
+        },
+    ];
+
+    if (props.vat_enabled) {
+        base.push({
+            key: 'vat_liability',
+            title: 'VAT Liability',
+            icon: Landmark,
+            ...props.kpis.vat_liability,
+        });
+    }
+
+    return base.map((item) => ({
         ...item,
         value: formatCents(item.amount ?? 0),
         hint: item.trend_percentage == null
             ? 'No prior month data'
             : `${item.trend_percentage >= 0 ? '+' : ''}${item.trend_percentage}% vs last month`,
-    })));
+    }));
+});
 
 const chartOptions = computed(() => ({
     tooltip: { trigger: 'axis' },
@@ -108,7 +116,7 @@ const openRecordPayment = (invoice) => {
         <div class="space-y-6">
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <template v-if="isLoading">
-                    <AppCard v-for="n in 4" :key="`kpi-skeleton-${n}`">
+                    <AppCard v-for="n in (props.vat_enabled ? 4 : 3)" :key="`kpi-skeleton-${n}`">
                         <div class="h-5 w-24 animate-pulse rounded bg-slate-100" />
                         <div class="mt-3 h-8 w-32 animate-pulse rounded bg-slate-100" />
                     </AppCard>
@@ -134,7 +142,7 @@ const openRecordPayment = (invoice) => {
                     <VChart v-else class="h-56 w-full md:h-80" :option="chartOptions" autoresize />
                 </AppCard>
 
-                <AppCard>
+                <AppCard v-if="props.vat_enabled">
                     <h3 class="mb-4 text-lg font-semibold text-slate-900">VAT Summary</h3>
                     <div v-if="isLoading" class="space-y-3">
                         <div v-for="n in 5" :key="`vat-skeleton-${n}`" class="h-4 animate-pulse rounded bg-slate-100" />
@@ -146,6 +154,15 @@ const openRecordPayment = (invoice) => {
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2"><span class="font-medium">Net VAT</span><span class="font-semibold">{{ formatCents(vat_summary.net_vat) }}</span></div>
                         <div class="text-xs text-slate-500">Due date: <DateDisplay :value="vat_summary.due_date" /></div>
                     </div>
+                </AppCard>
+                <AppCard v-else>
+                    <h3 class="mb-2 text-lg font-semibold text-slate-900">VAT is disabled</h3>
+                    <p class="text-sm text-slate-600">
+                        VAT cards and reports are hidden until VAT is enabled in company settings.
+                    </p>
+                    <a :href="route('settings.company', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+                        Enable VAT in Company settings
+                    </a>
                 </AppCard>
             </div>
 

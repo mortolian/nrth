@@ -87,55 +87,63 @@ const currentTeam = computed(() => page.props.auth?.user?.current_team);
 const teams = computed(() => page.props.auth?.user?.all_teams ?? []);
 const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeatures));
 const currentPath = computed(() => page.url.split('?')[0]);
+const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 
-const navItems: MenuItem[] = [
-    { label: 'Dashboard', href: route('dashboard'), icon: Home },
-    {
-        label: 'Money In',
-        href: route('invoicing.invoices.index'),
-        icon: Wallet,
-        group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Quotes', href: route('invoicing.quotes.index') }, { label: 'Clients', href: route('invoicing.clients.index') }] }],
-    },
-    {
-        label: 'Money Out',
-        href: route('expenses.index'),
-        icon: Landmark,
-        group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: '#' }] }],
-    },
-    {
-        label: 'Accounting',
-        href: route('accounting.transactions.index'),
-        icon: BookOpen,
-        group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'General Ledger', href: route('accounting.journal.index') }, { label: 'Chart of Accounts', href: route('accounting.accounts.index') }] }],
-    },
-    { label: 'Planning', href: route('budgeting.index'), icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }] },
-    {
-        label: 'Tax',
-        href: route('tax.vat.index'),
-        icon: Calculator,
-        group: [{
-            title: 'Tax',
-            items: [
-                { label: 'VAT Returns', href: route('tax.vat.index') },
-                { label: 'VAT rates', href: route('tax.vat-rates.index') },
-                { label: 'Tax Periods', href: route('tax.provisional.index') },
-                { label: 'Documents', href: route('tax.documents.index') },
-            ],
-        }],
-    },
-    {
-        label: 'Contracting',
-        href: route('contracting.contracts.index'),
-        icon: Briefcase,
-        group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }] }],
-    },
-    {
-        label: 'Reports',
-        href: route('reports.profit-loss'),
-        icon: ChartColumnBig,
-        group: [{ title: 'Reports', items: [{ label: 'Profit And Loss', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
-    },
-];
+const navItems = computed<MenuItem[]>(() => {
+    const items: MenuItem[] = [
+        { label: 'Dashboard', href: route('dashboard'), icon: Home },
+        {
+            label: 'Money In',
+            href: route('invoicing.invoices.index'),
+            icon: Wallet,
+            group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Quotes', href: route('invoicing.quotes.index') }, { label: 'Clients', href: route('invoicing.clients.index') }] }],
+        },
+        {
+            label: 'Money Out',
+            href: route('expenses.index'),
+            icon: Landmark,
+            group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: '#' }] }],
+        },
+        {
+            label: 'Accounting',
+            href: route('accounting.transactions.index'),
+            icon: BookOpen,
+            group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'General Ledger', href: route('accounting.journal.index') }, { label: 'Chart of Accounts', href: route('accounting.accounts.index') }] }],
+        },
+        { label: 'Planning', href: route('budgeting.index'), icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }] },
+        {
+            label: 'Contracting',
+            href: route('contracting.contracts.index'),
+            icon: Briefcase,
+            group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }] }],
+        },
+    ];
+
+    if (vatEnabled.value) {
+        items.push({
+            label: 'Tax',
+            href: route('tax.vat.index'),
+            icon: Calculator,
+            group: [{
+                title: 'Tax',
+                items: [
+                    { label: 'VAT Returns', href: route('tax.vat.index') },
+                    { label: 'VAT rates', href: route('tax.vat-rates.index') },
+                    { label: 'Tax Periods', href: route('tax.provisional.index') },
+                    { label: 'Documents', href: route('tax.documents.index') },
+                ],
+            }],
+        });
+        items.push({
+            label: 'Reports',
+            href: route('reports.profit-loss'),
+            icon: ChartColumnBig,
+            group: [{ title: 'Reports', items: [{ label: 'Profit And Loss', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
+        });
+    }
+
+    return items;
+});
 
 const isActivePath = (href: string) => href !== '#' && currentPath.value === href.split('?')[0];
 
@@ -173,7 +181,7 @@ function isNavSectionExpanded(item: MenuItem): boolean {
 }
 
 function toggleNavSection(label: string): void {
-    const item = navItems.find((i) => i.label === label);
+    const item = navItems.value.find((i) => i.label === label);
     if (!item?.group) return;
     const next = !isNavSectionExpanded(item);
     navManualOverride.value = { ...navManualOverride.value, [label]: next };
@@ -359,6 +367,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </div>
                         </div>
                     </template>
+                    <div
+                        v-if="!vatEnabled && !collapsed"
+                        class="mx-2 mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                    >
+                        VAT is disabled. VAT and report menus are hidden.
+                        <a :href="route('settings.company', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
+                            Enable in Company settings
+                        </a>
+                    </div>
                 </nav>
 
                 <div class="border-t border-slate-900/10 p-2">
@@ -549,6 +566,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </div>
                         </div>
                     </template>
+                    <div v-if="!vatEnabled" class="mx-1 mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        VAT is disabled. VAT and report menus are hidden.
+                        <a :href="route('settings.company', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
+                            Enable
+                        </a>
+                    </div>
                     <button
                         type="button"
                         class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-white/30"
@@ -626,16 +649,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <Plus class="h-7 w-7" />
                         </button>
                     </div>
-                    <Link
-                        :href="route('reports.profit-loss')"
-                        :class="[
-                            'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
-                            isActivePath(route('reports.profit-loss')) ? 'text-brand-700' : 'text-slate-600',
-                        ]"
-                    >
-                        <ChartColumnBig class="h-5 w-5 shrink-0" />
-                        <span>Reports</span>
-                    </Link>
+                    <template v-if="vatEnabled">
+                        <Link
+                            :href="route('reports.profit-loss')"
+                            :class="[
+                                'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
+                                isActivePath(route('reports.profit-loss')) ? 'text-brand-700' : 'text-slate-600',
+                            ]"
+                        >
+                            <ChartColumnBig class="h-5 w-5 shrink-0" />
+                            <span>Reports</span>
+                        </Link>
+                    </template>
+                    <template v-else>
+                        <a
+                            :href="route('settings.company', { tab: 'tax' })"
+                            class="flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium text-slate-400"
+                        >
+                            <Calculator class="h-5 w-5 shrink-0" />
+                            <span>VAT Off</span>
+                        </a>
+                    </template>
                     <button
                         type="button"
                         class="flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium text-slate-600"

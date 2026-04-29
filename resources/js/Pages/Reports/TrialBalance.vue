@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 
@@ -25,6 +25,8 @@ const props = defineProps<{
 
 const asOf = ref(props.as_of);
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const page = usePage<{ vat_enabled?: boolean }>();
+const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 
 const groupMeta: Array<{ key: GroupKey; label: string }> = [
     { key: 'asset', label: 'Assets' },
@@ -54,6 +56,16 @@ const apply = () => {
             </template>
         </PageHeader>
 
+        <AppCard v-if="!vatEnabled" class="mt-5">
+            <h3 class="text-lg font-semibold text-slate-900">Reports are unavailable</h3>
+            <p class="mt-2 text-sm text-slate-600">
+                VAT is disabled in Company settings, so report pages are hidden.
+            </p>
+            <a :href="route('settings.company', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+                Enable VAT in Company settings
+            </a>
+        </AppCard>
+        <template v-else>
         <AppCard class="mt-5">
             <div class="flex flex-wrap items-end gap-3">
                 <div>
@@ -113,5 +125,6 @@ const apply = () => {
                 <span v-else>✗ Unbalanced — difference: {{ formatCents(report.totals.difference) }}</span>
             </div>
         </AppCard>
+        </template>
     </AppLayout>
 </template>

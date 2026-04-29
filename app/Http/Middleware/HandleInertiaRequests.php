@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'csrf_token' => fn () => csrf_token(),
+            'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
             'currencyOptions' => fn () => Iso4217Currencies::selectOptions(),
             'commandPalette' => fn () => $this->commandPaletteData($request),
