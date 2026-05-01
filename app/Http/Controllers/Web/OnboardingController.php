@@ -13,6 +13,7 @@ use App\Domain\Accounting\Services\LedgerService;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Models\TeamBankAccount;
 use App\Models\User;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Http\RedirectResponse;
@@ -210,6 +211,24 @@ class OnboardingController extends Controller
             if ($request->hasFile('logo')) {
                 $team->clearMediaCollection('logo');
                 $team->addMediaFromRequest('logo')->toMediaCollection('logo');
+            }
+
+            $hasBankRow = filled($validated['bank_name'] ?? null)
+                || filled($validated['bank_account_holder'] ?? null)
+                || filled($validated['bank_account_number'] ?? null)
+                || filled($validated['bank_branch_code'] ?? null);
+            if ($hasBankRow) {
+                TeamBankAccount::query()->create([
+                    'team_id' => (int) $team->id,
+                    'sort_order' => 0,
+                    'title' => null,
+                    'bank_name' => $validated['bank_name'] ?: null,
+                    'bank_account_holder' => $validated['bank_account_holder'] ?: null,
+                    'bank_account_number' => $validated['bank_account_number'] ?: null,
+                    'bank_branch_code' => $validated['bank_branch_code'] ?: null,
+                    'bank_account_type' => $validated['bank_account_type'],
+                    'show_on_invoice' => true,
+                ]);
             }
 
             InvoiceNumberSequence::query()->updateOrCreate(

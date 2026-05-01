@@ -6,6 +6,7 @@ use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Transaction;
+use App\Models\TeamBankAccount;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -105,5 +106,13 @@ class OnboardingWizardTest extends TestCase
 
         $this->assertNotNull($transaction);
         $this->assertSame(TransactionStatus::Posted, $transaction->status);
+
+        $this->assertDatabaseHas('team_bank_accounts', [
+            'team_id' => $team->id,
+            'bank_name' => 'Test Bank',
+            'bank_account_number' => '1234567890',
+            'show_on_invoice' => true,
+        ]);
+        $this->assertSame(1, TeamBankAccount::query()->where('team_id', $team->id)->count());
     }
 }

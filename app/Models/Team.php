@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Tax\Models\TaxRate;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
@@ -58,6 +59,64 @@ class Team extends JetstreamTeam implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('logo')->singleFile();
+    }
+
+    /**
+     * @return HasMany<TeamBankAccount, $this>
+     */
+    public function bankAccounts(): HasMany
+    {
+        return $this->hasMany(TeamBankAccount::class)->orderBy('sort_order');
+    }
+
+    /**
+     * Banking rows to print on invoice PDFs (show_on_invoice + any detail present).
+     *
+     * @return list<array{title: string|null, name: string|null, holder: string|null, account: string|null, branch: string|null, type: string|null}>
+     */
+    public function bankAccountsForInvoicePdf(): array
+    {
+        $rows = $this->bankAccounts()->get();
+        if ($rows->isNotEmpty()) {
+            return $rows
+                ->filter(fn (TeamBankAccount $b) => $b->show_on_invoice)
+                ->map(function (TeamBankAccount $b): array {
+                    return [
+                        'title' => $b->title,
+                        'name' => $b->bank_name,
+                        'holder' => $b->bank_account_holder,
+                        'account' => $b->bank_account_number,
+                        'branch' => $b->bank_branch_code,
+                        'type' => $b->bank_account_type,
+                    ];
+                })
+                ->filter(function (array $row): bool {
+                    return collect($row)->filter(function (mixed $v): bool {
+                        if ($v === null || $v === '') {
+                            return false;
+                        }
+
+                        return true;
+                    })->isNotEmpty();
+                })
+                ->values()
+                ->all();
+        }
+
+        $settings = $this->mergedCompanySettings();
+        $bank = [
+            'title' => null,
+            'name' => $settings['bank_name'] ?? null,
+            'holder' => $settings['bank_account_holder'] ?? null,
+            'account' => $settings['bank_account_number'] ?? null,
+            'branch' => $settings['bank_branch_code'] ?? null,
+            'type' => $settings['bank_account_type'] ?? null,
+        ];
+        if (collect($bank)->filter(fn (?string $v) => $v !== null && $v !== '')->isEmpty()) {
+            return [];
+        }
+
+        return [$bank];
     }
 
     /**

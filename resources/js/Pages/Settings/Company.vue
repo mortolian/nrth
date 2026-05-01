@@ -4,13 +4,34 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ActionMessage from '@/Components/ActionMessage.vue';
 import AppButton from '@/Components/AppButton.vue';
-import { Building2, ImagePlus, Trash2 } from 'lucide-vue-next';
+import { Building2, ImagePlus, Plus, Trash2 } from 'lucide-vue-next';
 
 type Settings = Record<string, unknown>;
+
+type BankAccountRow = {
+    title: string;
+    bank_name: string;
+    bank_account_holder: string;
+    bank_account_number: string;
+    bank_branch_code: string;
+    bank_account_type: string;
+    show_on_invoice: boolean;
+};
+
+const emptyBankRow = (): BankAccountRow => ({
+    title: '',
+    bank_name: '',
+    bank_account_holder: '',
+    bank_account_number: '',
+    bank_branch_code: '',
+    bank_account_type: 'current',
+    show_on_invoice: true,
+});
 
 const props = defineProps<{
     team: { id: number; name: string };
     settings: Settings;
+    bank_accounts: BankAccountRow[];
     logo_url: string | null;
     invoice_next_sequence: number;
     tax_rates: Array<{
@@ -81,11 +102,18 @@ const form = useForm({
     vat_registered: Boolean(props.settings.vat_registered ?? true),
     vat_period_type: String(props.settings.vat_period_type ?? 'bi_monthly'),
     default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
-    bank_name: String(props.settings.bank_name ?? ''),
-    bank_account_holder: String(props.settings.bank_account_holder ?? ''),
-    bank_account_number: String(props.settings.bank_account_number ?? ''),
-    bank_branch_code: String(props.settings.bank_branch_code ?? ''),
-    bank_account_type: String(props.settings.bank_account_type ?? 'current'),
+    bank_accounts:
+        props.bank_accounts.length > 0
+            ? props.bank_accounts.map((r) => ({
+                  title: String(r.title ?? ''),
+                  bank_name: String(r.bank_name ?? ''),
+                  bank_account_holder: String(r.bank_account_holder ?? ''),
+                  bank_account_number: String(r.bank_account_number ?? ''),
+                  bank_branch_code: String(r.bank_branch_code ?? ''),
+                  bank_account_type: String(r.bank_account_type ?? 'current'),
+                  show_on_invoice: Boolean(r.show_on_invoice),
+              }))
+            : [emptyBankRow()],
 });
 
 const logoFile = ref<File | null>(null);
@@ -235,11 +263,15 @@ const submit = () => {
         vat_registered: form.vat_registered,
         vat_period_type: form.vat_period_type,
         default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
-        bank_name: form.bank_name,
-        bank_account_holder: form.bank_account_holder,
-        bank_account_number: form.bank_account_number,
-        bank_branch_code: form.bank_branch_code,
-        bank_account_type: form.bank_account_type,
+        bank_accounts: form.bank_accounts.map((r) => ({
+            title: r.title,
+            bank_name: r.bank_name,
+            bank_account_holder: r.bank_account_holder,
+            bank_account_number: r.bank_account_number,
+            bank_branch_code: r.bank_branch_code,
+            bank_account_type: r.bank_account_type,
+            show_on_invoice: r.show_on_invoice,
+        })),
         remove_logo: removeLogo.value ? 1 : 0,
     };
 
@@ -259,6 +291,17 @@ const submit = () => {
             }
         },
     });
+};
+
+const addBankAccount = () => {
+    form.bank_accounts.push(emptyBankRow());
+};
+
+const removeBankAccount = (index: number) => {
+    if (form.bank_accounts.length <= 1) {
+        return;
+    }
+    form.bank_accounts.splice(index, 1);
 };
 </script>
 
@@ -598,32 +641,77 @@ const submit = () => {
             </AppCard>
 
             <AppCard v-show="tab === 'banking'">
-                <h3 class="text-base font-semibold text-slate-900">Banking details (invoices)</h3>
-                <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Bank name</label>
-                        <AppInput v-model="form.bank_name" />
+                <h3 class="text-base font-semibold text-slate-900">Bank accounts</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Add one or more accounts. Give each a title (e.g. “Primary”, “USD”) for your own reference and for invoice PDFs. Tick
+                    <span class="font-medium text-slate-700">Show on invoice</span> for accounts that should appear on PDFs.
+                </p>
+                <div class="mt-4 space-y-6">
+                    <div
+                        v-for="(row, idx) in form.bank_accounts"
+                        :key="idx"
+                        class="rounded-lg border border-slate-200 bg-slate-50/80 p-4"
+                    >
+                        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-sm font-medium text-slate-800">{{
+                                (row.title ?? '').trim() ? (row.title ?? '').trim() : `Account ${idx + 1}`
+                            }}</span>
+                            <button
+                                v-if="form.bank_accounts.length > 1"
+                                type="button"
+                                class="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                                @click="removeBankAccount(idx)"
+                            >
+                                <Trash2 class="h-3.5 w-3.5" aria-hidden="true" />
+                                Remove
+                            </button>
+                        </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Account title</label>
+                                <AppInput v-model="row.title" placeholder="e.g. Primary account, USD, Operating" />
+                                <p class="mt-1 text-xs text-slate-500">Shown on this card and on the invoice PDF above that account’s banking details.</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Bank name</label>
+                                <AppInput v-model="row.bank_name" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Account holder</label>
+                                <AppInput v-model="row.bank_account_holder" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Account number</label>
+                                <AppInput v-model="row.bank_account_number" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Branch code</label>
+                                <AppInput v-model="row.bank_branch_code" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Account type</label>
+                                <AppSelect
+                                    :model-value="row.bank_account_type"
+                                    :options="bank_account_types.map((b) => ({ label: b.label, value: b.value }))"
+                                    @update:model-value="row.bank_account_type = $event"
+                                />
+                            </div>
+                            <div class="flex items-end pb-1">
+                                <label class="flex items-center gap-2 text-sm text-slate-700">
+                                    <input v-model="row.show_on_invoice" type="checkbox" class="rounded border-slate-300">
+                                    Show on invoice
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Account holder</label>
-                        <AppInput v-model="form.bank_account_holder" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Account number</label>
-                        <AppInput v-model="form.bank_account_number" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Branch code</label>
-                        <AppInput v-model="form.bank_branch_code" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Account type</label>
-                        <AppSelect
-                            :model-value="form.bank_account_type"
-                            :options="bank_account_types.map((b) => ({ label: b.label, value: b.value }))"
-                            @update:model-value="form.bank_account_type = $event"
-                        />
-                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                        @click="addBankAccount"
+                    >
+                        <Plus class="h-4 w-4" aria-hidden="true" />
+                        Add bank account
+                    </button>
                 </div>
             </AppCard>
         </div>

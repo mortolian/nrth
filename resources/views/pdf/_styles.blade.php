@@ -148,6 +148,82 @@
     }
     .section p { margin: 0 0 4px; color: #334155; font-size: 10px; }
 
+    /* Banking — light bordered cards + key/value rows */
+    .section-banking {
+        margin-top: 14px;
+        padding: 0;
+        background: transparent;
+        border: none;
+    }
+    .section-banking h3 {
+        margin: 0 0 8px;
+        font-size: 9px;
+        letter-spacing: 0.12em;
+        color: #475569;
+    }
+    table.bank-grid {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 0;
+        table-layout: fixed;
+    }
+    table.bank-grid > tbody > tr > td.bank-grid-cell {
+        width: 50%;
+        vertical-align: top;
+        padding-bottom: 10px;
+    }
+    table.bank-grid > tbody > tr > td.bank-grid-cell-left {
+        padding-right: 7px;
+    }
+    table.bank-grid > tbody > tr > td.bank-grid-cell-right {
+        padding-left: 7px;
+    }
+    table.bank-grid > tbody > tr:last-child > td.bank-grid-cell {
+        padding-bottom: 0;
+    }
+    .bank-card {
+        margin: 0;
+        padding: 8px 10px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .bank-card-title {
+        font-weight: 800;
+        font-size: 10px;
+        color: #0f172a;
+        margin: 0 0 6px;
+        letter-spacing: 0.02em;
+    }
+    table.bank-kv {
+        width: 100%;
+        max-width: 100%;
+        border-collapse: collapse;
+        font-size: 9px;
+        line-height: 1.35;
+    }
+    table.bank-kv td {
+        padding: 3px 10px 3px 0;
+        vertical-align: top;
+        border-bottom: 1px solid #e8ecf1;
+    }
+    table.bank-kv tr:last-child td { border-bottom: none; }
+    table.bank-kv td.bank-k {
+        width: 38%;
+        max-width: none;
+        color: #64748b;
+        font-size: 8px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        white-space: normal;
+    }
+    table.bank-kv td.bank-v {
+        color: #0f172a;
+        font-weight: 600;
+        word-wrap: break-word;
+    }
+
     /* Footer */
     .footer {
         margin-top: 22px;

@@ -5,7 +5,8 @@
 @php
     $team = $invoice->team;
     $client = $invoice->client;
-    $settings = $team ? $team->mergedCompanySettings() : \App\Models\Team::defaultCompanySettings();
+    $banksForInvoice = $team ? $team->bankAccountsForInvoicePdf() : [];
+    $hasBankDetails = count($banksForInvoice) > 0;
 
     $issuer = $team ? $team->issuerForInvoicingDocuments() : [
         'name' => config('app.name'),
@@ -23,15 +24,6 @@
     $companyPhone = $issuer['phone'];
     $companyWebsite = $issuer['website'];
     $physical = $issuer['address'] ?? '';
-
-    $bank = [
-        'name' => $settings['bank_name'] ?? null,
-        'holder' => $settings['bank_account_holder'] ?? null,
-        'account' => $settings['bank_account_number'] ?? null,
-        'branch' => $settings['bank_branch_code'] ?? null,
-        'type' => $settings['bank_account_type'] ?? null,
-    ];
-    $hasBankDetails = collect($bank)->filter()->isNotEmpty();
 
     $clientAddress = is_array($client?->address)
         ? trim(collect([
@@ -170,16 +162,64 @@
 </table>
 
 @if($hasBankDetails)
-    <div class="section">
-        <h3>Banking details</h3>
-        <table style="width: 100%;">
-            <tr>
-                @if($bank['name'])<td style="padding-right: 14px;"><span class="muted small">Bank</span><br><span class="b">{{ $bank['name'] }}</span></td>@endif
-                @if($bank['holder'])<td style="padding-right: 14px;"><span class="muted small">Account holder</span><br><span class="b">{{ $bank['holder'] }}</span></td>@endif
-                @if($bank['account'])<td style="padding-right: 14px;"><span class="muted small">Account #</span><br><span class="b">{{ $bank['account'] }}</span></td>@endif
-                @if($bank['branch'])<td style="padding-right: 14px;"><span class="muted small">Branch</span><br><span class="b">{{ $bank['branch'] }}</span></td>@endif
-                @if($bank['type'])<td><span class="muted small">Type</span><br><span class="b">{{ ucfirst($bank['type']) }}</span></td>@endif
-            </tr>
+    <div class="section section-banking">
+        <h3>Payment details</h3>
+        <table class="bank-grid">
+            <tbody>
+                @foreach(collect($banksForInvoice)->chunk(2) as $bankPair)
+                    <tr>
+                        @foreach($bankPair as $bank)
+                            @php
+                                $hasBankCells = !empty($bank['name']) || !empty($bank['holder']) || !empty($bank['account']) || !empty($bank['branch']) || !empty($bank['type']);
+                            @endphp
+                            <td class="bank-grid-cell {{ $loop->first ? 'bank-grid-cell-left' : 'bank-grid-cell-right' }}">
+                                <div class="bank-card">
+                                    @if(!empty($bank['title']))
+                                        <div class="bank-card-title">{{ $bank['title'] }}</div>
+                                    @endif
+                                    @if($hasBankCells)
+                                        <table class="bank-kv">
+                                            @if(!empty($bank['name']))
+                                                <tr>
+                                                    <td class="bank-k">Bank</td>
+                                                    <td class="bank-v">{{ $bank['name'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['holder']))
+                                                <tr>
+                                                    <td class="bank-k">Account holder</td>
+                                                    <td class="bank-v">{{ $bank['holder'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['account']))
+                                                <tr>
+                                                    <td class="bank-k">Account no.</td>
+                                                    <td class="bank-v">{{ $bank['account'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['branch']))
+                                                <tr>
+                                                    <td class="bank-k">Branch code</td>
+                                                    <td class="bank-v">{{ $bank['branch'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['type']))
+                                                <tr>
+                                                    <td class="bank-k">Account type</td>
+                                                    <td class="bank-v">{{ ucfirst((string) $bank['type']) }}</td>
+                                                </tr>
+                                            @endif
+                                        </table>
+                                    @endif
+                                </div>
+                            </td>
+                        @endforeach
+                        @if($bankPair->count() === 1)
+                            <td class="bank-grid-cell bank-grid-cell-right"></td>
+                        @endif
+                    </tr>
+                @endforeach
+            </tbody>
         </table>
     </div>
 @endif

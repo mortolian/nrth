@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Web\Settings;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
+use App\Models\TeamBankAccount;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,6 +37,15 @@ class CompanySettingsController extends Controller
                 'name' => $team->name,
             ],
             'settings' => $settings,
+            'bank_accounts' => $team->bankAccounts()->get()->map(fn (TeamBankAccount $b) => [
+                'title' => (string) ($b->title ?? ''),
+                'bank_name' => (string) ($b->bank_name ?? ''),
+                'bank_account_holder' => (string) ($b->bank_account_holder ?? ''),
+                'bank_account_number' => (string) ($b->bank_account_number ?? ''),
+                'bank_branch_code' => (string) ($b->bank_branch_code ?? ''),
+                'bank_account_type' => (string) ($b->bank_account_type ?? 'current'),
+                'show_on_invoice' => (bool) $b->show_on_invoice,
+            ])->values()->all(),
             'logo_url' => $team->getFirstMediaUrl('logo') ?: null,
             'invoice_next_sequence' => $nextSeq,
             'tax_rates' => $this->taxRatesPayload($teamId),
@@ -135,11 +146,14 @@ class CompanySettingsController extends Controller
             'vat_registered' => ['required', 'boolean'],
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
             'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('team_id', $teamId)],
-            'bank_name' => ['nullable', 'string', 'max:255'],
-            'bank_account_holder' => ['nullable', 'string', 'max:255'],
-            'bank_account_number' => ['nullable', 'string', 'max:64'],
-            'bank_branch_code' => ['nullable', 'string', 'max:32'],
-            'bank_account_type' => ['required', Rule::in(['current', 'savings'])],
+            'bank_accounts' => ['required', 'array', 'max:50'],
+            'bank_accounts.*.bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_accounts.*.bank_account_holder' => ['nullable', 'string', 'max:255'],
+            'bank_accounts.*.bank_account_number' => ['nullable', 'string', 'max:64'],
+            'bank_accounts.*.bank_branch_code' => ['nullable', 'string', 'max:32'],
+            'bank_accounts.*.bank_account_type' => ['nullable', Rule::in(['current', 'savings'])],
+            'bank_accounts.*.title' => ['nullable', 'string', 'max:128'],
+            'bank_accounts.*.show_on_invoice' => ['required', 'boolean'],
             'logo' => ['nullable', 'image', 'max:4096'],
             'remove_logo' => ['nullable', 'boolean'],
         ]);
@@ -162,7 +176,6 @@ class CompanySettingsController extends Controller
             'invoice_default_notes', 'invoice_default_footer',
             'invoice_email_subject_template', 'invoice_email_body_template',
             'vat_registered', 'vat_period_type', 'default_tax_rate_id',
-            'bank_name', 'bank_account_holder', 'bank_account_number', 'bank_branch_code', 'bank_account_type',
         ];
 
         $newSettings = [];
@@ -171,6 +184,16 @@ class CompanySettingsController extends Controller
                 $newSettings[$key] = $validated[$key];
             }
         }
+
+        $newSettings = array_merge($newSettings, [
+            'bank_name' => null,
+            'bank_account_holder' => null,
+            'bank_account_number' => null,
+            'bank_branch_code' => null,
+            'bank_account_type' => null,
+        ]);
+
+        $this->syncTeamBankAccounts($team, $validated['bank_accounts']);
 
         $team->name = $validated['name'];
         $mergedSettings = array_replace_recursive(
@@ -306,6 +329,44 @@ class CompanySettingsController extends Controller
         $team->save();
 
         return to_route('settings.company', ['tab' => 'tax'])->with('success', 'VAT rate removed.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function syncTeamBankAccounts(Team $team, array $rows): void
+    {
+        $teamId = (int) $team->id;
+        TeamBankAccount::query()->where('team_id', $teamId)->delete();
+
+        $sortOrder = 0;
+        foreach ($rows as $row) {
+            $hasDetail = filled($row['bank_name'] ?? null)
+                || filled($row['bank_account_holder'] ?? null)
+                || filled($row['bank_account_number'] ?? null)
+                || filled($row['bank_branch_code'] ?? null)
+                || filled($row['title'] ?? null);
+            if (! $hasDetail) {
+                continue;
+            }
+
+            $type = $row['bank_account_type'] ?? 'current';
+            if (! in_array($type, ['current', 'savings'], true)) {
+                $type = 'current';
+            }
+
+            TeamBankAccount::query()->create([
+                'team_id' => $teamId,
+                'sort_order' => $sortOrder++,
+                'title' => filled($row['title'] ?? null) ? (string) $row['title'] : null,
+                'bank_name' => filled($row['bank_name'] ?? null) ? (string) $row['bank_name'] : null,
+                'bank_account_holder' => filled($row['bank_account_holder'] ?? null) ? (string) $row['bank_account_holder'] : null,
+                'bank_account_number' => filled($row['bank_account_number'] ?? null) ? (string) $row['bank_account_number'] : null,
+                'bank_branch_code' => filled($row['bank_branch_code'] ?? null) ? (string) $row['bank_branch_code'] : null,
+                'bank_account_type' => $type,
+                'show_on_invoice' => filter_var($row['show_on_invoice'] ?? true, FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
     }
 
     /**
