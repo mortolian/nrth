@@ -12,5 +12,6 @@ readonly class UpdateAccountDTO
         public string|Unspecified $code = Unspecified::Value,
         public string|null|Unspecified $description = Unspecified::Value,
         public int|null|Unspecified $parentId = Unspecified::Value,
+        public bool|Unspecified $isActive = Unspecified::Value,
     ) {}
 }

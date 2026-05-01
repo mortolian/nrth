@@ -28,6 +28,7 @@ class Transaction extends Model implements HasMedia
         'status',
         'reference',
         'description',
+        'expense_meta',
         'transaction_date',
         'posted_at',
         'voided_at',
@@ -43,6 +44,7 @@ class Transaction extends Model implements HasMedia
         return [
             'type' => TransactionType::class,
             'status' => TransactionStatus::class,
+            'expense_meta' => 'array',
             'transaction_date' => 'date',
             'posted_at' => 'datetime',
             'voided_at' => 'datetime',

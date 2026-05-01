@@ -85,6 +85,14 @@ class UpdateAccountAction
                 $account->parent_id = $dto->parentId;
             }
 
+            if ($dto->isActive !== Unspecified::Value) {
+                if ($account->is_system && ! $dto->isActive) {
+                    throw SystemAccountProtectedException::cannotDeactivate();
+                }
+
+                $account->is_active = $dto->isActive;
+            }
+
             $account->save();
 
             return $account->refresh();

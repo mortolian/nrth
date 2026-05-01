@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
@@ -24,7 +24,15 @@ type AccountGroup = {
 
 const props = defineProps<{
     groups: AccountGroup[];
+    account_count: number;
+    can_manage: boolean;
 }>();
+
+const page = usePage();
+const flashSuccess = computed(() => (page.props.flash as { success?: string } | undefined)?.success);
+const pageErrors = computed(() => page.props.errors as Record<string, string> | undefined);
+
+const isTrulyEmpty = computed(() => props.account_count === 0);
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
@@ -63,6 +71,31 @@ const viewStatement = (id: number) => {
     router.get(route('accounting.accounts.statement', id));
 };
 
+const seedDefaultChart = () => {
+    if (!confirm('Install the standard South African chart of accounts for this company? Existing codes will be updated if they match.')) {
+        return;
+    }
+    router.post(route('accounting.accounts.seed-default'));
+};
+
+const editAccount = (id: number) => {
+    router.get(route('accounting.accounts.edit', id));
+};
+
+const deactivateAccount = (id: number) => {
+    if (!confirm('Archive this account? It will be hidden from new transactions unless you show inactive accounts.')) {
+        return;
+    }
+    router.post(route('accounting.accounts.deactivate', id));
+};
+
+const deleteAccount = (id: number) => {
+    if (!confirm('Permanently delete this account? Only allowed when it has no ledger activity or sub-accounts.')) {
+        return;
+    }
+    router.delete(route('accounting.accounts.destroy', id));
+};
+
 const typeBadgeClass: Record<string, string> = {
     asset: 'bg-blue-100 text-blue-700',
     liability: 'bg-rose-100 text-rose-700',
@@ -82,6 +115,32 @@ const typeBadgeClass: Record<string, string> = {
             subtitle="All accounts used in your double-entry bookkeeping"
         />
 
+        <div
+            v-if="flashSuccess"
+            class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
+            {{ flashSuccess }}
+        </div>
+        <div
+            v-if="pageErrors?.account"
+            class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+        >
+            {{ pageErrors.account }}
+        </div>
+
+        <div v-if="can_manage" class="mt-4 flex flex-wrap gap-3">
+            <AppButton
+                v-if="isTrulyEmpty"
+                variant="primary"
+                @click="seedDefaultChart"
+            >
+                Install default chart
+            </AppButton>
+            <AppButton variant="primary" @click="router.visit(route('accounting.accounts.create'))">
+                Add account
+            </AppButton>
+        </div>
+
         <AppCard class="mt-5">
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex-1 min-w-48">
@@ -94,10 +153,18 @@ const typeBadgeClass: Record<string, string> = {
             </div>
         </AppCard>
 
-        <div v-if="filteredGroups.length === 0" class="mt-5">
+        <div v-if="isTrulyEmpty" class="mt-5">
             <AppCard>
                 <EmptyState
-                    title="No accounts found"
+                    title="No accounts yet"
+                    description="Install the standard South African chart (bank, debtors, VAT, revenue, expenses, etc.) or add your own accounts. Only the team owner can change the chart."
+                />
+            </AppCard>
+        </div>
+        <div v-else-if="filteredGroups.length === 0" class="mt-5">
+            <AppCard>
+                <EmptyState
+                    title="No accounts match"
                     description="Try adjusting your search or enabling inactive accounts."
                 />
             </AppCard>
@@ -122,7 +189,7 @@ const typeBadgeClass: Record<string, string> = {
                         { key: 'parent', label: 'Parent' },
                         { key: 'balance', label: 'Balance' },
                         { key: 'flags', label: '' },
-                        { key: 'actions', label: '' },
+                        { key: 'actions', label: 'Actions' },
                     ]"
                 >
                     <tr
@@ -155,14 +222,42 @@ const typeBadgeClass: Record<string, string> = {
                             </div>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <AppButton
-                                v-if="account.is_active"
-                                size="sm"
-                                variant="ghost"
-                                @click="viewStatement(account.id)"
-                            >
-                                View statement
-                            </AppButton>
+                            <div class="flex flex-wrap items-center justify-end gap-1">
+                                <AppButton
+                                    v-if="account.is_active"
+                                    size="sm"
+                                    variant="ghost"
+                                    @click="viewStatement(account.id)"
+                                >
+                                    Statement
+                                </AppButton>
+                                <AppButton
+                                    v-if="can_manage"
+                                    size="sm"
+                                    variant="ghost"
+                                    @click="editAccount(account.id)"
+                                >
+                                    Edit
+                                </AppButton>
+                                <AppButton
+                                    v-if="can_manage && !account.is_system && account.is_active"
+                                    size="sm"
+                                    variant="ghost"
+                                    class="text-amber-800"
+                                    @click="deactivateAccount(account.id)"
+                                >
+                                    Archive
+                                </AppButton>
+                                <AppButton
+                                    v-if="can_manage && !account.is_system"
+                                    size="sm"
+                                    variant="ghost"
+                                    class="text-rose-700"
+                                    @click="deleteAccount(account.id)"
+                                >
+                                    Delete
+                                </AppButton>
+                            </div>
                         </td>
                     </tr>
                 </AppTable>

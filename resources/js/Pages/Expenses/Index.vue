@@ -16,6 +16,7 @@ type ExpenseRow = {
     vat_amount: number;
     status: string;
     has_receipt: boolean;
+    can_delete: boolean;
 };
 
 const props = defineProps<{
@@ -75,6 +76,36 @@ const toggleSelected = (id: number, checked: boolean) => {
     }
     selected.value = selected.value.filter((item) => item !== id);
 };
+
+const receiptAttachTransactionId = ref<number | null>(null);
+const receiptAttachInput = ref<HTMLInputElement | null>(null);
+
+const startAttachReceipt = (id: number) => {
+    receiptAttachTransactionId.value = id;
+    receiptAttachInput.value?.click();
+};
+
+const onReceiptFileSelected = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const id = receiptAttachTransactionId.value;
+    if (!file || id == null) {
+        input.value = '';
+        receiptAttachTransactionId.value = null;
+        return;
+    }
+    const form = new FormData();
+    form.append('receipt', file);
+    router.post(route('expenses.receipt.store', id), form, { preserveScroll: true });
+    receiptAttachTransactionId.value = null;
+    input.value = '';
+};
+
+const confirmDelete = (expense: ExpenseRow) => {
+    if (!expense.can_delete) return;
+    if (!confirm(`Delete expense from ${expense.date ?? 'this date'} (${expense.supplier})? This removes the journal entry.`)) return;
+    router.delete(route('expenses.destroy', expense.id), { preserveScroll: true });
+};
 </script>
 
 <template>
@@ -90,6 +121,14 @@ const toggleSelected = (id: number, checked: boolean) => {
                 <AppButton variant="primary" @click="router.visit(route('expenses.create'))">New Expense</AppButton>
             </template>
         </PageHeader>
+
+        <input
+            ref="receiptAttachInput"
+            type="file"
+            accept="image/*,.pdf"
+            class="hidden"
+            @change="onReceiptFileSelected"
+        >
 
         <div class="mt-5 grid gap-4 md:grid-cols-3">
             <StatCard title="Total expenses (MTD)" :value="formatCents(summary.total_this_month)" trend="neutral" />
@@ -222,10 +261,18 @@ const toggleSelected = (id: number, checked: boolean) => {
                         <TriangleAlert v-else class="h-4 w-4 text-rose-500" />
                     </td>
                     <td class="px-4 py-3">
-                        <div class="flex gap-1">
-                            <AppButton size="sm" variant="ghost">Edit</AppButton>
-                            <AppButton size="sm" variant="ghost">Attach Receipt</AppButton>
-                            <AppButton size="sm" variant="ghost">Delete</AppButton>
+                        <div class="flex flex-wrap gap-1">
+                            <AppButton size="sm" variant="ghost" @click.stop="router.visit(route('expenses.edit', expense.id))">Edit</AppButton>
+                            <AppButton size="sm" variant="ghost" @click.stop="startAttachReceipt(expense.id)">Attach receipt</AppButton>
+                            <AppButton
+                                size="sm"
+                                variant="ghost"
+                                class="text-rose-600"
+                                :disabled="!expense.can_delete"
+                                @click.stop="confirmDelete(expense)"
+                            >
+                                Delete
+                            </AppButton>
                         </div>
                     </td>
                 </tr>

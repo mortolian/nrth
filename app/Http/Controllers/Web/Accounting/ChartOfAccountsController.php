@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Web\Accounting;
 use App\Domain\Accounting\Models\Account;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -16,7 +15,14 @@ class ChartOfAccountsController extends Controller
     public function __invoke(Request $request): Response
     {
         if (! Schema::hasTable('accounts')) {
-            return Inertia::render('Accounting/Accounts/Index', ['groups' => []]);
+            $user = $request->user();
+            $team = $user->currentTeam;
+
+            return Inertia::render('Accounting/Accounts/Index', [
+                'groups' => [],
+                'account_count' => 0,
+                'can_manage' => $team !== null && $user->can('update', $team),
+            ]);
         }
 
         $teamId = (int) $request->user()->current_team_id;
@@ -69,8 +75,13 @@ class ChartOfAccountsController extends Controller
             ->values()
             ->all();
 
+        $user = $request->user();
+        $team = $user->currentTeam;
+
         return Inertia::render('Accounting/Accounts/Index', [
             'groups' => $groups,
+            'account_count' => $accounts->count(),
+            'can_manage' => $team !== null && $user->can('update', $team),
         ]);
     }
 

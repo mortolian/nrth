@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Web\Accounting\AccountController;
 use App\Http\Controllers\Web\Accounting\AccountStatementController;
 use App\Http\Controllers\Web\Accounting\ChartOfAccountsController;
 use App\Http\Controllers\Web\Accounting\GeneralLedgerController;
@@ -60,6 +61,10 @@ Route::middleware([
     Route::get('/expenses', [ExpensesController::class, 'index'])->name('expenses.index');
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
+    Route::get('/expenses/{transaction}/edit', [ExpensesController::class, 'edit'])->name('expenses.edit');
+    Route::put('/expenses/{transaction}', [ExpensesController::class, 'update'])->name('expenses.update');
+    Route::delete('/expenses/{transaction}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
+    Route::post('/expenses/{transaction}/receipt', [ExpensesController::class, 'storeReceipt'])->name('expenses.receipt.store');
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::get('/suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
@@ -71,6 +76,13 @@ Route::middleware([
     Route::delete('/accounting/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('accounting.transactions.destroy');
     Route::get('/accounting/journal', GeneralLedgerController::class)->name('accounting.journal.index');
     Route::get('/accounting/accounts', ChartOfAccountsController::class)->name('accounting.accounts.index');
+    Route::post('/accounting/accounts/seed-default', [AccountController::class, 'seedDefault'])->name('accounting.accounts.seed-default');
+    Route::get('/accounting/accounts/create', [AccountController::class, 'create'])->name('accounting.accounts.create');
+    Route::post('/accounting/accounts', [AccountController::class, 'store'])->name('accounting.accounts.store');
+    Route::get('/accounting/accounts/{account}/edit', [AccountController::class, 'edit'])->name('accounting.accounts.edit');
+    Route::put('/accounting/accounts/{account}', [AccountController::class, 'update'])->name('accounting.accounts.update');
+    Route::post('/accounting/accounts/{account}/deactivate', [AccountController::class, 'deactivate'])->name('accounting.accounts.deactivate');
+    Route::delete('/accounting/accounts/{account}', [AccountController::class, 'destroy'])->name('accounting.accounts.destroy');
     Route::get('/accounting/accounts/{account}/statement', AccountStatementController::class)->name('accounting.accounts.statement');
     Route::get('/budgeting', [BudgetingController::class, 'index'])->name('budgeting.index');
     Route::get('/budgeting/create', [BudgetingController::class, 'create'])->name('budgeting.create');
