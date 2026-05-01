@@ -58,13 +58,13 @@ const props = defineProps<{
     bank_account_types: Array<{ value: string; label: string }>;
 }>();
 
-type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking';
+type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages';
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking'];
+const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
 
@@ -110,6 +110,41 @@ const form = useForm({
     vat_registered: Boolean(props.settings.vat_registered ?? true),
     vat_period_type: String(props.settings.vat_period_type ?? 'bi_monthly'),
     default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
+    payment_gateways: {
+        payfast: {
+            enabled: Boolean((props.settings.payment_gateways as any)?.payfast?.enabled ?? false),
+            merchant_id: String((props.settings.payment_gateways as any)?.payfast?.merchant_id ?? ''),
+            merchant_key: String((props.settings.payment_gateways as any)?.payfast?.merchant_key ?? ''),
+            passphrase: String((props.settings.payment_gateways as any)?.payfast?.passphrase ?? ''),
+        },
+        stripe: {
+            enabled: Boolean((props.settings.payment_gateways as any)?.stripe?.enabled ?? false),
+            publishable_key: String((props.settings.payment_gateways as any)?.stripe?.publishable_key ?? ''),
+            secret_key: String((props.settings.payment_gateways as any)?.stripe?.secret_key ?? ''),
+            webhook_secret: String((props.settings.payment_gateways as any)?.stripe?.webhook_secret ?? ''),
+        },
+        paypal: {
+            enabled: Boolean((props.settings.payment_gateways as any)?.paypal?.enabled ?? false),
+            client_id: String((props.settings.payment_gateways as any)?.paypal?.client_id ?? ''),
+            client_secret: String((props.settings.payment_gateways as any)?.paypal?.client_secret ?? ''),
+            environment: String((props.settings.payment_gateways as any)?.paypal?.environment ?? 'sandbox'),
+        },
+        netcash: {
+            enabled: Boolean((props.settings.payment_gateways as any)?.netcash?.enabled ?? false),
+            account_id: String((props.settings.payment_gateways as any)?.netcash?.account_id ?? ''),
+            service_key: String((props.settings.payment_gateways as any)?.netcash?.service_key ?? ''),
+        },
+        snapscan: {
+            enabled: Boolean((props.settings.payment_gateways as any)?.snapscan?.enabled ?? false),
+            merchant_id: String((props.settings.payment_gateways as any)?.snapscan?.merchant_id ?? ''),
+            api_key: String((props.settings.payment_gateways as any)?.snapscan?.api_key ?? ''),
+        },
+        zapper: {
+            enabled: Boolean((props.settings.payment_gateways as any)?.zapper?.enabled ?? false),
+            merchant_id: String((props.settings.payment_gateways as any)?.zapper?.merchant_id ?? ''),
+            api_key: String((props.settings.payment_gateways as any)?.zapper?.api_key ?? ''),
+        },
+    },
     bank_accounts:
         props.bank_accounts.length > 0
             ? props.bank_accounts.map((r) => ({
@@ -226,6 +261,7 @@ const tabs = [
     { id: 'estimate' as const, label: 'Estimates' },
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
+    { id: 'payment_pages' as const, label: 'Payment page providers' },
 ];
 
 const activeTaxRates = computed(() => props.tax_rates.filter((rate) => rate.is_active));
@@ -275,6 +311,41 @@ const submit = () => {
         vat_registered: form.vat_registered,
         vat_period_type: form.vat_period_type,
         default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
+        payment_gateways: {
+            payfast: {
+                enabled: form.payment_gateways.payfast.enabled,
+                merchant_id: form.payment_gateways.payfast.merchant_id,
+                merchant_key: form.payment_gateways.payfast.merchant_key,
+                passphrase: form.payment_gateways.payfast.passphrase,
+            },
+            stripe: {
+                enabled: form.payment_gateways.stripe.enabled,
+                publishable_key: form.payment_gateways.stripe.publishable_key,
+                secret_key: form.payment_gateways.stripe.secret_key,
+                webhook_secret: form.payment_gateways.stripe.webhook_secret,
+            },
+            paypal: {
+                enabled: form.payment_gateways.paypal.enabled,
+                client_id: form.payment_gateways.paypal.client_id,
+                client_secret: form.payment_gateways.paypal.client_secret,
+                environment: form.payment_gateways.paypal.environment,
+            },
+            netcash: {
+                enabled: form.payment_gateways.netcash.enabled,
+                account_id: form.payment_gateways.netcash.account_id,
+                service_key: form.payment_gateways.netcash.service_key,
+            },
+            snapscan: {
+                enabled: form.payment_gateways.snapscan.enabled,
+                merchant_id: form.payment_gateways.snapscan.merchant_id,
+                api_key: form.payment_gateways.snapscan.api_key,
+            },
+            zapper: {
+                enabled: form.payment_gateways.zapper.enabled,
+                merchant_id: form.payment_gateways.zapper.merchant_id,
+                api_key: form.payment_gateways.zapper.api_key,
+            },
+        },
         bank_accounts: form.bank_accounts.map((r) => ({
             title: r.title,
             bank_name: r.bank_name,
@@ -329,7 +400,10 @@ const removeBankAccount = (index: number) => {
             { label: 'Company' },
         ]"
     >
-        <PageHeader title="Company settings" subtitle="Profile, invoicing, tax, and banking details for your business" />
+        <PageHeader
+            title="Company settings"
+            subtitle="Profile, invoicing, tax, banking, and online payment providers for your business"
+        />
 
         <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
             <button
@@ -744,6 +818,85 @@ const removeBankAccount = (index: number) => {
                         <Plus class="h-4 w-4" aria-hidden="true" />
                         Add bank account
                     </button>
+                </div>
+            </AppCard>
+
+            <AppCard v-show="tab === 'payment_pages'">
+                <h3 class="text-base font-semibold text-slate-900">Payment page providers</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Store gateway credentials for hosted checkout (Stripe, PayFast, PayPal, Netcash, SnapScan, Zapper). Invoice “Pay online” uses the enabled providers.
+                </p>
+                <div class="mt-4 space-y-5">
+                    <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <input v-model="form.payment_gateways.payfast.enabled" type="checkbox" class="rounded border-slate-300">
+                            Enable PayFast
+                        </label>
+                        <div v-show="form.payment_gateways.payfast.enabled" class="mt-3 grid gap-3 md:grid-cols-3">
+                            <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.payfast.merchant_id" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">Merchant Key</label><AppInput v-model="form.payment_gateways.payfast.merchant_key" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">Passphrase</label><AppInput v-model="form.payment_gateways.payfast.passphrase" /></div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <input v-model="form.payment_gateways.stripe.enabled" type="checkbox" class="rounded border-slate-300">
+                            Enable Stripe
+                        </label>
+                        <div v-show="form.payment_gateways.stripe.enabled" class="mt-3 grid gap-3 md:grid-cols-3">
+                            <div><label class="mb-1 block text-xs text-slate-500">Publishable key</label><AppInput v-model="form.payment_gateways.stripe.publishable_key" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">Secret key</label><AppInput v-model="form.payment_gateways.stripe.secret_key" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">Webhook secret</label><AppInput v-model="form.payment_gateways.stripe.webhook_secret" /></div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <input v-model="form.payment_gateways.paypal.enabled" type="checkbox" class="rounded border-slate-300">
+                            Enable PayPal
+                        </label>
+                        <div v-show="form.payment_gateways.paypal.enabled" class="mt-3 grid gap-3 md:grid-cols-3">
+                            <div><label class="mb-1 block text-xs text-slate-500">Client ID</label><AppInput v-model="form.payment_gateways.paypal.client_id" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">Client Secret</label><AppInput v-model="form.payment_gateways.paypal.client_secret" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Environment</label>
+                                <AppSelect
+                                    :model-value="form.payment_gateways.paypal.environment"
+                                    :options="[{ label: 'Sandbox', value: 'sandbox' }, { label: 'Live', value: 'live' }]"
+                                    @update:model-value="form.payment_gateways.paypal.environment = $event"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <input v-model="form.payment_gateways.netcash.enabled" type="checkbox" class="rounded border-slate-300">
+                            Enable Netcash
+                        </label>
+                        <div v-show="form.payment_gateways.netcash.enabled" class="mt-3 grid gap-3 md:grid-cols-2">
+                            <div><label class="mb-1 block text-xs text-slate-500">Account ID</label><AppInput v-model="form.payment_gateways.netcash.account_id" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">Service key</label><AppInput v-model="form.payment_gateways.netcash.service_key" /></div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <input v-model="form.payment_gateways.snapscan.enabled" type="checkbox" class="rounded border-slate-300">
+                            Enable SnapScan
+                        </label>
+                        <div v-show="form.payment_gateways.snapscan.enabled" class="mt-3 grid gap-3 md:grid-cols-2">
+                            <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.snapscan.merchant_id" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">API key</label><AppInput v-model="form.payment_gateways.snapscan.api_key" /></div>
+                        </div>
+                    </div>
+                    <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <input v-model="form.payment_gateways.zapper.enabled" type="checkbox" class="rounded border-slate-300">
+                            Enable Zapper
+                        </label>
+                        <div v-show="form.payment_gateways.zapper.enabled" class="mt-3 grid gap-3 md:grid-cols-2">
+                            <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.zapper.merchant_id" /></div>
+                            <div><label class="mb-1 block text-xs text-slate-500">API key</label><AppInput v-model="form.payment_gateways.zapper.api_key" /></div>
+                        </div>
+                    </div>
                 </div>
             </AppCard>
         </div>

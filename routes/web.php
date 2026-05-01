@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\Invoicing\EstimateController;
 use App\Http\Controllers\Web\Invoicing\EstimatePdfController;
 use App\Http\Controllers\Web\Invoicing\ExchangeRateController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
+use App\Http\Controllers\Web\Invoicing\InvoiceOnlinePaymentController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\CompanySettingsController;
@@ -23,6 +24,8 @@ use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
 use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
+use App\Http\Controllers\Web\Webhooks\PayFastPaymentWebhookController;
+use App\Http\Controllers\Web\Webhooks\StripePaymentWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -30,6 +33,9 @@ Route::get('/', function () {
         ? redirect()->route('dashboard')
         : redirect()->route('login');
 });
+
+Route::post('/webhooks/payments/stripe/{team}', StripePaymentWebhookController::class)->name('webhooks.stripe');
+Route::post('/webhooks/payments/payfast/{team}', PayFastPaymentWebhookController::class)->name('webhooks.payfast');
 
 Route::middleware([
     'auth:sanctum',
@@ -115,6 +121,7 @@ Route::middleware([
         Route::post('/invoices/{invoice}/unvoid', [InvoiceController::class, 'unvoid'])->name('invoices.unvoid');
         Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
         Route::post('/invoices/{invoice}/payments/{payment}/undo', [InvoiceController::class, 'undoPayment'])->name('invoices.payments.undo');
+        Route::post('/invoices/{invoice}/online-payments', [InvoiceOnlinePaymentController::class, 'store'])->name('invoices.online-payments.store');
     });
     Route::get('/invoices/{invoice}/pdf', [InvoicePdfController::class, 'download'])->name('invoices.pdf.download');
 });

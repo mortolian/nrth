@@ -150,6 +150,34 @@ class CompanySettingsController extends Controller
             'vat_registered' => ['required', 'boolean'],
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
             'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('team_id', $teamId)],
+            'payment_gateways' => ['required', 'array'],
+            'payment_gateways.payfast' => ['required', 'array'],
+            'payment_gateways.payfast.enabled' => ['required', 'boolean'],
+            'payment_gateways.payfast.merchant_id' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.payfast.merchant_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.payfast.passphrase' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.stripe' => ['required', 'array'],
+            'payment_gateways.stripe.enabled' => ['required', 'boolean'],
+            'payment_gateways.stripe.publishable_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.stripe.secret_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.stripe.webhook_secret' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.paypal' => ['required', 'array'],
+            'payment_gateways.paypal.enabled' => ['required', 'boolean'],
+            'payment_gateways.paypal.client_id' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.paypal.client_secret' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.paypal.environment' => ['required', Rule::in(['sandbox', 'live'])],
+            'payment_gateways.netcash' => ['required', 'array'],
+            'payment_gateways.netcash.enabled' => ['required', 'boolean'],
+            'payment_gateways.netcash.account_id' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.netcash.service_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.snapscan' => ['required', 'array'],
+            'payment_gateways.snapscan.enabled' => ['required', 'boolean'],
+            'payment_gateways.snapscan.merchant_id' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.snapscan.api_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.zapper' => ['required', 'array'],
+            'payment_gateways.zapper.enabled' => ['required', 'boolean'],
+            'payment_gateways.zapper.merchant_id' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.zapper.api_key' => ['nullable', 'string', 'max:255'],
             'bank_accounts' => ['required', 'array', 'max:50'],
             'bank_accounts.*.bank_name' => ['nullable', 'string', 'max:255'],
             'bank_accounts.*.bank_account_holder' => ['nullable', 'string', 'max:255'],
@@ -184,6 +212,7 @@ class CompanySettingsController extends Controller
             'invoice_default_notes', 'invoice_default_footer',
             'invoice_email_subject_template', 'invoice_email_body_template',
             'vat_registered', 'vat_period_type', 'default_tax_rate_id',
+            'payment_gateways',
         ];
 
         $newSettings = [];
@@ -236,7 +265,7 @@ class CompanySettingsController extends Controller
         }
 
         $tab = (string) $request->input('tab', 'profile');
-        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking'], true)) {
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages'], true)) {
             $tab = 'profile';
         }
 

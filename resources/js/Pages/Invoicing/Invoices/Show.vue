@@ -90,6 +90,8 @@ const props = defineProps<{
         record_payment: boolean;
         delete: boolean;
     };
+    /** Enabled checkout providers for this invoice (e.g. stripe, payfast). */
+    online_payment_providers: string[];
 }>();
 
 const bookCurrencySnapshot = computed(() => {
@@ -177,6 +179,14 @@ const openRecordPayment = () => {
     paymentDrawerOpen.value = true;
 };
 
+const startOnlinePayment = (provider: string) => {
+    router.post(
+        route('invoicing.invoices.online-payments.store', props.invoice.id),
+        { provider },
+        { preserveScroll: true },
+    );
+};
+
 const undoPayment = (paymentId: number) => {
     if (
         !window.confirm(
@@ -232,6 +242,34 @@ const undoPayment = (paymentId: number) => {
                     @click="openRecordPayment"
                 >
                     <Wallet class="mr-1 h-4 w-4 shrink-0" /> Record payment
+                </AppButton>
+                <AppButton
+                    v-if="
+                        ['sent', 'partial', 'overdue'].includes(invoice.status) &&
+                        can.record_payment &&
+                        invoice.amount_due_cents > 0 &&
+                        online_payment_providers.includes('stripe')
+                    "
+                    class="shrink-0"
+                    variant="secondary"
+                    type="button"
+                    @click="startOnlinePayment('stripe')"
+                >
+                    Pay with Stripe
+                </AppButton>
+                <AppButton
+                    v-if="
+                        ['sent', 'partial', 'overdue'].includes(invoice.status) &&
+                        can.record_payment &&
+                        invoice.amount_due_cents > 0 &&
+                        online_payment_providers.includes('payfast')
+                    "
+                    class="shrink-0"
+                    variant="secondary"
+                    type="button"
+                    @click="startOnlinePayment('payfast')"
+                >
+                    Pay with PayFast
                 </AppButton>
                 <AppButton v-if="['sent', 'partial'].includes(invoice.status)" class="shrink-0" variant="primary" type="button">
                     Send reminder

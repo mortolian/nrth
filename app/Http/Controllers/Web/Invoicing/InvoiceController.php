@@ -547,6 +547,7 @@ class InvoiceController extends Controller
                 'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
                 'delete' => ! $invoice->payments()->exists(),
             ],
+            'online_payment_providers' => $this->onlinePaymentProvidersForInvoice($invoice),
             'charges_vat' => $invoice->team?->chargesVat() ?? false,
         ]);
     }
@@ -703,6 +704,42 @@ class InvoiceController extends Controller
                 'footer' => (string) ($settings['invoice_default_footer'] ?? ''),
             ],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function onlinePaymentProvidersForInvoice(Invoice $invoice): array
+    {
+        $invoice->loadMissing('team');
+        $team = $invoice->team;
+        if ($team === null) {
+            return [];
+        }
+
+        $settings = $team->mergedCompanySettings();
+        /** @var array<string, mixed> $gateways */
+        $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
+        $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
+
+        $providers = [];
+
+        /** @var array<string, mixed> $stripe */
+        $stripe = is_array($gateways['stripe'] ?? null) ? $gateways['stripe'] : [];
+        $stripeSecret = isset($stripe['secret_key']) && is_string($stripe['secret_key']) ? trim($stripe['secret_key']) : '';
+        if (($stripe['enabled'] ?? false) && $stripeSecret !== '') {
+            $providers[] = 'stripe';
+        }
+
+        /** @var array<string, mixed> $payfast */
+        $payfast = is_array($gateways['payfast'] ?? null) ? $gateways['payfast'] : [];
+        $mid = isset($payfast['merchant_id']) && is_string($payfast['merchant_id']) ? trim($payfast['merchant_id']) : '';
+        $mkey = isset($payfast['merchant_key']) && is_string($payfast['merchant_key']) ? trim($payfast['merchant_key']) : '';
+        if ($currency === 'ZAR' && ($payfast['enabled'] ?? false) && $mid !== '' && $mkey !== '') {
+            $providers[] = 'payfast';
+        }
+
+        return $providers;
     }
 
     /**

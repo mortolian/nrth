@@ -215,6 +215,41 @@ class Team extends JetstreamTeam implements HasMedia
             'bank_account_number' => null,
             'bank_branch_code' => null,
             'bank_account_type' => 'current',
+            'payment_gateways' => [
+                'payfast' => [
+                    'enabled' => false,
+                    'merchant_id' => null,
+                    'merchant_key' => null,
+                    'passphrase' => null,
+                ],
+                'stripe' => [
+                    'enabled' => false,
+                    'publishable_key' => null,
+                    'secret_key' => null,
+                    'webhook_secret' => null,
+                ],
+                'paypal' => [
+                    'enabled' => false,
+                    'client_id' => null,
+                    'client_secret' => null,
+                    'environment' => 'sandbox',
+                ],
+                'netcash' => [
+                    'enabled' => false,
+                    'account_id' => null,
+                    'service_key' => null,
+                ],
+                'snapscan' => [
+                    'enabled' => false,
+                    'merchant_id' => null,
+                    'api_key' => null,
+                ],
+                'zapper' => [
+                    'enabled' => false,
+                    'merchant_id' => null,
+                    'api_key' => null,
+                ],
+            ],
         ];
     }
 

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'payfast' => [
+        'sandbox' => env('PAYFAST_SANDBOX', true),
+    ],
+
 ];
