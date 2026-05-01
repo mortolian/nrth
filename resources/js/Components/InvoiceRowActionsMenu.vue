@@ -42,8 +42,14 @@ const emit = defineEmits<{
                 <DropdownMenuItem
                     v-for="action in actions"
                     :key="action.id"
-                    class="flex cursor-pointer select-none rounded px-3 py-2 text-sm outline-none data-[highlighted]:bg-slate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                    :class="action.id === 'delete' ? 'text-red-600 data-[highlighted]:bg-red-50' : 'text-slate-700'"
+                    class="flex cursor-pointer select-none rounded px-3 py-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    :class="
+                        action.id === 'delete'
+                            ? 'text-red-600 data-[highlighted]:bg-red-50'
+                            : action.id === 'undo_invoice_payment'
+                              ? 'text-amber-800 data-[highlighted]:bg-amber-50'
+                              : 'text-slate-700 data-[highlighted]:bg-slate-100'
+                    "
                     @select="emit('select', action.id)"
                 >
                     {{ action.label }}

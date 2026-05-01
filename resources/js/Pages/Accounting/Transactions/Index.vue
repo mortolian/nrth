@@ -15,6 +15,7 @@ type LedgerRow = {
     total_amount: number;
     status: string;
     can_delete: boolean;
+    invoice_payment_undo: { invoice_id: number; payment_id: number } | null;
     journal_entries: Array<{
         id: number;
         account: string;
@@ -83,6 +84,9 @@ const toggleExpanded = (id: number) => {
 
 const rowActionItems = (row: LedgerRow) => {
     const actions = [{ id: 'view_journal', label: 'View journal entries' }];
+    if (row.invoice_payment_undo !== null) {
+        actions.push({ id: 'undo_invoice_payment', label: 'Undo invoice payment' });
+    }
     if (row.can_delete) {
         actions.push({ id: 'delete', label: 'Delete' });
     }
@@ -92,6 +96,22 @@ const rowActionItems = (row: LedgerRow) => {
 const onTransactionAction = (transaction: LedgerRow, actionId: string) => {
     if (actionId === 'view_journal') {
         toggleExpanded(transaction.id);
+    } else if (actionId === 'undo_invoice_payment' && transaction.invoice_payment_undo !== null) {
+        if (
+            !window.confirm(
+                'Undo this payment? The ledger entry will be reversed and the invoice balance will be updated. This is for mistaken entries.',
+            )
+        ) {
+            return;
+        }
+        router.post(
+            route('invoicing.invoices.payments.undo', [
+                transaction.invoice_payment_undo.invoice_id,
+                transaction.invoice_payment_undo.payment_id,
+            ]),
+            {},
+            { preserveScroll: true },
+        );
     } else if (actionId === 'delete') {
         if (
             !window.confirm(

@@ -114,6 +114,7 @@ Route::middleware([
         Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
         Route::post('/invoices/{invoice}/unvoid', [InvoiceController::class, 'unvoid'])->name('invoices.unvoid');
         Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
+        Route::post('/invoices/{invoice}/payments/{payment}/undo', [InvoiceController::class, 'undoPayment'])->name('invoices.payments.undo');
     });
     Route::get('/invoices/{invoice}/pdf', [InvoicePdfController::class, 'download'])->name('invoices.pdf.download');
 });

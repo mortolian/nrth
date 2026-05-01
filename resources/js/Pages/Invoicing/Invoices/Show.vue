@@ -64,6 +64,7 @@ type InvoicePayload = {
         method: string;
         reference: string | null;
         notes: string | null;
+        can_undo: boolean;
     }>;
     activity_log: Array<{
         id: number;
@@ -174,6 +175,21 @@ const downloadPdf = () => {
 };
 const openRecordPayment = () => {
     paymentDrawerOpen.value = true;
+};
+
+const undoPayment = (paymentId: number) => {
+    if (
+        !window.confirm(
+            'Undo this payment? The ledger entry will be reversed and the invoice balance will be updated. This is for mistaken entries.',
+        )
+    ) {
+        return;
+    }
+    router.post(
+        route('invoicing.invoices.payments.undo', [props.invoice.id, paymentId]),
+        {},
+        { preserveScroll: true },
+    );
 };
 </script>
 
@@ -346,9 +362,24 @@ const openRecordPayment = () => {
                         <AppButton v-if="can.record_payment" size="sm" variant="secondary" @click="openRecordPayment">Record Payment</AppButton>
                     </div>
                     <div v-if="invoice.payments.length" class="mt-3 space-y-2">
-                        <div v-for="payment in invoice.payments" :key="payment.id" class="rounded-md border border-slate-200 p-2 text-sm">
-                            <p class="font-medium text-slate-900">{{ formatCents(payment.amount_cents) }}</p>
-                            <p class="text-xs text-slate-500">{{ payment.payment_date }} • {{ payment.method.toUpperCase() }}</p>
+                        <div
+                            v-for="payment in invoice.payments"
+                            :key="payment.id"
+                            class="flex items-start justify-between gap-2 rounded-md border border-slate-200 p-2 text-sm"
+                        >
+                            <div class="min-w-0">
+                                <p class="font-medium text-slate-900">{{ formatCents(payment.amount_cents) }}</p>
+                                <p class="text-xs text-slate-500">{{ payment.payment_date }} • {{ payment.method.toUpperCase() }}</p>
+                            </div>
+                            <AppButton
+                                v-if="payment.can_undo"
+                                size="sm"
+                                variant="ghost"
+                                class="shrink-0 text-amber-900 hover:bg-amber-50"
+                                @click="undoPayment(payment.id)"
+                            >
+                                Undo
+                            </AppButton>
                         </div>
                     </div>
                     <p v-else class="mt-3 text-sm text-slate-500">No payments recorded yet.</p>

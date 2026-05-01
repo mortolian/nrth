@@ -4,6 +4,7 @@ namespace App\Domain\Accounting\Models;
 
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
+use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
 use App\Models\User;
@@ -74,6 +75,14 @@ class Transaction extends Model implements HasMedia
     public function journalEntries(): HasMany
     {
         return $this->hasMany(JournalEntry::class);
+    }
+
+    /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     /**

@@ -8,6 +8,8 @@ use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Invoicing\Models\Payment;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,7 +40,13 @@ class TransactionController extends Controller
 
         $query = Transaction::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->with(['journalEntries.account']);
+            ->with([
+                'journalEntries.account',
+                'payments' => fn ($q) => $q
+                    ->select(['id', 'team_id', 'invoice_id', 'transaction_id'])
+                    ->where('team_id', $teamId)
+                    ->with(['invoice:id,team_id,status']),
+            ]);
 
         if ($from !== '') {
             $query->whereDate('transaction_date', '>=', $from);
@@ -78,6 +86,21 @@ class TransactionController extends Controller
                 $debitAccount = $debits->first()?->account?->name ?? '—';
                 $creditAccount = $credits->first()?->account?->name ?? '—';
 
+                /** @var Payment|null $invoicePayment */
+                $invoicePayment = $transaction->payments->first();
+                $invoicePaymentUndo = null;
+                if (
+                    $invoicePayment !== null
+                    && $invoicePayment->invoice !== null
+                    && $invoicePayment->invoice->status !== InvoiceStatus::Void
+                    && in_array($transaction->status, [TransactionStatus::Posted, TransactionStatus::Draft], true)
+                ) {
+                    $invoicePaymentUndo = [
+                        'invoice_id' => $invoicePayment->invoice_id,
+                        'payment_id' => $invoicePayment->id,
+                    ];
+                }
+
                 return [
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
@@ -86,6 +109,7 @@ class TransactionController extends Controller
                     'description' => $transaction->description,
                     'status' => $transaction->status->value,
                     'can_delete' => DeleteTransactionAction::canDelete($transaction),
+                    'invoice_payment_undo' => $invoicePaymentUndo,
                     'total_amount' => $amount,
                     'accounts_affected' => $debitAccount.' -> '.$creditAccount,
                     'journal_entries' => $lines->map(fn ($line) => [

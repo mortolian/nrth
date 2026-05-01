@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Web\Invoicing;
 
 use App\Domain\Accounting\Enums\AccountType;
+use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Invoicing\Actions\CreateInvoiceAction;
 use App\Domain\Invoicing\Actions\MarkInvoiceSentAction;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\SendInvoiceAction;
+use App\Domain\Invoicing\Actions\UndoInvoicePaymentAction;
 use App\Domain\Invoicing\Actions\UnvoidInvoiceAction;
 use App\Domain\Invoicing\Actions\VoidInvoiceAction;
 use App\Domain\Invoicing\DTOs\CreateInvoiceDTO;
@@ -515,14 +517,19 @@ class InvoiceController extends Controller
                     'total_cents' => (int) $item->total_cents,
                 ])->values()->all(),
                 'payments' => $invoice->payments->sortByDesc('payment_date')->values()->map(
-                    fn (Payment $payment) => [
-                        'id' => $payment->id,
-                        'amount_cents' => (int) $payment->getRawOriginal('amount_cents'),
-                        'payment_date' => optional($payment->payment_date)->toDateString(),
-                        'method' => $payment->method->value,
-                        'reference' => $payment->reference,
-                        'notes' => $payment->notes,
-                    ]
+                    function (Payment $payment): array {
+                        $tx = $payment->transaction;
+
+                        return [
+                            'id' => $payment->id,
+                            'amount_cents' => (int) $payment->getRawOriginal('amount_cents'),
+                            'payment_date' => optional($payment->payment_date)->toDateString(),
+                            'method' => $payment->method->value,
+                            'reference' => $payment->reference,
+                            'notes' => $payment->notes,
+                            'can_undo' => $tx !== null && in_array($tx->status, [TransactionStatus::Posted, TransactionStatus::Draft], true),
+                        ];
+                    }
                 )->all(),
                 'activity_log' => $activities->map(fn (Activity $activity) => [
                     'id' => $activity->id,
@@ -573,6 +580,25 @@ class InvoiceController extends Controller
                 : null,
             bookFxLossToExpense: (bool) ($payload['book_fx_loss_to_expense'] ?? false),
         ));
+
+        return back();
+    }
+
+    public function undoPayment(Request $request, Invoice $invoice, Payment $payment, UndoInvoicePaymentAction $undoInvoicePaymentAction): RedirectResponse
+    {
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+        abort_unless($payment->invoice_id === $invoice->id, 404);
+        abort_unless($payment->team_id === $invoice->team_id, 403);
+
+        $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $undoInvoicePaymentAction->execute(
+            $payment,
+            (int) $request->user()->current_team_id,
+            $request->filled('reason') ? $request->string('reason')->toString() : null,
+        );
 
         return back();
     }
