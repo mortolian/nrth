@@ -312,7 +312,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <Link
                                 :href="item.href"
                                 :class="[
-                                    'flex items-center rounded-md border-l-2 px-3 py-2 text-sm transition',
+                                    'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
+                                    collapsed ? 'justify-center' : '',
                                     isActive(item.href)
                                         ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
                                         : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
