@@ -50,7 +50,7 @@ const breadcrumbs = computed(() => {
     }
     return [
         { label: 'Settings', href: route('profile.show') },
-        { label: 'Teams and Members' },
+        { label: 'Teams and members' },
     ];
 });
 
@@ -151,161 +151,206 @@ const deleteTeam = () => {
 </script>
 
 <template>
-    <AppLayout title="Teams and Members" :breadcrumbs="breadcrumbs">
-        <PageHeader title="Teams and Members" :subtitle="`Team: ${team.name}`" />
+    <AppLayout title="Teams and members" :breadcrumbs="breadcrumbs">
+        <PageHeader
+            title="Teams and members"
+            :subtitle="`Workspace “${team.name}”: invite people, assign roles, and control who can use billing and invoicing with you.`"
+        />
 
-        <AppCard v-if="team.owner" class="mt-6">
-            <h3 class="text-base font-semibold text-slate-900">Team details</h3>
-            <p class="mt-1 text-sm text-slate-500">Display name and owner for this workspace.</p>
-            <div class="mt-4 flex items-center gap-3 border-b border-slate-100 pb-4">
-                <img
-                    :src="team.owner.profile_photo_url"
-                    :alt="team.owner.name"
-                    class="h-12 w-12 rounded-full object-cover"
-                >
-                <div>
-                    <div class="text-sm font-medium text-slate-900">{{ team.owner.name }}</div>
-                    <div class="text-xs text-slate-500">{{ team.owner.email }}</div>
-                    <div class="text-xs text-slate-400">Team owner</div>
-                </div>
-            </div>
-            <div class="mt-4">
-                <label class="mb-1 block text-xs font-medium text-slate-500">Team name</label>
-                <AppInput
-                    v-model="updateTeamNameForm.name"
-                    type="text"
-                    class="max-w-md"
-                    :disabled="!permissions.canUpdateTeam"
-                />
-                <p v-if="updateTeamNameForm.errors.name" class="mt-1 text-xs text-rose-600">{{ updateTeamNameForm.errors.name }}</p>
-            </div>
-            <div v-if="permissions.canUpdateTeam" class="mt-4 flex items-center gap-3">
-                <AppButton variant="primary" :disabled="updateTeamNameForm.processing" @click="submitTeamName">
-                    Save name
-                </AppButton>
-                <span v-if="updateTeamNameForm.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
-            </div>
-        </AppCard>
+        <div class="mt-5 space-y-6">
+            <AppCard>
+                <h3 class="text-base font-semibold text-slate-900">Teams and members</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Same layout as Company settings—grouped sections with short descriptions. The owner always has full access; other members follow the role you assign.
+                </p>
 
-        <div class="mt-6 grid gap-4 md:grid-cols-3">
-            <AppCard v-for="summary in role_summaries" :key="summary.key" class="border-slate-200">
-                <h3 class="text-sm font-semibold text-slate-900">{{ summary.title }}</h3>
-                <p class="mt-2 text-sm text-slate-600">{{ summary.description }}</p>
-            </AppCard>
-        </div>
-
-        <AppCard v-if="permissions.canAddTeamMembers" class="mt-6">
-            <h3 class="text-base font-semibold text-slate-900">Invite by email</h3>
-            <p class="mt-1 text-sm text-slate-500">
-                We’ll email an invitation link. The recipient accepts to join this team (Jetstream invitations).
-            </p>
-            <div class="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
-                    <AppInput v-model="inviteForm.email" type="email" placeholder="colleague@example.com" />
-                    <p v-if="inviteForm.errors.email" class="mt-1 text-xs text-rose-600">{{ inviteForm.errors.email }}</p>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Role</label>
-                    <AppSelect
-                        :model-value="inviteForm.role"
-                        :options="available_roles.map((r) => ({ label: r.name, value: r.key }))"
-                        @update:model-value="inviteForm.role = $event"
-                    />
-                    <p v-if="inviteForm.errors.role" class="mt-1 text-xs text-rose-600">{{ inviteForm.errors.role }}</p>
-                </div>
-            </div>
-            <div class="mt-4">
-                <AppButton variant="primary" :disabled="inviteForm.processing" @click="submitInvite">Send invitation</AppButton>
-            </div>
-        </AppCard>
-
-        <AppCard v-if="invitations.length && permissions.canAddTeamMembers" class="mt-6">
-            <h3 class="text-base font-semibold text-slate-900">Pending invitations</h3>
-            <ul class="mt-3 divide-y divide-slate-100">
-                <li v-for="inv in invitations" :key="inv.id" class="flex items-center justify-between py-3 text-sm">
-                    <div>
-                        <span class="font-medium text-slate-900">{{ inv.email }}</span>
-                        <span class="ml-2 text-slate-500">({{ inv.role_label }})</span>
-                    </div>
-                    <button
-                        v-if="permissions.canRemoveTeamMembers"
-                        type="button"
-                        class="text-rose-600 hover:underline"
-                        @click="cancelInvitation(inv)"
-                    >
-                        Revoke
-                    </button>
-                </li>
-            </ul>
-        </AppCard>
-
-        <AppCard class="mt-6">
-            <h3 class="text-base font-semibold text-slate-900">Team Members</h3>
-            <AppTable
-                class="mt-4"
-                :columns="[
-                    { key: 'member', label: 'Member' },
-                    { key: 'role', label: 'Role' },
-                    { key: 'actions', label: '' },
-                ]"
-                :page="1"
-                :last-page="1"
-            >
-                <tr v-for="m in members" :key="m.id" class="border-b border-slate-100">
-                    <td class="px-4 py-3">
-                        <div class="flex items-center gap-3">
-                            <img :src="m.profile_photo_url" :alt="m.name" class="h-9 w-9 rounded-full object-cover">
-                            <div>
-                                <div class="font-medium text-slate-900">{{ m.name }}</div>
-                                <div class="text-xs text-slate-500">{{ m.email }}</div>
+                <div class="mt-6 space-y-5">
+                    <section v-if="team.owner" class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Workspace &amp; owner</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Display name for this team and the person who owns the workspace (billing and full control).
+                        </p>
+                        <div class="mt-4 flex items-center gap-3 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
+                            <img
+                                :src="team.owner.profile_photo_url"
+                                :alt="team.owner.name"
+                                class="h-12 w-12 shrink-0 rounded-full object-cover"
+                            >
+                            <div class="min-w-0">
+                                <div class="text-sm font-medium text-slate-900">{{ team.owner.name }}</div>
+                                <div class="truncate text-xs text-slate-500">{{ team.owner.email }}</div>
+                                <div class="text-xs text-slate-400">Team owner</div>
                             </div>
                         </div>
-                    </td>
-                    <td class="px-4 py-3">
-                        <button
-                            v-if="permissions.canUpdateTeamMembers && !m.is_owner && available_roles.length"
-                            type="button"
-                            class="text-sm text-brand-700 underline"
-                            @click="openRoleModal(m)"
-                        >
-                            {{ m.role_label }}
-                        </button>
-                        <span v-else class="text-sm text-slate-700">{{ m.role_label }}</span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button
-                            v-if="authUserId === m.id && !m.is_owner"
-                            type="button"
-                            class="text-sm text-rose-600 hover:underline"
-                            @click="leaveModalOpen = true"
-                        >
-                            Leave team
-                        </button>
-                        <button
-                            v-else-if="!m.is_owner && permissions.canRemoveTeamMembers && authUserId !== m.id"
-                            type="button"
-                            class="text-sm text-rose-600 hover:underline"
-                            @click="confirmRemove(m)"
-                        >
-                            Revoke access
-                        </button>
-                    </td>
-                </tr>
-            </AppTable>
-        </AppCard>
+                        <div class="mt-4">
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Team name</label>
+                            <AppInput
+                                v-model="updateTeamNameForm.name"
+                                type="text"
+                                class="max-w-md"
+                                :disabled="!permissions.canUpdateTeam"
+                            />
+                            <p v-if="updateTeamNameForm.errors.name" class="mt-1 text-xs text-rose-600">
+                                {{ updateTeamNameForm.errors.name }}
+                            </p>
+                        </div>
+                        <div v-if="permissions.canUpdateTeam" class="mt-4 flex flex-wrap items-center gap-3">
+                            <AppButton variant="primary" :disabled="updateTeamNameForm.processing" @click="submitTeamName">
+                                Save name
+                            </AppButton>
+                            <span v-if="updateTeamNameForm.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
+                        </div>
+                    </section>
 
-        <AppCard v-if="permissions.canDeleteTeam && !team.personal_team" class="mt-6 border-rose-100">
-            <h3 class="text-base font-semibold text-slate-900">Delete team</h3>
-            <p class="mt-1 text-sm text-slate-500">
-                Permanently delete this team and its data. Download anything you need to keep first.
-            </p>
-            <div class="mt-4">
-                <AppButton variant="ghost" class="!border-rose-200 !text-rose-700 hover:!bg-rose-50" @click="deleteTeamModalOpen = true">
-                    Delete team…
-                </AppButton>
-            </div>
-        </AppCard>
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Roles on this team</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Each role limits what teammates can see and change. Pick the smallest role that still lets someone do their job.
+                        </p>
+                        <div class="mt-4 grid gap-3 md:grid-cols-3">
+                            <div
+                                v-for="summary in role_summaries"
+                                :key="summary.key"
+                                class="rounded-lg border border-slate-200/90 bg-white p-4 shadow-sm"
+                            >
+                                <h5 class="text-sm font-semibold text-slate-900">{{ summary.title }}</h5>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ summary.description }}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section v-if="permissions.canAddTeamMembers" class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Invite by email</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            We’ll email an invitation link. The recipient accepts to join this team (Jetstream invitations).
+                        </p>
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
+                                <AppInput v-model="inviteForm.email" type="email" placeholder="colleague@example.com" />
+                                <p v-if="inviteForm.errors.email" class="mt-1 text-xs text-rose-600">{{ inviteForm.errors.email }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Role</label>
+                                <AppSelect
+                                    :model-value="inviteForm.role"
+                                    :options="available_roles.map((r) => ({ label: r.name, value: r.key }))"
+                                    @update:model-value="inviteForm.role = $event"
+                                />
+                                <p v-if="inviteForm.errors.role" class="mt-1 text-xs text-rose-600">{{ inviteForm.errors.role }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <AppButton variant="primary" :disabled="inviteForm.processing" @click="submitInvite">
+                                Send invitation
+                            </AppButton>
+                        </div>
+                    </section>
+
+                    <section
+                        v-if="invitations.length && permissions.canAddTeamMembers"
+                        class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5"
+                    >
+                        <h4 class="text-sm font-semibold text-slate-900">Pending invitations</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">People who have been invited but have not joined yet.</p>
+                        <ul class="mt-4 divide-y divide-slate-200/80 rounded-lg border border-slate-200/90 bg-white">
+                            <li v-for="inv in invitations" :key="inv.id" class="flex items-center justify-between gap-3 px-3 py-3 text-sm first:rounded-t-lg last:rounded-b-lg">
+                                <div class="min-w-0">
+                                    <span class="font-medium text-slate-900">{{ inv.email }}</span>
+                                    <span class="ml-2 text-slate-500">({{ inv.role_label }})</span>
+                                </div>
+                                <button
+                                    v-if="permissions.canRemoveTeamMembers"
+                                    type="button"
+                                    class="shrink-0 text-rose-600 hover:underline"
+                                    @click="cancelInvitation(inv)"
+                                >
+                                    Revoke
+                                </button>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Team members</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Everyone with access to this workspace. Owners cannot be removed; other roles can be changed or revoked if you have permission.
+                        </p>
+                        <div class="mt-4 overflow-hidden rounded-lg border border-slate-200/90 bg-white">
+                            <AppTable
+                                :columns="[
+                                    { key: 'member', label: 'Member' },
+                                    { key: 'role', label: 'Role' },
+                                    { key: 'actions', label: '' },
+                                ]"
+                                :page="1"
+                                :last-page="1"
+                            >
+                                <tr v-for="m in members" :key="m.id" class="border-b border-slate-100 last:border-b-0">
+                                    <td class="px-4 py-3">
+                                        <div class="flex items-center gap-3">
+                                            <img :src="m.profile_photo_url" :alt="m.name" class="h-9 w-9 rounded-full object-cover">
+                                            <div class="min-w-0">
+                                                <div class="font-medium text-slate-900">{{ m.name }}</div>
+                                                <div class="truncate text-xs text-slate-500">{{ m.email }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <button
+                                            v-if="permissions.canUpdateTeamMembers && !m.is_owner && available_roles.length"
+                                            type="button"
+                                            class="text-sm text-brand-700 underline"
+                                            @click="openRoleModal(m)"
+                                        >
+                                            {{ m.role_label }}
+                                        </button>
+                                        <span v-else class="text-sm text-slate-700">{{ m.role_label }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <button
+                                            v-if="authUserId === m.id && !m.is_owner"
+                                            type="button"
+                                            class="text-sm text-rose-600 hover:underline"
+                                            @click="leaveModalOpen = true"
+                                        >
+                                            Leave team
+                                        </button>
+                                        <button
+                                            v-else-if="!m.is_owner && permissions.canRemoveTeamMembers && authUserId !== m.id"
+                                            type="button"
+                                            class="text-sm text-rose-600 hover:underline"
+                                            @click="confirmRemove(m)"
+                                        >
+                                            Revoke access
+                                        </button>
+                                    </td>
+                                </tr>
+                            </AppTable>
+                        </div>
+                    </section>
+
+                    <section
+                        v-if="permissions.canDeleteTeam && !team.personal_team"
+                        class="rounded-xl border border-rose-200 bg-rose-50/50 p-4 md:p-5"
+                    >
+                        <h4 class="text-sm font-semibold text-slate-900">Delete team</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Permanently delete this team and its data. Download anything you need to keep first.
+                        </p>
+                        <div class="mt-4">
+                            <AppButton
+                                variant="ghost"
+                                class="!border-rose-200 !text-rose-700 hover:!bg-rose-50"
+                                @click="deleteTeamModalOpen = true"
+                            >
+                                Delete team…
+                            </AppButton>
+                        </div>
+                    </section>
+                </div>
+            </AppCard>
+        </div>
 
         <div
             v-if="deleteTeamModalOpen"

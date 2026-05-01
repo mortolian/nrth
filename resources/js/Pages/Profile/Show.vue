@@ -2,7 +2,6 @@
 import AppLayout from '@/Layouts/AppLayout.vue';
 import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
 import LogoutOtherBrowserSessionsForm from '@/Pages/Profile/Partials/LogoutOtherBrowserSessionsForm.vue';
-import SectionBorder from '@/Components/SectionBorder.vue';
 import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
 import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
@@ -14,44 +13,40 @@ defineProps({
 </script>
 
 <template>
-    <AppLayout title="Profile">
-        <template #header>
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Profile
-            </h2>
-        </template>
+    <AppLayout
+        title="Profile"
+        :breadcrumbs="[
+            { label: 'Home', href: route('dashboard') },
+            { label: 'Profile' },
+        ]"
+    >
+        <PageHeader
+            title="Profile"
+            subtitle="Your personal sign-in, password, and security settings. Company and team workspaces are configured under Settings."
+        />
 
-        <div>
-            <div class="max-w-7xl mx-auto py-10 sm:px-6 lg:px-8">
-                <div v-if="$page.props.jetstream.canUpdateProfileInformation">
-                    <UpdateProfileInformationForm :user="$page.props.auth.user" />
+        <div class="mt-5 space-y-6">
+            <AppCard>
+                <h3 class="text-base font-semibold text-slate-900">Account</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Update how you appear in the app, how you sign in, and how to recover access if you lose a device.
+                </p>
 
-                    <SectionBorder />
-                </div>
+                <div class="mt-6 space-y-5">
+                    <UpdateProfileInformationForm v-if="$page.props.jetstream.canUpdateProfileInformation" :user="$page.props.auth.user" />
 
-                <div v-if="$page.props.jetstream.canUpdatePassword">
-                    <UpdatePasswordForm class="mt-10 sm:mt-0" />
+                    <UpdatePasswordForm v-if="$page.props.jetstream.canUpdatePassword" />
 
-                    <SectionBorder />
-                </div>
-
-                <div v-if="$page.props.jetstream.canManageTwoFactorAuthentication">
                     <TwoFactorAuthenticationForm
+                        v-if="$page.props.jetstream.canManageTwoFactorAuthentication"
                         :requires-confirmation="confirmsTwoFactorAuthentication"
-                        class="mt-10 sm:mt-0"
                     />
 
-                    <SectionBorder />
+                    <LogoutOtherBrowserSessionsForm :sessions="sessions" />
+
+                    <DeleteUserForm v-if="$page.props.jetstream.hasAccountDeletionFeatures" />
                 </div>
-
-                <LogoutOtherBrowserSessionsForm :sessions="sessions" class="mt-10 sm:mt-0" />
-
-                <template v-if="$page.props.jetstream.hasAccountDeletionFeatures">
-                    <SectionBorder />
-
-                    <DeleteUserForm class="mt-10 sm:mt-0" />
-                </template>
-            </div>
+            </AppCard>
         </div>
     </AppLayout>
 </template>

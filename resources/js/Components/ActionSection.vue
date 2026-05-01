@@ -1,19 +1,13 @@
-<script setup>
-import SectionTitle from './SectionTitle.vue';
-</script>
-
 <template>
-    <section class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid md:grid-cols-3 md:gap-8">
-        <SectionTitle>
-            <template #title>
-                <slot name="title" />
-            </template>
-            <template #description>
-                <slot name="description" />
-            </template>
-        </SectionTitle>
+    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+        <h4 class="text-sm font-semibold text-slate-900">
+            <slot name="title" />
+        </h4>
+        <p class="mt-0.5 text-xs text-slate-500">
+            <slot name="description" />
+        </p>
 
-        <div class="mt-6 md:mt-0 md:col-span-2">
+        <div class="mt-4">
             <slot name="content" />
         </div>
     </section>

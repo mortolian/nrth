@@ -40,15 +40,15 @@ const updatePassword = () => {
 <template>
     <FormSection @submitted="updatePassword">
         <template #title>
-            Update Password
+            Update password
         </template>
 
         <template #description>
-            Ensure your account is using a long, random password to stay secure.
+            Use a strong password you don’t reuse on other sites. You’ll need your current password to change it.
         </template>
 
         <template #form>
-            <div class="col-span-6 sm:col-span-4">
+            <div>
                 <InputLabel for="current_password" value="Current Password" />
                 <TextInput
                     id="current_password"
@@ -61,7 +61,7 @@ const updatePassword = () => {
                 <InputError :message="form.errors.current_password" class="mt-2" />
             </div>
 
-            <div class="col-span-6 sm:col-span-4">
+            <div>
                 <InputLabel for="password" value="New Password" />
                 <TextInput
                     id="password"
@@ -74,7 +74,7 @@ const updatePassword = () => {
                 <InputError :message="form.errors.password" class="mt-2" />
             </div>
 
-            <div class="col-span-6 sm:col-span-4">
+            <div>
                 <InputLabel for="password_confirmation" value="Confirm Password" />
                 <TextInput
                     id="password_confirmation"
