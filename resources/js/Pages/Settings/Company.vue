@@ -655,27 +655,6 @@ const removeBankAccount = (index: number) => {
                             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
-                    <div class="md:col-span-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
-                        <h4 class="text-sm font-semibold text-slate-900">Online payment pages</h4>
-                        <p class="mt-1 text-xs text-slate-600">
-                            Turn off the entire public pay experience (pay page, link, QR, and hosted card checkout). Gateway keys and per-provider toggles are on the
-                            <button type="button" class="font-medium text-brand-700 hover:underline" @click="tab = 'payment_pages'">Online payments</button>
-                            tab.
-                        </p>
-                        <label class="mt-3 flex cursor-pointer items-start gap-3">
-                            <input
-                                v-model="form.payment_pages_enabled"
-                                type="checkbox"
-                                class="mt-1 rounded border-slate-300"
-                            >
-                            <span>
-                                <span class="block text-sm font-medium text-slate-900">Enable online payment pages</span>
-                                <span class="mt-0.5 block text-xs text-slate-600">
-                                    When off, the public pay URL and QR are unavailable and checkout is hidden; your saved provider settings stay in place.
-                                </span>
-                            </span>
-                        </label>
-                    </div>
                 </div>
             </AppCard>
 
