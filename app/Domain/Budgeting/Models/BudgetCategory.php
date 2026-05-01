@@ -5,14 +5,16 @@ namespace App\Domain\Budgeting\Models;
 use App\Domain\Accounting\Models\Account;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class BudgetLine extends Model
+class BudgetCategory extends Model
 {
     protected $fillable = [
         'budget_id',
+        'name',
+        'envelope_cents',
         'account_id',
-        'monthly_amount_cents',
-        'annual_total_cents',
+        'sort_order',
     ];
 
     /**
@@ -29,5 +31,13 @@ class BudgetLine extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class);
+    }
+
+    /**
+     * @return HasMany<BudgetItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(BudgetItem::class)->orderBy('sort_order');
     }
 }

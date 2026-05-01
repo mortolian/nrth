@@ -43,10 +43,10 @@ class Budget extends Model
     }
 
     /**
-     * @return HasMany<BudgetLine, $this>
+     * @return HasMany<BudgetCategory, $this>
      */
-    public function lines(): HasMany
+    public function categories(): HasMany
     {
-        return $this->hasMany(BudgetLine::class);
+        return $this->hasMany(BudgetCategory::class)->orderBy('sort_order');
     }
 }

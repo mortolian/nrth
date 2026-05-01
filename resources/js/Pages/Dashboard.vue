@@ -21,11 +21,14 @@ const props = defineProps({
     outstanding_invoices: { type: Object, default: () => ({ data: [], current_page: 1, last_page: 1 }) },
     recent_transactions: { type: Array, default: () => [] },
     budget_progress: { type: Array, default: () => [] },
+    budget_progress_currency: { type: String, default: 'ZAR' },
     vat_summary: { type: Object, default: () => ({}) },
     vat_enabled: { type: Boolean, default: true },
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const formatBudgetCents = (cents) =>
+    useFormatCurrency((Number(cents) || 0) / 100, props.budget_progress_currency || 'ZAR');
 const formatRowCents = (cents, currency) =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 const daysOverdueInt = (value) => {
@@ -352,7 +355,7 @@ const onInvoiceAction = (invoice, actionId) => {
                             <div class="mb-1 flex items-center justify-between text-sm">
                                 <span class="font-medium text-slate-700">{{ item.category }}</span>
                                 <span class="text-slate-500">
-                                    {{ formatCents(item.spent) }} / {{ formatCents(item.allocated) }}
+                                    {{ formatBudgetCents(item.spent) }} / {{ formatBudgetCents(item.allocated) }}
                                 </span>
                             </div>
                             <div class="h-2 rounded-full bg-slate-100">
@@ -365,7 +368,9 @@ const onInvoiceAction = (invoice, actionId) => {
                                 />
                             </div>
                         </div>
-                        <p v-if="!budget_progress.length" class="text-sm text-slate-500">No budget categories for this month yet.</p>
+                        <p v-if="!budget_progress.length" class="text-sm text-slate-500">
+                            No active budget for this month, or the current month is outside your budget dates. Create or activate a budget under Planning → Budgets.
+                        </p>
                     </div>
                 </AppCard>
             </div>

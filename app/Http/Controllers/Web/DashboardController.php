@@ -7,6 +7,8 @@ use App\Domain\Accounting\Enums\EntryType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Budgeting\Models\Budget;
+use App\Domain\Budgeting\Models\BudgetCategory;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\Services\VATService;
@@ -14,6 +16,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -48,6 +51,20 @@ class DashboardController extends Controller
         $outstandingTotal = array_sum(array_column($outstandingRows, 'amount'));
         $vatEnabled = $team->chargesVat();
 
+        $activeBudget = Schema::hasTable('budgets')
+            ? Budget::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->where('is_active', true)
+                ->orderByDesc('start_date')
+                ->first()
+            : null;
+
+        $companyCurrency = Iso4217Currencies::normalize(
+            (string) ($team->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+        );
+        $budgetProgressAligned = $activeBudget === null
+            || strcasecmp((string) $activeBudget->currency, $companyCurrency) === 0;
+
         $vatDueCurrent = 0;
         $vatOutputCurrent = 0;
         $vatInputCurrent = 0;
@@ -76,14 +93,19 @@ class DashboardController extends Controller
             'revenue_chart' => $this->revenueChart($team),
             'outstanding_invoices' => $outstandingInvoices,
             'recent_transactions' => $this->recentTransactions($team),
-            'budget_progress' => collect($this->budgetProgress($team, $monthStart, $monthEnd))
-                ->map(fn (array $item) => [
-                    'category' => $item['category'],
-                    'allocated' => $item['allocated_cents'],
-                    'spent' => $item['spent_cents'],
-                    'percentage' => $item['progress_percent'],
-                ])
-                ->all(),
+            'budget_progress' => $budgetProgressAligned
+                ? collect($this->budgetProgress($team, $monthStart, $monthEnd, $activeBudget))
+                    ->map(fn (array $item) => [
+                        'category' => $item['category'],
+                        'allocated' => $item['allocated_cents'],
+                        'spent' => $item['spent_cents'],
+                        'percentage' => $item['progress_percent'],
+                    ])
+                    ->all()
+                : [],
+            'budget_progress_currency' => Iso4217Currencies::normalize(
+                (string) ($activeBudget?->currency ?? $companyCurrency)
+            ),
             'vat_summary' => [
                 'current_period' => $monthStart->format('M Y'),
                 'output_vat' => $vatOutputCurrent,
@@ -218,37 +240,96 @@ class DashboardController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function budgetProgress(Team $team, Carbon $from, Carbon $to): array
+    private function budgetProgress(Team $team, Carbon $from, Carbon $to, ?Budget $activeBudget): array
     {
-        $entries = JournalEntry::query()
-            ->with('account:id,name')
-            ->where('type', EntryType::Debit)
-            ->whereHas('transaction', fn ($q) => $q
-                ->withoutGlobalScopes()
-                ->where('team_id', $team->id)
-                ->where('status', TransactionStatus::Posted->value)
-                ->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()]))
-            ->whereHas('account', fn ($q) => $q
-                ->withoutGlobalScopes()
-                ->where('team_id', $team->id)
-                ->where('type', AccountType::Expense->value))
-            ->get();
+        if ($activeBudget === null) {
+            return [];
+        }
 
-        return $entries
-            ->groupBy(fn (JournalEntry $entry) => $entry->account?->name ?? 'Uncategorised')
-            ->map(function ($group, $name): array {
-                $spent = (int) $group->sum(fn (JournalEntry $entry) => (int) $entry->getRawOriginal('amount_cents'));
-                $allocated = (int) max(100_00, round($spent * 1.2));
+        $activeBudget->loadMissing(['categories.items', 'categories.account']);
+
+        $factor = $this->budgetMonthProrationFactor($activeBudget, $from);
+        if ($factor <= 0) {
+            return [];
+        }
+
+        $monthsInPeriod = $this->budgetMonthsInPeriod($activeBudget->start_date, $activeBudget->end_date);
+        $spentByAccount = $this->spentByExpenseAccountIds($team->id, $from->toDateString(), $to->toDateString());
+
+        return $activeBudget->categories
+            ->map(function (BudgetCategory $cat) use ($spentByAccount, $factor, $monthsInPeriod): array {
+                $monthlyEnvelope = $monthsInPeriod > 0
+                    ? (int) round($cat->envelope_cents / $monthsInPeriod)
+                    : 0;
+                $allocated = (int) round($monthlyEnvelope * $factor);
+                $spent = $cat->account_id !== null
+                    ? (int) ($spentByAccount[$cat->account_id] ?? 0)
+                    : 0;
+                $progressPercent = $allocated > 0
+                    ? min(100, (int) round(($spent / $allocated) * 100))
+                    : ($spent > 0 ? 100 : 0);
 
                 return [
-                    'category' => $name,
+                    'category' => $cat->name,
                     'spent_cents' => $spent,
                     'allocated_cents' => $allocated,
-                    'progress_percent' => $allocated > 0 ? min(100, (int) round(($spent / $allocated) * 100)) : 0,
+                    'progress_percent' => $progressPercent,
                 ];
             })
             ->values()
             ->all();
+    }
+
+    private function budgetMonthsInPeriod(CarbonInterface $start, CarbonInterface $end): int
+    {
+        $s = $start->copy()->startOfMonth();
+        $e = $end->copy()->startOfMonth();
+
+        return max(1, (int) $s->diffInMonths($e) + 1);
+    }
+
+    private function budgetMonthProrationFactor(Budget $budget, Carbon $monthStart): float
+    {
+        $mStart = $monthStart->copy()->startOfMonth();
+        $mEnd = $monthStart->copy()->endOfMonth();
+
+        if ($mEnd->lt($budget->start_date) || $mStart->gt($budget->end_date)) {
+            return 0.0;
+        }
+
+        $overlapStart = $mStart->greaterThan($budget->start_date) ? $mStart : $budget->start_date->copy()->startOfDay();
+        $overlapEnd = $mEnd->lessThan($budget->end_date) ? $mEnd : $budget->end_date->copy()->endOfDay();
+
+        if ($overlapStart->greaterThan($overlapEnd)) {
+            return 0.0;
+        }
+
+        $daysInMonth = $mStart->daysInMonth;
+        $overlapDays = $overlapStart->diffInDays($overlapEnd) + 1;
+
+        return min(1.0, $overlapDays / $daysInMonth);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function spentByExpenseAccountIds(int $teamId, string $from, string $to): array
+    {
+        return JournalEntry::query()
+            ->where('type', EntryType::Debit)
+            ->whereHas('transaction', fn ($q) => $q
+                ->withoutGlobalScopes()
+                ->where('team_id', $teamId)
+                ->where('status', TransactionStatus::Posted->value)
+                ->whereBetween('transaction_date', [$from, $to]))
+            ->whereHas('account', fn ($q) => $q
+                ->withoutGlobalScopes()
+                ->where('team_id', $teamId)
+                ->where('type', AccountType::Expense->value))
+            ->get()
+            ->groupBy('account_id')
+            ->map(fn ($rows): int => (int) $rows->sum(fn (JournalEntry $entry) => (int) $entry->getRawOriginal('amount_cents')))
+            ->toArray();
     }
 
     private function trend(int $current, int $previous): ?float

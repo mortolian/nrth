@@ -89,6 +89,7 @@ Route::middleware([
     Route::post('/budgeting', [BudgetingController::class, 'store'])->name('budgeting.store');
     Route::get('/budgeting/{budget}/edit', [BudgetingController::class, 'edit'])->name('budgeting.edit');
     Route::put('/budgeting/{budget}', [BudgetingController::class, 'update'])->name('budgeting.update');
+    Route::delete('/budgeting/{budget}', [BudgetingController::class, 'destroy'])->name('budgeting.destroy');
     Route::get('/tax/vat', [VATController::class, 'index'])->name('tax.vat.index');
     Route::get('/tax/vat-rates', [VatRateController::class, 'index'])->name('tax.vat-rates.index');
     Route::post('/tax/vat-rates', [VatRateController::class, 'store'])->name('tax.vat-rates.store');

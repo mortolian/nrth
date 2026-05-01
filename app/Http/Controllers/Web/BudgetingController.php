@@ -8,15 +8,19 @@ use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Budgeting\Models\Budget;
-use App\Domain\Budgeting\Models\BudgetLine;
+use App\Domain\Budgeting\Models\BudgetCategory;
+use App\Domain\Budgeting\Models\BudgetItem;
 use App\Http\Controllers\Controller;
+use App\Support\BudgetFx;
 use App\Support\Iso4217Currencies;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Inertia\RedirectResponse;
 use Inertia\Response;
 
 class BudgetingController extends Controller
@@ -28,20 +32,32 @@ class BudgetingController extends Controller
                 'budgets' => [],
                 'active_budget' => null,
                 'monthly_variance' => [],
+                'company_currency' => 'ZAR',
+                'variance_currency_aligned' => true,
             ]);
         }
 
         $teamId = (int) $request->user()->current_team_id;
+        $team = $request->user()->currentTeam;
+        $companyCurrency = Iso4217Currencies::normalize(
+            (string) ($team?->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+        );
+
         $budgetRows = Budget::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->with(['lines.account'])
+            ->with(['categories.items', 'categories.account'])
             ->orderByDesc('start_date')
             ->get();
 
-        $active = $budgetRows->firstWhere('is_active', true) ?? $budgetRows->first();
+        $active = $budgetRows->firstWhere('is_active', true);
         $months = collect(range(0, 5))->map(fn (int $i) => now()->subMonths(5 - $i)->startOfMonth());
 
-        $monthlySeries = $months->map(function ($month) use ($teamId): array {
+        $varianceAligned = $active === null || strcasecmp((string) $active->currency, $companyCurrency) === 0;
+        $periodSpentCompany = $active !== null && $varianceAligned
+            ? $this->spentForPeriod($teamId, $active->start_date->toDateString(), $active->end_date->toDateString())
+            : null;
+
+        $monthlySeries = $months->map(function ($month) use ($teamId, $active, $varianceAligned): array {
             $from = $month->copy()->startOfMonth()->toDateString();
             $to = $month->copy()->endOfMonth()->toDateString();
 
@@ -58,24 +74,27 @@ class BudgetingController extends Controller
                     ->where('type', AccountType::Expense->value))
                 ->sum('amount_cents');
 
-            $budgeted = (int) max(100_00, round($spent * 1.15));
+            $budgeted = $active !== null
+                ? $this->budgetedCentsForCalendarMonth($active, $month)
+                : 0;
 
             return [
                 'month' => $month->format('M Y'),
                 'budgeted' => $budgeted,
-                'actual' => $spent,
-                'variance' => $budgeted - $spent,
+                'actual' => $varianceAligned ? $spent : null,
+                'variance' => $varianceAligned ? ($budgeted - $spent) : null,
             ];
         });
 
         $budgets = $budgetRows->map(function (Budget $budget): array {
-            $allocated = (int) $budget->lines->sum('annual_total_cents');
+            $allocated = (int) $budget->categories->sum('envelope_cents');
             $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
 
             return [
                 'id' => $budget->id,
                 'name' => $budget->name,
                 'period' => $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y'),
+                'currency' => $budget->currency,
                 'total_allocated' => $allocated,
                 'total_spent' => $spent,
                 'percentage_used' => $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0,
@@ -85,37 +104,56 @@ class BudgetingController extends Controller
 
         $activeBudgetPayload = null;
         if ($active !== null) {
+            $monthsInPeriod = $this->monthsInBudgetPeriod($active->start_date, $active->end_date);
             $spentByAccount = $this->spentByExpenseAccount(
                 $teamId,
                 $active->start_date->toDateString(),
                 $active->end_date->toDateString()
             );
 
-            $categories = $active->lines->map(function (BudgetLine $line) use ($spentByAccount): array {
-                $allocated = (int) $line->annual_total_cents;
-                $spent = (int) ($spentByAccount[$line->account_id] ?? 0);
-                $remaining = max(0, $allocated - $spent);
-                $percent = $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0;
+            $categories = $active->categories->map(function (BudgetCategory $cat) use ($spentByAccount, $monthsInPeriod): array {
+                $monthlyPlanned = (int) $cat->items->sum('monthly_budget_currency_cents');
+                $periodPlanned = $monthlyPlanned * $monthsInPeriod;
+                $envelope = (int) $cat->envelope_cents;
+                $spent = $cat->account_id !== null
+                    ? (int) ($spentByAccount[$cat->account_id] ?? 0)
+                    : 0;
+                $percent = $envelope > 0 ? (int) round(($spent / $envelope) * 100) : ($spent > 0 ? 100 : 0);
+                $plannedVsEnvelope = $envelope > 0 ? (int) round(($periodPlanned / $envelope) * 100) : 0;
 
                 return [
-                    'category' => $line->account?->name ?? 'Unknown',
-                    'allocated' => $allocated,
-                    'spent' => $spent,
-                    'remaining' => $remaining,
+                    'name' => $cat->name,
+                    'envelope_cents' => $envelope,
+                    'period_planned_cents' => $periodPlanned,
+                    'monthly_planned_cents' => $monthlyPlanned,
+                    'planned_fill_percent' => min(100, $plannedVsEnvelope),
+                    'spent_cents' => $spent,
+                    'has_account' => $cat->account_id !== null,
                     'percentage' => $percent,
-                    'trend' => $percent > 80 ? 'faster' : 'slower',
+                    'remaining_cents' => max(0, $envelope - $spent),
+                    'items' => $cat->items->map(fn (BudgetItem $item) => [
+                        'label' => $item->label,
+                        'monthly_amount_cents' => (int) $item->monthly_amount_cents,
+                        'currency' => $item->currency,
+                        'monthly_budget_currency_cents' => (int) $item->monthly_budget_currency_cents,
+                        'period_total_budget_cents' => (int) $item->monthly_budget_currency_cents * $monthsInPeriod,
+                        'annualized_budget_cents' => (int) $item->monthly_budget_currency_cents * 12,
+                    ])->values()->all(),
                 ];
             })->values()->all();
 
-            $allocated = (int) collect($categories)->sum('allocated');
-            $spent = (int) collect($categories)->sum('spent');
+            $allocated = (int) collect($categories)->sum('envelope_cents');
+            $spentTotal = $periodSpentCompany !== null ? (int) $periodSpentCompany : (int) collect($categories)->sum('spent_cents');
             $activeBudgetPayload = [
                 'id' => $active->id,
                 'name' => $active->name,
                 'period' => $active->start_date->format('M Y').' - '.$active->end_date->format('M Y'),
+                'currency' => $active->currency,
+                'is_active' => (bool) $active->is_active,
                 'total_allocated' => $allocated,
-                'total_spent' => $spent,
-                'percentage_used' => $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0,
+                'total_spent' => $spentTotal,
+                'company_spend_aligned' => $periodSpentCompany !== null,
+                'percentage_used' => $allocated > 0 ? (int) round(($spentTotal / $allocated) * 100) : 0,
                 'categories' => $categories,
             ];
         }
@@ -124,6 +162,8 @@ class BudgetingController extends Controller
             'budgets' => $budgets,
             'active_budget' => $activeBudgetPayload,
             'monthly_variance' => $monthlySeries->values()->all(),
+            'company_currency' => $companyCurrency,
+            'variance_currency_aligned' => $varianceAligned,
         ]);
     }
 
@@ -132,41 +172,28 @@ class BudgetingController extends Controller
         return Inertia::render('Budgeting/Form', [
             'isEditing' => false,
             'budget' => null,
-            ...$this->formMeta($request),
+            ...$this->formMeta($request, null),
         ]);
     }
 
     public function edit(Request $request, Budget $budget): Response
     {
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
-        $budget->loadMissing('lines.account');
+        $budget->loadMissing(['categories.items', 'categories.account']);
 
         return Inertia::render('Budgeting/Form', [
             'isEditing' => true,
-            'budget' => [
-                'id' => $budget->id,
-                'name' => $budget->name,
-                'period_type' => $budget->period_type,
-                'start_date' => $budget->start_date?->toDateString(),
-                'end_date' => $budget->end_date?->toDateString(),
-                'currency' => $budget->currency,
-                'lines' => $budget->lines->map(fn (BudgetLine $line) => [
-                    'account_id' => $line->account_id,
-                    'account_name' => $line->account?->name ?? 'Unknown',
-                    'monthly_amount_cents' => (int) $line->monthly_amount_cents,
-                    'annual_total_cents' => (int) $line->annual_total_cents,
-                ])->values()->all(),
-            ],
-            ...$this->formMeta($request),
+            'budget' => $this->budgetPayload($budget),
+            ...$this->formMeta($request, $budget->id),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $payload = $this->validateBudget($request);
+        $payload = $this->validateBudgetPayload($request);
         $teamId = (int) $request->user()->current_team_id;
 
-        $budget = DB::transaction(function () use ($teamId, $payload): Budget {
+        DB::transaction(function () use ($teamId, $payload): void {
             if (! empty($payload['set_active'])) {
                 Budget::queryWithoutTeamScope()
                     ->where('team_id', $teamId)
@@ -183,16 +210,7 @@ class BudgetingController extends Controller
                 'is_active' => (bool) ($payload['set_active'] ?? false),
             ]);
 
-            foreach ($payload['lines'] as $line) {
-                $monthly = (int) $line['monthly_amount_cents'];
-                $budget->lines()->create([
-                    'account_id' => (int) $line['account_id'],
-                    'monthly_amount_cents' => $monthly,
-                    'annual_total_cents' => $monthly * 12,
-                ]);
-            }
-
-            return $budget;
+            $this->syncCategories($budget, $payload['categories'], $payload['currency']);
         });
 
         return to_route('budgeting.index');
@@ -201,7 +219,7 @@ class BudgetingController extends Controller
     public function update(Request $request, Budget $budget): RedirectResponse
     {
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
-        $payload = $this->validateBudget($request);
+        $payload = $this->validateBudgetPayload($request);
         $teamId = (int) $request->user()->current_team_id;
 
         DB::transaction(function () use ($budget, $payload, $teamId): void {
@@ -220,16 +238,17 @@ class BudgetingController extends Controller
                 'is_active' => (bool) ($payload['set_active'] ?? false),
             ]);
 
-            $budget->lines()->delete();
-            foreach ($payload['lines'] as $line) {
-                $monthly = (int) $line['monthly_amount_cents'];
-                $budget->lines()->create([
-                    'account_id' => (int) $line['account_id'],
-                    'monthly_amount_cents' => $monthly,
-                    'annual_total_cents' => $monthly * 12,
-                ]);
-            }
+            $budget->categories()->delete();
+            $this->syncCategories($budget, $payload['categories'], $payload['currency']);
         });
+
+        return to_route('budgeting.index');
+    }
+
+    public function destroy(Request $request, Budget $budget): RedirectResponse
+    {
+        abort_unless($budget->team_id === $request->user()->current_team_id, 403);
+        $budget->delete();
 
         return to_route('budgeting.index');
     }
@@ -237,7 +256,76 @@ class BudgetingController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function formMeta(Request $request): array
+    private function budgetPayload(Budget $budget): array
+    {
+        return [
+            'id' => $budget->id,
+            'name' => $budget->name,
+            'period_type' => $budget->period_type,
+            'start_date' => $budget->start_date?->toDateString(),
+            'end_date' => $budget->end_date?->toDateString(),
+            'currency' => $budget->currency,
+            'is_active' => (bool) $budget->is_active,
+            'categories' => $budget->categories->map(fn (BudgetCategory $cat) => [
+                'name' => $cat->name,
+                'envelope_cents' => (int) $cat->envelope_cents,
+                'account_id' => $cat->account_id,
+                'items' => $cat->items->map(fn (BudgetItem $item) => [
+                    'label' => $item->label,
+                    'monthly_amount_cents' => (int) $item->monthly_amount_cents,
+                    'currency' => $item->currency,
+                    'fx_budget_per_line_major' => $item->fx_budget_per_line_major !== null
+                        ? (string) $item->fx_budget_per_line_major
+                        : '',
+                ])->values()->all(),
+            ])->values()->all(),
+        ];
+    }
+
+    /**
+     * @param  array<int, array{name: string, envelope_cents: int, account_id: int|null, items: array<int, array{label: string, monthly_amount_cents: int, currency: string, fx_budget_per_line_major: string|null}>}>  $categories
+     */
+    private function syncCategories(Budget $budget, array $categories, string $budgetCurrency): void
+    {
+        $budgetCurrency = Iso4217Currencies::normalize($budgetCurrency);
+
+        foreach ($categories as $ci => $catPayload) {
+            $category = $budget->categories()->create([
+                'name' => $catPayload['name'],
+                'envelope_cents' => (int) $catPayload['envelope_cents'],
+                'account_id' => $catPayload['account_id'] ?? null,
+                'sort_order' => $ci,
+            ]);
+
+            foreach ($catPayload['items'] as $ii => $itemPayload) {
+                $lineMinor = (int) $itemPayload['monthly_amount_cents'];
+                $lineCcy = Iso4217Currencies::normalize($itemPayload['currency']);
+                $fx = $itemPayload['fx_budget_per_line_major'] ?? null;
+                $fx = ($fx !== null && $fx !== '') ? (string) $fx : null;
+
+                $budgetMinor = BudgetFx::monthlyLineMinorToBudgetMinor(
+                    $lineMinor,
+                    $lineCcy,
+                    $budgetCurrency,
+                    strcasecmp($lineCcy, $budgetCurrency) === 0 ? null : $fx
+                );
+
+                $category->items()->create([
+                    'label' => $itemPayload['label'],
+                    'monthly_amount_cents' => $lineMinor,
+                    'currency' => $lineCcy,
+                    'monthly_budget_currency_cents' => $budgetMinor,
+                    'fx_budget_per_line_major' => strcasecmp($lineCcy, $budgetCurrency) === 0 ? null : $fx,
+                    'sort_order' => $ii,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formMeta(Request $request, ?int $excludeBudgetId): array
     {
         $teamId = (int) $request->user()->current_team_id;
         $expenseAccounts = Account::queryWithoutTeamScope()
@@ -252,39 +340,122 @@ class BudgetingController extends Controller
             ])
             ->all();
 
-        $previousBudget = Budget::queryWithoutTeamScope()
+        $previousQuery = Budget::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->with('lines')
-            ->orderByDesc('start_date')
-            ->first();
+            ->with(['categories.items'])
+            ->orderByDesc('start_date');
+
+        if ($excludeBudgetId !== null) {
+            $previousQuery->where('id', '!=', $excludeBudgetId);
+        }
+
+        $previousBudget = $previousQuery->first();
+
+        $importCategories = [];
+        if ($previousBudget !== null) {
+            $importCategories = $previousBudget->categories->map(fn (BudgetCategory $cat) => [
+                'name' => $cat->name,
+                'envelope_cents' => (int) $cat->envelope_cents,
+                'account_id' => $cat->account_id,
+                'items' => $cat->items->map(fn (BudgetItem $item) => [
+                    'label' => $item->label,
+                    'monthly_amount_cents' => (int) $item->monthly_amount_cents,
+                    'currency' => $item->currency,
+                    'fx_budget_per_line_major' => $item->fx_budget_per_line_major !== null
+                        ? (string) $item->fx_budget_per_line_major
+                        : '',
+                ])->values()->all(),
+            ])->values()->all();
+        }
 
         return [
             'expense_accounts' => $expenseAccounts,
-            'import_lines' => $previousBudget?->lines->map(fn (BudgetLine $line) => [
-                'account_id' => $line->account_id,
-                'monthly_amount_cents' => (int) $line->monthly_amount_cents,
-            ])->values()->all() ?? [],
+            'import_categories' => $importCategories,
         ];
+    }
+
+    private function monthsInBudgetPeriod(Carbon $start, Carbon $end): int
+    {
+        $s = $start->copy()->startOfMonth();
+        $e = $end->copy()->startOfMonth();
+
+        return max(1, (int) $s->diffInMonths($e) + 1);
+    }
+
+    private function budgetedCentsForCalendarMonth(Budget $budget, Carbon $monthStart): int
+    {
+        $budget->loadMissing('categories.items');
+
+        $mStart = $monthStart->copy()->startOfMonth();
+        $mEnd = $monthStart->copy()->endOfMonth();
+
+        if ($mEnd->lt($budget->start_date) || $mStart->gt($budget->end_date)) {
+            return 0;
+        }
+
+        $monthlyTotal = (int) $budget->categories->flatMap->items->sum('monthly_budget_currency_cents');
+
+        $overlapStart = $mStart->greaterThan($budget->start_date) ? $mStart : $budget->start_date->copy()->startOfDay();
+        $overlapEnd = $mEnd->lessThan($budget->end_date) ? $mEnd : $budget->end_date->copy()->endOfDay();
+
+        if ($overlapStart->greaterThan($overlapEnd)) {
+            return 0;
+        }
+
+        $daysInMonth = $mStart->daysInMonth;
+        $overlapDays = $overlapStart->diffInDays($overlapEnd) + 1;
+
+        return (int) round($monthlyTotal * min(1.0, $overlapDays / $daysInMonth));
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function validateBudget(Request $request): array
+    private function validateBudgetPayload(Request $request): array
     {
         $teamId = (int) $request->user()->current_team_id;
 
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'period_type' => ['required', Rule::in(['monthly', 'quarterly', 'annual', 'custom'])],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
             'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'set_active' => ['nullable', 'boolean'],
-            'lines' => ['required', 'array', 'min:1'],
-            'lines.*.account_id' => ['required', 'integer', Rule::exists('accounts', 'id')->where('team_id', $teamId)],
-            'lines.*.monthly_amount_cents' => ['required', 'integer', 'min:0'],
+            'categories' => ['required', 'array', 'min:1'],
+            'categories.*.name' => ['required', 'string', 'max:255'],
+            'categories.*.envelope_cents' => ['required', 'integer', 'min:0'],
+            'categories.*.account_id' => ['nullable', 'integer', Rule::exists('accounts', 'id')->where('team_id', $teamId)],
+            'categories.*.items' => ['present', 'array'],
+            'categories.*.items.*.label' => ['required', 'string', 'max:255'],
+            'categories.*.items.*.monthly_amount_cents' => ['required', 'integer', 'min:0'],
+            'categories.*.items.*.currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
+            'categories.*.items.*.fx_budget_per_line_major' => ['nullable', 'string', 'max:32'],
         ]);
+
+        $budgetCurrency = Iso4217Currencies::normalize($data['currency']);
+
+        $validator = Validator::make($data, []);
+        $validator->after(function (\Illuminate\Validation\Validator $v) use ($data, $budgetCurrency): void {
+            foreach ($data['categories'] as $ci => $cat) {
+                foreach ($cat['items'] as $ii => $item) {
+                    $lineCcy = Iso4217Currencies::normalize($item['currency']);
+                    if (strcasecmp($lineCcy, $budgetCurrency) !== 0) {
+                        $fx = $item['fx_budget_per_line_major'] ?? null;
+                        if ($fx === null || $fx === '' || (float) $fx <= 0) {
+                            $v->errors()->add(
+                                "categories.$ci.items.$ii.fx_budget_per_line_major",
+                                'Enter the exchange rate from the line currency to the budget currency (budget units per one line unit).'
+                            );
+                        }
+                    }
+                }
+            }
+        });
+        $validator->validate();
+
+        /** @var array<string, mixed> $data */
+        return $data;
     }
 
     /**

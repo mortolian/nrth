@@ -19,6 +19,8 @@ const props = withDefaults(defineProps<{
     tableClass?: string;
     /** When false, hides the page footer (e.g. embedded lists with a single page). */
     showPagination?: boolean;
+    /** Called with the data `<tbody>` when the slot body is mounted (or `null` when unmounted). For row Sortable. */
+    tbodyRefFn?: (el: HTMLTableSectionElement | null) => void;
 }>(), {
     columns: () => [],
     page: 1,
@@ -28,6 +30,10 @@ const props = withDefaults(defineProps<{
     tableClass: '',
     showPagination: true,
 });
+
+function setDataTbodyRef(el: unknown) {
+    props.tbodyRefFn?.(el instanceof HTMLTableSectionElement ? el : null);
+}
 
 const emit = defineEmits<{
     (e: 'sort', payload: { key: string; direction: 'asc' | 'desc' }): void;
@@ -101,7 +107,7 @@ const prevPage = () => {
                         </td>
                     </tr>
                 </tbody>
-                <tbody v-else class="divide-y divide-slate-100">
+                <tbody v-else :ref="setDataTbodyRef" class="divide-y divide-slate-100">
                     <slot />
                 </tbody>
             </table>
