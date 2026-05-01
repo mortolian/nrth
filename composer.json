@@ -20,6 +20,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "phpoffice/phpspreadsheet": "^3.10",
+        "propaganistas/laravel-phone": "^6.0",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-backup": "^10.2",
         "spatie/laravel-medialibrary": "^11.21",

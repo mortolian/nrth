@@ -4,6 +4,7 @@ import { useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import ActionMessage from '@/Components/ActionMessage.vue';
 import AppButton from '@/Components/AppButton.vue';
+import AppPhoneInput from '@/Components/AppPhoneInput.vue';
 import { Building2, ImagePlus, Plus, Trash2 } from 'lucide-vue-next';
 
 type Settings = Record<string, unknown>;
@@ -617,7 +618,7 @@ const removeBankAccount = (index: number) => {
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                                <AppInput v-model="form.company_phone" />
+                                <AppPhoneInput v-model="form.company_phone" />
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Website</label>

@@ -4,6 +4,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import AppPhoneInput from '@/Components/AppPhoneInput.vue';
 
 const props = defineProps<{
     isEditing: boolean;
@@ -129,7 +130,7 @@ const submit = () => {
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                    <AppInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event)" />
+                    <AppPhoneInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event ?? '')" />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>

@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 class CompanySettingsController extends Controller
 {
@@ -128,7 +130,7 @@ class CompanySettingsController extends Controller
             'postal_postal_code' => ['nullable', 'string', 'max:32'],
             'postal_country' => ['nullable', 'string', 'max:255'],
             'company_email' => ['nullable', 'email', 'max:255'],
-            'company_phone' => ['nullable', 'string', 'max:64'],
+            'company_phone' => ['nullable', 'string', 'max:64', (new Phone)->international()],
             'company_website' => ['nullable', 'string', 'max:255'],
             'invoice_default_payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'invoice_default_currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
@@ -197,6 +199,12 @@ class CompanySettingsController extends Controller
 
         if (! $validated['vat_registered']) {
             $validated['vat_number'] = null;
+        }
+
+        if (! empty($validated['company_phone'])) {
+            $validated['company_phone'] = (new PhoneNumber((string) $validated['company_phone']))->formatE164();
+        } else {
+            $validated['company_phone'] = null;
         }
 
         $settingsKeys = [

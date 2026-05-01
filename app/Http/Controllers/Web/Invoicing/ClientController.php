@@ -13,6 +13,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Propaganistas\LaravelPhone\PhoneNumber;
+use Propaganistas\LaravelPhone\Rules\Phone;
 
 class ClientController extends Controller
 {
@@ -219,11 +221,11 @@ class ClientController extends Controller
      */
     private function validateClient(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'max:50', (new Phone)->international()],
             'vat_number' => ['nullable', 'regex:/^4\d{9}$/'],
             'registration_number' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'array'],
@@ -237,6 +239,14 @@ class ClientController extends Controller
             'notes' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
         ]);
+
+        if (! empty($validated['phone'])) {
+            $validated['phone'] = (new PhoneNumber((string) $validated['phone']))->formatE164();
+        } else {
+            $validated['phone'] = null;
+        }
+
+        return $validated;
     }
 
     /**
