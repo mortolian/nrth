@@ -12,6 +12,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\Services\VATService;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
@@ -145,25 +146,29 @@ class DashboardController extends Controller
 
         return Invoice::queryWithoutTeamScope()
             ->with('client:id,name')
+            ->withCount('payments')
             ->where('team_id', $team->id)
             ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value])
             ->orderBy('due_date')
             ->paginate(5)
             ->through(function (Invoice $invoice) use ($asOf): array {
-                    $total = (int) $invoice->getRawOriginal('total_cents');
-                    $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
-                    $due = max(0, $total - $paid);
-                    $dueDate = Carbon::parse($invoice->due_date);
+                $total = (int) $invoice->getRawOriginal('total_cents');
+                $paid = (int) $invoice->getRawOriginal('amount_paid_cents');
+                $due = max(0, $total - $paid);
+                $dueDate = Carbon::parse($invoice->due_date);
 
-                    return [
-                        'id' => $invoice->id,
-                        'client' => $invoice->client?->name ?? 'Unknown',
-                        'number' => $invoice->number,
-                        'amount' => $due,
-                        'due_date' => $dueDate->toDateString(),
-                        'days_overdue' => $dueDate->isPast() ? abs($dueDate->diffInDays($asOf)) : 0,
-                    ];
-                });
+                return [
+                    'id' => $invoice->id,
+                    'client' => $invoice->client?->name ?? 'Unknown',
+                    'number' => $invoice->number,
+                    'amount' => $due,
+                    'due_date' => $dueDate->toDateString(),
+                    'days_overdue' => $dueDate->isPast() ? abs($dueDate->diffInDays($asOf)) : 0,
+                    'status' => $invoice->status->value,
+                    'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
+                    'can_delete' => (int) $invoice->payments_count === 0,
+                ];
+            });
     }
 
     private function getOutstandingInvoicesTotal(Team $team, Carbon $asOfDate): int

@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue';
+import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
@@ -23,6 +25,8 @@ const props = defineProps({
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const formatRowCents = (cents, currency) =>
+    useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 const daysOverdueInt = (value) => {
     const n = Number(value);
     if (!Number.isFinite(n)) return 0;
@@ -113,6 +117,49 @@ const chartOptions = computed(() => ({
 const openRecordPayment = (invoice) => {
     selectedInvoice.value = invoice;
     paymentDrawerOpen.value = true;
+};
+
+const rowActionItems = (invoice) => {
+    const actions = [
+        { id: 'view', label: 'View' },
+        { id: 'download_pdf', label: 'Download PDF' },
+    ];
+    if (invoice.status === 'draft') {
+        actions.push({ id: 'send', label: 'Send' });
+        actions.push({ id: 'mark_sent', label: 'Mark as sent' });
+    }
+    if (invoice.status !== 'paid' && invoice.status !== 'void') {
+        actions.push({ id: 'record_payment', label: 'Record Payment' });
+    }
+    if (invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
+    if (invoice.status === 'void') actions.push({ id: 'unvoid', label: 'Restore' });
+    if (invoice.can_delete) actions.push({ id: 'delete', label: 'Delete' });
+    return actions;
+};
+
+const onInvoiceAction = (invoice, actionId) => {
+    if (actionId === 'view') {
+        router.visit(route('invoicing.invoices.show', invoice.id));
+    } else if (actionId === 'download_pdf') {
+        window.location.assign(route('invoices.pdf.download', invoice.id));
+    } else if (actionId === 'send') {
+        router.post(route('invoicing.invoices.send', invoice.id));
+    } else if (actionId === 'mark_sent') {
+        router.post(route('invoicing.invoices.mark-sent', invoice.id));
+    } else if (actionId === 'void') {
+        router.post(route('invoicing.invoices.void', invoice.id));
+    } else if (actionId === 'unvoid') {
+        router.post(route('invoicing.invoices.unvoid', invoice.id));
+    } else if (actionId === 'record_payment') {
+        openRecordPayment(invoice);
+    } else if (actionId === 'delete') {
+        if (!window.confirm(`Permanently delete invoice ${invoice.number}? This cannot be undone.`)) {
+            return;
+        }
+        router.delete(route('invoicing.invoices.destroy', invoice.id), {
+            preserveScroll: true,
+        });
+    }
 };
 </script>
 
@@ -217,9 +264,15 @@ const openRecordPayment = (invoice) => {
                             </div>
                             <div class="mt-2 flex items-center justify-between text-sm">
                                 <span class="text-slate-500 whitespace-nowrap">Due <DateDisplay :value="invoice.due_date" /></span>
-                                <span class="font-semibold">{{ formatCents(invoice.amount) }}</span>
+                                <span class="font-semibold">{{ formatRowCents(invoice.amount, invoice.currency) }}</span>
                             </div>
-                            <AppButton class="mt-3 w-full min-h-11" variant="secondary" @click="openRecordPayment(invoice)">Record Payment</AppButton>
+                            <div class="mt-3 flex justify-end">
+                                <InvoiceRowActionsMenu
+                                    :actions="rowActionItems(invoice)"
+                                    :aria-label="`Actions for ${invoice.number}`"
+                                    @select="(id) => onInvoiceAction(invoice, id)"
+                                />
+                            </div>
                         </div>
                         <p v-if="!isLoading && !(outstanding_invoices.data ?? []).length" class="text-sm text-slate-500">No outstanding invoices.</p>
                     </div>
@@ -231,7 +284,7 @@ const openRecordPayment = (invoice) => {
                             { key: 'amount', label: 'Amount', sortable: true },
                             { key: 'due_date', label: 'Due Date', sortable: true },
                             { key: 'days_overdue', label: 'Days Overdue' },
-                            { key: 'action', label: 'Action' },
+                            { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
                         ]"
                         table-class="min-w-[820px]"
                         :page="outstanding_invoices.current_page ?? 1"
@@ -248,15 +301,21 @@ const openRecordPayment = (invoice) => {
                         >
                             <td class="px-4 py-3 whitespace-nowrap">{{ invoice.client }}</td>
                             <td class="px-4 py-3 whitespace-nowrap font-medium">{{ invoice.number }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap">{{ formatCents(invoice.amount) }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap">{{ formatRowCents(invoice.amount, invoice.currency) }}</td>
                             <td class="px-4 py-3 whitespace-nowrap"><DateDisplay :value="invoice.due_date" /></td>
                             <td class="px-4 py-3">
                                 <AppBadge :variant="daysOverdueInt(invoice.days_overdue) > 0 ? 'danger' : 'neutral'" class="whitespace-nowrap">
                                     {{ daysOverdueInt(invoice.days_overdue) > 0 ? `${daysOverdueInt(invoice.days_overdue)} days` : 'Current' }}
                                 </AppBadge>
                             </td>
-                            <td class="px-4 py-3">
-                                <AppButton size="sm" variant="secondary" @click="openRecordPayment(invoice)">Record Payment</AppButton>
+                            <td class="px-4 py-3 text-right align-middle">
+                                <div class="inline-flex justify-end">
+                                    <InvoiceRowActionsMenu
+                                        :actions="rowActionItems(invoice)"
+                                        :aria-label="`Actions for ${invoice.number}`"
+                                        @select="(id) => onInvoiceAction(invoice, id)"
+                                    />
+                                </div>
                             </td>
                         </tr>
                         <tr v-if="!isLoading && !(outstanding_invoices.data ?? []).length">
