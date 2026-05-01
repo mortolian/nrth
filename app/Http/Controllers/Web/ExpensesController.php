@@ -9,10 +9,12 @@ use App\Domain\Accounting\Enums\TaxLineType;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
+use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\TaxLine;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +22,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
-use Inertia\RedirectResponse;
 use Inertia\Response;
 
 class ExpensesController extends Controller
@@ -51,7 +52,7 @@ class ExpensesController extends Controller
         $query = Transaction::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('type', TransactionType::Expense->value)
-            ->with(['journalEntries.account', 'taxLines'])
+            ->with(['journalEntries.account', 'taxLines', 'supplier'])
             ->withCount('media');
 
         if ($start !== '') {
@@ -63,7 +64,8 @@ class ExpensesController extends Controller
         if ($supplier !== '') {
             $query->where(function ($q) use ($supplier): void {
                 $q->where('reference', 'like', '%'.$supplier.'%')
-                    ->orWhere('description', 'like', '%'.$supplier.'%');
+                    ->orWhere('description', 'like', '%'.$supplier.'%')
+                    ->orWhereHas('supplier', fn ($sq) => $sq->where('name', 'like', '%'.$supplier.'%'));
             });
         }
         if ($hasReceipt === 'yes') {
@@ -100,7 +102,9 @@ class ExpensesController extends Controller
                 return [
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
-                    'supplier' => $transaction->reference ?: ($transaction->description ?: 'Unknown supplier'),
+                    'supplier_id' => $transaction->supplier_id,
+                    'supplier' => $transaction->supplier?->name
+                        ?: ($transaction->reference ?: ($transaction->description ?: 'Unknown supplier')),
                     'category' => $category,
                     'description' => $transaction->description,
                     'amount' => $amountCents,
@@ -173,16 +177,15 @@ class ExpensesController extends Controller
                     'name' => trim($account->code.' - '.$account->name),
                 ])
                 ->all(),
-            'suppliers' => Transaction::queryWithoutTeamScope()
+            'supplier_options' => Supplier::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
-                ->where('type', TransactionType::Expense->value)
-                ->whereNotNull('reference')
-                ->select('reference')
-                ->distinct()
-                ->orderBy('reference')
-                ->pluck('reference')
-                ->filter()
-                ->values()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Supplier $supplier) => [
+                    'id' => $supplier->id,
+                    'name' => $supplier->name,
+                ])
                 ->all(),
             'tax_rates' => [
                 ['value' => 'vat15', 'label' => 'VAT 15%', 'rate' => 0.15, 'claimable' => true],
@@ -198,9 +201,13 @@ class ExpensesController extends Controller
     {
         $teamId = (int) $request->user()->current_team_id;
         $userId = (int) $request->user()->id;
+        if ($request->has('supplier_id') && $request->string('supplier_id')->toString() === '') {
+            $request->merge(['supplier_id' => null]);
+        }
         $payload = $request->validate([
             'date' => ['required', 'date'],
-            'supplier' => ['required', 'string', 'max:255'],
+            'supplier_id' => ['nullable', 'integer', Rule::exists('suppliers', 'id')->where('team_id', $teamId)],
+            'supplier' => ['required_without:supplier_id', 'nullable', 'string', 'max:255'],
             'category_account_id' => ['required', 'integer', Rule::exists('accounts', 'id')->where('team_id', $teamId)],
             'description' => ['nullable', 'string'],
             'amount_excl_vat_cents' => ['required', 'integer', 'min:0'],
@@ -214,6 +221,20 @@ class ExpensesController extends Controller
             'rate_per_km' => ['nullable', 'numeric', 'min:0'],
             'receipt' => ['nullable', 'file', 'max:10240'],
         ]);
+
+        $supplierId = isset($payload['supplier_id']) ? (int) $payload['supplier_id'] : 0;
+        $reference = null;
+        $supplierIdToSave = null;
+        if ($supplierId > 0) {
+            $supplierRow = Supplier::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->whereKey($supplierId)
+                ->firstOrFail();
+            $reference = $supplierRow->name;
+            $supplierIdToSave = $supplierRow->id;
+        } else {
+            $reference = trim((string) ($payload['supplier'] ?? ''));
+        }
 
         $categoryAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $teamId)
@@ -242,12 +263,13 @@ class ExpensesController extends Controller
         $isVatClaimable = in_array($payload['vat_rate'], ['vat15', 'vat0'], true) && (int) $payload['vat_amount_cents'] > 0;
         $totalCents = (int) $payload['amount_excl_vat_cents'] + (int) $payload['vat_amount_cents'];
 
-        $transaction = DB::transaction(function () use ($payload, $teamId, $userId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $totalCents, $postTransactionAction): Transaction {
+        $transaction = DB::transaction(function () use ($payload, $teamId, $userId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $totalCents, $postTransactionAction, $supplierIdToSave, $reference): Transaction {
             $transaction = Transaction::queryWithoutTeamScope()->create([
                 'team_id' => $teamId,
+                'supplier_id' => $supplierIdToSave,
                 'type' => TransactionType::Expense,
                 'status' => 'draft',
-                'reference' => $payload['supplier'],
+                'reference' => $reference,
                 'description' => $payload['description'] ?? $payload['notes'] ?? null,
                 'transaction_date' => $payload['date'],
                 'created_by' => $userId,
@@ -259,7 +281,7 @@ class ExpensesController extends Controller
                 'type' => EntryType::Debit,
                 'amount_cents' => (int) $payload['amount_excl_vat_cents'],
                 'currency' => 'ZAR',
-                'description' => 'Expense: '.($payload['description'] ?? $payload['supplier']),
+                'description' => 'Expense: '.($payload['description'] ?? $reference),
             ]);
 
             $creditAmount = $totalCents;

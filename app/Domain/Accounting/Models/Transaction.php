@@ -23,6 +23,7 @@ class Transaction extends Model implements HasMedia
 
     protected $fillable = [
         'team_id',
+        'supplier_id',
         'type',
         'status',
         'reference',
@@ -59,6 +60,14 @@ class Transaction extends Model implements HasMedia
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * @return BelongsTo<Supplier, $this>
+     */
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     /**

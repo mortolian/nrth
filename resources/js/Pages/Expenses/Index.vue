@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { Paperclip, TriangleAlert } from 'lucide-vue-next';
@@ -8,6 +8,7 @@ import { Paperclip, TriangleAlert } from 'lucide-vue-next';
 type ExpenseRow = {
     id: number;
     date: string | null;
+    supplier_id: number | null;
     supplier: string;
     category: string;
     description: string | null;
@@ -197,7 +198,17 @@ const toggleSelected = (id: number, checked: boolean) => {
                         >
                     </td>
                     <td class="px-4 py-3">{{ expense.date || '-' }}</td>
-                    <td class="px-4 py-3">{{ expense.supplier }}</td>
+                    <td class="px-4 py-3">
+                        <Link
+                            v-if="expense.supplier_id"
+                            :href="route('suppliers.show', expense.supplier_id)"
+                            class="font-medium text-brand-600 hover:underline"
+                            @click.stop
+                        >
+                            {{ expense.supplier }}
+                        </Link>
+                        <span v-else>{{ expense.supplier }}</span>
+                    </td>
                     <td class="px-4 py-3"><AppBadge variant="info">{{ expense.category }}</AppBadge></td>
                     <td class="px-4 py-3">{{ expense.description || '-' }}</td>
                     <td class="px-4 py-3">{{ formatCents(expense.amount) }}</td>

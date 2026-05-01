@@ -9,34 +9,42 @@ import { Camera, Upload } from 'lucide-vue-next';
 
 type CategoryOption = { id: number; name: string };
 type TaxRateOption = { value: string; label: string; rate: number; claimable: boolean };
+type SupplierOption = { id: number; name: string };
 
 const props = defineProps<{
     categories: CategoryOption[];
-    suppliers: string[];
+    supplier_options: SupplierOption[];
     tax_rates: TaxRateOption[];
     sars_rate_per_km: number;
 }>();
 
-const schema = z.object({
-    date: z.string().min(1),
-    supplier: z.string().min(1),
-    category_account_id: z.coerce.number().int().positive(),
-    description: z.string().optional(),
-    amount_excl_vat: z.coerce.number().min(0),
-    vat_rate: z.enum(['vat15', 'vat0', 'exempt', 'no_vat']),
-    vat_amount: z.coerce.number().min(0),
-    payment_method: z.enum(['business_account', 'personal_reimbursable', 'credit_card']),
-    reference: z.string().optional(),
-    notes: z.string().optional(),
-    office_percentage: z.coerce.number().min(0).max(100).optional(),
-    distance_km: z.coerce.number().min(0).optional(),
-    rate_per_km: z.coerce.number().min(0).optional(),
-});
+const schema = z
+    .object({
+        date: z.string().min(1),
+        supplier_id: z.coerce.number().int().min(0),
+        supplier_custom: z.string().optional(),
+        category_account_id: z.coerce.number().int().positive(),
+        description: z.string().optional(),
+        amount_excl_vat: z.coerce.number().min(0),
+        vat_rate: z.enum(['vat15', 'vat0', 'exempt', 'no_vat']),
+        vat_amount: z.coerce.number().min(0),
+        payment_method: z.enum(['business_account', 'personal_reimbursable', 'credit_card']),
+        reference: z.string().optional(),
+        notes: z.string().optional(),
+        office_percentage: z.coerce.number().min(0).max(100).optional(),
+        distance_km: z.coerce.number().min(0).optional(),
+        rate_per_km: z.coerce.number().min(0).optional(),
+    })
+    .refine((data) => data.supplier_id > 0 || (data.supplier_custom?.trim().length ?? 0) > 0, {
+        path: ['supplier_custom'],
+        message: 'Choose a saved supplier or enter a one-off name',
+    });
 
 const { values } = useForm({
     initialValues: {
         date: new Date().toISOString().slice(0, 10),
-        supplier: '',
+        supplier_id: 0,
+        supplier_custom: '',
         category_account_id: props.categories[0]?.id ?? 0,
         description: '',
         amount_excl_vat: 0,
@@ -89,13 +97,22 @@ const onReceiptChange = (event: Event) => {
     }
 };
 
+const supplierSelectOptions = computed(() => [
+    { label: 'Custom (one-off)', value: '0' },
+    ...props.supplier_options.map((s) => ({ label: s.name, value: String(s.id) })),
+]);
+
 const submit = () => {
     const parsed = schema.safeParse(values.value);
     if (!parsed.success) return;
 
     const form = new FormData();
     form.set('date', parsed.data.date);
-    form.set('supplier', parsed.data.supplier);
+    if (parsed.data.supplier_id > 0) {
+        form.set('supplier_id', String(parsed.data.supplier_id));
+    } else {
+        form.set('supplier', parsed.data.supplier_custom?.trim() ?? '');
+    }
     form.set('category_account_id', String(parsed.data.category_account_id));
     form.set('description', parsed.data.description ?? '');
     form.set('amount_excl_vat_cents', String(Math.round(parsed.data.amount_excl_vat * 100)));
@@ -158,12 +175,28 @@ const submit = () => {
                     <label class="mb-1 block text-xs font-medium text-slate-500">Date</label>
                     <AppInput v-model="values.date" type="date" class="min-h-12 text-base md:min-h-0 md:text-sm" />
                 </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Supplier</label>
-                    <AppInput v-model="values.supplier" list="supplier-options" placeholder="Search or create supplier..." class="min-h-12 text-base md:min-h-0 md:text-sm" />
-                    <datalist id="supplier-options">
-                        <option v-for="supplier in suppliers" :key="supplier" :value="supplier" />
-                    </datalist>
+                <div class="md:col-span-2">
+                    <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <label class="block text-xs font-medium text-slate-500">Supplier</label>
+                        <button
+                            type="button"
+                            class="text-xs font-medium text-brand-600 hover:underline"
+                            @click="router.get(route('suppliers.create'), { return: '/expenses/create' })"
+                        >
+                            New supplier
+                        </button>
+                    </div>
+                    <AppSelect
+                        :model-value="String(values.supplier_id)"
+                        :options="supplierSelectOptions"
+                        @update:model-value="values.supplier_id = Number($event)"
+                    />
+                    <AppInput
+                        v-if="values.supplier_id === 0"
+                        v-model="values.supplier_custom"
+                        placeholder="One-off supplier name"
+                        class="mt-2 min-h-12 text-base md:min-h-0 md:text-sm"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Category</label>

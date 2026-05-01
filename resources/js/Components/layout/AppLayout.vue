@@ -102,7 +102,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Money Out',
             href: route('expenses.index'),
             icon: Landmark,
-            group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: '#' }] }],
+            group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: route('suppliers.index') }] }],
         },
         {
             label: 'Accounting',
