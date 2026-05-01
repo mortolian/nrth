@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
@@ -46,6 +47,12 @@ class HandleInertiaRequests extends Middleware
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
             'currencyOptions' => fn () => Iso4217Currencies::selectOptions(),
+            'company_currency' => fn () => Iso4217Currencies::normalize(
+                (string) ($request->user()?->currentTeam?->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+            ),
+            'invoice_payment_methods' => fn () => $request->user()?->current_team_id
+                ? PaymentMethodOptions::forInertia()
+                : [],
             'commandPalette' => fn () => $this->commandPaletteData($request),
         ];
     }

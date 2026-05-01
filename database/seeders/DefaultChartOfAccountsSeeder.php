@@ -31,6 +31,7 @@ class DefaultChartOfAccountsSeeder
             ['code' => '3100', 'name' => 'Retained Earnings', 'description' => 'Accumulated profits', 'type' => AccountType::Equity, 'parent_code' => null],
             ['code' => '4000', 'name' => 'Service Revenue', 'description' => 'Primary trading income', 'type' => AccountType::Income, 'parent_code' => null],
             ['code' => '4900', 'name' => 'Other Income', 'description' => 'Non-operating income', 'type' => AccountType::Income, 'parent_code' => null],
+            ['code' => '4950', 'name' => 'Foreign Exchange Gain', 'description' => 'Realised foreign exchange gains', 'type' => AccountType::Income, 'parent_code' => null],
             ['code' => '5000', 'name' => 'Cost of Sales', 'description' => 'Direct costs', 'type' => AccountType::Expense, 'parent_code' => null],
             ['code' => '5100', 'name' => 'Salaries', 'description' => 'Wages and salaries', 'type' => AccountType::Expense, 'parent_code' => null],
             ['code' => '5200', 'name' => 'Rent', 'description' => 'Premises rent', 'type' => AccountType::Expense, 'parent_code' => null],
@@ -40,7 +41,24 @@ class DefaultChartOfAccountsSeeder
             ['code' => '5600', 'name' => 'Professional Fees', 'description' => 'Accounting, legal, consulting', 'type' => AccountType::Expense, 'parent_code' => null],
             ['code' => '5700', 'name' => 'Bank Charges', 'description' => 'Bank and payment fees', 'type' => AccountType::Expense, 'parent_code' => null],
             ['code' => '5800', 'name' => 'Depreciation', 'description' => 'Depreciation expense', 'type' => AccountType::Expense, 'parent_code' => null],
+            ['code' => '5900', 'name' => 'Foreign Exchange Loss', 'description' => 'Realised foreign exchange losses', 'type' => AccountType::Expense, 'parent_code' => null],
         ];
+    }
+
+    /**
+     * Idempotent: creates the full default chart when core accounts (e.g. Bank 1010) are missing.
+     * Covers teams that never completed onboarding or install seeding.
+     */
+    public function ensureForTeam(Team $team): void
+    {
+        if (Account::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('code', '1010')
+            ->exists()) {
+            return;
+        }
+
+        $this->runForTeam($team);
     }
 
     public function runForTeam(Team $team): void

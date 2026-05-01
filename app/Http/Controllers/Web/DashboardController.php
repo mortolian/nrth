@@ -162,10 +162,22 @@ class DashboardController extends Controller
                     'client' => $invoice->client?->name ?? 'Unknown',
                     'number' => $invoice->number,
                     'amount' => $due,
+                    'amount_due_cents' => $due,
+                    'total_cents' => $total,
                     'due_date' => $dueDate->toDateString(),
                     'days_overdue' => $dueDate->isPast() ? abs($dueDate->diffInDays($asOf)) : 0,
                     'status' => $invoice->status->value,
                     'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
+                    'company_currency_code' => $invoice->company_currency_code !== null
+                        ? Iso4217Currencies::normalize((string) $invoice->company_currency_code)
+                        : null,
+                    'fx_rate_invoice_to_company' => $invoice->fx_rate_invoice_to_company !== null
+                        ? (string) $invoice->fx_rate_invoice_to_company
+                        : null,
+                    'fx_rate_date' => optional($invoice->fx_rate_date)->toDateString(),
+                    'total_company_currency_cents' => $invoice->total_company_currency_cents !== null
+                        ? (int) $invoice->getRawOriginal('total_company_currency_cents')
+                        : null,
                     'can_delete' => (int) $invoice->payments_count === 0,
                 ];
             });

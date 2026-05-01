@@ -3,13 +3,14 @@ import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
 import VChart from 'vue-echarts';
-import { CircleDollarSign, HandCoins, Landmark, TrendingUp, X } from 'lucide-vue-next';
+import { CircleDollarSign, HandCoins, Landmark, TrendingUp } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
@@ -136,6 +137,23 @@ const rowActionItems = (invoice) => {
     if (invoice.can_delete) actions.push({ id: 'delete', label: 'Delete' });
     return actions;
 };
+
+const recordPaymentInvoice = computed(() => {
+    const inv = selectedInvoice.value;
+    if (!inv) return null;
+    return {
+        id: inv.id,
+        number: inv.number,
+        client_name: inv.client,
+        amount_due_cents: inv.amount_due_cents ?? inv.amount,
+        total_cents: inv.total_cents,
+        currency: inv.currency,
+        company_currency_code: inv.company_currency_code ?? null,
+        fx_rate_invoice_to_company: inv.fx_rate_invoice_to_company ?? null,
+        fx_rate_date: inv.fx_rate_date ?? null,
+        total_company_currency_cents: inv.total_company_currency_cents ?? null,
+    };
+});
 
 const onInvoiceAction = (invoice, actionId) => {
     if (actionId === 'view') {
@@ -380,31 +398,11 @@ const onInvoiceAction = (invoice, actionId) => {
             </AppCard>
         </div>
 
-        <div
-            v-if="paymentDrawerOpen"
-            class="fixed inset-0 z-[80] bg-black/40"
-            @click="paymentDrawerOpen = false"
+        <RecordInvoicePaymentDrawer
+            :open="paymentDrawerOpen"
+            :invoice="paymentDrawerOpen ? recordPaymentInvoice : null"
+            :charges-vat="props.vat_enabled !== false"
+            @update:open="paymentDrawerOpen = $event"
         />
-        <aside
-            :class="[
-                'fixed inset-y-0 right-0 z-[90] w-full max-w-md transform bg-white shadow-xl transition-transform',
-                paymentDrawerOpen ? 'translate-x-0' : 'translate-x-full',
-            ]"
-        >
-            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                <h3 class="text-lg font-semibold text-slate-900">Record Payment</h3>
-                <button class="rounded p-1 hover:bg-slate-100" @click="paymentDrawerOpen = false">
-                    <X class="h-5 w-5" />
-                </button>
-            </div>
-            <div class="space-y-4 px-5 py-4 text-sm text-slate-600">
-                <p v-if="selectedInvoice">
-                    Invoice <strong>{{ selectedInvoice.number }}</strong> for
-                    <strong>{{ selectedInvoice.client }}</strong> is ready for payment capture.
-                </p>
-                <p>UI scaffold ready. Hook this to the payment form/action next.</p>
-                <AppButton variant="primary">Continue</AppButton>
-            </div>
-        </aside>
     </AppLayout>
 </template>

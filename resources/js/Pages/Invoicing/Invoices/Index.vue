@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { Filter, X } from 'lucide-vue-next';
 
@@ -19,6 +20,10 @@ type InvoiceRow = {
     is_overdue: boolean;
     days_overdue: number;
     can_delete: boolean;
+    company_currency_code?: string | null;
+    fx_rate_invoice_to_company?: string | null;
+    fx_rate_date?: string | null;
+    total_company_currency_cents?: number | null;
 };
 
 const props = defineProps<{
@@ -46,11 +51,30 @@ const props = defineProps<{
     filter_client: { id: number; name: string } | null;
 }>();
 
-const page = usePage<{ csrf_token?: string }>();
+const page = usePage<{ csrf_token?: string; vat_enabled?: boolean }>();
 const selected = ref<number[]>([]);
 const exportingZip = ref(false);
 const paymentDrawerOpen = ref(false);
 const selectedInvoice = ref<InvoiceRow | null>(null);
+
+const recordPaymentInvoice = computed(() => {
+    const inv = selectedInvoice.value;
+    if (!inv) return null;
+    return {
+        id: inv.id,
+        number: inv.number,
+        client_name: inv.client_name,
+        amount_due_cents: inv.amount_due,
+        total_cents: inv.total,
+        currency: inv.currency,
+        company_currency_code: inv.company_currency_code ?? null,
+        fx_rate_invoice_to_company: inv.fx_rate_invoice_to_company ?? null,
+        fx_rate_date: inv.fx_rate_date ?? null,
+        total_company_currency_cents: inv.total_company_currency_cents ?? null,
+    };
+});
+
+const chargesVatForPayment = computed(() => page.props.vat_enabled !== false);
 
 const localFilters = ref({
     status: props.filters.status ?? 'all',
@@ -530,31 +554,11 @@ const exportSelectedPdfZip = async () => {
             </AppCard>
         </div>
 
-        <div
-            v-if="paymentDrawerOpen"
-            class="fixed inset-0 z-[80] bg-black/40"
-            @click="paymentDrawerOpen = false"
+        <RecordInvoicePaymentDrawer
+            :open="paymentDrawerOpen"
+            :invoice="paymentDrawerOpen ? recordPaymentInvoice : null"
+            :charges-vat="chargesVatForPayment"
+            @update:open="paymentDrawerOpen = $event"
         />
-        <aside
-            :class="[
-                'fixed inset-y-0 right-0 z-[90] w-full max-w-md transform bg-white shadow-xl transition-transform',
-                paymentDrawerOpen ? 'translate-x-0' : 'translate-x-full',
-            ]"
-        >
-            <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                <h3 class="text-lg font-semibold text-slate-900">Record Payment</h3>
-                <button class="rounded p-1 hover:bg-slate-100" @click="paymentDrawerOpen = false">
-                    <X class="h-5 w-5" />
-                </button>
-            </div>
-            <div class="space-y-4 px-5 py-4 text-sm text-slate-600">
-                <p v-if="selectedInvoice">
-                    Invoice <strong>{{ selectedInvoice.number }}</strong> for
-                    <strong>{{ selectedInvoice.client_name }}</strong>.
-                </p>
-                <p>Slide-over scaffold ready for payment form wiring.</p>
-                <AppButton variant="primary">Continue</AppButton>
-            </div>
-        </aside>
     </AppLayout>
 </template>

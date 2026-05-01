@@ -149,6 +149,44 @@ class InvoicingActionsTest extends TestCase
         Mail::assertQueued(InvoiceMailer::class);
     }
 
+    public function test_record_payment_seeds_default_chart_when_bank_account_missing(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->actingTeamContext($user, $team);
+
+        $this->assertFalse(
+            Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '1010')->exists()
+        );
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'subtotal_cents' => 100_00,
+                'vat_amount_cents' => 15_00,
+                'total_cents' => 115_00,
+                'amount_paid_cents' => 0,
+            ]);
+
+        $action = new RecordPaymentAction(
+            new PostTransactionAction(new LedgerService)
+        );
+
+        $action->execute(new RecordPaymentDTO(
+            invoiceId: $invoice->id,
+            teamId: $team->id,
+            amountCents: 115_00,
+            paymentDate: '2026-04-25',
+            method: PaymentMethod::Eft,
+            createdBy: $user->id,
+        ));
+
+        $this->assertTrue(
+            Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '1010')->exists()
+        );
+    }
+
     public function test_record_payment_action_creates_payment_and_posts_transaction(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
@@ -185,6 +223,66 @@ class InvoicingActionsTest extends TestCase
         $this->assertNotNull($payment->transaction_id);
         $this->assertSame(TransactionStatus::Posted, $payment->transaction?->status);
         $this->assertSame(InvoiceStatus::Paid, $invoice->fresh()->status);
+    }
+
+    public function test_record_payment_foreign_invoice_books_fx_loss_to_expense(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->actingTeamContext($user, $team);
+
+        Account::factory()->for($team)->asset()->create(['code' => '1010', 'is_system' => true]);
+        Account::factory()->for($team)->asset()->create(['code' => '1100', 'is_system' => true]);
+        Account::factory()->for($team)->liability()->create(['code' => '2100', 'is_system' => true]);
+        Account::factory()->for($team)->income()->create(['code' => '4950', 'is_system' => true]);
+        Account::factory()->for($team)->expense()->create(['code' => '5900', 'is_system' => true]);
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'currency' => 'USD',
+                'company_currency_code' => 'ZAR',
+                'subtotal_cents' => 100_00,
+                'vat_amount_cents' => 0,
+                'total_cents' => 100_00,
+                'total_company_currency_cents' => 1800_00,
+                'fx_rate_invoice_to_company' => '18',
+                'fx_rate_date' => '2026-04-25',
+                'amount_paid_cents' => 0,
+            ]);
+
+        $action = new RecordPaymentAction(
+            new PostTransactionAction(new LedgerService)
+        );
+
+        $payment = $action->execute(new RecordPaymentDTO(
+            invoiceId: $invoice->id,
+            teamId: $team->id,
+            amountCents: 100_00,
+            paymentDate: '2026-04-26',
+            method: PaymentMethod::Eft,
+            currency: 'USD',
+            createdBy: $user->id,
+            bankAmountCompanyCents: 1700_00,
+            bookFxLossToExpense: true,
+        ));
+
+        $this->assertSame(1700_00, (int) $payment->getRawOriginal('bank_amount_company_cents'));
+
+        $lossAccountId = Account::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('code', '5900')
+            ->value('id');
+        $this->assertNotNull($lossAccountId);
+
+        $lossLine = JournalEntry::query()
+            ->where('transaction_id', $payment->transaction_id)
+            ->where('account_id', $lossAccountId)
+            ->first();
+        $this->assertNotNull($lossLine);
+        $this->assertSame(100_00, (int) $lossLine->getRawOriginal('amount_cents'));
+        $this->assertSame('ZAR', $lossLine->getRawOriginal('currency'));
     }
 
     public function test_void_invoice_action_voids_linked_posted_transactions(): void

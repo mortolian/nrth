@@ -360,6 +360,16 @@ class InvoiceController extends Controller
                     'issue_date' => optional($invoice->issue_date)->toDateString(),
                     'due_date' => optional($invoice->due_date)->toDateString(),
                     'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
+                    'company_currency_code' => $invoice->company_currency_code !== null
+                        ? Iso4217Currencies::normalize((string) $invoice->company_currency_code)
+                        : null,
+                    'fx_rate_invoice_to_company' => $invoice->fx_rate_invoice_to_company !== null
+                        ? (string) $invoice->fx_rate_invoice_to_company
+                        : null,
+                    'fx_rate_date' => optional($invoice->fx_rate_date)->toDateString(),
+                    'total_company_currency_cents' => $invoice->total_company_currency_cents !== null
+                        ? (int) $invoice->getRawOriginal('total_company_currency_cents')
+                        : null,
                     'total' => $total,
                     'amount_due' => $amountDue,
                     'status' => $invoice->status->value,
@@ -530,18 +540,6 @@ class InvoiceController extends Controller
                 'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
                 'delete' => ! $invoice->payments()->exists(),
             ],
-            'payment_methods' => array_map(
-                fn (PaymentMethod $method) => [
-                    'value' => $method->value,
-                    'label' => match ($method) {
-                        PaymentMethod::Eft => 'EFT',
-                        PaymentMethod::Cash => 'Cash',
-                        PaymentMethod::Card => 'Card',
-                        PaymentMethod::Other => 'Other',
-                    },
-                ],
-                PaymentMethod::cases()
-            ),
             'charges_vat' => $invoice->team?->chargesVat() ?? false,
         ]);
     }
@@ -556,6 +554,8 @@ class InvoiceController extends Controller
             'method' => ['required', Rule::in(array_map(fn (PaymentMethod $method) => $method->value, PaymentMethod::cases()))],
             'reference' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'bank_amount_company_cents' => ['nullable', 'integer', 'min:0'],
+            'book_fx_loss_to_expense' => ['sometimes', 'boolean'],
         ]);
 
         $recordPaymentAction->execute(new RecordPaymentDTO(
@@ -568,9 +568,13 @@ class InvoiceController extends Controller
             reference: $payload['reference'] ?? null,
             notes: $payload['notes'] ?? null,
             createdBy: (int) $request->user()->id,
+            bankAmountCompanyCents: isset($payload['bank_amount_company_cents'])
+                ? (int) $payload['bank_amount_company_cents']
+                : null,
+            bookFxLossToExpense: (bool) ($payload['book_fx_loss_to_expense'] ?? false),
         ));
 
-        return to_route('invoicing.invoices.show', $invoice);
+        return back();
     }
 
     /**

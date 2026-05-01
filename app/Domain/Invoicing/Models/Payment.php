@@ -16,6 +16,7 @@ class Payment extends Model
 {
     /** @use HasFactory<PaymentFactory> */
     use HasFactory;
+
     use HasTeamScope;
 
     protected $fillable = [
@@ -23,6 +24,7 @@ class Payment extends Model
         'invoice_id',
         'amount_cents',
         'currency',
+        'bank_amount_company_cents',
         'payment_date',
         'method',
         'reference',
