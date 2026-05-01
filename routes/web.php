@@ -49,6 +49,7 @@ Route::middleware([
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
     Route::get('/accounting/transactions', [TransactionController::class, 'index'])->name('accounting.transactions.index');
+    Route::delete('/accounting/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('accounting.transactions.destroy');
     Route::get('/accounting/journal', GeneralLedgerController::class)->name('accounting.journal.index');
     Route::get('/accounting/accounts', ChartOfAccountsController::class)->name('accounting.accounts.index');
     Route::get('/accounting/accounts/{account}/statement', AccountStatementController::class)->name('accounting.accounts.statement');

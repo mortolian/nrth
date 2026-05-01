@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Web\Accounting;
 
+use App\Domain\Accounting\Actions\DeleteTransactionAction;
 use App\Domain\Accounting\Enums\EntryType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Transaction;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
@@ -83,6 +85,7 @@ class TransactionController extends Controller
                     'reference' => $transaction->reference,
                     'description' => $transaction->description,
                     'status' => $transaction->status->value,
+                    'can_delete' => DeleteTransactionAction::canDelete($transaction),
                     'total_amount' => $amount,
                     'accounts_affected' => $debitAccount.' -> '.$creditAccount,
                     'journal_entries' => $lines->map(fn ($line) => [
@@ -110,6 +113,15 @@ class TransactionController extends Controller
             'filters' => $this->filters($request),
             'accounts' => $accounts,
         ]);
+    }
+
+    public function destroy(Request $request, Transaction $transaction, DeleteTransactionAction $deleteTransactionAction): RedirectResponse
+    {
+        abort_unless($transaction->team_id === (int) $request->user()->current_team_id, 403);
+
+        $deleteTransactionAction->execute($transaction);
+
+        return back();
     }
 
     /**

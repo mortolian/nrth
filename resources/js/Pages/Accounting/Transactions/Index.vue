@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 type LedgerRow = {
@@ -13,6 +14,7 @@ type LedgerRow = {
     accounts_affected: string;
     total_amount: number;
     status: string;
+    can_delete: boolean;
     journal_entries: Array<{
         id: number;
         account: string;
@@ -41,6 +43,16 @@ const props = defineProps<{
     }>;
 }>();
 
+const page = usePage<{ errors?: Record<string, string | string[] | undefined> }>();
+
+const transactionDeleteError = computed(() => {
+    const err = page.props.errors?.transaction;
+    if (err === undefined || err === null) {
+        return null;
+    }
+    return Array.isArray(err) ? err.join(' ') : String(err);
+});
+
 const expandedRows = ref<number[]>([]);
 const filters = ref({
     from: props.filters.from ?? '',
@@ -68,6 +80,29 @@ const toggleExpanded = (id: number) => {
     }
     expandedRows.value = [...expandedRows.value, id];
 };
+
+const rowActionItems = (row: LedgerRow) => {
+    const actions = [{ id: 'view_journal', label: 'View journal entries' }];
+    if (row.can_delete) {
+        actions.push({ id: 'delete', label: 'Delete' });
+    }
+    return actions;
+};
+
+const onTransactionAction = (transaction: LedgerRow, actionId: string) => {
+    if (actionId === 'view_journal') {
+        toggleExpanded(transaction.id);
+    } else if (actionId === 'delete') {
+        if (
+            !window.confirm(
+                'Permanently delete this transaction? Journal lines will be removed. This cannot be undone.',
+            )
+        ) {
+            return;
+        }
+        router.delete(route('accounting.transactions.destroy', transaction.id), { preserveScroll: true });
+    }
+};
 </script>
 
 <template>
@@ -78,11 +113,19 @@ const toggleExpanded = (id: number) => {
             { label: 'Transactions' },
         ]"
     >
-        <PageHeader title="Transactions" subtitle="All financial events across invoices, payments, and expenses">
+        <PageHeader title="Transactions">
             <template #actions>
                 <AppButton variant="secondary">Export to Excel</AppButton>
             </template>
         </PageHeader>
+
+        <div
+            v-if="transactionDeleteError"
+            class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+            role="alert"
+        >
+            {{ transactionDeleteError }}
+        </div>
 
         <AppCard class="mt-5">
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -159,7 +202,7 @@ const toggleExpanded = (id: number) => {
                     { key: 'accounts', label: 'Accounts affected' },
                     { key: 'amount', label: 'Amount' },
                     { key: 'status', label: 'Status' },
-                    { key: 'actions', label: 'Actions' },
+                    { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
                 ]"
                 :page="transactions.current_page"
                 :last-page="transactions.last_page"
@@ -183,10 +226,13 @@ const toggleExpanded = (id: number) => {
                                 {{ transaction.status }}
                             </AppBadge>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="flex gap-1">
-                                <AppButton size="sm" variant="ghost" @click.stop="toggleExpanded(transaction.id)">View journal entries</AppButton>
-                                <AppButton v-if="transaction.status === 'posted'" size="sm" variant="ghost" @click.stop>Void</AppButton>
+                        <td class="px-4 py-3 text-right align-middle" @click.stop>
+                            <div class="inline-flex justify-end">
+                                <InvoiceRowActionsMenu
+                                    :actions="rowActionItems(transaction)"
+                                    :aria-label="`Actions for transaction ${transaction.reference || transaction.id}`"
+                                    @select="(id) => onTransactionAction(transaction, id)"
+                                />
                             </div>
                         </td>
                     </tr>
