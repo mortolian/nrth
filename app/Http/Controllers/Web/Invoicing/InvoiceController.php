@@ -25,6 +25,8 @@ use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Support\InvoiceOnlinePaymentProviders;
+use App\Support\InvoicePayQrCode;
 use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -32,11 +34,13 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\Activitylog\Models\Activity;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class InvoiceController extends Controller
 {
@@ -547,8 +551,50 @@ class InvoiceController extends Controller
                 'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
                 'delete' => ! $invoice->payments()->exists(),
             ],
-            'online_payment_providers' => $this->onlinePaymentProvidersForInvoice($invoice),
+            'online_payment_providers' => InvoiceOnlinePaymentProviders::enabledForInvoice($invoice),
+            'public_pay_url' => $invoice->public_token !== null
+                ? route('public.invoice.pay', ['token' => $invoice->public_token], true)
+                : null,
+            'public_pay_qr_url' => $invoice->public_token !== null
+                ? route('invoicing.invoices.public-pay-qr', $invoice)
+                : null,
+            'can_manage_public_pay_link' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
             'charges_vat' => $invoice->team?->chargesVat() ?? false,
+        ]);
+    }
+
+    public function storePublicPayLink(Request $request, Invoice $invoice): RedirectResponse
+    {
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+        abort_unless(
+            in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
+            403,
+        );
+
+        $request->validate([
+            'regenerate' => ['sometimes', 'boolean'],
+        ]);
+
+        if ($request->boolean('regenerate') || $invoice->public_token === null) {
+            $invoice->forceFill([
+                'public_token' => Str::lower(bin2hex(random_bytes(16))),
+            ])->save();
+        }
+
+        return back();
+    }
+
+    public function publicPayQr(Invoice $invoice): SymfonyResponse
+    {
+        abort_unless($invoice->team_id === request()->user()->current_team_id, 403);
+        abort_if($invoice->public_token === null, 404);
+
+        $payUrl = route('public.invoice.pay', ['token' => $invoice->public_token], true);
+        $png = InvoicePayQrCode::pngBinary($payUrl, 220, 8);
+
+        return response($png, 200, [
+            'Content-Type' => 'image/png',
+            'Cache-Control' => 'private, max-age=3600',
         ]);
     }
 
@@ -704,42 +750,6 @@ class InvoiceController extends Controller
                 'footer' => (string) ($settings['invoice_default_footer'] ?? ''),
             ],
         ];
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function onlinePaymentProvidersForInvoice(Invoice $invoice): array
-    {
-        $invoice->loadMissing('team');
-        $team = $invoice->team;
-        if ($team === null) {
-            return [];
-        }
-
-        $settings = $team->mergedCompanySettings();
-        /** @var array<string, mixed> $gateways */
-        $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
-        $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
-
-        $providers = [];
-
-        /** @var array<string, mixed> $stripe */
-        $stripe = is_array($gateways['stripe'] ?? null) ? $gateways['stripe'] : [];
-        $stripeSecret = isset($stripe['secret_key']) && is_string($stripe['secret_key']) ? trim($stripe['secret_key']) : '';
-        if (($stripe['enabled'] ?? false) && $stripeSecret !== '') {
-            $providers[] = 'stripe';
-        }
-
-        /** @var array<string, mixed> $payfast */
-        $payfast = is_array($gateways['payfast'] ?? null) ? $gateways['payfast'] : [];
-        $mid = isset($payfast['merchant_id']) && is_string($payfast['merchant_id']) ? trim($payfast['merchant_id']) : '';
-        $mkey = isset($payfast['merchant_key']) && is_string($payfast['merchant_key']) ? trim($payfast['merchant_key']) : '';
-        if ($currency === 'ZAR' && ($payfast['enabled'] ?? false) && $mid !== '' && $mkey !== '') {
-            $providers[] = 'payfast';
-        }
-
-        return $providers;
     }
 
     /**

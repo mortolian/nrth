@@ -51,6 +51,7 @@ class Invoice extends Model implements HasMedia
         'paid_at',
         'voided_at',
         'transaction_id',
+        'public_token',
     ];
 
     /**

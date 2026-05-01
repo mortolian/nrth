@@ -7,7 +7,7 @@ import RecordInvoicePaymentDrawer, {
     type RecordPaymentInvoiceInput,
 } from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { CheckCircle2, CircleDot, Download, Edit3, Mail, Trash2, Wallet } from 'lucide-vue-next';
+import { CheckCircle2, CircleDot, Download, Edit3, Mail, QrCode, Trash2, Wallet } from 'lucide-vue-next';
 
 type Issuer = {
     name: string;
@@ -92,6 +92,12 @@ const props = defineProps<{
     };
     /** Enabled checkout providers for this invoice (e.g. stripe, payfast). */
     online_payment_providers: string[];
+    /** Absolute URL to the customer-facing pay page (after link is created). */
+    public_pay_url: string | null;
+    /** Same-origin URL to a PNG QR code for `public_pay_url` (requires an active link). */
+    public_pay_qr_url: string | null;
+    /** Whether the team can create or rotate the public link (issued, unpaid states). */
+    can_manage_public_pay_link: boolean;
 }>();
 
 const bookCurrencySnapshot = computed(() => {
@@ -130,6 +136,10 @@ const recordPaymentInvoice = computed((): RecordPaymentInvoiceInput => ({
 }));
 
 const invoiceCurrency = computed(() => props.invoice.currency || 'ZAR');
+/** Guard: `.includes` on a non-array throws and white-screens the page. */
+const onlinePaymentProviders = computed(() =>
+    Array.isArray(props.online_payment_providers) ? props.online_payment_providers : [],
+);
 const formatCents = (cents: number) =>
     useFormatCurrency((Number(cents) || 0) / 100, invoiceCurrency.value);
 
@@ -185,6 +195,49 @@ const startOnlinePayment = (provider: string) => {
         { provider },
         { preserveScroll: true },
     );
+};
+
+const showPublicPayCard = computed(
+    () =>
+        props.invoice.status !== 'draft'
+        && props.invoice.status !== 'void'
+        && (props.public_pay_url !== null || props.can_manage_public_pay_link),
+);
+
+const createPublicPayLink = () => {
+    router.post(route('invoicing.invoices.public-pay-link.store', props.invoice.id), {}, { preserveScroll: true });
+};
+
+const regeneratePublicPayLink = () => {
+    if (
+        !window.confirm(
+            'Generate a new link? The old QR code and URL will stop working (use this if a link was shared by mistake).',
+        )
+    ) {
+        return;
+    }
+    router.post(
+        route('invoicing.invoices.public-pay-link.store', props.invoice.id),
+        { regenerate: true },
+        { preserveScroll: true },
+    );
+};
+
+const copyPublicPayUrl = async () => {
+    if (!props.public_pay_url) {
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(props.public_pay_url);
+    } catch {
+        window.prompt('Copy this link:', props.public_pay_url);
+    }
+};
+
+const openPublicPayPage = () => {
+    if (props.public_pay_url) {
+        window.open(props.public_pay_url, '_blank', 'noopener,noreferrer');
+    }
 };
 
 const undoPayment = (paymentId: number) => {
@@ -248,7 +301,7 @@ const undoPayment = (paymentId: number) => {
                         ['sent', 'partial', 'overdue'].includes(invoice.status) &&
                         can.record_payment &&
                         invoice.amount_due_cents > 0 &&
-                        online_payment_providers.includes('stripe')
+                        onlinePaymentProviders.includes('stripe')
                     "
                     class="shrink-0"
                     variant="secondary"
@@ -262,7 +315,7 @@ const undoPayment = (paymentId: number) => {
                         ['sent', 'partial', 'overdue'].includes(invoice.status) &&
                         can.record_payment &&
                         invoice.amount_due_cents > 0 &&
-                        online_payment_providers.includes('payfast')
+                        onlinePaymentProviders.includes('payfast')
                     "
                     class="shrink-0"
                     variant="secondary"
@@ -392,6 +445,49 @@ const undoPayment = (paymentId: number) => {
                     <p class="mt-2 text-sm text-slate-700">{{ invoice.client.name || 'Unknown client' }}</p>
                     <p class="text-sm text-slate-600">{{ invoice.client.email || '-' }}</p>
                     <p class="text-sm text-slate-600">{{ invoice.client.phone || '-' }}</p>
+                </AppCard>
+
+                <AppCard v-if="showPublicPayCard">
+                    <div class="flex items-start gap-2">
+                        <QrCode class="mt-0.5 h-5 w-5 shrink-0 text-slate-600" aria-hidden="true" />
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-base font-semibold text-slate-900">Customer pay link</h3>
+                            <p class="mt-1 text-xs text-slate-500">
+                                QR for in-person or print. Opens a page with this invoice, PDF download, and online payment
+                                (when configured).
+                            </p>
+                        </div>
+                    </div>
+                    <div v-if="!public_pay_url && can_manage_public_pay_link" class="mt-4">
+                        <AppButton variant="secondary" type="button" @click="createPublicPayLink">Create pay link &amp; QR</AppButton>
+                    </div>
+                    <div v-else-if="public_pay_url" class="mt-4 space-y-3">
+                        <div class="flex justify-center rounded-md border border-slate-200 bg-white p-3">
+                            <img
+                                v-if="public_pay_qr_url"
+                                :src="public_pay_qr_url"
+                                alt="QR code linking to customer pay page"
+                                class="h-44 w-44"
+                                width="220"
+                                height="220"
+                            >
+                        </div>
+                        <p class="break-all font-mono text-xs text-slate-700">{{ public_pay_url }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            <AppButton size="sm" variant="secondary" type="button" @click="copyPublicPayUrl">Copy link</AppButton>
+                            <AppButton size="sm" variant="secondary" type="button" @click="openPublicPayPage">Open</AppButton>
+                            <AppButton
+                                v-if="can_manage_public_pay_link"
+                                size="sm"
+                                variant="ghost"
+                                class="text-amber-900 hover:bg-amber-50"
+                                type="button"
+                                @click="regeneratePublicPayLink"
+                            >
+                                New link
+                            </AppButton>
+                        </div>
+                    </div>
                 </AppCard>
 
                 <AppCard>

@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
 @php
+    $public_pay_url = $public_pay_url ?? null;
+    $public_pay_qr_data_uri = $public_pay_qr_data_uri ?? null;
+
     $team = $invoice->team;
     $client = $invoice->client;
     $banksForInvoice = $team ? $team->bankAccountsForInvoicePdf() : [];
@@ -258,6 +261,15 @@
 
 @include('pdf._prose-section', ['title' => 'Notes', 'content' => $invoice->notes])
 @include('pdf._prose-section', ['title' => 'Terms & conditions', 'content' => $invoice->footer])
+
+@if($public_pay_qr_data_uri && $public_pay_url)
+    <div class="section section-pay-online pay-online-qr">
+        <h3>Pay online</h3>
+        <p class="small muted" style="margin: 0 0 8px;">Scan the QR code to open the payment page (card or bank transfer where enabled).</p>
+        <img src="{{ $public_pay_qr_data_uri }}" alt="" width="168" height="168" style="display: block; width: 168px; height: 168px;">
+        <p class="small muted" style="margin-top: 8px; word-break: break-all;">{{ $public_pay_url }}</p>
+    </div>
+@endif
 
 <div class="footer">
     {{ $companyName }} &middot; {{ $documentTitle }} {{ $invoice->number }} &middot; Generated {{ now()->format('d M Y') }}

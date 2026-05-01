@@ -17,9 +17,13 @@ use Stripe\StripeClient;
 class StartInvoiceOnlinePaymentSessionAction
 {
     /**
+     * Optional checkout return URLs (e.g. public pay page). Keys: stripe_success, stripe_cancel, payfast_return, payfast_cancel.
+     * Stripe success URL must accept Stripe’s `{CHECKOUT_SESSION_ID}` placeholder in the query string.
+     *
+     * @param  array<string, string>|null  $checkoutReturnUrls
      * @return array{type: 'stripe_redirect', url: string}|array{type: 'payfast_form', action: string, fields: array<string, string>}
      */
-    public function execute(Team $team, Invoice $invoice, string $provider): array
+    public function execute(Team $team, Invoice $invoice, string $provider, ?array $checkoutReturnUrls = null): array
     {
         $provider = strtolower(trim($provider));
 
@@ -50,8 +54,8 @@ class StartInvoiceOnlinePaymentSessionAction
         $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
 
         return match ($provider) {
-            'stripe' => $this->startStripe($team, $invoice, $amountDue, $currency, $gateways),
-            'payfast' => $this->startPayFast($team, $invoice, $amountDue, $currency, $gateways),
+            'stripe' => $this->startStripe($team, $invoice, $amountDue, $currency, $gateways, $checkoutReturnUrls),
+            'payfast' => $this->startPayFast($team, $invoice, $amountDue, $currency, $gateways, $checkoutReturnUrls),
             default => throw ValidationException::withMessages([
                 'provider' => __('This payment provider is not supported yet.'),
             ]),
@@ -60,9 +64,10 @@ class StartInvoiceOnlinePaymentSessionAction
 
     /**
      * @param  array<string, mixed>  $gateways
+     * @param  array<string, string>|null  $checkoutReturnUrls
      * @return array{type: 'stripe_redirect', url: string}
      */
-    private function startStripe(Team $team, Invoice $invoice, int $amountDueCents, string $currency, array $gateways): array
+    private function startStripe(Team $team, Invoice $invoice, int $amountDueCents, string $currency, array $gateways, ?array $checkoutReturnUrls): array
     {
         /** @var array<string, mixed> $cfg */
         $cfg = is_array($gateways['stripe'] ?? null) ? $gateways['stripe'] : [];
@@ -92,13 +97,9 @@ class StartInvoiceOnlinePaymentSessionAction
 
         $stripe = new StripeClient(['api_key' => $secret]);
 
-        $successUrl = URL::route('invoicing.invoices.show', [
-            'invoice' => $invoice->id,
-        ]).'?online_payment=success&session_id={CHECKOUT_SESSION_ID}';
-
-        $cancelUrl = URL::route('invoicing.invoices.show', [
-            'invoice' => $invoice->id,
-        ]).'?online_payment=cancelled';
+        $defaultShow = URL::route('invoicing.invoices.show', ['invoice' => $invoice->id]);
+        $successUrl = $checkoutReturnUrls['stripe_success'] ?? ($defaultShow.'?online_payment=success&session_id={CHECKOUT_SESSION_ID}');
+        $cancelUrl = $checkoutReturnUrls['stripe_cancel'] ?? ($defaultShow.'?online_payment=cancelled');
 
         $checkout = $stripe->checkout->sessions->create([
             'mode' => 'payment',
@@ -137,9 +138,10 @@ class StartInvoiceOnlinePaymentSessionAction
 
     /**
      * @param  array<string, mixed>  $gateways
+     * @param  array<string, string>|null  $checkoutReturnUrls
      * @return array{type: 'payfast_form', action: string, fields: array<string, string>}
      */
-    private function startPayFast(Team $team, Invoice $invoice, int $amountDueCents, string $currency, array $gateways): array
+    private function startPayFast(Team $team, Invoice $invoice, int $amountDueCents, string $currency, array $gateways, ?array $checkoutReturnUrls): array
     {
         if ($currency !== 'ZAR') {
             throw ValidationException::withMessages([
@@ -185,8 +187,9 @@ class StartInvoiceOnlinePaymentSessionAction
         ])->save();
 
         $notifyUrl = URL::route('webhooks.payfast', ['team' => $team->id]);
-        $returnUrl = URL::route('invoicing.invoices.show', ['invoice' => $invoice->id]).'?online_payment=success';
-        $cancelUrl = URL::route('invoicing.invoices.show', ['invoice' => $invoice->id]).'?online_payment=cancelled';
+        $defaultShow = URL::route('invoicing.invoices.show', ['invoice' => $invoice->id]);
+        $returnUrl = $checkoutReturnUrls['payfast_return'] ?? ($defaultShow.'?online_payment=success');
+        $cancelUrl = $checkoutReturnUrls['payfast_cancel'] ?? ($defaultShow.'?online_payment=cancelled');
 
         $invoice->loadMissing('client');
         $settings = $team->mergedCompanySettings();

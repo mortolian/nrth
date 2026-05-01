@@ -2,7 +2,9 @@
 
 namespace App\Domain\Invoicing\Services;
 
+use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Support\InvoicePayQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -42,7 +44,21 @@ class InvoicePdfService
         $tmpPath = storage_path('app/tmp/invoice-'.$invoice->id.'-'.uniqid().'.pdf');
         File::ensureDirectoryExists(dirname($tmpPath));
 
-        Pdf::loadView('pdf.invoice', ['invoice' => $invoice])
+        $publicPayUrl = null;
+        $publicPayQrDataUri = null;
+        if (
+            $invoice->public_token !== null
+            && ! in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Void], true)
+        ) {
+            $publicPayUrl = route('public.invoice.pay', ['token' => $invoice->public_token], true);
+            $publicPayQrDataUri = InvoicePayQrCode::pngDataUri($publicPayUrl, 168, 8);
+        }
+
+        Pdf::loadView('pdf.invoice', [
+            'invoice' => $invoice,
+            'public_pay_url' => $publicPayUrl,
+            'public_pay_qr_data_uri' => $publicPayQrDataUri,
+        ])
             ->setPaper('a4')
             ->setOptions([
                 'isRemoteEnabled' => true,

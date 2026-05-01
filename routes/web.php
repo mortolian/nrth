@@ -16,6 +16,7 @@ use App\Http\Controllers\Web\Invoicing\ExchangeRateController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\Invoicing\InvoiceOnlinePaymentController;
 use App\Http\Controllers\Web\OnboardingController;
+use App\Http\Controllers\Web\PublicInvoicePayController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\CompanySettingsController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
@@ -36,6 +37,10 @@ Route::get('/', function () {
 
 Route::post('/webhooks/payments/stripe/{team}', StripePaymentWebhookController::class)->name('webhooks.stripe');
 Route::post('/webhooks/payments/payfast/{team}', PayFastPaymentWebhookController::class)->name('webhooks.payfast');
+
+Route::get('/pay/{token}', [PublicInvoicePayController::class, 'show'])->where('token', '[a-f0-9]{32}')->name('public.invoice.pay');
+Route::post('/pay/{token}/checkout', [PublicInvoicePayController::class, 'checkout'])->where('token', '[a-f0-9]{32}')->name('public.invoice.checkout');
+Route::get('/pay/{token}/pdf', [PublicInvoicePayController::class, 'pdf'])->where('token', '[a-f0-9]{32}')->name('public.invoice.pdf');
 
 Route::middleware([
     'auth:sanctum',
@@ -122,6 +127,8 @@ Route::middleware([
         Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
         Route::post('/invoices/{invoice}/payments/{payment}/undo', [InvoiceController::class, 'undoPayment'])->name('invoices.payments.undo');
         Route::post('/invoices/{invoice}/online-payments', [InvoiceOnlinePaymentController::class, 'store'])->name('invoices.online-payments.store');
+        Route::post('/invoices/{invoice}/public-pay-link', [InvoiceController::class, 'storePublicPayLink'])->name('invoices.public-pay-link.store');
+        Route::get('/invoices/{invoice}/public-pay-qr', [InvoiceController::class, 'publicPayQr'])->name('invoices.public-pay-qr');
     });
     Route::get('/invoices/{invoice}/pdf', [InvoicePdfController::class, 'download'])->name('invoices.pdf.download');
 });

@@ -179,6 +179,16 @@
         page-break-inside: avoid;
     }
 
+    .section.section-pay-online {
+        margin-top: 20px;
+        border: 1px solid #e2e8f0;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .section.section-pay-online img {
+        margin: 0;
+    }
+
     /* Banking — light bordered cards + key/value rows */
     .section-banking {
         margin-top: 14px;
