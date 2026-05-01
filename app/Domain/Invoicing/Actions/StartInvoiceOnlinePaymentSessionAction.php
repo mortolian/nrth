@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Enums\OnlinePaymentSessionStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceOnlinePaymentSession;
 use App\Models\Team;
+use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\Iso4217Currencies;
 use App\Support\PayFastSignature;
 use Illuminate\Support\Facades\URL;
@@ -50,6 +51,11 @@ class StartInvoiceOnlinePaymentSessionAction
 
         $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
         $settings = $team->mergedCompanySettings();
+        if (! InvoiceOnlinePaymentProviders::paymentPagesEnabledForSettings($settings)) {
+            throw ValidationException::withMessages([
+                'provider' => __('Online payment pages are disabled for this company.'),
+            ]);
+        }
         /** @var array<string, mixed> $gateways */
         $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
 

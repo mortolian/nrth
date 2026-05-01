@@ -150,6 +150,7 @@ class CompanySettingsController extends Controller
             'vat_registered' => ['required', 'boolean'],
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
             'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('team_id', $teamId)],
+            'payment_pages_enabled' => ['sometimes', 'boolean'],
             'payment_gateways' => ['required', 'array'],
             'payment_gateways.payfast' => ['required', 'array'],
             'payment_gateways.payfast.enabled' => ['required', 'boolean'],
@@ -212,6 +213,7 @@ class CompanySettingsController extends Controller
             'invoice_default_notes', 'invoice_default_footer',
             'invoice_email_subject_template', 'invoice_email_body_template',
             'vat_registered', 'vat_period_type', 'default_tax_rate_id',
+            'payment_pages_enabled',
             'payment_gateways',
         ];
 

@@ -30,6 +30,8 @@ class PublicInvoicePayController extends Controller
             abort(404);
         }
 
+        $this->abortUnlessPaymentPagesEnabled($invoice);
+
         if ($invoice->viewed_at === null && ! in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Void], true)) {
             $invoice->forceFill(['viewed_at' => now()])->save();
         }
@@ -101,6 +103,8 @@ class PublicInvoicePayController extends Controller
             abort(404);
         }
 
+        $this->abortUnlessPaymentPagesEnabled($invoice);
+
         $team = $invoice->team ?? $invoice->loadMissing('team')->team;
         if ($team === null) {
             abort(404);
@@ -141,6 +145,8 @@ class PublicInvoicePayController extends Controller
         if ($invoice === null) {
             abort(404);
         }
+
+        $this->abortUnlessPaymentPagesEnabled($invoice);
 
         try {
             $media = $invoicePdfService->generate($invoice->fresh());
@@ -188,5 +194,13 @@ class PublicInvoicePayController extends Controller
         }
 
         return $invoice;
+    }
+
+    private function abortUnlessPaymentPagesEnabled(Invoice $invoice): void
+    {
+        $invoice->loadMissing('team');
+        if (! InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team)) {
+            abort(404);
+        }
     }
 }

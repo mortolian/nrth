@@ -4,6 +4,7 @@ namespace App\Domain\Invoicing\Services;
 
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\InvoicePayQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
@@ -49,6 +50,7 @@ class InvoicePdfService
         if (
             $invoice->public_token !== null
             && ! in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Void], true)
+            && InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team)
         ) {
             $publicPayUrl = route('public.invoice.pay', ['token' => $invoice->public_token], true);
             $publicPayQrDataUri = InvoicePayQrCode::pngDataUri($publicPayUrl, 168, 8);

@@ -3,9 +3,27 @@
 namespace App\Support;
 
 use App\Domain\Invoicing\Models\Invoice;
+use App\Models\Team;
 
 final class InvoiceOnlinePaymentProviders
 {
+    /**
+     * @param  array<string, mixed>  $mergedCompanySettings
+     */
+    public static function paymentPagesEnabledForSettings(array $mergedCompanySettings): bool
+    {
+        return filter_var($mergedCompanySettings['payment_pages_enabled'] ?? true, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    public static function paymentPagesEnabledForTeam(?Team $team): bool
+    {
+        if ($team === null) {
+            return false;
+        }
+
+        return self::paymentPagesEnabledForSettings($team->mergedCompanySettings());
+    }
+
     /**
      * @return list<string>
      */
@@ -13,11 +31,12 @@ final class InvoiceOnlinePaymentProviders
     {
         $invoice->loadMissing('team');
         $team = $invoice->team;
-        if ($team === null) {
+        if (! self::paymentPagesEnabledForTeam($team)) {
             return [];
         }
 
         $settings = $team->mergedCompanySettings();
+
         /** @var array<string, mixed> $gateways */
         $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
         $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));

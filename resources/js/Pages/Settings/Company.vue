@@ -68,6 +68,12 @@ const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
 
+watch(tab, (next) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', next);
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+});
+
 const form = useForm({
     name: props.team.name,
     trading_name: String(props.settings.trading_name ?? ''),
@@ -110,6 +116,7 @@ const form = useForm({
     vat_registered: Boolean(props.settings.vat_registered ?? true),
     vat_period_type: String(props.settings.vat_period_type ?? 'bi_monthly'),
     default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
+    payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? true),
     payment_gateways: {
         payfast: {
             enabled: Boolean((props.settings.payment_gateways as any)?.payfast?.enabled ?? false),
@@ -261,7 +268,7 @@ const tabs = [
     { id: 'estimate' as const, label: 'Estimates' },
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
-    { id: 'payment_pages' as const, label: 'Payment page providers' },
+    { id: 'payment_pages' as const, label: 'Online payments' },
 ];
 
 const activeTaxRates = computed(() => props.tax_rates.filter((rate) => rate.is_active));
@@ -311,6 +318,7 @@ const submit = () => {
         vat_registered: form.vat_registered,
         vat_period_type: form.vat_period_type,
         default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
+        payment_pages_enabled: form.payment_pages_enabled,
         payment_gateways: {
             payfast: {
                 enabled: form.payment_gateways.payfast.enabled,
@@ -402,7 +410,7 @@ const removeBankAccount = (index: number) => {
     >
         <PageHeader
             title="Company settings"
-            subtitle="Profile, invoicing, tax, banking, and online payment providers for your business"
+            subtitle="Profile, invoicing, tax, banking, and online payments (card checkout). Use the Online payments tab for Stripe, PayFast, and other gateways."
         />
 
         <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
@@ -647,6 +655,27 @@ const removeBankAccount = (index: number) => {
                             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
+                    <div class="md:col-span-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
+                        <h4 class="text-sm font-semibold text-slate-900">Online payment pages</h4>
+                        <p class="mt-1 text-xs text-slate-600">
+                            Turn off the entire public pay experience (pay page, link, QR, and hosted card checkout). Gateway keys and per-provider toggles are on the
+                            <button type="button" class="font-medium text-brand-700 hover:underline" @click="tab = 'payment_pages'">Online payments</button>
+                            tab.
+                        </p>
+                        <label class="mt-3 flex cursor-pointer items-start gap-3">
+                            <input
+                                v-model="form.payment_pages_enabled"
+                                type="checkbox"
+                                class="mt-1 rounded border-slate-300"
+                            >
+                            <span>
+                                <span class="block text-sm font-medium text-slate-900">Enable online payment pages</span>
+                                <span class="mt-0.5 block text-xs text-slate-600">
+                                    When off, the public pay URL and QR are unavailable and checkout is hidden; your saved provider settings stay in place.
+                                </span>
+                            </span>
+                        </label>
+                    </div>
                 </div>
             </AppCard>
 
@@ -822,11 +851,29 @@ const removeBankAccount = (index: number) => {
             </AppCard>
 
             <AppCard v-show="tab === 'payment_pages'">
-                <h3 class="text-base font-semibold text-slate-900">Payment page providers</h3>
+                <h3 class="text-base font-semibold text-slate-900">Online payments</h3>
                 <p class="mt-1 text-sm text-slate-500">
-                    Store gateway credentials for hosted checkout (Stripe, PayFast, PayPal, Netcash, SnapScan, Zapper). Invoice “Pay online” uses the enabled providers.
+                    Store gateway credentials for hosted checkout (Stripe, PayFast, PayPal, Netcash, SnapScan, Zapper). When online payment pages are on, invoice “Pay online”, the customer pay page, and the public PDF link use the enabled providers.
                 </p>
-                <div class="mt-4 space-y-5">
+                <div class="mt-4 rounded-lg border border-slate-300 bg-slate-100 px-4 py-3">
+                    <label class="flex cursor-pointer items-start gap-3">
+                        <input
+                            v-model="form.payment_pages_enabled"
+                            type="checkbox"
+                            class="mt-1 rounded border-slate-300"
+                        >
+                        <span>
+                            <span class="block text-sm font-semibold text-slate-900">Enable online payment pages</span>
+                            <span class="mt-0.5 block text-sm text-slate-600">
+                                When off, public pay URLs, QR codes, public invoice PDF, and hosted checkout are disabled. Gateway settings below are kept so you can turn this back on without re-entering keys.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                <div
+                    class="mt-4 space-y-5 transition-opacity"
+                    :class="{ 'pointer-events-none opacity-45': !form.payment_pages_enabled }"
+                >
                     <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
                         <label class="flex items-center gap-2 text-sm font-medium text-slate-800">
                             <input v-model="form.payment_gateways.payfast.enabled" type="checkbox" class="rounded border-slate-300">

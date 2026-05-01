@@ -210,6 +210,8 @@ class Team extends JetstreamTeam implements HasMedia
             'vat_registered' => true,
             'vat_period_type' => 'bi_monthly',
             'default_tax_rate_id' => null,
+            /** Master switch: hosted checkout on invoice + public pay page (Stripe, PayFast, …). */
+            'payment_pages_enabled' => true,
             'bank_name' => null,
             'bank_account_holder' => null,
             'bank_account_number' => null,

@@ -552,13 +552,14 @@ class InvoiceController extends Controller
                 'delete' => ! $invoice->payments()->exists(),
             ],
             'online_payment_providers' => InvoiceOnlinePaymentProviders::enabledForInvoice($invoice),
-            'public_pay_url' => $invoice->public_token !== null
+            'public_pay_url' => $invoice->public_token !== null && InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team)
                 ? route('public.invoice.pay', ['token' => $invoice->public_token], true)
                 : null,
-            'public_pay_qr_url' => $invoice->public_token !== null
+            'public_pay_qr_url' => $invoice->public_token !== null && InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team)
                 ? route('invoicing.invoices.public-pay-qr', $invoice)
                 : null,
-            'can_manage_public_pay_link' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
+            'can_manage_public_pay_link' => InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team)
+                && in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
             'charges_vat' => $invoice->team?->chargesVat() ?? false,
         ]);
     }
@@ -570,6 +571,8 @@ class InvoiceController extends Controller
             in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
             403,
         );
+        $invoice->loadMissing('team');
+        abort_unless(InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team), 403);
 
         $request->validate([
             'regenerate' => ['sometimes', 'boolean'],
@@ -588,6 +591,8 @@ class InvoiceController extends Controller
     {
         abort_unless($invoice->team_id === request()->user()->current_team_id, 403);
         abort_if($invoice->public_token === null, 404);
+        $invoice->loadMissing('team');
+        abort_unless(InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team), 403);
 
         $payUrl = route('public.invoice.pay', ['token' => $invoice->public_token], true);
         $png = InvoicePayQrCode::pngBinary($payUrl, 220, 8);
