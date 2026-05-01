@@ -22,6 +22,10 @@ class CompanyBankAccountsTest extends TestCase
             'bank_name' => 'Bank A',
             'bank_account_holder' => null,
             'bank_account_number' => '111',
+            'swift_code' => 'SBZAZAJJ',
+            'bic' => 'DEUTDEFF',
+            'iban' => 'GB29NWBK60161331926819',
+            'routing_sort_code' => '20-00-00',
             'bank_branch_code' => null,
             'bank_account_type' => 'current',
             'title' => 'Primary operating account',
@@ -42,6 +46,10 @@ class CompanyBankAccountsTest extends TestCase
         $this->assertCount(1, $shown);
         $this->assertSame('Bank A', $shown[0]['name']);
         $this->assertSame('111', $shown[0]['account']);
+        $this->assertSame('SBZAZAJJ', $shown[0]['swift_code']);
+        $this->assertSame('DEUTDEFF', $shown[0]['bic']);
+        $this->assertSame('GB29NWBK60161331926819', $shown[0]['iban']);
+        $this->assertSame('20-00-00', $shown[0]['routing_sort_code']);
         $this->assertSame('Primary operating account', $shown[0]['title']);
     }
 

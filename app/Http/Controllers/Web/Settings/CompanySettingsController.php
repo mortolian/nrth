@@ -42,6 +42,10 @@ class CompanySettingsController extends Controller
                 'bank_name' => (string) ($b->bank_name ?? ''),
                 'bank_account_holder' => (string) ($b->bank_account_holder ?? ''),
                 'bank_account_number' => (string) ($b->bank_account_number ?? ''),
+                'swift_code' => (string) ($b->swift_code ?? ''),
+                'bic' => (string) ($b->bic ?? ''),
+                'iban' => (string) ($b->iban ?? ''),
+                'routing_sort_code' => (string) ($b->routing_sort_code ?? ''),
                 'bank_branch_code' => (string) ($b->bank_branch_code ?? ''),
                 'bank_account_type' => (string) ($b->bank_account_type ?? 'current'),
                 'show_on_invoice' => (bool) $b->show_on_invoice,
@@ -150,6 +154,10 @@ class CompanySettingsController extends Controller
             'bank_accounts.*.bank_name' => ['nullable', 'string', 'max:255'],
             'bank_accounts.*.bank_account_holder' => ['nullable', 'string', 'max:255'],
             'bank_accounts.*.bank_account_number' => ['nullable', 'string', 'max:64'],
+            'bank_accounts.*.swift_code' => ['nullable', 'string', 'max:32'],
+            'bank_accounts.*.bic' => ['nullable', 'string', 'max:32'],
+            'bank_accounts.*.iban' => ['nullable', 'string', 'max:64'],
+            'bank_accounts.*.routing_sort_code' => ['nullable', 'string', 'max:64'],
             'bank_accounts.*.bank_branch_code' => ['nullable', 'string', 'max:32'],
             'bank_accounts.*.bank_account_type' => ['nullable', Rule::in(['current', 'savings'])],
             'bank_accounts.*.title' => ['nullable', 'string', 'max:128'],
@@ -344,6 +352,10 @@ class CompanySettingsController extends Controller
             $hasDetail = filled($row['bank_name'] ?? null)
                 || filled($row['bank_account_holder'] ?? null)
                 || filled($row['bank_account_number'] ?? null)
+                || filled($row['swift_code'] ?? null)
+                || filled($row['bic'] ?? null)
+                || filled($row['iban'] ?? null)
+                || filled($row['routing_sort_code'] ?? null)
                 || filled($row['bank_branch_code'] ?? null)
                 || filled($row['title'] ?? null);
             if (! $hasDetail) {
@@ -362,6 +374,10 @@ class CompanySettingsController extends Controller
                 'bank_name' => filled($row['bank_name'] ?? null) ? (string) $row['bank_name'] : null,
                 'bank_account_holder' => filled($row['bank_account_holder'] ?? null) ? (string) $row['bank_account_holder'] : null,
                 'bank_account_number' => filled($row['bank_account_number'] ?? null) ? (string) $row['bank_account_number'] : null,
+                'swift_code' => filled($row['swift_code'] ?? null) ? (string) $row['swift_code'] : null,
+                'bic' => filled($row['bic'] ?? null) ? (string) $row['bic'] : null,
+                'iban' => filled($row['iban'] ?? null) ? (string) $row['iban'] : null,
+                'routing_sort_code' => filled($row['routing_sort_code'] ?? null) ? (string) $row['routing_sort_code'] : null,
                 'bank_branch_code' => filled($row['bank_branch_code'] ?? null) ? (string) $row['bank_branch_code'] : null,
                 'bank_account_type' => $type,
                 'show_on_invoice' => filter_var($row['show_on_invoice'] ?? true, FILTER_VALIDATE_BOOLEAN),

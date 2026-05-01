@@ -170,7 +170,15 @@
                     <tr>
                         @foreach($bankPair as $bank)
                             @php
-                                $hasBankCells = !empty($bank['name']) || !empty($bank['holder']) || !empty($bank['account']) || !empty($bank['branch']) || !empty($bank['type']);
+                                $hasBankCells = !empty($bank['name'])
+                                    || !empty($bank['holder'])
+                                    || !empty($bank['account'])
+                                    || !empty($bank['swift_code'])
+                                    || !empty($bank['bic'])
+                                    || !empty($bank['iban'])
+                                    || !empty($bank['routing_sort_code'])
+                                    || !empty($bank['branch'])
+                                    || !empty($bank['type']);
                             @endphp
                             <td class="bank-grid-cell {{ $loop->first ? 'bank-grid-cell-left' : 'bank-grid-cell-right' }}">
                                 <div class="bank-card">
@@ -195,6 +203,30 @@
                                                 <tr>
                                                     <td class="bank-k">Account no.</td>
                                                     <td class="bank-v">{{ $bank['account'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['swift_code']))
+                                                <tr>
+                                                    <td class="bank-k">SWIFT</td>
+                                                    <td class="bank-v">{{ $bank['swift_code'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['bic']))
+                                                <tr>
+                                                    <td class="bank-k">BIC</td>
+                                                    <td class="bank-v">{{ $bank['bic'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['iban']))
+                                                <tr>
+                                                    <td class="bank-k">IBAN</td>
+                                                    <td class="bank-v">{{ $bank['iban'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['routing_sort_code']))
+                                                <tr>
+                                                    <td class="bank-k">Routing / sort</td>
+                                                    <td class="bank-v">{{ $bank['routing_sort_code'] }}</td>
                                                 </tr>
                                             @endif
                                             @if(!empty($bank['branch']))

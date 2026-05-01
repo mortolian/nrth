@@ -13,6 +13,10 @@ type BankAccountRow = {
     bank_name: string;
     bank_account_holder: string;
     bank_account_number: string;
+    swift_code: string;
+    bic: string;
+    iban: string;
+    routing_sort_code: string;
     bank_branch_code: string;
     bank_account_type: string;
     show_on_invoice: boolean;
@@ -23,6 +27,10 @@ const emptyBankRow = (): BankAccountRow => ({
     bank_name: '',
     bank_account_holder: '',
     bank_account_number: '',
+    swift_code: '',
+    bic: '',
+    iban: '',
+    routing_sort_code: '',
     bank_branch_code: '',
     bank_account_type: 'current',
     show_on_invoice: true,
@@ -109,6 +117,10 @@ const form = useForm({
                   bank_name: String(r.bank_name ?? ''),
                   bank_account_holder: String(r.bank_account_holder ?? ''),
                   bank_account_number: String(r.bank_account_number ?? ''),
+                  swift_code: String(r.swift_code ?? ''),
+                  bic: String(r.bic ?? ''),
+                  iban: String(r.iban ?? ''),
+                  routing_sort_code: String(r.routing_sort_code ?? ''),
                   bank_branch_code: String(r.bank_branch_code ?? ''),
                   bank_account_type: String(r.bank_account_type ?? 'current'),
                   show_on_invoice: Boolean(r.show_on_invoice),
@@ -268,6 +280,10 @@ const submit = () => {
             bank_name: r.bank_name,
             bank_account_holder: r.bank_account_holder,
             bank_account_number: r.bank_account_number,
+            swift_code: r.swift_code,
+            bic: r.bic,
+            iban: r.iban,
+            routing_sort_code: r.routing_sort_code,
             bank_branch_code: r.bank_branch_code,
             bank_account_type: r.bank_account_type,
             show_on_invoice: r.show_on_invoice,
@@ -683,6 +699,22 @@ const removeBankAccount = (index: number) => {
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Account number</label>
                                 <AppInput v-model="row.bank_account_number" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">SWIFT</label>
+                                <AppInput v-model="row.swift_code" placeholder="e.g. SBZAZAJJ" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">BIC</label>
+                                <AppInput v-model="row.bic" placeholder="e.g. DEUTDEFF" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">IBAN</label>
+                                <AppInput v-model="row.iban" placeholder="e.g. GB29NWBK60161331926819" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Routing / sort code</label>
+                                <AppInput v-model="row.routing_sort_code" placeholder="e.g. 20-00-00" />
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Branch code</label>
