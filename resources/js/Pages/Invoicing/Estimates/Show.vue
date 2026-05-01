@@ -6,7 +6,7 @@ import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
-type Quote = {
+type EstimateDetail = {
     id: number;
     number: string;
     client_id: number;
@@ -30,7 +30,7 @@ type Quote = {
 };
 
 const props = defineProps<{
-    quote: Quote;
+    estimate: EstimateDetail;
     /** When false, VAT rows are hidden in totals (company not VAT-registered / no default rate). */
     charges_vat: boolean;
     can: {
@@ -50,18 +50,18 @@ const convertForm = ref({
     invoice_notes: props.convert_defaults.invoice_notes,
 });
 
-const currency = (cents: number) => useFormatCurrency(cents / 100, props.quote.currency || 'ZAR');
+const currency = (cents: number) => useFormatCurrency(cents / 100, props.estimate.currency || 'ZAR');
 
 const badgeVariant = () => {
-    if (props.quote.status === 'accepted') return 'success';
-    if (props.quote.status === 'declined') return 'danger';
-    if (props.quote.status === 'expired') return 'danger';
-    if (props.quote.status === 'converted') return 'neutral';
+    if (props.estimate.status === 'accepted') return 'success';
+    if (props.estimate.status === 'declined') return 'danger';
+    if (props.estimate.status === 'expired') return 'danger';
+    if (props.estimate.status === 'converted') return 'neutral';
     return 'info';
 };
 
 const submitConvert = () => {
-    router.post(route('invoicing.quotes.convert', props.quote.id), convertForm.value, {
+    router.post(route('invoicing.estimates.convert', props.estimate.id), convertForm.value, {
         onSuccess: () => {
             convertDrawerOpen.value = false;
         },
@@ -69,55 +69,55 @@ const submitConvert = () => {
 };
 
 const downloadPdf = () => {
-    window.location.assign(route('invoicing.quotes.pdf.download', props.quote.id));
+    window.location.assign(route('invoicing.estimates.pdf.download', props.estimate.id));
 };
 
-const deleteQuote = () => {
-    if (!window.confirm('Permanently delete this quote? This cannot be undone.')) {
+const deleteEstimate = () => {
+    if (!window.confirm('Permanently delete this estimate? This cannot be undone.')) {
         return;
     }
-    router.delete(route('invoicing.quotes.destroy', props.quote.id));
+    router.delete(route('invoicing.estimates.destroy', props.estimate.id));
 };
 </script>
 
 <template>
     <AppLayout
-        :title="quote.number"
+        :title="estimate.number"
         :breadcrumbs="[
             { label: 'Money In' },
-            { label: 'Quotes', href: route('invoicing.quotes.index') },
-            { label: quote.number },
+            { label: 'Estimates', href: route('invoicing.estimates.index') },
+            { label: estimate.number },
         ]"
     >
-        <Head :title="quote.number" />
+        <Head :title="estimate.number" />
 
-        <PageHeader :title="quote.number">
+        <PageHeader :title="estimate.number">
             <template #actions>
                 <div class="flex gap-2">
-                    <AppButton variant="primary" @click="router.visit(route('invoicing.quotes.edit', quote.id))">Edit quote</AppButton>
+                    <AppButton variant="primary" @click="router.visit(route('invoicing.estimates.edit', estimate.id))">Edit estimate</AppButton>
                     <AppButton variant="primary" @click="downloadPdf">Download PDF</AppButton>
-                    <AppButton v-if="quote.status === 'draft'" variant="primary" @click="router.post(route('invoicing.quotes.send', quote.id))">Send quote</AppButton>
-                    <AppButton v-if="quote.status === 'draft'" variant="primary" @click="router.post(route('invoicing.quotes.mark-sent', quote.id))">Mark as sent</AppButton>
-                    <AppButton v-if="quote.status === 'sent'" variant="primary" @click="router.post(route('invoicing.quotes.accept', quote.id))">Mark accepted</AppButton>
-                    <AppButton v-if="quote.status === 'sent'" variant="primary" @click="router.post(route('invoicing.quotes.decline', quote.id))">Mark declined</AppButton>
+                    <AppButton v-if="estimate.status === 'draft'" variant="primary" @click="router.post(route('invoicing.estimates.send', estimate.id))">Send estimate</AppButton>
+                    <AppButton v-if="estimate.status === 'draft'" variant="primary" @click="router.post(route('invoicing.estimates.mark-sent', estimate.id))">Mark as sent</AppButton>
+                    <AppButton v-if="estimate.status === 'sent'" variant="primary" @click="router.post(route('invoicing.estimates.accept', estimate.id))">Mark accepted</AppButton>
+                    <AppButton v-if="estimate.status === 'sent'" variant="primary" @click="router.post(route('invoicing.estimates.decline', estimate.id))">Mark declined</AppButton>
                     <AppButton
-                        v-if="['accepted', 'sent'].includes(quote.status)"
+                        v-if="['accepted', 'sent'].includes(estimate.status)"
                         variant="primary"
                         @click="convertDrawerOpen = true"
                     >
                         Convert to invoice
                     </AppButton>
                     <AppButton
-                        v-if="quote.status === 'converted' && quote.converted_invoice_id"
+                        v-if="estimate.status === 'converted' && estimate.converted_invoice_id"
                         variant="primary"
-                        @click="router.visit(route('invoicing.invoices.show', quote.converted_invoice_id))"
+                        @click="router.visit(route('invoicing.invoices.show', estimate.converted_invoice_id))"
                     >
                         View invoice
                     </AppButton>
                     <AppButton
                         v-if="can.delete"
                         variant="primary"
-                        @click="deleteQuote"
+                        @click="deleteEstimate"
                     >
                         Delete
                     </AppButton>
@@ -131,19 +131,19 @@ const deleteQuote = () => {
                     <div class="grid gap-3 md:grid-cols-2">
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">Client</p>
-                            <p class="text-sm font-medium text-slate-900">{{ quote.client_name }}</p>
+                            <p class="text-sm font-medium text-slate-900">{{ estimate.client_name }}</p>
                         </div>
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">Status</p>
-                            <AppBadge :variant="badgeVariant()">{{ quote.status }}</AppBadge>
+                            <AppBadge :variant="badgeVariant()">{{ estimate.status }}</AppBadge>
                         </div>
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">Issued</p>
-                            <p class="text-sm text-slate-900">{{ quote.issue_date }}</p>
+                            <p class="text-sm text-slate-900">{{ estimate.issue_date }}</p>
                         </div>
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">Valid until</p>
-                            <p class="text-sm text-slate-900">{{ quote.expiry_date }}</p>
+                            <p class="text-sm text-slate-900">{{ estimate.expiry_date }}</p>
                         </div>
                     </div>
 
@@ -159,7 +159,7 @@ const deleteQuote = () => {
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                <tr v-for="(line, idx) in quote.line_items" :key="idx">
+                                <tr v-for="(line, idx) in estimate.line_items" :key="idx">
                                     <td class="px-3 py-2">{{ line.description }}</td>
                                     <td class="px-3 py-2">{{ line.quantity }}</td>
                                     <td class="px-3 py-2">{{ currency(line.unit_price_cents) }}</td>
@@ -171,34 +171,34 @@ const deleteQuote = () => {
                     </div>
 
                     <div class="ml-auto w-full max-w-sm space-y-2 text-sm">
-                        <div class="flex items-center justify-between"><span class="text-slate-500">Subtotal</span><span>{{ currency(quote.subtotal_cents) }}</span></div>
-                        <div v-if="charges_vat" class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ currency(quote.vat_amount_cents) }}</span></div>
-                        <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ currency(quote.total_cents) }}</span></div>
+                        <div class="flex items-center justify-between"><span class="text-slate-500">Subtotal</span><span>{{ currency(estimate.subtotal_cents) }}</span></div>
+                        <div v-if="charges_vat" class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ currency(estimate.vat_amount_cents) }}</span></div>
+                        <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ currency(estimate.total_cents) }}</span></div>
                     </div>
 
-                    <div v-if="quote.notes" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+                    <div v-if="estimate.notes" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Notes</p>
-                        {{ quote.notes }}
+                        {{ estimate.notes }}
                     </div>
-                    <div v-if="quote.terms" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+                    <div v-if="estimate.terms" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Terms</p>
-                        {{ quote.terms }}
+                        {{ estimate.terms }}
                     </div>
                 </AppCard>
             </section>
 
             <aside class="space-y-4">
                 <AppCard>
-                    <h3 class="text-base font-semibold text-slate-900">Quote total</h3>
-                    <p class="mt-1 text-2xl font-bold text-slate-900">{{ currency(quote.total_cents) }}</p>
+                    <h3 class="text-base font-semibold text-slate-900">Estimate total</h3>
+                    <p class="mt-1 text-2xl font-bold text-slate-900">{{ currency(estimate.total_cents) }}</p>
                     <p v-if="charges_vat" class="mt-2 text-xs text-slate-500">Incl VAT estimate</p>
                 </AppCard>
                 <AppCard>
                     <h3 class="text-base font-semibold text-slate-900">Next actions</h3>
                     <ul class="mt-2 list-disc space-y-1 pl-4 text-sm text-slate-600">
-                        <li>Send quote by email</li>
+                        <li>Send estimate by email</li>
                         <li>Follow up before expiry</li>
-                        <li>Convert accepted quote to invoice</li>
+                        <li>Convert accepted estimate to invoice</li>
                     </ul>
                 </AppCard>
             </aside>
@@ -241,4 +241,3 @@ const deleteQuote = () => {
         </aside>
     </AppLayout>
 </template>
-

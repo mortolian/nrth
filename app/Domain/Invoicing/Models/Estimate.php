@@ -2,7 +2,7 @@
 
 namespace App\Domain\Invoicing\Models;
 
-use App\Domain\Invoicing\Enums\QuoteStatus;
+use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
 use Illuminate\Database\Eloquent\Model;
@@ -12,10 +12,12 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Quote extends Model implements HasMedia
+class Estimate extends Model implements HasMedia
 {
     use HasTeamScope;
     use InteractsWithMedia;
+
+    protected $table = 'estimates';
 
     protected $fillable = [
         'team_id',
@@ -43,7 +45,7 @@ class Quote extends Model implements HasMedia
     protected function casts(): array
     {
         return [
-            'status' => QuoteStatus::class,
+            'status' => EstimateStatus::class,
             'issue_date' => 'date',
             'expiry_date' => 'date',
             'line_items' => 'array',
@@ -79,7 +81,7 @@ class Quote extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('quote-pdfs')->singleFile();
+        $this->addMediaCollection('estimate-pdfs')->singleFile();
     }
 
     /**
@@ -87,6 +89,6 @@ class Quote extends Model implements HasMedia
      */
     public function pdfs(): Collection
     {
-        return $this->getMedia('quote-pdfs');
+        return $this->getMedia('estimate-pdfs');
     }
 }

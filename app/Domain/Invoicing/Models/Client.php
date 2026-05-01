@@ -14,6 +14,7 @@ class Client extends Model
 {
     /** @use HasFactory<ClientFactory> */
     use HasFactory;
+
     use HasTeamScope;
 
     protected $fillable = [
@@ -60,11 +61,11 @@ class Client extends Model
     }
 
     /**
-     * @return HasMany<Quote, $this>
+     * @return HasMany<Estimate, $this>
      */
-    public function quotes(): HasMany
+    public function estimates(): HasMany
     {
-        return $this->hasMany(Quote::class);
+        return $this->hasMany(Estimate::class);
     }
 
     /**

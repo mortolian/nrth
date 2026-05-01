@@ -2,7 +2,7 @@
 
 namespace App\Mail;
 
-use App\Domain\Invoicing\Models\Quote;
+use App\Domain\Invoicing\Models\Estimate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -12,39 +12,39 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class QuoteMailer extends Mailable implements ShouldQueue
+class EstimateMailer extends Mailable implements ShouldQueue
 {
     use Queueable;
     use SerializesModels;
 
     public function __construct(
-        public Quote $quote,
+        public Estimate $estimate,
         public ?Media $pdfMedia = null,
     ) {}
 
     public function envelope(): Envelope
     {
-        $this->quote->loadMissing('team');
-        $fromName = $this->quote->team !== null
-            ? $this->quote->team->issuerForInvoicingDocuments()['name']
+        $this->estimate->loadMissing('team');
+        $fromName = $this->estimate->team !== null
+            ? $this->estimate->team->issuerForInvoicingDocuments('estimate')['name']
             : config('app.name');
 
         return new Envelope(
-            subject: 'Quote '.$this->quote->number.' from '.$fromName,
+            subject: 'Estimate '.$this->estimate->number.' from '.$fromName,
         );
     }
 
     public function content(): Content
     {
-        $this->quote->loadMissing('team');
-        $issuerName = $this->quote->team !== null
-            ? $this->quote->team->issuerForInvoicingDocuments()['name']
+        $this->estimate->loadMissing('team');
+        $issuerName = $this->estimate->team !== null
+            ? $this->estimate->team->issuerForInvoicingDocuments('estimate')['name']
             : config('app.name');
 
         return new Content(
-            view: 'emails.quote',
+            view: 'emails.estimate',
             with: [
-                'quote' => $this->quote,
+                'estimate' => $this->estimate,
                 'issuer_name' => $issuerName,
             ],
         );

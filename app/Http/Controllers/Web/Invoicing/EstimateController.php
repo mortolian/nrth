@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Web\Invoicing;
 
-use App\Domain\Invoicing\Actions\MarkQuoteSentAction;
-use App\Domain\Invoicing\Actions\SendQuoteAction;
-use App\Domain\Invoicing\Enums\QuoteStatus;
+use App\Domain\Invoicing\Actions\MarkEstimateSentAction;
+use App\Domain\Invoicing\Actions\SendEstimateAction;
+use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Invoicing\Models\Client;
+use App\Domain\Invoicing\Models\Estimate;
 use App\Domain\Invoicing\Models\Invoice;
-use App\Domain\Invoicing\Models\Quote;
 use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
@@ -21,7 +21,7 @@ use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class QuoteController extends Controller
+class EstimateController extends Controller
 {
     public function index(Request $request): Response
     {
@@ -29,7 +29,7 @@ class QuoteController extends Controller
         $status = (string) $request->string('status')->toString();
         $search = trim((string) $request->string('search')->toString());
 
-        $query = Quote::queryWithoutTeamScope()
+        $query = Estimate::queryWithoutTeamScope()
             ->with('client:id,name')
             ->where('team_id', $teamId);
 
@@ -43,25 +43,25 @@ class QuoteController extends Controller
             });
         }
 
-        $quotes = $query->orderByDesc('issue_date')->get();
+        $estimates = $query->orderByDesc('issue_date')->get();
 
-        return Inertia::render('Invoicing/Quotes/Index', [
-            'quotes' => $quotes->map(fn (Quote $quote) => [
-                'id' => $quote->id,
-                'number' => $quote->number,
-                'client_name' => $quote->client?->name ?? 'Unknown',
-                'issue_date' => optional($quote->issue_date)->toDateString(),
-                'expiry_date' => optional($quote->expiry_date)->toDateString(),
-                'total_cents' => (int) $quote->getRawOriginal('total_cents'),
-                'currency' => Iso4217Currencies::normalize((string) ($quote->currency ?? 'ZAR')),
-                'status' => $quote->status->value,
-                'converted_invoice_id' => $quote->converted_invoice_id,
+        return Inertia::render('Invoicing/Estimates/Index', [
+            'estimates' => $estimates->map(fn (Estimate $estimate) => [
+                'id' => $estimate->id,
+                'number' => $estimate->number,
+                'client_name' => $estimate->client?->name ?? 'Unknown',
+                'issue_date' => optional($estimate->issue_date)->toDateString(),
+                'expiry_date' => optional($estimate->expiry_date)->toDateString(),
+                'total_cents' => (int) $estimate->getRawOriginal('total_cents'),
+                'currency' => Iso4217Currencies::normalize((string) ($estimate->currency ?? 'ZAR')),
+                'status' => $estimate->status->value,
+                'converted_invoice_id' => $estimate->converted_invoice_id,
             ])->values()->all(),
             'summary' => [
-                'draft' => $quotes->filter(fn (Quote $q) => $q->status === QuoteStatus::Draft)->count(),
-                'sent' => $quotes->filter(fn (Quote $q) => $q->status === QuoteStatus::Sent)->count(),
-                'accepted' => $quotes->filter(fn (Quote $q) => $q->status === QuoteStatus::Accepted)->count(),
-                'expired' => $quotes->filter(fn (Quote $q) => $q->status === QuoteStatus::Expired)->count(),
+                'draft' => $estimates->filter(fn (Estimate $e) => $e->status === EstimateStatus::Draft)->count(),
+                'sent' => $estimates->filter(fn (Estimate $e) => $e->status === EstimateStatus::Sent)->count(),
+                'accepted' => $estimates->filter(fn (Estimate $e) => $e->status === EstimateStatus::Accepted)->count(),
+                'expired' => $estimates->filter(fn (Estimate $e) => $e->status === EstimateStatus::Expired)->count(),
             ],
             'filters' => [
                 'status' => $status !== '' ? $status : 'all',
@@ -77,9 +77,11 @@ class QuoteController extends Controller
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
         $settings = $request->user()->currentTeam?->mergedCompanySettings() ?? [];
 
-        return Inertia::render('Invoicing/Quotes/Form', [
+        return Inertia::render('Invoicing/Estimates/Form', [
             'isEditing' => false,
-            'quote' => null,
+            'estimate' => null,
+            'default_notes' => (string) ($settings['estimate_default_notes'] ?? ''),
+            'default_terms' => (string) ($settings['estimate_default_terms'] ?? ''),
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
@@ -93,22 +95,24 @@ class QuoteController extends Controller
                 ->values()
                 ->all(),
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
-            'tax_rates' => $this->taxRatesForQuoteForm($teamId, $chargesVat),
+            'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
-            'next_number' => $this->nextQuoteNumber($teamId),
+            'next_number' => $this->nextEstimateNumber($teamId),
         ]);
     }
 
-    public function edit(Request $request, Quote $quote): Response
+    public function edit(Request $request, Estimate $estimate): Response
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
         $settings = $request->user()->currentTeam?->mergedCompanySettings() ?? [];
 
-        return Inertia::render('Invoicing/Quotes/Form', [
+        return Inertia::render('Invoicing/Estimates/Form', [
             'isEditing' => true,
-            'quote' => $this->serializeQuote($quote->loadMissing('client'), $chargesVat),
+            'estimate' => $this->serializeEstimate($estimate->loadMissing('client'), $chargesVat),
+            'default_notes' => (string) ($settings['estimate_default_notes'] ?? ''),
+            'default_terms' => (string) ($settings['estimate_default_terms'] ?? ''),
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
@@ -122,43 +126,43 @@ class QuoteController extends Controller
                 ->values()
                 ->all(),
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
-            'tax_rates' => $this->taxRatesForQuoteForm($teamId, $chargesVat),
+            'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
-            'next_number' => $this->nextQuoteNumber($teamId),
+            'next_number' => $this->nextEstimateNumber($teamId),
         ]);
     }
 
-    public function show(Request $request, Quote $quote): Response
+    public function show(Request $request, Estimate $estimate): Response
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
 
-        return Inertia::render('Invoicing/Quotes/Show', [
-            'quote' => $this->serializeQuote($quote->loadMissing('client')),
+        return Inertia::render('Invoicing/Estimates/Show', [
+            'estimate' => $this->serializeEstimate($estimate->loadMissing('client')),
             'can' => [
                 'delete' => true,
             ],
             'charges_vat' => $request->user()->currentTeam?->chargesVat() ?? false,
             'convert_defaults' => [
                 'invoice_due_date' => now()->addDays(30)->toDateString(),
-                'invoice_footer' => (string) ($quote->terms ?? ''),
-                'invoice_notes' => (string) ($quote->notes ?? ''),
+                'invoice_footer' => (string) ($estimate->terms ?? ''),
+                'invoice_notes' => (string) ($estimate->notes ?? ''),
             ],
         ]);
     }
 
-    public function store(Request $request, SendQuoteAction $sendQuoteAction): RedirectResponse
+    public function store(Request $request, SendEstimateAction $sendEstimateAction): RedirectResponse
     {
-        $payload = $this->validateQuote($request, null);
+        $payload = $this->validateEstimate($request, null);
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
-        $lineItems = $this->normalizeQuoteLineItemsVat($payload['line_items'], $chargesVat);
+        $lineItems = $this->normalizeEstimateLineItemsVat($payload['line_items'], $chargesVat);
         [$subtotal, $vat, $total] = $this->calculateTotals($lineItems);
 
         $submitAction = (string) ($payload['submit_action'] ?? 'draft');
-        $quote = Quote::query()->create([
+        $estimate = Estimate::query()->create([
             'team_id' => $teamId,
             'client_id' => (int) $payload['client_id'],
-            'status' => QuoteStatus::Draft,
+            'status' => EstimateStatus::Draft,
             'number' => (string) $payload['number'],
             'issue_date' => (string) $payload['issue_date'],
             'expiry_date' => (string) $payload['expiry_date'],
@@ -173,21 +177,21 @@ class QuoteController extends Controller
         ]);
 
         if ($submitAction === 'send') {
-            $sendQuoteAction->execute($quote);
+            $sendEstimateAction->execute($estimate);
         }
 
-        return to_route('invoicing.quotes.show', $quote);
+        return to_route('invoicing.estimates.show', $estimate);
     }
 
-    public function update(Request $request, Quote $quote, SendQuoteAction $sendQuoteAction): RedirectResponse
+    public function update(Request $request, Estimate $estimate, SendEstimateAction $sendEstimateAction): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
-        $payload = $this->validateQuote($request, $quote);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
+        $payload = $this->validateEstimate($request, $estimate);
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
-        $lineItems = $this->normalizeQuoteLineItemsVat($payload['line_items'], $chargesVat);
+        $lineItems = $this->normalizeEstimateLineItemsVat($payload['line_items'], $chargesVat);
         [$subtotal, $vat, $total] = $this->calculateTotals($lineItems);
 
-        $quote->update([
+        $estimate->update([
             'client_id' => (int) $payload['client_id'],
             'number' => (string) $payload['number'],
             'issue_date' => (string) $payload['issue_date'],
@@ -201,73 +205,73 @@ class QuoteController extends Controller
             'terms' => $payload['terms'] ?? null,
         ]);
 
-        if (($payload['submit_action'] ?? 'draft') === 'send' && $quote->status === QuoteStatus::Draft) {
-            $sendQuoteAction->execute($quote->fresh());
+        if (($payload['submit_action'] ?? 'draft') === 'send' && $estimate->status === EstimateStatus::Draft) {
+            $sendEstimateAction->execute($estimate->fresh());
         }
 
-        return to_route('invoicing.quotes.show', $quote);
+        return to_route('invoicing.estimates.show', $estimate);
     }
 
-    public function send(Request $request, Quote $quote, SendQuoteAction $sendQuoteAction): RedirectResponse
+    public function send(Request $request, Estimate $estimate, SendEstimateAction $sendEstimateAction): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
-        $sendQuoteAction->execute($quote);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
+        $sendEstimateAction->execute($estimate);
 
         return back();
     }
 
-    public function markSent(Request $request, Quote $quote, MarkQuoteSentAction $markQuoteSentAction): RedirectResponse
+    public function markSent(Request $request, Estimate $estimate, MarkEstimateSentAction $markEstimateSentAction): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
-        $markQuoteSentAction->execute($quote);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
+        $markEstimateSentAction->execute($estimate);
 
         return back();
     }
 
-    public function accept(Request $request, Quote $quote): RedirectResponse
+    public function accept(Request $request, Estimate $estimate): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
-        $quote->update(['status' => QuoteStatus::Accepted, 'accepted_at' => now(), 'declined_at' => null]);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
+        $estimate->update(['status' => EstimateStatus::Accepted, 'accepted_at' => now(), 'declined_at' => null]);
 
         return back();
     }
 
-    public function decline(Request $request, Quote $quote): RedirectResponse
+    public function decline(Request $request, Estimate $estimate): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
-        $quote->update(['status' => QuoteStatus::Declined, 'declined_at' => now(), 'accepted_at' => null]);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
+        $estimate->update(['status' => EstimateStatus::Declined, 'declined_at' => now(), 'accepted_at' => null]);
 
         return back();
     }
 
-    public function convert(Request $request, Quote $quote, InvoiceNumberService $invoiceNumberService): RedirectResponse
+    public function convert(Request $request, Estimate $estimate, InvoiceNumberService $invoiceNumberService): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
-        abort_if($quote->converted_invoice_id !== null, 422, 'Quote already converted.');
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
+        abort_if($estimate->converted_invoice_id !== null, 422, 'Estimate already converted.');
         $payload = $request->validate([
             'invoice_due_date' => ['required', 'date'],
             'invoice_footer' => ['nullable', 'string'],
             'invoice_notes' => ['nullable', 'string'],
         ]);
 
-        $invoice = DB::transaction(function () use ($quote, $invoiceNumberService, $payload): Invoice {
-            $team = Team::query()->findOrFail((int) $quote->team_id);
+        $invoice = DB::transaction(function () use ($estimate, $invoiceNumberService, $payload): Invoice {
+            $team = Team::query()->findOrFail((int) $estimate->team_id);
             $chargesVat = $team->chargesVat();
             $defaultVatRate = $team->defaultVatRateForInvoicing();
 
             $invoice = Invoice::query()->create([
-                'team_id' => $quote->team_id,
-                'client_id' => $quote->client_id,
+                'team_id' => $estimate->team_id,
+                'client_id' => $estimate->client_id,
                 'status' => 'draft',
-                'number' => $invoiceNumberService->generate((int) $quote->team_id),
-                'reference' => 'Converted from '.$quote->number,
+                'number' => $invoiceNumberService->generate((int) $estimate->team_id),
+                'reference' => 'Converted from '.$estimate->number,
                 'issue_date' => now()->toDateString(),
                 'due_date' => (string) $payload['invoice_due_date'],
                 'subtotal_cents' => 0,
                 'vat_amount_cents' => 0,
                 'total_cents' => 0,
                 'amount_paid_cents' => 0,
-                'currency' => $quote->currency ?? 'ZAR',
+                'currency' => $estimate->currency ?? 'ZAR',
                 'notes' => $payload['invoice_notes'] ?? null,
                 'footer' => $payload['invoice_footer'] ?? null,
             ]);
@@ -275,7 +279,7 @@ class QuoteController extends Controller
             $subtotalCents = 0;
             $vatCents = 0;
 
-            foreach ((array) $quote->line_items as $index => $line) {
+            foreach ((array) $estimate->line_items as $index => $line) {
                 $quantity = (float) ($line['quantity'] ?? 1);
                 $unitPriceCents = (int) ($line['unit_price_cents'] ?? 0);
                 $vatRate = $chargesVat
@@ -306,8 +310,8 @@ class QuoteController extends Controller
             $invoice->refresh();
             app(InvoiceCompanyCurrencySnapshot::class)->sync($invoice);
 
-            $quote->update([
-                'status' => QuoteStatus::Converted,
+            $estimate->update([
+                'status' => EstimateStatus::Converted,
                 'converted_invoice_id' => $invoice->id,
             ]);
 
@@ -317,22 +321,22 @@ class QuoteController extends Controller
         return to_route('invoicing.invoices.show', $invoice);
     }
 
-    public function destroy(Request $request, Quote $quote): RedirectResponse
+    public function destroy(Request $request, Estimate $estimate): RedirectResponse
     {
-        abort_unless($quote->team_id === (int) $request->user()->current_team_id, 403);
+        abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
 
-        DB::transaction(function () use ($quote): void {
-            $quote->clearMediaCollection('quote-pdfs');
-            $quote->delete();
+        DB::transaction(function () use ($estimate): void {
+            $estimate->clearMediaCollection('estimate-pdfs');
+            $estimate->delete();
         });
 
-        return to_route('invoicing.quotes.index');
+        return to_route('invoicing.estimates.index');
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function validateQuote(Request $request, ?Quote $quote): array
+    private function validateEstimate(Request $request, ?Estimate $estimate): array
     {
         $teamId = (int) $request->user()->current_team_id;
 
@@ -342,9 +346,9 @@ class QuoteController extends Controller
                 'required',
                 'string',
                 'max:32',
-                Rule::unique('quotes', 'number')
+                Rule::unique('estimates', 'number')
                     ->where(fn ($q) => $q->where('team_id', $teamId))
-                    ->ignore($quote?->id),
+                    ->ignore($estimate?->id),
             ],
             'issue_date' => ['required', 'date'],
             'expiry_date' => ['required', 'date', 'after_or_equal:issue_date'],
@@ -385,7 +389,7 @@ class QuoteController extends Controller
      * @param  array<int, array<string, mixed>>  $lineItems
      * @return array<int, array<string, mixed>>
      */
-    private function normalizeQuoteLineItemsVat(array $lineItems, bool $chargesVat): array
+    private function normalizeEstimateLineItemsVat(array $lineItems, bool $chargesVat): array
     {
         return collect($lineItems)
             ->map(function (array $line) use ($chargesVat): array {
@@ -400,7 +404,7 @@ class QuoteController extends Controller
     /**
      * @return list<array{id: int, name: string, rate: float, is_default: bool}>
      */
-    private function taxRatesForQuoteForm(int $teamId, bool $chargesVat): array
+    private function taxRatesForEstimateForm(int $teamId, bool $chargesVat): array
     {
         if (! $chargesVat) {
             return [];
@@ -424,9 +428,9 @@ class QuoteController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serializeQuote(Quote $quote, bool $teamChargesVat = true): array
+    private function serializeEstimate(Estimate $estimate, bool $teamChargesVat = true): array
     {
-        $lines = collect($quote->line_items ?? [])->map(function ($line) use ($teamChargesVat) {
+        $lines = collect($estimate->line_items ?? [])->map(function ($line) use ($teamChargesVat) {
             $row = is_array($line) ? $line : (array) $line;
             if (! $teamChargesVat) {
                 $row['vat_rate'] = 0.0;
@@ -436,32 +440,71 @@ class QuoteController extends Controller
         })->values()->all();
 
         return [
-            'id' => $quote->id,
-            'number' => $quote->number,
-            'client_id' => $quote->client_id,
-            'client_name' => $quote->client?->name ?? 'Unknown',
-            'issue_date' => optional($quote->issue_date)->toDateString(),
-            'expiry_date' => optional($quote->expiry_date)->toDateString(),
-            'total_cents' => (int) $quote->getRawOriginal('total_cents'),
-            'subtotal_cents' => (int) $quote->getRawOriginal('subtotal_cents'),
-            'vat_amount_cents' => (int) $quote->getRawOriginal('vat_amount_cents'),
-            'status' => $quote->status->value,
+            'id' => $estimate->id,
+            'number' => $estimate->number,
+            'client_id' => $estimate->client_id,
+            'client_name' => $estimate->client?->name ?? 'Unknown',
+            'issue_date' => optional($estimate->issue_date)->toDateString(),
+            'expiry_date' => optional($estimate->expiry_date)->toDateString(),
+            'total_cents' => (int) $estimate->getRawOriginal('total_cents'),
+            'subtotal_cents' => (int) $estimate->getRawOriginal('subtotal_cents'),
+            'vat_amount_cents' => (int) $estimate->getRawOriginal('vat_amount_cents'),
+            'status' => $estimate->status->value,
             'line_items' => $lines,
-            'notes' => $quote->notes,
-            'terms' => $quote->terms,
-            'currency' => Iso4217Currencies::normalize((string) ($quote->currency ?? 'ZAR')),
-            'converted_invoice_id' => $quote->converted_invoice_id,
+            'notes' => $estimate->notes,
+            'terms' => $estimate->terms,
+            'currency' => Iso4217Currencies::normalize((string) ($estimate->currency ?? 'ZAR')),
+            'converted_invoice_id' => $estimate->converted_invoice_id,
         ];
     }
 
-    private function nextQuoteNumber(int $teamId): string
+    private function nextEstimateNumber(int $teamId): string
     {
+        $settings = $this->teamSettings($teamId);
         $year = (int) now()->format('Y');
-        $count = Quote::queryWithoutTeamScope()
+        $count = Estimate::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->whereYear('issue_date', $year)
             ->count() + 1;
 
-        return sprintf('Q-%d-%04d', $year, $count);
+        $prefixRaw = (string) ($settings['estimate_prefix'] ?? 'EST');
+        $prefix = trim($prefixRaw, " \t\n\r\0\x0B-");
+        if ($prefix === '') {
+            $prefix = 'EST';
+        }
+
+        $parts = [$prefix, (string) $year];
+        if ((bool) ($settings['estimate_number_include_month'] ?? false)) {
+            $parts[] = now()->format('m');
+        }
+
+        if ((bool) ($settings['estimate_number_use_random_suffix'] ?? false)) {
+            $parts[] = $this->randomIdentifier();
+        } else {
+            $parts[] = sprintf('%04d', $count);
+        }
+
+        return implode('-', $parts);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function teamSettings(int $teamId): array
+    {
+        $team = Team::query()->find($teamId);
+
+        return $team?->mergedCompanySettings() ?? [];
+    }
+
+    private function randomIdentifier(): string
+    {
+        $alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+        $suffix = '';
+        for ($i = 0; $i < 4; $i++) {
+            $suffix .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+        }
+
+        return $suffix;
     }
 }

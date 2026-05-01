@@ -96,7 +96,7 @@ const goHistoryPage = (page: number) => {
         <PageHeader :title="client.name" subtitle="Client profile and invoicing performance">
             <template #actions>
                 <AppButton variant="secondary" @click="router.visit(route('invoicing.invoices.create'))">New Invoice</AppButton>
-                <AppButton variant="secondary">New Quote</AppButton>
+                <AppButton variant="secondary" @click="router.visit(route('invoicing.estimates.create'))">New Estimate</AppButton>
                 <AppButton variant="primary" @click="router.visit(route('invoicing.clients.edit', client.id))">Edit Client</AppButton>
             </template>
         </PageHeader>

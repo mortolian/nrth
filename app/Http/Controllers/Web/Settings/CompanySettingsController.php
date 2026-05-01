@@ -120,7 +120,13 @@ class CompanySettingsController extends Controller
             'invoice_prefix' => ['required', 'string', 'max:32'],
             'invoice_number_include_month' => ['required', 'boolean'],
             'invoice_number_use_random_suffix' => ['required', 'boolean'],
+            'estimate_prefix' => ['required', 'string', 'max:32'],
+            'estimate_number_include_month' => ['required', 'boolean'],
+            'estimate_number_use_random_suffix' => ['required', 'boolean'],
+            'estimate_default_notes' => ['nullable', 'string'],
+            'estimate_default_terms' => ['nullable', 'string'],
             'invoice_show_street_address' => ['required', 'boolean'],
+            'estimate_show_street_address' => ['required', 'boolean'],
             'invoice_next_sequence' => ['nullable', 'integer', 'min:1', 'max:999999'],
             'invoice_default_notes' => ['nullable', 'string'],
             'invoice_default_footer' => ['nullable', 'string'],
@@ -150,7 +156,9 @@ class CompanySettingsController extends Controller
             'company_email', 'company_phone', 'company_website',
             'invoice_default_payment_terms_days', 'invoice_default_currency', 'invoice_prefix',
             'invoice_number_include_month', 'invoice_number_use_random_suffix',
-            'invoice_show_street_address',
+            'estimate_prefix', 'estimate_number_include_month', 'estimate_number_use_random_suffix',
+            'estimate_default_notes', 'estimate_default_terms',
+            'invoice_show_street_address', 'estimate_show_street_address',
             'invoice_default_notes', 'invoice_default_footer',
             'invoice_email_subject_template', 'invoice_email_body_template',
             'vat_registered', 'vat_period_type', 'default_tax_rate_id',
@@ -165,10 +173,14 @@ class CompanySettingsController extends Controller
         }
 
         $team->name = $validated['name'];
-        $team->company_settings = array_replace_recursive(
+        $mergedSettings = array_replace_recursive(
             $team->mergedCompanySettings(),
             $newSettings
         );
+        foreach (['quote_prefix', 'quote_number_include_month', 'quote_number_use_random_suffix'] as $legacyKey) {
+            unset($mergedSettings[$legacyKey]);
+        }
+        $team->company_settings = $mergedSettings;
         $team->save();
 
         if ($request->boolean('remove_logo')) {
@@ -193,7 +205,7 @@ class CompanySettingsController extends Controller
         }
 
         $tab = (string) $request->input('tab', 'profile');
-        if (! in_array($tab, ['profile', 'contact', 'invoice', 'tax', 'banking'], true)) {
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking'], true)) {
             $tab = 'profile';
         }
 

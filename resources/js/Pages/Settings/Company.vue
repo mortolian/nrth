@@ -29,13 +29,13 @@ const props = defineProps<{
     bank_account_types: Array<{ value: string; label: string }>;
 }>();
 
-type CompanyTab = 'profile' | 'contact' | 'invoice' | 'tax' | 'banking';
+type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking';
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'tax', 'banking'];
+const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
 
@@ -66,6 +66,12 @@ const form = useForm({
     invoice_prefix: String(props.settings.invoice_prefix ?? 'INV'),
     invoice_number_include_month: Boolean(props.settings.invoice_number_include_month ?? false),
     invoice_number_use_random_suffix: Boolean(props.settings.invoice_number_use_random_suffix ?? false),
+    estimate_prefix: String(props.settings.estimate_prefix ?? 'EST'),
+    estimate_number_include_month: Boolean(props.settings.estimate_number_include_month ?? false),
+    estimate_number_use_random_suffix: Boolean(props.settings.estimate_number_use_random_suffix ?? false),
+    estimate_default_notes: String(props.settings.estimate_default_notes ?? ''),
+    estimate_default_terms: String(props.settings.estimate_default_terms ?? ''),
+    estimate_show_street_address: Boolean(props.settings.estimate_show_street_address ?? true),
     invoice_show_street_address: Boolean(props.settings.invoice_show_street_address ?? true),
     invoice_next_sequence: props.invoice_next_sequence,
     invoice_default_notes: String(props.settings.invoice_default_notes ?? ''),
@@ -95,6 +101,19 @@ const liveInvoicePreview = computed(() => {
     const seq = Math.max(1, Number(form.invoice_next_sequence) || 1);
     const suffix = form.invoice_number_use_random_suffix ? 'sdfg' : String(seq).padStart(4, '0');
     return form.invoice_number_include_month
+        ? `${base}-${y}-${month}-${suffix}`
+        : `${base}-${y}-${suffix}`;
+});
+
+const liveEstimatePreview = computed(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const raw = (form.estimate_prefix || 'EST').trim().replace(/-+$/, '');
+    const base = raw || 'EST';
+    const seq = Math.max(1, Number(form.invoice_next_sequence) || 1);
+    const suffix = form.estimate_number_use_random_suffix ? 'sdfg' : String(seq).padStart(4, '0');
+    return form.estimate_number_include_month
         ? `${base}-${y}-${month}-${suffix}`
         : `${base}-${y}-${suffix}`;
 });
@@ -163,7 +182,8 @@ const clearLogo = () => {
 const tabs = [
     { id: 'profile' as const, label: 'Company profile' },
     { id: 'contact' as const, label: 'Contact' },
-    { id: 'invoice' as const, label: 'Invoice defaults' },
+    { id: 'invoice' as const, label: 'Invoices' },
+    { id: 'estimate' as const, label: 'Estimates' },
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
 ];
@@ -200,6 +220,12 @@ const submit = () => {
         invoice_prefix: form.invoice_prefix,
         invoice_number_include_month: form.invoice_number_include_month,
         invoice_number_use_random_suffix: form.invoice_number_use_random_suffix,
+        estimate_prefix: form.estimate_prefix,
+        estimate_number_include_month: form.estimate_number_include_month,
+        estimate_number_use_random_suffix: form.estimate_number_use_random_suffix,
+        estimate_default_notes: form.estimate_default_notes,
+        estimate_default_terms: form.estimate_default_terms,
+        estimate_show_street_address: form.estimate_show_street_address,
         invoice_show_street_address: form.invoice_show_street_address,
         invoice_next_sequence: form.invoice_next_sequence,
         invoice_default_notes: form.invoice_default_notes,
@@ -415,21 +441,21 @@ const submit = () => {
             </AppCard>
 
             <AppCard v-show="tab === 'invoice'">
-                <h3 class="text-base font-semibold text-slate-900">Invoice defaults</h3>
+                <h3 class="text-base font-semibold text-slate-900">Invoices</h3>
                 <div class="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Default payment terms (days)</label>
                         <AppInput v-model="form.invoice_default_payment_terms_days" type="number" />
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default invoice &amp; quote currency</label>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Default invoice &amp; estimate currency</label>
                         <AppSelect
                             :model-value="form.invoice_default_currency"
                             :options="currencyOptions"
                             @update:model-value="form.invoice_default_currency = $event"
                         />
                         <p class="mt-1 text-xs text-slate-500">
-                            Used for new invoices and quotes until you pick a client (client currency applies) or choose another currency on the document.
+                            Used for new invoices and estimates until you pick a client (client currency applies) or choose another currency on the document.
                         </p>
                     </div>
                     <div>
@@ -448,7 +474,7 @@ const submit = () => {
                     <label class="mt-6 flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
                         <input v-model="form.invoice_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300">
                         <span>
-                            Show street address on invoice and quote PDFs
+                            Show street address on invoice PDFs
                             <span class="mt-0.5 block text-xs font-normal text-slate-500">
                                 When unchecked, only city, province, postal code and country appear under your company name. Email, phone and website on those PDFs are unchanged.
                             </span>
@@ -485,6 +511,50 @@ const submit = () => {
                         <textarea
                             v-model="form.invoice_email_body_template"
                             rows="5"
+                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                    </div>
+                </div>
+            </AppCard>
+
+            <AppCard v-show="tab === 'estimate'">
+                <h3 class="text-base font-semibold text-slate-900">Estimates</h3>
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Estimate prefix</label>
+                        <AppInput v-model="form.estimate_prefix" placeholder="EST" />
+                        <p class="mt-1 text-xs text-slate-500">Numbers format preview: {{ liveEstimatePreview }}</p>
+                    </div>
+                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
+                        <input v-model="form.estimate_number_include_month" type="checkbox" class="rounded border-slate-300">
+                        Include month number in estimate number
+                    </label>
+                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
+                        <input v-model="form.estimate_number_use_random_suffix" type="checkbox" class="rounded border-slate-300">
+                        Use random 4-character suffix for estimate numbers
+                    </label>
+                    <label class="mt-6 flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
+                        <input v-model="form.estimate_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300">
+                        <span>
+                            Show street address on estimate PDFs
+                            <span class="mt-0.5 block text-xs font-normal text-slate-500">
+                                When unchecked, only city, province, postal code and country appear under your company name. Email, phone and website on those PDFs are unchanged.
+                            </span>
+                        </span>
+                    </label>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Default notes (new estimates)</label>
+                        <textarea
+                            v-model="form.estimate_default_notes"
+                            rows="3"
+                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        />
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Default terms (new estimates)</label>
+                        <textarea
+                            v-model="form.estimate_default_terms"
+                            rows="4"
                             class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>

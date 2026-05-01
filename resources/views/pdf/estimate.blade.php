@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quote {{ $quote->number }}</title>
+    <title>Estimate {{ $estimate->number }}</title>
     @include('pdf._styles')
 </head>
 <body>
 @php
-    $team = $quote->team;
-    $client = $quote->client;
+    $team = $estimate->team;
+    $client = $estimate->client;
 
-    $issuer = $team ? $team->issuerForInvoicingDocuments() : [
+    $issuer = $team ? $team->issuerForInvoicingDocuments('estimate') : [
         'name' => config('app.name'),
         'address' => null,
         'email' => null,
@@ -39,7 +39,7 @@
 
     $logoSrc = $team?->logoDataUriForPdf();
 
-    $statusValue = $quote->status?->value ?? 'draft';
+    $statusValue = $estimate->status?->value ?? 'draft';
     $statusLabel = strtoupper(str_replace('_', ' ', $statusValue));
     $statusClass = match ($statusValue) {
         'accepted', 'converted' => '',
@@ -48,11 +48,11 @@
         default => 'warn',
     };
 
-    $subtotal = (int) ($quote->getRawOriginal('subtotal_cents') ?? 0);
-    $vatTotal = (int) ($quote->getRawOriginal('vat_amount_cents') ?? 0);
-    $total = (int) ($quote->getRawOriginal('total_cents') ?? 0);
+    $subtotal = (int) ($estimate->getRawOriginal('subtotal_cents') ?? 0);
+    $vatTotal = (int) ($estimate->getRawOriginal('vat_amount_cents') ?? 0);
+    $total = (int) ($estimate->getRawOriginal('total_cents') ?? 0);
 
-    $lines = collect((array) $quote->line_items)->map(function ($line) {
+    $lines = collect((array) $estimate->line_items)->map(function ($line) {
         $qty = (float) ($line['quantity'] ?? 1);
         $unit = (int) ($line['unit_price_cents'] ?? 0);
         $rate = (float) ($line['vat_rate'] ?? 0);
@@ -70,7 +70,7 @@
 
     $chargesVat = $team && method_exists($team, 'chargesVat') ? $team->chargesVat() : false;
 
-    $fmtMoney = static fn (int $cents): string => \App\Support\FormatMoney::minorUnits($cents, (string) ($quote->currency ?? 'ZAR'));
+    $fmtMoney = static fn (int $cents): string => \App\Support\FormatMoney::minorUnits($cents, (string) ($estimate->currency ?? 'ZAR'));
 @endphp
 
 <table class="brand">
@@ -90,13 +90,13 @@
             </div>
         </td>
         <td class="doc-cell">
-            <h1>Quote</h1>
+            <h1>Estimate</h1>
             <div class="pill {{ $statusClass }}">{{ $statusLabel }}</div>
             <div class="doc-meta">
-                <div><span class="label">Quote #</span> &nbsp; <span class="b">{{ $quote->number }}</span></div>
-                <div><span class="label">Issued</span> &nbsp; {{ optional($quote->issue_date)->format('d M Y') }}</div>
-                @if($quote->expiry_date)
-                    <div><span class="label">Valid until</span> &nbsp; {{ optional($quote->expiry_date)->format('d M Y') }}</div>
+                <div><span class="label">Estimate #</span> &nbsp; <span class="b">{{ $estimate->number }}</span></div>
+                <div><span class="label">Issued</span> &nbsp; {{ optional($estimate->issue_date)->format('d M Y') }}</div>
+                @if($estimate->expiry_date)
+                    <div><span class="label">Valid until</span> &nbsp; {{ optional($estimate->expiry_date)->format('d M Y') }}</div>
                 @endif
             </div>
         </td>
@@ -118,8 +118,8 @@
             <div class="label">Estimated total</div>
             <div class="name accent" style="font-size: 22px;">{{ $fmtMoney($total) }}</div>
             <p class="small muted">{{ count($lines) }} item{{ count($lines) === 1 ? '' : 's' }}@if($chargesVat), VAT incl.@endif</p>
-            @if($quote->expiry_date)
-                <p class="small muted pad-top-12">This quote is valid until {{ optional($quote->expiry_date)->format('d M Y') }}.</p>
+            @if($estimate->expiry_date)
+                <p class="small muted pad-top-12">This estimate is valid until {{ optional($estimate->expiry_date)->format('d M Y') }}.</p>
             @endif
         </td>
     </tr>
@@ -166,27 +166,27 @@
     </tr>
     @endif
     <tr class="grand">
-        <td class="label">Quote total</td>
+        <td class="label">Estimate total</td>
         <td class="value">{{ $fmtMoney($total) }}</td>
     </tr>
 </table>
 
-@if($quote->notes)
+@if($estimate->notes)
     <div class="section">
         <h3>Notes</h3>
-        <p>{!! nl2br(e($quote->notes)) !!}</p>
+        <p>{!! nl2br(e($estimate->notes)) !!}</p>
     </div>
 @endif
 
-@if($quote->terms)
+@if($estimate->terms)
     <div class="section">
         <h3>Terms &amp; conditions</h3>
-        <p>{!! nl2br(e($quote->terms)) !!}</p>
+        <p>{!! nl2br(e($estimate->terms)) !!}</p>
     </div>
 @endif
 
 <div class="footer">
-    {{ $companyName }} &middot; Quote {{ $quote->number }} &middot; Generated {{ now()->format('d M Y') }}
+    {{ $companyName }} &middot; Estimate {{ $estimate->number }} &middot; Generated {{ now()->format('d M Y') }}
 </div>
 </body>
 </html>

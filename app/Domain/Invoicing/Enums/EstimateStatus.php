@@ -2,7 +2,7 @@
 
 namespace App\Domain\Invoicing\Enums;
 
-enum QuoteStatus: string
+enum EstimateStatus: string
 {
     case Draft = 'draft';
     case Sent = 'sent';

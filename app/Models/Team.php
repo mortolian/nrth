@@ -129,6 +129,12 @@ class Team extends JetstreamTeam implements HasMedia
             'invoice_prefix' => 'INV',
             'invoice_number_include_month' => false,
             'invoice_number_use_random_suffix' => false,
+            'estimate_prefix' => 'EST',
+            'estimate_number_include_month' => false,
+            'estimate_number_use_random_suffix' => false,
+            'estimate_default_notes' => null,
+            'estimate_default_terms' => '50% deposit on acceptance. Balance due on delivery.',
+            'estimate_show_street_address' => true,
             'invoice_default_notes' => null,
             'invoice_default_footer' => null,
             'invoice_show_street_address' => true,
@@ -150,14 +156,31 @@ class Team extends JetstreamTeam implements HasMedia
      */
     public function mergedCompanySettings(): array
     {
+        $stored = is_array($this->company_settings) ? $this->company_settings : [];
+        $normalized = $stored;
+
+        foreach ([
+            'quote_prefix' => 'estimate_prefix',
+            'quote_number_include_month' => 'estimate_number_include_month',
+            'quote_number_use_random_suffix' => 'estimate_number_use_random_suffix',
+        ] as $legacyKey => $key) {
+            if (array_key_exists($legacyKey, $normalized) && ! array_key_exists($key, $normalized)) {
+                $normalized[$key] = $normalized[$legacyKey];
+            }
+        }
+
+        if (! array_key_exists('estimate_show_street_address', $normalized) && array_key_exists('invoice_show_street_address', $normalized)) {
+            $normalized['estimate_show_street_address'] = $normalized['invoice_show_street_address'];
+        }
+
         return array_replace_recursive(
             self::defaultCompanySettings(),
-            $this->company_settings ?? []
+            $normalized
         );
     }
 
     /**
-     * Issuer / "from" block for invoices, quotes, previews, PDFs, and client-facing emails.
+     * Issuer / "from" block for invoices, estimates, previews, PDFs, and client-facing emails.
      *
      * @return array{
      *     name: string,
@@ -169,14 +192,15 @@ class Team extends JetstreamTeam implements HasMedia
      *     vat_number: string|null,
      * }
      */
-    public function issuerForInvoicingDocuments(): array
+    public function issuerForInvoicingDocuments(string $documentType = 'invoice'): array
     {
         $settings = $this->mergedCompanySettings();
 
         $trading = trim((string) ($settings['trading_name'] ?? ''));
         $name = $trading !== '' ? $trading : (string) $this->name;
 
-        $showStreet = (bool) ($settings['invoice_show_street_address'] ?? true);
+        $showStreetSetting = $documentType === 'estimate' ? 'estimate_show_street_address' : 'invoice_show_street_address';
+        $showStreet = (bool) ($settings[$showStreetSetting] ?? true);
         $physicalParts = $showStreet
             ? [
                 $settings['physical_street'] ?? null,
@@ -215,7 +239,7 @@ class Team extends JetstreamTeam implements HasMedia
     }
 
     /**
-     * Whether invoices/quotes may apply VAT: VAT-registered in settings and a valid default VAT rate is configured.
+     * Whether invoices/estimates may apply VAT: VAT-registered in settings and a valid default VAT rate is configured.
      */
     public function chargesVat(): bool
     {

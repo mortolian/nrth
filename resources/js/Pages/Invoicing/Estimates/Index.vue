@@ -7,7 +7,7 @@ import AppCard from '@/Components/AppCard.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
-type QuoteRow = {
+type EstimateRow = {
     id: number;
     number: string;
     client_name: string;
@@ -20,16 +20,16 @@ type QuoteRow = {
 };
 
 const props = defineProps<{
-    quotes: QuoteRow[];
+    estimates: EstimateRow[];
     summary: { draft: number; sent: number; accepted: number; expired: number };
     filters: { status: string; search: string | null };
 }>();
 
-const status = ref<'all' | QuoteRow['status']>((props.filters.status as 'all' | QuoteRow['status']) ?? 'all');
+const status = ref<'all' | EstimateRow['status']>((props.filters.status as 'all' | EstimateRow['status']) ?? 'all');
 const search = ref(props.filters.search ?? '');
 
 const rows = computed(() =>
-    props.quotes.filter((q) => {
+    props.estimates.filter((q) => {
         const statusOk = status.value === 'all' || q.status === status.value;
         const term = search.value.trim().toLowerCase();
         const searchOk = !term || q.number.toLowerCase().includes(term) || q.client_name.toLowerCase().includes(term);
@@ -38,77 +38,77 @@ const rows = computed(() =>
 );
 
 const applyFilters = () => {
-    router.get(route('invoicing.quotes.index'), {
+    router.get(route('invoicing.estimates.index'), {
         status: status.value,
         search: search.value,
     }, { preserveState: true, preserveScroll: true, replace: true });
 };
 
-const formatQuoteTotal = (cents: number, code: string) => useFormatCurrency(cents / 100, code || 'ZAR');
+const formatEstimateTotal = (cents: number, code: string) => useFormatCurrency(cents / 100, code || 'ZAR');
 
-const badgeVariant = (value: QuoteRow['status']) => {
+const badgeVariant = (value: EstimateRow['status']) => {
     if (value === 'accepted') return 'success';
     if (value === 'expired') return 'danger';
     if (value === 'converted') return 'neutral';
     return 'info';
 };
 
-const quoteActionItems = (quote: QuoteRow) => {
+const estimateActionItems = (estimate: EstimateRow) => {
     const actions = [
         { id: 'view', label: 'View' },
         { id: 'edit', label: 'Edit' },
         { id: 'download_pdf', label: 'Download PDF' },
     ];
 
-    if (quote.status === 'draft') {
-        actions.push({ id: 'send', label: 'Send quote' });
+    if (estimate.status === 'draft') {
+        actions.push({ id: 'send', label: 'Send estimate' });
         actions.push({ id: 'mark_sent', label: 'Mark as sent' });
     }
-    if (quote.status === 'sent') {
+    if (estimate.status === 'sent') {
         actions.push({ id: 'accept', label: 'Mark accepted' });
         actions.push({ id: 'decline', label: 'Mark declined' });
     }
-    if (quote.status === 'converted' && quote.converted_invoice_id) {
+    if (estimate.status === 'converted' && estimate.converted_invoice_id) {
         actions.push({ id: 'view_invoice', label: 'View invoice' });
     }
-    actions.push({ id: 'delete', label: 'Delete quote' });
+    actions.push({ id: 'delete', label: 'Delete estimate' });
 
     return actions;
 };
 
-const onAction = (quote: QuoteRow, actionId: string) => {
+const onAction = (estimate: EstimateRow, actionId: string) => {
     if (actionId === 'view') {
-        router.visit(route('invoicing.quotes.show', quote.id));
+        router.visit(route('invoicing.estimates.show', estimate.id));
     } else if (actionId === 'edit') {
-        router.visit(route('invoicing.quotes.edit', quote.id));
+        router.visit(route('invoicing.estimates.edit', estimate.id));
     } else if (actionId === 'download_pdf') {
-        window.location.assign(route('invoicing.quotes.pdf.download', quote.id));
+        window.location.assign(route('invoicing.estimates.pdf.download', estimate.id));
     } else if (actionId === 'send') {
-        router.post(route('invoicing.quotes.send', quote.id));
+        router.post(route('invoicing.estimates.send', estimate.id));
     } else if (actionId === 'mark_sent') {
-        router.post(route('invoicing.quotes.mark-sent', quote.id));
+        router.post(route('invoicing.estimates.mark-sent', estimate.id));
     } else if (actionId === 'accept') {
-        router.post(route('invoicing.quotes.accept', quote.id));
+        router.post(route('invoicing.estimates.accept', estimate.id));
     } else if (actionId === 'decline') {
-        router.post(route('invoicing.quotes.decline', quote.id));
-    } else if (actionId === 'view_invoice' && quote.converted_invoice_id) {
-        router.visit(route('invoicing.invoices.show', quote.converted_invoice_id));
+        router.post(route('invoicing.estimates.decline', estimate.id));
+    } else if (actionId === 'view_invoice' && estimate.converted_invoice_id) {
+        router.visit(route('invoicing.invoices.show', estimate.converted_invoice_id));
     } else if (actionId === 'delete') {
-        if (!window.confirm(`Permanently delete quote ${quote.number}? This cannot be undone.`)) {
+        if (!window.confirm(`Permanently delete estimate ${estimate.number}? This cannot be undone.`)) {
             return;
         }
-        router.delete(route('invoicing.quotes.destroy', quote.id), { preserveScroll: true });
+        router.delete(route('invoicing.estimates.destroy', estimate.id), { preserveScroll: true });
     }
 };
 </script>
 
 <template>
-    <AppLayout title="Quotes" :breadcrumbs="[{ label: 'Money In' }, { label: 'Quotes' }]">
-        <Head title="Quotes" />
+    <AppLayout title="Estimates" :breadcrumbs="[{ label: 'Money In' }, { label: 'Estimates' }]">
+        <Head title="Estimates" />
 
-        <PageHeader title="Quotes">
+        <PageHeader title="Estimates">
             <template #actions>
-                <AppButton variant="primary" @click="router.visit(route('invoicing.quotes.create'))">New Quote</AppButton>
+                <AppButton variant="primary" @click="router.visit(route('invoicing.estimates.create'))">New Estimate</AppButton>
             </template>
         </PageHeader>
 
@@ -135,7 +135,7 @@ const onAction = (quote: QuoteRow, actionId: string) => {
                         @update:model-value="status = $event"
                     />
                     <div class="md:col-span-2">
-                        <AppInput v-model="search" placeholder="Search by quote number or client..." />
+                        <AppInput v-model="search" placeholder="Search by estimate number or client..." />
                     </div>
                 </div>
                 <div class="mt-3 flex gap-2">
@@ -157,7 +157,7 @@ const onAction = (quote: QuoteRow, actionId: string) => {
             <AppCard>
                 <AppTable
                     :columns="[
-                        { key: 'number', label: 'Quote' },
+                        { key: 'number', label: 'Estimate' },
                         { key: 'client', label: 'Client' },
                         { key: 'issue', label: 'Issued' },
                         { key: 'expiry', label: 'Expiry' },
@@ -168,35 +168,34 @@ const onAction = (quote: QuoteRow, actionId: string) => {
                     :page="1"
                     :last-page="1"
                 >
-                    <tr v-for="quote in rows" :key="quote.id" class="text-sm text-slate-700 hover:bg-slate-50">
+                    <tr v-for="estimate in rows" :key="estimate.id" class="text-sm text-slate-700 hover:bg-slate-50">
                         <td class="px-4 py-3 font-medium text-brand-700">
-                            <a :href="route('invoicing.quotes.show', quote.id)" class="hover:underline">
-                                {{ quote.number }}
+                            <a :href="route('invoicing.estimates.show', estimate.id)" class="hover:underline">
+                                {{ estimate.number }}
                             </a>
                         </td>
-                        <td class="px-4 py-3">{{ quote.client_name }}</td>
-                        <td class="px-4 py-3">{{ quote.issue_date }}</td>
-                        <td class="px-4 py-3">{{ quote.expiry_date }}</td>
-                        <td class="px-4 py-3">{{ formatQuoteTotal(quote.total_cents, quote.currency) }}</td>
+                        <td class="px-4 py-3">{{ estimate.client_name }}</td>
+                        <td class="px-4 py-3">{{ estimate.issue_date }}</td>
+                        <td class="px-4 py-3">{{ estimate.expiry_date }}</td>
+                        <td class="px-4 py-3">{{ formatEstimateTotal(estimate.total_cents, estimate.currency) }}</td>
                         <td class="px-4 py-3">
-                            <AppBadge :variant="badgeVariant(quote.status)">{{ quote.status }}</AppBadge>
+                            <AppBadge :variant="badgeVariant(estimate.status)">{{ estimate.status }}</AppBadge>
                         </td>
                         <td class="px-4 py-3">
                             <div class="inline-flex">
                                 <InvoiceRowActionsMenu
-                                    :actions="quoteActionItems(quote)"
-                                    :aria-label="`Actions for ${quote.number}`"
-                                    @select="(id) => onAction(quote, id)"
+                                    :actions="estimateActionItems(estimate)"
+                                    :aria-label="`Actions for ${estimate.number}`"
+                                    @select="(id) => onAction(estimate, id)"
                                 />
                             </div>
                         </td>
                     </tr>
                     <tr v-if="!rows.length">
-                        <td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">No quotes match your filters.</td>
+                        <td colspan="7" class="px-4 py-8 text-center text-sm text-slate-500">No estimates match your filters.</td>
                     </tr>
                 </AppTable>
             </AppCard>
         </div>
     </AppLayout>
 </template>
-

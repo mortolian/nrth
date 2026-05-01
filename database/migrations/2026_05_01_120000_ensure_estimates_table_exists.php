@@ -6,9 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Repair path for environments where `estimates` is missing (e.g. migration
+     * history renamed, or migrate was never run after the quotes → estimates change).
+     */
     public function up(): void
     {
-        Schema::create('quotes', function (Blueprint $table) {
+        if (Schema::hasTable('estimates')) {
+            return;
+        }
+
+        if (Schema::hasTable('quotes')) {
+            Schema::rename('quotes', 'estimates');
+
+            return;
+        }
+
+        Schema::create('estimates', function (Blueprint $table) {
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->foreignId('client_id')->constrained()->restrictOnDelete();
@@ -37,7 +51,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('quotes');
+        // Non-destructive: do not drop `estimates` here; earlier migrations own lifecycle.
     }
 };
-

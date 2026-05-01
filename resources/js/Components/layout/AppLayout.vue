@@ -96,7 +96,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Money In',
             href: route('invoicing.invoices.index'),
             icon: Wallet,
-            group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Quotes', href: route('invoicing.quotes.index') }, { label: 'Clients', href: route('invoicing.clients.index') }] }],
+            group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Estimates', href: route('invoicing.estimates.index') }, { label: 'Clients', href: route('invoicing.clients.index') }] }],
         },
         {
             label: 'Money Out',

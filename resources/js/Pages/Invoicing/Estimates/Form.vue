@@ -10,8 +10,8 @@ import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
 type ClientOption = { id: number; name: string; currency: string };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
-type QuoteLineApi = { description: string; quantity: number; unit_price_cents: number; vat_rate: number };
-type QuoteLineForm = {
+type EstimateLineApi = { description: string; quantity: number; unit_price_cents: number; vat_rate: number };
+type EstimateLineForm = {
     row_key: string;
     description: string;
     quantity: number;
@@ -19,7 +19,7 @@ type QuoteLineForm = {
     unit_price: string;
     vat_rate: number;
 };
-type QuotePayload = {
+type EstimatePayload = {
     id: number;
     client_id: number;
     number: string;
@@ -28,17 +28,20 @@ type QuotePayload = {
     currency: string;
     notes: string | null;
     terms: string | null;
-    line_items: QuoteLineApi[];
+    line_items: EstimateLineApi[];
 };
 
 const props = defineProps<{
     isEditing: boolean;
-    quote: QuotePayload | null;
+    estimate: EstimatePayload | null;
     clients: ClientOption[];
     tax_rates: TaxRateOption[];
     charges_vat: boolean;
     next_number: string;
     default_currency: string;
+    /** Company settings: used when creating a new estimate only */
+    default_notes?: string;
+    default_terms?: string;
 }>();
 
 const page = usePage();
@@ -69,28 +72,28 @@ const vatSelectOptions = computed(() => {
     return [{ label: 'No VAT', value: '0' }];
 });
 
-const initialQuoteClientId = props.quote?.client_id ?? props.clients[0]?.id ?? 0;
-const initialQuoteCurrency =
-    props.quote?.currency
-    ?? props.clients.find((c) => c.id === initialQuoteClientId)?.currency
+const initialEstimateClientId = props.estimate?.client_id ?? props.clients[0]?.id ?? 0;
+const initialEstimateCurrency =
+    props.estimate?.currency
+    ?? props.clients.find((c) => c.id === initialEstimateClientId)?.currency
     ?? props.default_currency
     ?? 'ZAR';
 
 const form = ref({
-    client_id: initialQuoteClientId,
-    number: props.quote?.number ?? props.next_number,
-    issue_date: props.quote?.issue_date ?? new Date().toISOString().slice(0, 10),
-    expiry_date: props.quote?.expiry_date ?? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-    currency: initialQuoteCurrency,
-    notes: props.quote?.notes ?? '',
-    terms: props.quote?.terms ?? '50% deposit on acceptance. Balance due on delivery.',
+    client_id: initialEstimateClientId,
+    number: props.estimate?.number ?? props.next_number,
+    issue_date: props.estimate?.issue_date ?? new Date().toISOString().slice(0, 10),
+    expiry_date: props.estimate?.expiry_date ?? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+    currency: initialEstimateCurrency,
+    notes: props.estimate?.notes ?? (props.default_notes ?? ''),
+    terms: props.estimate?.terms ?? (props.default_terms ?? ''),
 });
 
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
-const lineItems = ref<QuoteLineForm[]>(
-    props.quote?.line_items?.length
-        ? props.quote.line_items.map((row) => ({
+const lineItems = ref<EstimateLineForm[]>(
+    props.estimate?.line_items?.length
+        ? props.estimate.line_items.map((row) => ({
             row_key: makeRowKey(),
             description: row.description ?? '',
             quantity: Number(row.quantity) || 1,
@@ -120,7 +123,7 @@ const initLineItemSortable = () => {
     }
     lineItemSortable = Sortable.create(el, {
         animation: 150,
-        handle: '.quote-line-drag-handle',
+        handle: '.estimate-line-drag-handle',
         draggable: 'tr',
         onEnd(evt) {
             const { oldIndex, newIndex } = evt;
@@ -168,12 +171,12 @@ watch(
     },
 );
 
-const lineSubtotalCents = (row: QuoteLineForm) =>
+const lineSubtotalCents = (row: EstimateLineForm) =>
     Math.round((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) * 100);
 
-const lineVatCents = (row: QuoteLineForm) => Math.round(lineSubtotalCents(row) * (Number(row.vat_rate) || 0));
+const lineVatCents = (row: EstimateLineForm) => Math.round(lineSubtotalCents(row) * (Number(row.vat_rate) || 0));
 
-const lineTotalCents = (row: QuoteLineForm) => lineSubtotalCents(row) + lineVatCents(row);
+const lineTotalCents = (row: EstimateLineForm) => lineSubtotalCents(row) + lineVatCents(row);
 
 const totals = computed(() => {
     const subtotal = lineItems.value.reduce((acc, row) => acc + lineSubtotalCents(row), 0);
@@ -183,7 +186,7 @@ const totals = computed(() => {
 
 const money = (cents: number) => useFormatCurrency(cents / 100, form.value.currency || 'ZAR');
 
-const updateLine = (index: number, field: keyof QuoteLineForm, value: string | number) => {
+const updateLine = (index: number, field: keyof EstimateLineForm, value: string | number) => {
     if (field === 'row_key') {
         return;
     }
@@ -238,25 +241,25 @@ const submit = (submitAction: 'draft' | 'send') => {
         })),
     };
 
-    if (props.isEditing && props.quote?.id) {
-        router.put(route('invoicing.quotes.update', props.quote.id), payload);
+    if (props.isEditing && props.estimate?.id) {
+        router.put(route('invoicing.estimates.update', props.estimate.id), payload);
         return;
     }
-    router.post(route('invoicing.quotes.store'), payload);
+    router.post(route('invoicing.estimates.store'), payload);
 };
 </script>
 
 <template>
     <AppLayout
-        :title="isEditing ? 'Edit Quote' : 'Create Quote'"
+        :title="isEditing ? 'Edit Estimate' : 'Create Estimate'"
         :breadcrumbs="[
             { label: 'Money In' },
-            { label: 'Quotes', href: route('invoicing.quotes.index') },
+            { label: 'Estimates', href: route('invoicing.estimates.index') },
             { label: isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <Head :title="isEditing ? 'Edit Quote' : 'Create Quote'" />
-        <PageHeader :title="isEditing ? `Edit ${form.number}` : 'Create Quote'" />
+        <Head :title="isEditing ? 'Edit Estimate' : 'Create Estimate'" />
+        <PageHeader :title="isEditing ? `Edit ${form.number}` : 'Create Estimate'" />
 
         <div class="space-y-6">
                 <AppCard>
@@ -270,18 +273,18 @@ const submit = (submitAction: 'draft' | 'send') => {
                                 @update:model-value="form.client_id = Number($event)"
                             />
                         </div>
-                        <div><label class="mb-1 block text-xs font-medium text-slate-500">Quote number</label><AppInput v-model="form.number" /></div>
+                        <div><label class="mb-1 block text-xs font-medium text-slate-500">Estimate number</label><AppInput v-model="form.number" /></div>
                         <div><label class="mb-1 block text-xs font-medium text-slate-500">Issue date</label><AppInput v-model="form.issue_date" type="date" /></div>
                         <div><label class="mb-1 block text-xs font-medium text-slate-500">Expiry date</label><AppInput v-model="form.expiry_date" type="date" /></div>
                         <div class="md:col-span-2">
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Quote currency</label>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Estimate currency</label>
                             <AppSelect
                                 :model-value="form.currency"
                                 :options="currencyOptions"
                                 @update:model-value="form.currency = $event"
                             />
                             <p class="mt-1 text-xs text-slate-500">
-                                Defaults to the client&rsquo;s currency; change to override for this quote only.
+                                Defaults to the client&rsquo;s currency; change to override for this estimate only.
                             </p>
                         </div>
                     </div>
@@ -289,7 +292,7 @@ const submit = (submitAction: 'draft' | 'send') => {
 
                 <AppCard>
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        VAT is not applied on this quote. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
+                        VAT is not applied on this estimate. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
 
@@ -311,7 +314,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                 <tr v-for="(line, index) in lineItems" :key="line.row_key">
                                     <td class="w-10 px-1 py-3 align-top">
                                         <span
-                                            class="quote-line-drag-handle mt-1 inline-flex cursor-grab touch-manipulation rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                            class="estimate-line-drag-handle mt-1 inline-flex cursor-grab touch-manipulation rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
                                             role="button"
                                             tabindex="0"
                                             aria-label="Drag to reorder line"
@@ -323,7 +326,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                         <textarea
                                             :value="line.description"
                                             rows="3"
-                                            placeholder="What you quoted"
+                                            placeholder="Line item description"
                                             class="min-h-[4.5rem] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                             @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
                                         />
@@ -403,10 +406,9 @@ const submit = (submitAction: 'draft' | 'send') => {
 
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
             <div class="flex justify-end gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('invoicing.quotes.index'))">Cancel</AppButton>
+                <AppButton variant="ghost" @click="router.visit(route('invoicing.estimates.index'))">Cancel</AppButton>
                 <AppButton variant="primary" @click="submit('draft')">Save</AppButton>
             </div>
         </div>
     </AppLayout>
 </template>
-

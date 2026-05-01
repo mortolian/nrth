@@ -2,17 +2,17 @@
 
 namespace Tests\Feature\Invoicing;
 
-use App\Domain\Invoicing\Enums\QuoteStatus;
+use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Invoicing\Models\Client;
+use App\Domain\Invoicing\Models\Estimate;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Payment;
-use App\Domain\Invoicing\Models\Quote;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class InvoiceQuoteDeleteTest extends TestCase
+class InvoiceEstimateDeleteTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -67,7 +67,7 @@ class InvoiceQuoteDeleteTest extends TestCase
         $this->assertNotNull(Invoice::query()->find($invoice->id));
     }
 
-    public function test_user_can_delete_quote(): void
+    public function test_user_can_delete_estimate(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -75,11 +75,11 @@ class InvoiceQuoteDeleteTest extends TestCase
         $this->actingTeamContext($user, $team);
 
         $client = Client::factory()->for($team)->create();
-        $quote = Quote::query()->create([
+        $estimate = Estimate::query()->create([
             'team_id' => $team->id,
             'client_id' => $client->id,
-            'status' => QuoteStatus::Draft,
-            'number' => 'Q-2026-9001',
+            'status' => EstimateStatus::Draft,
+            'number' => 'EST-2026-9001',
             'issue_date' => '2026-04-01',
             'expiry_date' => '2026-05-01',
             'subtotal_cents' => 10000,
@@ -97,9 +97,9 @@ class InvoiceQuoteDeleteTest extends TestCase
             'converted_invoice_id' => null,
         ]);
 
-        $response = $this->delete(route('invoicing.quotes.destroy', $quote));
+        $response = $this->delete(route('invoicing.estimates.destroy', $estimate));
 
-        $response->assertRedirect(route('invoicing.quotes.index'));
-        $this->assertNull(Quote::query()->find($quote->id));
+        $response->assertRedirect(route('invoicing.estimates.index'));
+        $this->assertNull(Estimate::query()->find($estimate->id));
     }
 }
