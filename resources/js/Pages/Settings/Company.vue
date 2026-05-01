@@ -436,59 +436,86 @@ const removeBankAccount = (index: number) => {
 
             <AppCard v-show="tab === 'profile'">
                 <h3 class="text-base font-semibold text-slate-900">Company profile</h3>
-                <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Company name</label>
-                        <AppInput v-model="form.name" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Trading name (if different)</label>
-                        <AppInput v-model="form.trading_name" placeholder="Optional" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Registration number</label>
-                        <AppInput v-model="form.registration_number" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
-                        <AppInput v-model="form.vat_number" placeholder="4XXXXXXXXX" maxlength="10" />
-                        <p class="mt-1 text-xs text-slate-500">South African VAT numbers are 10 digits starting with 4.</p>
-                        <p v-if="form.errors.vat_number" class="mt-1 text-xs text-rose-600">{{ form.errors.vat_number }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Tax reference (SARS)</label>
-                        <AppInput v-model="form.tax_reference" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Industry</label>
-                        <AppSelect
-                            :model-value="form.industry || ''"
-                            :options="industries.map((i) => ({ label: i.label, value: i.value }))"
-                            placeholder="Select industry"
-                            @update:model-value="form.industry = $event"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Financial year end</label>
-                        <AppSelect
-                            :model-value="String(form.financial_year_end_month)"
-                            :options="financial_year_months.map((m) => ({ label: m.label, value: String(m.value) }))"
-                            @update:model-value="form.financial_year_end_month = Number($event)"
-                        />
-                        <p class="mt-1 text-xs text-slate-500">South Africa commonly uses February.</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Logo</label>
-                        <p class="mb-2 text-xs text-slate-500">Shown on invoices and reports (PNG or JPG, max 4&nbsp;MB).</p>
-                        <div class="flex flex-wrap items-center gap-4">
-                            <div
-                                class="flex h-20 w-20 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
-                            >
-                                <img v-if="displayLogo" :src="displayLogo" alt="Logo" class="max-h-full max-w-full object-contain">
-                                <Building2 v-else class="h-8 w-8 text-slate-300" />
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Legal and trading identity, tax references, and your logo. These feed invoices, estimates, and reports.
+                </p>
+
+                <div class="mt-6 space-y-5">
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Names &amp; registration</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Registered name as on official documents; trading name if you market under a different brand.</p>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Company name</label>
+                                <AppInput v-model="form.name" />
                             </div>
-                            <div class="flex gap-2">
-                                <label class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">Trading name (optional)</label>
+                                    <AppInput v-model="form.trading_name" placeholder="If different from company name" />
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">Registration number</label>
+                                    <AppInput v-model="form.registration_number" />
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Tax</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">VAT and SARS references used on tax invoices and compliance.</p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
+                                <AppInput v-model="form.vat_number" placeholder="4XXXXXXXXX" maxlength="10" />
+                                <p class="mt-1 text-xs text-slate-500">South African VAT numbers are 10 digits starting with 4.</p>
+                                <p v-if="form.errors.vat_number" class="mt-1 text-xs text-rose-600">{{ form.errors.vat_number }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Tax reference (SARS)</label>
+                                <AppInput v-model="form.tax_reference" />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Business classification</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Industry and financial year for reporting context.</p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Industry</label>
+                                <AppSelect
+                                    :model-value="form.industry || ''"
+                                    :options="industries.map((i) => ({ label: i.label, value: i.value }))"
+                                    placeholder="Select industry"
+                                    @update:model-value="form.industry = $event"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Financial year end</label>
+                                <AppSelect
+                                    :model-value="String(form.financial_year_end_month)"
+                                    :options="financial_year_months.map((m) => ({ label: m.label, value: String(m.value) }))"
+                                    @update:model-value="form.financial_year_end_month = Number($event)"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">South Africa commonly uses February.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Logo</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Shown on invoices, estimates, and other customer-facing PDFs (PNG or JPG, max 4&nbsp;MB).</p>
+                        <div class="mt-4 flex flex-wrap items-center gap-4">
+                            <div
+                                class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                            >
+                                <img v-if="displayLogo" :src="displayLogo" alt="Logo preview" class="max-h-full max-w-full object-contain">
+                                <Building2 v-else class="h-9 w-9 text-slate-300" />
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
                                     <ImagePlus class="h-4 w-4" />
                                     Upload
                                     <input type="file" accept="image/*" class="hidden" @change="onLogo">
@@ -496,209 +523,302 @@ const removeBankAccount = (index: number) => {
                                 <button
                                     v-if="displayLogo"
                                     type="button"
-                                    class="inline-flex items-center gap-1 rounded-md border border-rose-200 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50"
                                     @click="clearLogo"
                                 >
                                     <Trash2 class="h-4 w-4" /> Remove
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </section>
                 </div>
             </AppCard>
 
             <AppCard v-show="tab === 'contact'">
-                <h3 class="text-base font-semibold text-slate-900">Contact details</h3>
-                <p class="mt-1 text-sm text-slate-500">Physical address</p>
-                <div class="mt-3 grid gap-4 md:grid-cols-2">
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Street</label>
-                        <AppInput v-model="form.physical_street" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">City</label>
-                        <AppInput v-model="form.physical_city" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Province</label>
-                        <AppInput v-model="form.physical_province" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Postal code</label>
-                        <AppInput v-model="form.physical_postal_code" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Country</label>
-                        <AppInput v-model="form.physical_country" />
-                    </div>
-                </div>
+                <h3 class="text-base font-semibold text-slate-900">Contact</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Where your business is based, how postal mail reaches you, and the email, phone, and website shown to clients on documents.
+                </p>
 
-                <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
-                    <input v-model="form.postal_same_as_physical" type="checkbox" class="rounded border-slate-300">
-                    Postal address same as physical
-                </label>
+                <div class="mt-6 space-y-5">
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Physical address</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Principal place of business; used on invoices and estimates when you include address lines.</p>
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Street</label>
+                                <AppInput v-model="form.physical_street" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">City</label>
+                                <AppInput v-model="form.physical_city" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Province</label>
+                                <AppInput v-model="form.physical_province" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Postal code</label>
+                                <AppInput v-model="form.physical_postal_code" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Country</label>
+                                <AppInput v-model="form.physical_country" />
+                            </div>
+                        </div>
+                    </section>
 
-                <template v-if="!form.postal_same_as_physical">
-                    <p class="mt-4 text-sm text-slate-500">Postal address</p>
-                    <div class="mt-3 grid gap-4 md:grid-cols-2">
-                        <div class="md:col-span-2">
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Street</label>
-                            <AppInput v-model="form.postal_street" />
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Postal address</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Optional separate mailing address when it differs from your physical location.</p>
+                        <div class="mt-4 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
+                            <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                <input
+                                    v-model="form.postal_same_as_physical"
+                                    type="checkbox"
+                                    class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                >
+                                Postal address is the same as physical
+                            </label>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">City</label>
-                            <AppInput v-model="form.postal_city" />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Province</label>
-                            <AppInput v-model="form.postal_province" />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Postal code</label>
-                            <AppInput v-model="form.postal_postal_code" />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Country</label>
-                            <AppInput v-model="form.postal_country" />
-                        </div>
-                    </div>
-                </template>
+                        <template v-if="!form.postal_same_as_physical">
+                            <div class="mt-4 grid gap-4 md:grid-cols-2">
+                                <div class="md:col-span-2">
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">Street</label>
+                                    <AppInput v-model="form.postal_street" />
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">City</label>
+                                    <AppInput v-model="form.postal_city" />
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">Province</label>
+                                    <AppInput v-model="form.postal_province" />
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">Postal code</label>
+                                    <AppInput v-model="form.postal_postal_code" />
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-slate-500">Country</label>
+                                    <AppInput v-model="form.postal_country" />
+                                </div>
+                            </div>
+                        </template>
+                    </section>
 
-                <p class="mt-6 text-sm font-medium text-slate-900">General contact</p>
-                <div class="mt-3 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
-                        <AppInput v-model="form.company_email" type="email" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                        <AppInput v-model="form.company_phone" />
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Website</label>
-                        <AppInput v-model="form.company_website" placeholder="https://" />
-                    </div>
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Public contact details</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Shown on PDFs and in the “from” block when you email invoices.</p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
+                                <AppInput v-model="form.company_email" type="email" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
+                                <AppInput v-model="form.company_phone" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Website</label>
+                                <AppInput v-model="form.company_website" placeholder="https://" />
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </AppCard>
 
             <AppCard v-show="tab === 'invoice'">
                 <h3 class="text-base font-semibold text-slate-900">Invoices</h3>
-                <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default payment terms (days)</label>
-                        <AppInput v-model="form.invoice_default_payment_terms_days" type="number" />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default invoice &amp; estimate currency</label>
-                        <AppSelect
-                            :model-value="form.invoice_default_currency"
-                            :options="currencyOptions"
-                            @update:model-value="form.invoice_default_currency = $event"
-                        />
-                        <p class="mt-1 text-xs text-slate-500">
-                            Used for new invoices and estimates until you pick a client (client currency applies) or choose another currency on the document.
-                        </p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Invoice prefix</label>
-                        <AppInput v-model="form.invoice_prefix" placeholder="INV" />
-                        <p class="mt-1 text-xs text-slate-500">Numbers format preview: {{ liveInvoicePreview }}</p>
-                    </div>
-                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
-                        <input v-model="form.invoice_number_include_month" type="checkbox" class="rounded border-slate-300">
-                        Include month number in invoice number
-                    </label>
-                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
-                        <input v-model="form.invoice_number_use_random_suffix" type="checkbox" class="rounded border-slate-300">
-                        Use random 4-character suffix instead of sequence
-                    </label>
-                    <label class="mt-6 flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
-                        <input v-model="form.invoice_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300">
-                        <span>
-                            Show street address on invoice PDFs
-                            <span class="mt-0.5 block text-xs font-normal text-slate-500">
-                                When unchecked, only city, province, postal code and country appear under your company name. Email, phone and website on those PDFs are unchanged.
-                            </span>
-                        </span>
-                    </label>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Next sequence number (this year)</label>
-                        <AppInput v-model="form.invoice_next_sequence" type="number" min="1" :disabled="form.invoice_number_use_random_suffix" />
-                        <p class="mt-1 text-xs text-slate-500">Used only when random suffix is disabled.</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default notes (new invoices)</label>
-                        <textarea
-                            v-model="form.invoice_default_notes"
-                            rows="3"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default footer (banking details, etc.)</label>
-                        <textarea
-                            v-model="form.invoice_default_footer"
-                            rows="4"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Email subject template</label>
-                        <AppInput v-model="form.invoice_email_subject_template" />
-                        <p v-pre class="mt-1 text-xs text-slate-500">Placeholders: {{number}}, {{company}}, {{client_name}}</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Email body template</label>
-                        <textarea
-                            v-model="form.invoice_email_body_template"
-                            rows="5"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                    </div>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Defaults for new invoices, how numbers are generated, PDF layout, and the email templates used when you send from the app.
+                </p>
+
+                <div class="mt-6 space-y-5">
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">New invoice defaults</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Payment terms and currency apply until you change them on the invoice or the client has a set currency.</p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default payment terms (days)</label>
+                                <AppInput v-model="form.invoice_default_payment_terms_days" type="number" />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default invoice &amp; estimate currency</label>
+                                <AppSelect
+                                    :model-value="form.invoice_default_currency"
+                                    :options="currencyOptions"
+                                    @update:model-value="form.invoice_default_currency = $event"
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Invoice numbers</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Prefix and sequence; optional month segment or random suffix instead of counting.</p>
+                        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Prefix</label>
+                                <AppInput v-model="form.invoice_prefix" placeholder="INV" />
+                                <p class="mt-1.5 rounded-md bg-white/80 px-2 py-1.5 font-mono text-xs text-slate-600 ring-1 ring-slate-200/80">
+                                    Preview: {{ liveInvoicePreview }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Next sequence (this year)</label>
+                                <AppInput v-model="form.invoice_next_sequence" type="number" min="1" :disabled="form.invoice_number_use_random_suffix" />
+                                <p class="mt-1 text-xs text-slate-500">Ignored when using a random suffix.</p>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Format options</p>
+                                <div class="space-y-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
+                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                        <input v-model="form.invoice_number_include_month" type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                        Include month in the number
+                                    </label>
+                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                        <input v-model="form.invoice_number_use_random_suffix" type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                        Use random 4-character suffix instead of sequence
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">PDF &amp; letterhead</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">What appears on invoice PDFs generated from your company profile.</p>
+                        <div class="mt-4">
+                            <label class="flex cursor-pointer items-start gap-2.5 text-sm text-slate-800">
+                                <input v-model="form.invoice_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span>
+                                    Show street address on invoice PDFs
+                                    <span class="mt-1 block text-xs font-normal leading-relaxed text-slate-500">
+                                        If off, only city, province, postal code and country show under your company name (email, phone and website stay as configured).
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Default document text</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Pre-filled on new invoices; you can edit per invoice.</p>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default notes</label>
+                                <textarea
+                                    v-model="form.invoice_default_notes"
+                                    rows="3"
+                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default footer (e.g. banking)</label>
+                                <textarea
+                                    v-model="form.invoice_default_footer"
+                                    rows="4"
+                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Send invoice email</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Templates when emailing an invoice from the app.</p>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Subject</label>
+                                <AppInput v-model="form.invoice_email_subject_template" />
+                                <p v-pre class="mt-1 text-xs text-slate-500">Placeholders: {{number}}, {{company}}, {{client_name}}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Body</label>
+                                <textarea
+                                    v-model="form.invoice_email_body_template"
+                                    rows="5"
+                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </AppCard>
 
             <AppCard v-show="tab === 'estimate'">
                 <h3 class="text-base font-semibold text-slate-900">Estimates</h3>
-                <div class="mt-4 grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Estimate prefix</label>
-                        <AppInput v-model="form.estimate_prefix" placeholder="EST" />
-                        <p class="mt-1 text-xs text-slate-500">Numbers format preview: {{ liveEstimatePreview }}</p>
-                    </div>
-                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
-                        <input v-model="form.estimate_number_include_month" type="checkbox" class="rounded border-slate-300">
-                        Include month number in estimate number
-                    </label>
-                    <label class="mt-6 flex items-center gap-2 text-sm text-slate-700">
-                        <input v-model="form.estimate_number_use_random_suffix" type="checkbox" class="rounded border-slate-300">
-                        Use random 4-character suffix for estimate numbers
-                    </label>
-                    <label class="mt-6 flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
-                        <input v-model="form.estimate_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300">
-                        <span>
-                            Show street address on estimate PDFs
-                            <span class="mt-0.5 block text-xs font-normal text-slate-500">
-                                When unchecked, only city, province, postal code and country appear under your company name. Email, phone and website on those PDFs are unchanged.
-                            </span>
-                        </span>
-                    </label>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default notes (new estimates)</label>
-                        <textarea
-                            v-model="form.estimate_default_notes"
-                            rows="3"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default terms (new estimates)</label>
-                        <textarea
-                            v-model="form.estimate_default_terms"
-                            rows="4"
-                            class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                        />
-                    </div>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
+                    Numbering and PDF options for quotes; default notes and terms on new estimates.
+                </p>
+
+                <div class="mt-6 space-y-5">
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Estimate numbers</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Prefix and optional month or random suffix.</p>
+                        <div class="mt-4 space-y-4">
+                            <div class="max-w-md">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Prefix</label>
+                                <AppInput v-model="form.estimate_prefix" placeholder="EST" />
+                                <p class="mt-1.5 rounded-md bg-white/80 px-2 py-1.5 font-mono text-xs text-slate-600 ring-1 ring-slate-200/80">
+                                    Preview: {{ liveEstimatePreview }}
+                                </p>
+                            </div>
+                            <div>
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Format options</p>
+                                <div class="max-w-xl space-y-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
+                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                        <input v-model="form.estimate_number_include_month" type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                        Include month in the number
+                                    </label>
+                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                        <input v-model="form.estimate_number_use_random_suffix" type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                        Use random 4-character suffix instead of sequence
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">PDF &amp; letterhead</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Company block on estimate PDFs.</p>
+                        <div class="mt-4">
+                            <label class="flex cursor-pointer items-start gap-2.5 text-sm text-slate-800">
+                                <input v-model="form.estimate_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
+                                <span>
+                                    Show street address on estimate PDFs
+                                    <span class="mt-1 block text-xs font-normal leading-relaxed text-slate-500">
+                                        If off, only city, province, postal code and country show under your company name (email, phone and website stay as configured).
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
+                        <h4 class="text-sm font-semibold text-slate-900">Default document text</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">Pre-filled on new estimates.</p>
+                        <div class="mt-4 space-y-4">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default notes</label>
+                                <textarea
+                                    v-model="form.estimate_default_notes"
+                                    rows="3"
+                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default terms</label>
+                                <textarea
+                                    v-model="form.estimate_default_terms"
+                                    rows="4"
+                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </AppCard>
 
