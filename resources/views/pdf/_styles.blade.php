@@ -148,6 +148,37 @@
     }
     .section p { margin: 0 0 4px; color: #334155; font-size: 10px; }
 
+    /* Notes / terms: paginate between lines, keep heading with following text when possible */
+    .section.section-prose {
+        page-break-inside: auto;
+        break-inside: auto;
+    }
+    .section.section-prose h3 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+    }
+    .section.section-prose .pdf-prose {
+        page-break-inside: auto;
+    }
+    .section.section-prose .pdf-prose-p {
+        margin: 0 0 4px;
+        color: #334155;
+        font-size: 10px;
+        line-height: 1.5;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        page-break-inside: auto;
+        break-inside: auto;
+    }
+    .section.section-prose .pdf-prose-p:last-child {
+        margin-bottom: 0;
+    }
+    .section.section-prose .pdf-prose-break {
+        height: 4px;
+        margin: 0;
+        page-break-inside: avoid;
+    }
+
     /* Banking — light bordered cards + key/value rows */
     .section-banking {
         margin-top: 14px;

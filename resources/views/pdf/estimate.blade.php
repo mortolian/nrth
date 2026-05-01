@@ -171,19 +171,8 @@
     </tr>
 </table>
 
-@if($estimate->notes)
-    <div class="section">
-        <h3>Notes</h3>
-        <p>{!! nl2br(e($estimate->notes)) !!}</p>
-    </div>
-@endif
-
-@if($estimate->terms)
-    <div class="section">
-        <h3>Terms &amp; conditions</h3>
-        <p>{!! nl2br(e($estimate->terms)) !!}</p>
-    </div>
-@endif
+@include('pdf._prose-section', ['title' => 'Notes', 'content' => $estimate->notes])
+@include('pdf._prose-section', ['title' => 'Terms & conditions', 'content' => $estimate->terms])
 
 <div class="footer">
     {{ $companyName }} &middot; Estimate {{ $estimate->number }} &middot; Generated {{ now()->format('d M Y') }}

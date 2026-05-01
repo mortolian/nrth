@@ -224,19 +224,8 @@
     </div>
 @endif
 
-@if($invoice->notes)
-    <div class="section">
-        <h3>Notes</h3>
-        <p>{!! nl2br(e($invoice->notes)) !!}</p>
-    </div>
-@endif
-
-@if($invoice->footer)
-    <div class="section">
-        <h3>Terms &amp; conditions</h3>
-        <p>{!! nl2br(e($invoice->footer)) !!}</p>
-    </div>
-@endif
+@include('pdf._prose-section', ['title' => 'Notes', 'content' => $invoice->notes])
+@include('pdf._prose-section', ['title' => 'Terms & conditions', 'content' => $invoice->footer])
 
 <div class="footer">
     {{ $companyName }} &middot; {{ $documentTitle }} {{ $invoice->number }} &middot; Generated {{ now()->format('d M Y') }}
