@@ -16,6 +16,7 @@ use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
@@ -31,9 +32,7 @@ class BudgetingController extends Controller
             return Inertia::render('Budgeting/Index', [
                 'budgets' => [],
                 'active_budget' => null,
-                'monthly_variance' => [],
                 'company_currency' => 'ZAR',
-                'variance_currency_aligned' => true,
             ]);
         }
 
@@ -57,36 +56,7 @@ class BudgetingController extends Controller
             ? $this->spentForPeriod($teamId, $active->start_date->toDateString(), $active->end_date->toDateString())
             : null;
 
-        $monthlySeries = $months->map(function ($month) use ($teamId, $active, $varianceAligned): array {
-            $from = $month->copy()->startOfMonth()->toDateString();
-            $to = $month->copy()->endOfMonth()->toDateString();
-
-            $spent = (int) JournalEntry::query()
-                ->where('type', EntryType::Debit)
-                ->whereHas('transaction', fn ($q) => $q
-                    ->withoutGlobalScopes()
-                    ->where('team_id', $teamId)
-                    ->where('status', TransactionStatus::Posted->value)
-                    ->whereBetween('transaction_date', [$from, $to]))
-                ->whereHas('account', fn ($q) => $q
-                    ->withoutGlobalScopes()
-                    ->where('team_id', $teamId)
-                    ->where('type', AccountType::Expense->value))
-                ->sum('amount_cents');
-
-            $budgeted = $active !== null
-                ? $this->budgetedCentsForCalendarMonth($active, $month)
-                : 0;
-
-            return [
-                'month' => $month->format('M Y'),
-                'budgeted' => $budgeted,
-                'actual' => $varianceAligned ? $spent : null,
-                'variance' => $varianceAligned ? ($budgeted - $spent) : null,
-            ];
-        });
-
-        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $companyCurrency): array {
+        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $companyCurrency, $months): array {
             $allocated = (int) $budget->categories->sum('envelope_cents');
             $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
 
@@ -101,6 +71,7 @@ class BudgetingController extends Controller
                 'status' => $budget->is_active ? 'active' : 'closed',
                 'categories' => $this->budgetIndexCategoryBreakdown($budget, $teamId),
                 'company_spend_aligned' => strcasecmp((string) $budget->currency, $companyCurrency) === 0,
+                'monthly_variance' => $this->monthlyVarianceSeriesForBudget($budget, $teamId, $companyCurrency, $months),
             ];
         })->values()->all();
 
@@ -126,9 +97,7 @@ class BudgetingController extends Controller
         return Inertia::render('Budgeting/Index', [
             'budgets' => $budgets,
             'active_budget' => $activeBudgetPayload,
-            'monthly_variance' => $monthlySeries->values()->all(),
             'company_currency' => $companyCurrency,
-            'variance_currency_aligned' => $varianceAligned,
         ]);
     }
 
@@ -332,6 +301,44 @@ class BudgetingController extends Controller
         $e = $end->copy()->startOfMonth();
 
         return max(1, (int) $s->diffInMonths($e) + 1);
+    }
+
+    /**
+     * Last six calendar months: budgeted vs actual (when budget currency matches company books currency).
+     *
+     * @param  Collection<int, Carbon>  $months
+     * @return array<int, array{month: string, budgeted: int, actual: int|null, variance: int|null}>
+     */
+    private function monthlyVarianceSeriesForBudget(Budget $budget, int $teamId, string $companyCurrency, Collection $months): array
+    {
+        $aligned = strcasecmp((string) $budget->currency, $companyCurrency) === 0;
+
+        return $months->map(function (Carbon $month) use ($teamId, $budget, $aligned): array {
+            $from = $month->copy()->startOfMonth()->toDateString();
+            $to = $month->copy()->endOfMonth()->toDateString();
+
+            $spent = (int) JournalEntry::query()
+                ->where('type', EntryType::Debit)
+                ->whereHas('transaction', fn ($q) => $q
+                    ->withoutGlobalScopes()
+                    ->where('team_id', $teamId)
+                    ->where('status', TransactionStatus::Posted->value)
+                    ->whereBetween('transaction_date', [$from, $to]))
+                ->whereHas('account', fn ($q) => $q
+                    ->withoutGlobalScopes()
+                    ->where('team_id', $teamId)
+                    ->where('type', AccountType::Expense->value))
+                ->sum('amount_cents');
+
+            $budgeted = $this->budgetedCentsForCalendarMonth($budget, $month);
+
+            return [
+                'month' => $month->format('M Y'),
+                'budgeted' => $budgeted,
+                'actual' => $aligned ? $spent : null,
+                'variance' => $aligned ? ($budgeted - $spent) : null,
+            ];
+        })->values()->all();
     }
 
     /**

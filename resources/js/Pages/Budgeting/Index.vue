@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -13,21 +13,14 @@ use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer
 
 const props = defineProps({
     budgets: { type: Array, default: () => [] },
+    /** Still sent for Inertia/tests; variance chart uses per-budget `monthly_variance`. */
     active_budget: { type: Object, default: null },
-    monthly_variance: { type: Array, default: () => [] },
     company_currency: { type: String, default: 'ZAR' },
-    variance_currency_aligned: { type: Boolean, default: true },
 });
 
 const expandedBudgetId = ref(null);
 
-const displayCurrency = computed(() => {
-    if (props.active_budget?.currency) return props.active_budget.currency;
-    const first = props.budgets[0];
-    return first?.currency ?? 'ZAR';
-});
-
-const formatCents = (cents, currency = displayCurrency.value) =>
+const formatCents = (cents, currency = 'ZAR') =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 
 const deleteBudget = (budget) => {
@@ -45,22 +38,23 @@ const toggleBudgetExpanded = (id) => {
     expandedBudgetId.value = expandedBudgetId.value === id ? null : id;
 };
 
-const chartOptions = computed(() => {
-    const sym = displayCurrency.value === 'ZAR' ? 'R' : displayCurrency.value;
+function budgetVarianceChartOption(budget) {
+    const rows = budget.monthly_variance ?? [];
+    const sym = budget.currency === 'ZAR' ? 'R' : budget.currency;
     const series = [
         {
             name: 'Budgeted',
             type: 'line',
-            data: props.monthly_variance.map((row) => row.budgeted),
+            data: rows.map((row) => row.budgeted),
             lineStyle: { type: 'dashed', color: '#0ea5e9' },
             itemStyle: { color: '#0ea5e9' },
         },
     ];
-    if (props.variance_currency_aligned) {
+    if (budget.company_spend_aligned) {
         series.push({
             name: `Actual (${props.company_currency})`,
             type: 'line',
-            data: props.monthly_variance.map((row) => row.actual ?? 0),
+            data: rows.map((row) => row.actual ?? 0),
             lineStyle: { color: '#22c55e' },
             itemStyle: { color: '#22c55e' },
         });
@@ -69,7 +63,7 @@ const chartOptions = computed(() => {
         tooltip: { trigger: 'axis' },
         legend: { data: series.map((s) => s.name) },
         grid: { left: 16, right: 16, top: 36, bottom: 24, containLabel: true },
-        xAxis: { type: 'category', data: props.monthly_variance.map((row) => row.month) },
+        xAxis: { type: 'category', data: rows.map((row) => row.month) },
         yAxis: {
             type: 'value',
             axisLabel: {
@@ -78,7 +72,7 @@ const chartOptions = computed(() => {
         },
         series,
     };
-});
+}
 </script>
 
 <template>
@@ -233,30 +227,30 @@ const chartOptions = computed(() => {
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="mt-8 border-t border-slate-200 pt-6">
+                                <h4 class="mb-3 text-base font-semibold text-slate-900">Monthly variance</h4>
+                                <p v-if="!budget.company_spend_aligned" class="mb-3 text-sm text-amber-800">
+                                    This budget is in {{ budget.currency }} but books use {{ company_currency }}; only the budgeted
+                                    series is shown (actuals are in {{ company_currency }}).
+                                </p>
+                                <VChart class="h-72 w-full min-h-[18rem]" :option="budgetVarianceChartOption(budget)" autoresize />
+                                <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                                    <span
+                                        v-for="row in (budget.monthly_variance ?? []).filter(
+                                            (item) => item.variance != null && item.variance < 0,
+                                        )"
+                                        :key="`over-${budget.id}-${row.month}`"
+                                        class="rounded-md bg-rose-50 px-2 py-1 text-rose-700"
+                                    >
+                                        Over budget: {{ row.month }} ({{ formatCents(Math.abs(row.variance), budget.currency) }})
+                                    </span>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 </template>
             </AppTable>
-        </AppCard>
-
-        <AppCard class="mt-5">
-            <h3 class="mb-3 text-lg font-semibold text-slate-900">Monthly variance</h3>
-            <p v-if="!active_budget" class="mb-3 text-sm text-slate-500">
-                Budgeted amounts appear when you have an active budget covering these months.
-            </p>
-            <p v-else-if="!variance_currency_aligned" class="mb-3 text-sm text-amber-800">
-                Budget is in {{ displayCurrency }} but books use {{ company_currency }}; only the budgeted series is compared here.
-            </p>
-            <VChart class="h-80 w-full" :option="chartOptions" autoresize />
-            <div class="mt-3 flex flex-wrap gap-2 text-xs">
-                <span
-                    v-for="row in monthly_variance.filter((item) => item.variance != null && item.variance < 0)"
-                    :key="`over-${row.month}`"
-                    class="rounded-md bg-rose-50 px-2 py-1 text-rose-700"
-                >
-                    Over budget: {{ row.month }} ({{ formatCents(Math.abs(row.variance)) }})
-                </span>
-            </div>
         </AppCard>
     </AppLayout>
 </template>
