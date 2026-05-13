@@ -13,6 +13,7 @@ use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer
 
 const props = defineProps({
     budgets: { type: Array, default: () => [] },
+    trashed_budgets: { type: Array, default: () => [] },
     /** Still sent for Inertia/tests; variance chart uses per-budget `monthly_variance`. */
     active_budget: { type: Object, default: null },
     company_currency: { type: String, default: 'ZAR' },
@@ -20,13 +21,82 @@ const props = defineProps({
 
 const expandedBudgetId = ref(null);
 
+/** In-app delete confirmation (window.confirm is unreliable in some browsers / embedded views). */
+const budgetPendingDelete = ref(null);
+const budgetDeleteProcessing = ref(false);
+
+const openDeleteBudgetModal = (budget) => {
+    budgetPendingDelete.value = budget;
+};
+
+const closeDeleteBudgetModal = () => {
+    if (budgetDeleteProcessing.value) return;
+    budgetPendingDelete.value = null;
+};
+
+const confirmDeleteBudget = () => {
+    const b = budgetPendingDelete.value;
+    if (!b || budgetDeleteProcessing.value) return;
+    budgetDeleteProcessing.value = true;
+    budgetPendingDelete.value = null;
+    router.delete(route('budgeting.destroy', b.id), {
+        preserveScroll: true,
+        onFinish: () => {
+            budgetDeleteProcessing.value = false;
+        },
+    });
+};
+
+/** Trashed budgets: restore or permanently delete */
+const budgetPermanentDelete = ref(null);
+const budgetPermanentDeleteProcessing = ref(false);
+
+const openPermanentDeleteModal = (row) => {
+    budgetPermanentDelete.value = row;
+};
+
+const closePermanentDeleteModal = () => {
+    if (budgetPermanentDeleteProcessing.value) return;
+    budgetPermanentDelete.value = null;
+};
+
+const confirmPermanentDeleteBudget = () => {
+    const b = budgetPermanentDelete.value;
+    if (!b || budgetPermanentDeleteProcessing.value) return;
+    budgetPermanentDeleteProcessing.value = true;
+    budgetPermanentDelete.value = null;
+    router.delete(route('budgeting.force-destroy', b.id), {
+        preserveScroll: true,
+        onFinish: () => {
+            budgetPermanentDeleteProcessing.value = false;
+        },
+    });
+};
+
+const restoreBudget = (row) => {
+    router.post(
+        route('budgeting.restore', row.id),
+        {},
+        {
+            preserveScroll: true,
+        },
+    );
+};
+
+function formatDeletedAt(iso) {
+    if (!iso) return '—';
+    try {
+        return new Date(iso).toLocaleString(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        });
+    } catch {
+        return '—';
+    }
+}
+
 const formatCents = (cents, currency = 'ZAR') =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
-
-const deleteBudget = (budget) => {
-    if (!window.confirm(`Delete budget “${budget.name}”? This cannot be undone.`)) return;
-    router.delete(route('budgeting.destroy', budget.id), { preserveScroll: true });
-};
 
 const progressColor = (percentage) => {
     if (percentage >= 100) return 'bg-rose-500';
@@ -108,13 +178,13 @@ function budgetVarianceChartOption(budget) {
 
 <template>
     <AppLayout
-        title="Budgeting"
+        title="Budgets"
         :breadcrumbs="[
             { label: 'Planning' },
-            { label: 'Budgeting' },
+            { label: 'Budgets' },
         ]"
     >
-        <PageHeader title="Budgeting">
+        <PageHeader title="Budgets">
             <template #actions>
                 <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">New Budget</AppButton>
             </template>
@@ -181,7 +251,7 @@ function budgetVarianceChartOption(budget) {
                                     size="sm"
                                     variant="ghost"
                                     class="text-rose-600 hover:text-rose-700"
-                                    @click="deleteBudget(budget)"
+                                    @click.stop="openDeleteBudgetModal(budget)"
                                 >
                                     Delete
                                 </AppButton>
@@ -415,5 +485,107 @@ function budgetVarianceChartOption(budget) {
                 </template>
             </AppTable>
         </AppCard>
+
+        <AppCard v-if="(trashed_budgets ?? []).length" class="mt-5 border-dashed border-slate-300 bg-slate-50/50">
+            <h3 class="text-lg font-semibold text-slate-900">Trash</h3>
+            <p class="mt-1 text-sm text-slate-500">
+                Budgets you moved to trash can be restored or permanently deleted. Permanent deletion removes all categories and
+                lines.
+            </p>
+            <AppTable
+                class="mt-4"
+                :columns="[
+                    { key: 'name', label: 'Name' },
+                    { key: 'period', label: 'Period' },
+                    { key: 'deleted', label: 'Moved to trash' },
+                    { key: 'actions', label: '' },
+                ]"
+                :page="1"
+                :last-page="1"
+            >
+                <tr v-for="row in trashed_budgets" :key="row.id" class="align-middle">
+                    <td class="px-4 py-3 font-medium text-slate-900">{{ row.name }}</td>
+                    <td class="px-4 py-3 text-slate-600">{{ row.period }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-600">{{ formatDeletedAt(row.deleted_at) }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex justify-end gap-1">
+                            <AppButton size="sm" variant="secondary" @click="restoreBudget(row)">Restore</AppButton>
+                            <AppButton
+                                size="sm"
+                                variant="ghost"
+                                class="text-rose-600 hover:text-rose-700"
+                                @click.stop="openPermanentDeleteModal(row)"
+                            >
+                                Delete forever
+                            </AppButton>
+                        </div>
+                    </td>
+                </tr>
+            </AppTable>
+        </AppCard>
+
+        <!-- Move budget to trash confirmation -->
+        <div
+            v-if="budgetPendingDelete"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="budget-delete-title"
+            @click.self="closeDeleteBudgetModal"
+        >
+            <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                <h4 id="budget-delete-title" class="text-lg font-semibold text-slate-900">Move budget to trash</h4>
+                <p class="mt-2 text-sm text-slate-600">
+                    Move
+                    <strong class="text-slate-900">“{{ budgetPendingDelete.name }}”</strong>
+                    to trash? It will disappear from your budget list until you restore it from Trash below, or delete it forever.
+                </p>
+                <div class="mt-6 flex justify-end gap-2">
+                    <AppButton variant="ghost" :disabled="budgetDeleteProcessing" @click="closeDeleteBudgetModal">
+                        Cancel
+                    </AppButton>
+                    <AppButton
+                        variant="primary"
+                        class="!bg-rose-600 hover:!bg-rose-700"
+                        :disabled="budgetDeleteProcessing"
+                        @click="confirmDeleteBudget"
+                    >
+                        Move to trash
+                    </AppButton>
+                </div>
+            </div>
+        </div>
+
+        <!-- Permanently delete budget from trash -->
+        <div
+            v-if="budgetPermanentDelete"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="budget-permanent-delete-title"
+            @click.self="closePermanentDeleteModal"
+        >
+            <div class="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+                <h4 id="budget-permanent-delete-title" class="text-lg font-semibold text-slate-900">Delete forever</h4>
+                <p class="mt-2 text-sm text-slate-600">
+                    Permanently delete
+                    <strong class="text-slate-900">“{{ budgetPermanentDelete.name }}”</strong>
+                    ? All categories and line items will be removed. This cannot be undone.
+                </p>
+                <div class="mt-6 flex justify-end gap-2">
+                    <AppButton variant="ghost" :disabled="budgetPermanentDeleteProcessing" @click="closePermanentDeleteModal">
+                        Cancel
+                    </AppButton>
+                    <AppButton
+                        variant="primary"
+                        class="!bg-rose-600 hover:!bg-rose-700"
+                        :disabled="budgetPermanentDeleteProcessing"
+                        @click="confirmPermanentDeleteBudget"
+                    >
+                        Delete forever
+                    </AppButton>
+                </div>
+            </div>
+        </div>
     </AppLayout>
 </template>

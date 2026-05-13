@@ -59,6 +59,9 @@ const updatePhotoPreview = () => {
 };
 
 const deletePhoto = () => {
+    if (!window.confirm('Remove your profile photo? You can upload a new one at any time.')) {
+        return;
+    }
     router.delete(route('current-user-photo.destroy'), {
         preserveScroll: true,
         onSuccess: () => {

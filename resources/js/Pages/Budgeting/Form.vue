@@ -636,6 +636,9 @@ function addCategory() {
 
 function removeCategory(idx: number) {
     if (form.categories.length <= 1) return;
+    if (!window.confirm('Remove this category and all of its expense lines? You can still save or discard other changes.')) {
+        return;
+    }
     const cat = form.categories[idx];
     cat.items.forEach((it) => {
         delete monthlyAmountDisplay[it.uid];
@@ -658,6 +661,9 @@ function addItem(cat: Category) {
 }
 
 function removeItem(cat: Category, idx: number) {
+    if (!window.confirm('Remove this expense line?')) {
+        return;
+    }
     const it = cat.items[idx];
     delete monthlyAmountDisplay[it.uid];
     delete monthlyAmountError[it.uid];
@@ -997,7 +1003,7 @@ const submit = () => {
         :title="isEditing ? 'Edit Budget' : 'Create Budget'"
         :breadcrumbs="[
             { label: 'Planning' },
-            { label: 'Budgeting', href: route('budgeting.index') },
+            { label: 'Budgets', href: route('budgeting.index') },
             { label: isEditing ? 'Edit' : 'Create' },
         ]"
     >

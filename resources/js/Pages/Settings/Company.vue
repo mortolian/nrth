@@ -254,6 +254,9 @@ const onLogo = (event: Event) => {
 };
 
 const clearLogo = () => {
+    if (!window.confirm('Remove the company logo? Save company settings to apply; you can upload a new logo later.')) {
+        return;
+    }
     logoFile.value = null;
     removeLogo.value = true;
     if (logoPreview.value) {
@@ -395,6 +398,9 @@ const addBankAccount = () => {
 
 const removeBankAccount = (index: number) => {
     if (form.bank_accounts.length <= 1) {
+        return;
+    }
+    if (!window.confirm('Remove this bank account from the list?')) {
         return;
     }
     form.bank_accounts.splice(index, 1);

@@ -185,6 +185,7 @@ class BudgetCrudTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Budgeting/Index')
                 ->has('active_budget')
+                ->has('trashed_budgets')
                 ->where('active_budget.name', 'FY Plan')
                 ->where('active_budget.currency', 'ZAR'));
     }
@@ -199,6 +200,7 @@ class BudgetCrudTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Budgeting/Index')
+                ->has('trashed_budgets')
                 ->where('active_budget', null));
     }
 
@@ -243,6 +245,34 @@ class BudgetCrudTest extends TestCase
         $this->delete(route('budgeting.destroy', $budget))
             ->assertRedirect(route('budgeting.index'));
 
-        $this->assertNull(Budget::queryWithoutTeamScope()->find($budget->id));
+        $budgetId = (int) $budget->id;
+        $this->assertNull(Budget::queryWithoutTeamScope()->find($budgetId));
+        $this->assertTrue(Budget::queryWithoutTeamScope()->onlyTrashed()->whereKey($budgetId)->exists());
+
+        $this->delete(route('budgeting.force-destroy', $budgetId))
+            ->assertRedirect(route('budgeting.index'));
+
+        $this->assertNull(Budget::queryWithoutTeamScope()->withTrashed()->find($budgetId));
+    }
+
+    public function test_restore_soft_deleted_budget(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->samplePayload(false))->assertRedirect(route('budgeting.index'));
+
+        $budget = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->first();
+        $this->assertNotNull($budget);
+        $budgetId = (int) $budget->id;
+
+        $this->delete(route('budgeting.destroy', $budget))->assertRedirect(route('budgeting.index'));
+
+        $this->assertNull(Budget::queryWithoutTeamScope()->find($budgetId));
+
+        $this->post(route('budgeting.restore', $budgetId))->assertRedirect(route('budgeting.index'));
+
+        $restored = Budget::queryWithoutTeamScope()->find($budgetId);
+        $this->assertNotNull($restored);
+        $this->assertFalse($restored->trashed());
     }
 }

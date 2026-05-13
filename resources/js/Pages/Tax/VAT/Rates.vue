@@ -81,9 +81,16 @@ const saveEditVatRate = () => {
     });
 };
 
-const removeVatRate = (rateId: number) => {
-    deletingVatRateId.value = rateId;
-    deleteVatRateForm.delete(route('tax.vat-rates.destroy', rateId), {
+const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
+    if (
+        !window.confirm(
+            `Delete VAT rate “${rate.name}” (${rate.code})? This cannot be undone if the rate is no longer referenced.`,
+        )
+    ) {
+        return;
+    }
+    deletingVatRateId.value = rate.id;
+    deleteVatRateForm.delete(route('tax.vat-rates.destroy', rate.id), {
         preserveScroll: true,
         onFinish: () => {
             deletingVatRateId.value = null;
@@ -193,7 +200,7 @@ const removeVatRate = (rateId: number) => {
                                         <button type="button" class="text-xs font-medium text-brand-700 hover:underline" @click="beginEditVatRate(rate)">
                                             Edit
                                         </button>
-                                        <button type="button" class="text-xs text-rose-600 hover:underline" :disabled="deleteVatRateForm.processing && deletingVatRateId === rate.id" @click="removeVatRate(rate.id)">
+                                        <button type="button" class="text-xs text-rose-600 hover:underline" :disabled="deleteVatRateForm.processing && deletingVatRateId === rate.id" @click="removeVatRate(rate)">
                                             Delete
                                         </button>
                                     </div>

@@ -92,6 +92,9 @@ const regenerateRecoveryCodes = () => {
 };
 
 const disableTwoFactorAuthentication = () => {
+    if (!window.confirm('Disable two-factor authentication? You will sign in with your password only until you enable it again.')) {
+        return;
+    }
     disabling.value = true;
 
     router.delete(route('two-factor.disable'), {

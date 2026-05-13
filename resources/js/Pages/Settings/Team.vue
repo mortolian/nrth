@@ -71,6 +71,13 @@ const submitInvite = () => {
 };
 
 const cancelInvitation = (invitation: Invitation) => {
+    if (
+        !window.confirm(
+            `Revoke the invitation to ${invitation.email}? They will not be able to join using the current link.`,
+        )
+    ) {
+        return;
+    }
     router.delete(route('team-invitations.destroy', invitation.id), { preserveScroll: true });
 };
 

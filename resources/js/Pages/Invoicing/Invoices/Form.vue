@@ -305,6 +305,9 @@ const onUnitPriceBlur = (index: number) => {
 };
 
 const removeLine = (index: number) => {
+    if (!window.confirm('Remove this line item?')) {
+        return;
+    }
     const next = [...(formValues.value.line_items ?? [])];
     next.splice(index, 1);
     setFieldValue('line_items', next.length ? next : [{

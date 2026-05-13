@@ -90,6 +90,8 @@ Route::middleware([
     Route::get('/budgeting/{budget}/edit', [BudgetingController::class, 'edit'])->name('budgeting.edit');
     Route::put('/budgeting/{budget}', [BudgetingController::class, 'update'])->name('budgeting.update');
     Route::delete('/budgeting/{budget}', [BudgetingController::class, 'destroy'])->name('budgeting.destroy');
+    Route::post('/budgeting/trash/{id}/restore', [BudgetingController::class, 'restore'])->whereNumber('id')->name('budgeting.restore');
+    Route::delete('/budgeting/trash/{id}', [BudgetingController::class, 'forceDestroy'])->whereNumber('id')->name('budgeting.force-destroy');
     Route::get('/tax/vat', [VATController::class, 'index'])->name('tax.vat.index');
     Route::get('/tax/vat-rates', [VatRateController::class, 'index'])->name('tax.vat-rates.index');
     Route::post('/tax/vat-rates', [VatRateController::class, 'store'])->name('tax.vat-rates.store');

@@ -218,6 +218,9 @@ const addLine = () => {
 };
 
 const removeLine = (index: number) => {
+    if (!window.confirm('Remove this line item?')) {
+        return;
+    }
     const next = [...lineItems.value];
     next.splice(index, 1);
     lineItems.value = next.length ? next : [{

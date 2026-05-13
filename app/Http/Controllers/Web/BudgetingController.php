@@ -31,6 +31,7 @@ class BudgetingController extends Controller
         if (! Schema::hasTable('journal_entries') || ! Schema::hasTable('budgets')) {
             return Inertia::render('Budgeting/Index', [
                 'budgets' => [],
+                'trashed_budgets' => [],
                 'active_budget' => null,
                 'company_currency' => 'ZAR',
             ]);
@@ -47,6 +48,25 @@ class BudgetingController extends Controller
             ->with(['categories.items', 'categories.account'])
             ->orderByDesc('start_date')
             ->get();
+
+        $trashedBudgets = [];
+        if (Schema::hasColumn('budgets', 'deleted_at')) {
+            $trashedBudgetRows = Budget::queryWithoutTeamScope()
+                ->onlyTrashed()
+                ->where('team_id', $teamId)
+                ->orderByDesc('deleted_at')
+                ->get(['id', 'name', 'start_date', 'end_date', 'currency', 'deleted_at']);
+
+            $trashedBudgets = $trashedBudgetRows->map(function (Budget $budget): array {
+                return [
+                    'id' => $budget->id,
+                    'name' => $budget->name,
+                    'period' => $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y'),
+                    'currency' => $budget->currency,
+                    'deleted_at' => $budget->deleted_at?->toIso8601String(),
+                ];
+            })->values()->all();
+        }
 
         $active = $budgetRows->firstWhere('is_active', true);
         $months = collect(range(0, 5))->map(fn (int $i) => now()->subMonths(5 - $i)->startOfMonth());
@@ -98,6 +118,7 @@ class BudgetingController extends Controller
 
         return Inertia::render('Budgeting/Index', [
             'budgets' => $budgets,
+            'trashed_budgets' => $trashedBudgets,
             'active_budget' => $activeBudgetPayload,
             'company_currency' => $companyCurrency,
         ]);
@@ -172,6 +193,30 @@ class BudgetingController extends Controller
     {
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
         $budget->delete();
+
+        return to_route('budgeting.index');
+    }
+
+    public function restore(Request $request, int $id): RedirectResponse
+    {
+        $teamId = (int) $request->user()->current_team_id;
+        $budget = Budget::queryWithoutTeamScope()
+            ->onlyTrashed()
+            ->where('team_id', $teamId)
+            ->findOrFail($id);
+        $budget->restore();
+
+        return to_route('budgeting.index');
+    }
+
+    public function forceDestroy(Request $request, int $id): RedirectResponse
+    {
+        $teamId = (int) $request->user()->current_team_id;
+        $budget = Budget::queryWithoutTeamScope()
+            ->onlyTrashed()
+            ->where('team_id', $teamId)
+            ->findOrFail($id);
+        $budget->forceDelete();
 
         return to_route('budgeting.index');
     }

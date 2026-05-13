@@ -7,10 +7,12 @@ use App\Models\Team;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Budget extends Model
 {
     use HasTeamScope;
+    use SoftDeletes;
 
     protected $fillable = [
         'team_id',
