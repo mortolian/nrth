@@ -118,6 +118,62 @@ class BudgetCrudTest extends TestCase
         $this->assertSame(185_000, (int) $item->monthly_budget_currency_cents);
     }
 
+    public function test_store_leaves_existing_active_budgets_active_when_adding_another(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->samplePayload(true))
+            ->assertRedirect(route('budgeting.index'));
+
+        $first = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->where('name', 'FY Plan')->first();
+        $this->assertNotNull($first);
+        $this->assertTrue($first->is_active);
+
+        $secondPayload = $this->samplePayload(true);
+        $secondPayload['name'] = 'Next year';
+        $this->post(route('budgeting.store'), $secondPayload)
+            ->assertRedirect(route('budgeting.index'));
+
+        $first->refresh();
+        $this->assertTrue($first->is_active, 'Existing active budget must stay active when a new budget is added.');
+
+        $second = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->where('name', 'Next year')->first();
+        $this->assertNotNull($second);
+        $this->assertTrue($second->is_active);
+    }
+
+    public function test_update_set_active_true_does_not_deactivate_other_budgets(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->samplePayload(true));
+        $first = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->first();
+        $this->assertNotNull($first);
+
+        $inactivePayload = $this->samplePayload(false);
+        $inactivePayload['name'] = 'Draft budget';
+        $this->post(route('budgeting.store'), $inactivePayload);
+
+        $second = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->where('name', 'Draft budget')->first();
+        $this->assertNotNull($second);
+        $this->assertFalse($second->is_active);
+
+        $this->put(route('budgeting.update', $second), [
+            'name' => 'Draft budget',
+            'period_type' => 'annual',
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'currency' => 'ZAR',
+            'set_active' => true,
+            'categories' => $inactivePayload['categories'],
+        ])->assertRedirect(route('budgeting.index'));
+
+        $first->refresh();
+        $second->refresh();
+        $this->assertTrue($first->is_active);
+        $this->assertTrue($second->is_active);
+    }
+
     public function test_index_shows_active_budget_when_marked_active(): void
     {
         [, $team] = $this->userAndTeam();

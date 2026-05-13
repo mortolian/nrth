@@ -86,7 +86,7 @@ class BudgetingController extends Controller
             ];
         });
 
-        $budgets = $budgetRows->map(function (Budget $budget): array {
+        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $companyCurrency): array {
             $allocated = (int) $budget->categories->sum('envelope_cents');
             $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
 
@@ -99,49 +99,14 @@ class BudgetingController extends Controller
                 'total_spent' => $spent,
                 'percentage_used' => $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0,
                 'status' => $budget->is_active ? 'active' : 'closed',
+                'categories' => $this->budgetIndexCategoryBreakdown($budget, $teamId),
+                'company_spend_aligned' => strcasecmp((string) $budget->currency, $companyCurrency) === 0,
             ];
         })->values()->all();
 
         $activeBudgetPayload = null;
         if ($active !== null) {
-            $monthsInPeriod = $this->monthsInBudgetPeriod($active->start_date, $active->end_date);
-            $spentByAccount = $this->spentByExpenseAccount(
-                $teamId,
-                $active->start_date->toDateString(),
-                $active->end_date->toDateString()
-            );
-
-            $categories = $active->categories->map(function (BudgetCategory $cat) use ($spentByAccount, $monthsInPeriod): array {
-                $monthlyPlanned = (int) $cat->items->sum('monthly_budget_currency_cents');
-                $periodPlanned = $monthlyPlanned * $monthsInPeriod;
-                $envelope = (int) $cat->envelope_cents;
-                $spent = $cat->account_id !== null
-                    ? (int) ($spentByAccount[$cat->account_id] ?? 0)
-                    : 0;
-                $percent = $envelope > 0 ? (int) round(($spent / $envelope) * 100) : ($spent > 0 ? 100 : 0);
-                $plannedVsEnvelope = $envelope > 0 ? (int) round(($periodPlanned / $envelope) * 100) : 0;
-
-                return [
-                    'name' => $cat->name,
-                    'envelope_cents' => $envelope,
-                    'period_planned_cents' => $periodPlanned,
-                    'monthly_planned_cents' => $monthlyPlanned,
-                    'planned_fill_percent' => min(100, $plannedVsEnvelope),
-                    'spent_cents' => $spent,
-                    'has_account' => $cat->account_id !== null,
-                    'percentage' => $percent,
-                    'remaining_cents' => max(0, $envelope - $spent),
-                    'items' => $cat->items->map(fn (BudgetItem $item) => [
-                        'label' => $item->label,
-                        'monthly_amount_cents' => (int) $item->monthly_amount_cents,
-                        'currency' => $item->currency,
-                        'monthly_budget_currency_cents' => (int) $item->monthly_budget_currency_cents,
-                        'period_total_budget_cents' => (int) $item->monthly_budget_currency_cents * $monthsInPeriod,
-                        'annualized_budget_cents' => (int) $item->monthly_budget_currency_cents * 12,
-                    ])->values()->all(),
-                ];
-            })->values()->all();
-
+            $categories = $this->budgetIndexCategoryBreakdown($active, $teamId);
             $allocated = (int) collect($categories)->sum('envelope_cents');
             $spentTotal = $periodSpentCompany !== null ? (int) $periodSpentCompany : (int) collect($categories)->sum('spent_cents');
             $activeBudgetPayload = [
@@ -194,12 +159,6 @@ class BudgetingController extends Controller
         $teamId = (int) $request->user()->current_team_id;
 
         DB::transaction(function () use ($teamId, $payload): void {
-            if (! empty($payload['set_active'])) {
-                Budget::queryWithoutTeamScope()
-                    ->where('team_id', $teamId)
-                    ->update(['is_active' => false]);
-            }
-
             $budget = Budget::queryWithoutTeamScope()->create([
                 'team_id' => $teamId,
                 'name' => $payload['name'],
@@ -220,15 +179,8 @@ class BudgetingController extends Controller
     {
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
         $payload = $this->validateBudgetPayload($request);
-        $teamId = (int) $request->user()->current_team_id;
 
-        DB::transaction(function () use ($budget, $payload, $teamId): void {
-            if (! empty($payload['set_active'])) {
-                Budget::queryWithoutTeamScope()
-                    ->where('team_id', $teamId)
-                    ->update(['is_active' => false]);
-            }
-
+        DB::transaction(function () use ($budget, $payload): void {
             $budget->update([
                 'name' => $payload['name'],
                 'period_type' => $payload['period_type'],
@@ -380,6 +332,52 @@ class BudgetingController extends Controller
         $e = $end->copy()->startOfMonth();
 
         return max(1, (int) $s->diffInMonths($e) + 1);
+    }
+
+    /**
+     * Category and line-item breakdown for the budgeting index (table expand rows).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function budgetIndexCategoryBreakdown(Budget $budget, int $teamId): array
+    {
+        $monthsInPeriod = $this->monthsInBudgetPeriod($budget->start_date, $budget->end_date);
+        $spentByAccount = $this->spentByExpenseAccount(
+            $teamId,
+            $budget->start_date->toDateString(),
+            $budget->end_date->toDateString()
+        );
+
+        return $budget->categories->map(function (BudgetCategory $cat) use ($spentByAccount, $monthsInPeriod): array {
+            $monthlyPlanned = (int) $cat->items->sum('monthly_budget_currency_cents');
+            $periodPlanned = $monthlyPlanned * $monthsInPeriod;
+            $envelope = (int) $cat->envelope_cents;
+            $spent = $cat->account_id !== null
+                ? (int) ($spentByAccount[$cat->account_id] ?? 0)
+                : 0;
+            $percent = $envelope > 0 ? (int) round(($spent / $envelope) * 100) : ($spent > 0 ? 100 : 0);
+            $plannedVsEnvelope = $envelope > 0 ? (int) round(($periodPlanned / $envelope) * 100) : 0;
+
+            return [
+                'name' => $cat->name,
+                'envelope_cents' => $envelope,
+                'period_planned_cents' => $periodPlanned,
+                'monthly_planned_cents' => $monthlyPlanned,
+                'planned_fill_percent' => min(100, $plannedVsEnvelope),
+                'spent_cents' => $spent,
+                'has_account' => $cat->account_id !== null,
+                'percentage' => $percent,
+                'remaining_cents' => max(0, $envelope - $spent),
+                'items' => $cat->items->map(fn (BudgetItem $item) => [
+                    'label' => $item->label,
+                    'monthly_amount_cents' => (int) $item->monthly_amount_cents,
+                    'currency' => $item->currency,
+                    'monthly_budget_currency_cents' => (int) $item->monthly_budget_currency_cents,
+                    'period_total_budget_cents' => (int) $item->monthly_budget_currency_cents * $monthsInPeriod,
+                    'annualized_budget_cents' => (int) $item->monthly_budget_currency_cents * 12,
+                ])->values()->all(),
+            ];
+        })->values()->all();
     }
 
     private function budgetedCentsForCalendarMonth(Budget $budget, Carbon $monthStart): int
