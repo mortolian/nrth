@@ -5,7 +5,6 @@ import { z } from 'zod';
 import Sortable from 'sortablejs';
 import { Menu, Trash2 } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { useFormatCurrency } from '@/composables/useFormatCurrency';
 
 type Item = {
     uid: string;
@@ -171,13 +170,6 @@ function minorDigits(code: string): number {
     return 2;
 }
 
-function stepForCurrency(ccy: string): string {
-    const d = minorDigits(ccy);
-    if (d === 0) return '1';
-    if (d === 3) return '0.001';
-    return '0.01';
-}
-
 /** Display minor units as a decimal major-unit string (e.g. ZAR cents → "123.45" rands). */
 function centsToMajorStr(cents: number, ccy: string): string {
     const d = minorDigits(ccy);
@@ -185,14 +177,40 @@ function centsToMajorStr(cents: number, ccy: string): string {
     return n.toFixed(d);
 }
 
-/** Parse a major-unit decimal (rands/cents style) into minor units for the given currency. */
-function majorStrToCents(raw: string | number | null | undefined, ccy: string): number {
-    const d = minorDigits(ccy);
-    const s = typeof raw === 'number' ? String(raw) : String(raw ?? '').trim().replace(/\s/g, '').replace(',', '.');
-    if (s === '' || s === '-') return 0;
-    const n = parseFloat(s);
-    if (!Number.isFinite(n) || n < 0) return 0;
-    return Math.round(n * 10 ** d);
+/**
+ * Normalise pasted/typed money strings (thousands separators, EU decimal comma) before strict parse.
+ */
+function normalizeMajorAmountForParse(raw: string): string {
+    let s = raw.trim().replace(/\s/g, '');
+    if (s === '' || s === '-') {
+        return s;
+    }
+    const hasComma = s.includes(',');
+    const hasDot = s.includes('.');
+    if (hasComma && hasDot) {
+        const lastComma = s.lastIndexOf(',');
+        const lastDot = s.lastIndexOf('.');
+        if (lastDot > lastComma) {
+            s = s.replace(/,/g, '');
+        } else {
+            s = s.replace(/\./g, '').replace(',', '.');
+        }
+    } else if (hasComma && !hasDot) {
+        const parts = s.split(',');
+        if (
+            parts.length === 2 &&
+            parts[0] !== '' &&
+            parts[1] !== '' &&
+            parts[1].length <= 2 &&
+            /^\d+$/.test(parts[0]) &&
+            /^\d+$/.test(parts[1])
+        ) {
+            s = `${parts[0]}.${parts[1]}`;
+        } else {
+            s = s.replace(/,/g, '');
+        }
+    }
+    return s;
 }
 
 /** Validate and parse amount on field blur (normal currency entry, not raw minor units). */
@@ -201,11 +219,10 @@ function parseMajorAmountOnBlur(
     ccy: string,
 ): { ok: true; cents: number } | { ok: false; message: string } {
     const d = minorDigits(ccy);
-    let s = raw.trim().replace(/\s/g, '');
+    let s = normalizeMajorAmountForParse(raw.trim().replace(/\s/g, ''));
     if (s === '') {
         return { ok: true, cents: 0 };
     }
-    s = s.replace(',', '.');
     if (!/^(\d+\.?\d*|\.\d+)$/.test(s)) {
         return { ok: false, message: 'Use digits and at most one decimal point (e.g. 1250 or 1250.50).' };
     }
@@ -292,6 +309,58 @@ function flushPendingMonthlyAmounts(): boolean {
 
 initAllMonthlyAmountDisplays();
 
+/** Envelope amounts: draft text while typing; committed to cents on blur / save (avoids number-input fighting + selection bugs). */
+const envelopeDisplay = reactive<Record<string, string>>({});
+const envelopeError = reactive<Record<string, string>>({});
+
+function syncEnvelopeDisplayFromCents(cat: Category): void {
+    const ccy = form.currency || 'ZAR';
+    envelopeDisplay[cat.uid] = centsToMajorStr(cat.envelope_cents, ccy);
+    delete envelopeError[cat.uid];
+}
+
+function initAllEnvelopeDisplays(): void {
+    form.categories.forEach((cat) => syncEnvelopeDisplayFromCents(cat));
+}
+
+function onEnvelopeInput(cat: Category, val: string | number | null): void {
+    envelopeDisplay[cat.uid] = String(val ?? '');
+    delete envelopeError[cat.uid];
+}
+
+function onEnvelopeBlur(cat: Category): void {
+    const ccy = form.currency || 'ZAR';
+    const raw = envelopeDisplay[cat.uid] ?? '';
+    const result = parseMajorAmountOnBlur(raw, ccy);
+    if (!result.ok) {
+        envelopeError[cat.uid] = result.message;
+        return;
+    }
+    delete envelopeError[cat.uid];
+    cat.envelope_cents = result.cents;
+    envelopeDisplay[cat.uid] = centsToMajorStr(result.cents, ccy);
+}
+
+function flushPendingEnvelopes(): boolean {
+    let ok = true;
+    const ccy = form.currency || 'ZAR';
+    form.categories.forEach((cat) => {
+        const raw = envelopeDisplay[cat.uid] ?? '';
+        const result = parseMajorAmountOnBlur(raw, ccy);
+        if (!result.ok) {
+            envelopeError[cat.uid] = result.message;
+            ok = false;
+            return;
+        }
+        delete envelopeError[cat.uid];
+        cat.envelope_cents = result.cents;
+        envelopeDisplay[cat.uid] = centsToMajorStr(result.cents, ccy);
+    });
+    return ok;
+}
+
+initAllEnvelopeDisplays();
+
 function lineToBudgetMonthlyCents(item: Item, budgetCcy: string): number {
     const lineCurrency = item.currency || budgetCcy;
     const lineMinor = Math.max(0, Math.round(Number(item.monthly_amount_cents) || 0));
@@ -308,8 +377,20 @@ function lineToBudgetMonthlyCents(item: Item, budgetCcy: string): number {
 const monthsCount = computed(() => monthsInPeriod(form.start_date, form.end_date));
 
 const budgetCurrency = computed(() => form.currency || 'ZAR');
-const formatIn = (cents: number, ccy: string) =>
-    useFormatCurrency((Number(cents) || 0) / 100, ccy || 'ZAR');
+
+/** Budget-side minor units → formatted money (respects ISO minor digits, not always ÷100). */
+function formatBudgetMinor(minor: number, ccy: string): string {
+    const code = (ccy || 'ZAR').toUpperCase();
+    const d = minorDigits(code);
+    const major = (Number(minor) || 0) / 10 ** d;
+    return new Intl.NumberFormat('en-ZA', {
+        style: 'currency',
+        currency: code,
+        currencyDisplay: 'symbol',
+        minimumFractionDigits: d,
+        maximumFractionDigits: d,
+    }).format(major);
+}
 
 /** Frankfurter via {@code invoicing.exchange-rate} — quote (budget) per one unit of base (line). */
 function formatRateForStorage(rate: number): string {
@@ -331,6 +412,22 @@ type FxFetchRowState = { loading: boolean; error: string | null; date: string | 
 const fxFetchState = reactive<Record<string, FxFetchRowState>>({});
 const lastSuccessfulFxKey: Record<string, string> = {};
 const formHasMounted = ref(false);
+
+function anyFxRowsLoading(): boolean {
+    for (const cat of form.categories) {
+        for (const item of cat.items) {
+            if (budgetRowNeedsFx(item) && fxFetchState[item.uid]?.loading === true) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/** Server / validation errors delivered via `router.on('error')`, not always visible on `page.props.errors`. */
+const inertiaRouterErrorBanner = ref<string | null>(null);
+let offBudgetInertiaError: (() => void) | undefined;
+let offBudgetInertiaSuccess: (() => void) | undefined;
 
 const pairRateInflight = new Map<string, Promise<{ rate: number; date: string }>>();
 
@@ -500,6 +597,16 @@ onMounted(() => {
         });
     }
     initAllMonthlyAmountDisplays();
+    initAllEnvelopeDisplays();
+    offBudgetInertiaError?.();
+    offBudgetInertiaSuccess?.();
+    offBudgetInertiaError = router.on('error', (errors) => {
+        const msgs = collectNestedErrorStrings(errors as unknown);
+        inertiaRouterErrorBanner.value = msgs.length ? msgs.join(' ') : null;
+    });
+    offBudgetInertiaSuccess = router.on('success', () => {
+        inertiaRouterErrorBanner.value = null;
+    });
     nextTick(() => {
         initBudgetCategorySortable();
         initBudgetLineItemSortables();
@@ -524,14 +631,18 @@ function addCategory() {
     });
     const added = form.categories[form.categories.length - 1];
     added.items.forEach((it) => syncMonthlyDisplayFromCents(it));
+    syncEnvelopeDisplayFromCents(added);
 }
 
 function removeCategory(idx: number) {
     if (form.categories.length <= 1) return;
-    form.categories[idx].items.forEach((it) => {
+    const cat = form.categories[idx];
+    cat.items.forEach((it) => {
         delete monthlyAmountDisplay[it.uid];
         delete monthlyAmountError[it.uid];
     });
+    delete envelopeDisplay[cat.uid];
+    delete envelopeError[cat.uid];
     form.categories.splice(idx, 1);
 }
 
@@ -577,6 +688,9 @@ function initBudgetCategorySortable() {
         handle: '.budget-category-drag-handle',
         draggable: '.budget-category-block',
         ghostClass: 'budget-sortable-ghost',
+        filter: sortableInteractFilter,
+        /** Must be false: Sortable calls preventDefault on filter hits; that blocks input focus & text selection. */
+        preventOnFilter: false,
         onEnd(evt: SortableEndEvent) {
             const { oldIndex, newIndex } = evt;
             if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) {
@@ -591,6 +705,13 @@ function initBudgetCategorySortable() {
 }
 
 type SortableEndEvent = { oldIndex?: number; newIndex?: number };
+
+/**
+ * Ignore drag when interacting with form controls. Radix Select uses a button/combobox trigger, not an `<input>`,
+ * so a narrow filter makes rows/categories impossible to click without starting a drag.
+ */
+const sortableInteractFilter =
+    'input, textarea, button, select, option, [role="combobox"], [role="listbox"], [role="option"], a';
 
 function registerBudgetItemsTbody(catUid: string, el: HTMLTableSectionElement | null) {
     if (el) {
@@ -623,6 +744,9 @@ function initBudgetLineItemSortables() {
             handle: '.budget-line-drag-handle',
             draggable: 'tr',
             ghostClass: 'budget-sortable-ghost',
+            filter: sortableInteractFilter,
+            /** Must be false: Sortable calls preventDefault on filter hits; that blocks input focus & text selection. */
+            preventOnFilter: false,
             onEnd(evt: SortableEndEvent) {
                 const c = form.categories.find((x) => x.uid === catUid);
                 if (!c) {
@@ -647,6 +771,10 @@ watch(categoriesOrderSig, () => nextTick(() => initBudgetCategorySortable()), { 
 watch(budgetLineItemsOrderSig, () => nextTick(() => initBudgetLineItemSortables()), { flush: 'post' });
 
 onBeforeUnmount(() => {
+    offBudgetInertiaError?.();
+    offBudgetInertiaError = undefined;
+    offBudgetInertiaSuccess?.();
+    offBudgetInertiaSuccess = undefined;
     categorySortable?.destroy();
     categorySortable = null;
     for (const s of itemSortables.values()) {
@@ -661,8 +789,13 @@ function importFromPrevious() {
     if (!src.length) return;
     form.categories = src.map(mapImportedCategory);
     initAllMonthlyAmountDisplays();
+    initAllEnvelopeDisplays();
 }
 
+/** Client-side validation message (Zod / blur) so failed saves are not silent */
+const clientSubmitErrors = ref<string | null>(null);
+
+/** Match server: same-currency lines send null for FX; Zod must accept null, not only undefined */
 const submitSchema = z.object({
     name: z.string().min(1),
     period_type: z.enum(['monthly', 'quarterly', 'annual', 'custom']),
@@ -681,13 +814,14 @@ const submitSchema = z.object({
                         label: z.string().min(1),
                         monthly_amount_cents: z.coerce.number().int().min(0),
                         currency: z.string().length(3).transform((s) => s.toUpperCase()),
-                        fx_budget_per_line_major: z.string().optional(),
+                        fx_budget_per_line_major: z.string().max(32).nullish(),
                     }),
                 ),
             }),
         )
         .min(1),
 }).superRefine((data, ctx) => {
+    const budgetCcy = data.currency.trim().toUpperCase();
     data.categories.forEach((cat, ci) => {
         cat.items.forEach((item, ii) => {
             if (item.label.trim() === '' && item.monthly_amount_cents === 0) {
@@ -707,50 +841,154 @@ const submitSchema = z.object({
                     path: ['categories', ci, 'items', ii, 'monthly_amount_cents'],
                 });
             }
+            const lineCcy = item.currency.trim().toUpperCase();
+            if (lineCcy !== '' && lineCcy !== budgetCcy) {
+                const rawFx = item.fx_budget_per_line_major;
+                const fxStr = rawFx == null ? '' : String(rawFx).trim();
+                const fxNum = fxStr === '' ? 0 : parseFloat(fxStr);
+                const fxOk = Number.isFinite(fxNum) && fxNum > 0;
+                if (!fxOk) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message:
+                            'Lines in a currency other than the budget need a positive exchange rate (budget currency per one unit of the line currency).',
+                        path: ['categories', ci, 'items', ii, 'fx_budget_per_line_major'],
+                    });
+                }
+            }
         });
     });
 });
 
+function trimUnknown(value: unknown): string {
+    return String(value ?? '').trim();
+}
+
+/** Flatten Laravel / Inertia error bags (possibly nested arrays or plain objects). */
+function collectNestedErrorStrings(value: unknown): string[] {
+    if (value == null) return [];
+    if (typeof value === 'string') {
+        const t = value.trim();
+        return t.length ? [t] : [];
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return [String(value)];
+    }
+    if (Array.isArray(value)) {
+        return value.flatMap(collectNestedErrorStrings);
+    }
+    if (typeof value === 'object') {
+        return Object.values(value as Record<string, unknown>).flatMap(collectNestedErrorStrings);
+    }
+    return [];
+}
+
+const inertiaPageErrorSummary = computed(() => collectNestedErrorStrings(page.props.errors).join(' '));
+
+const combinedSaveBanner = computed(
+    () =>
+        clientSubmitErrors.value ||
+        inertiaRouterErrorBanner.value ||
+        inertiaPageErrorSummary.value ||
+        '',
+);
+
 const submit = () => {
-    if (!flushPendingMonthlyAmounts()) {
-        return;
+    clientSubmitErrors.value = null;
+    inertiaRouterErrorBanner.value = null;
+
+    try {
+        if (props.isEditing && !props.budget) {
+            clientSubmitErrors.value =
+                'This edit screen is missing the budget record — refresh the page or open the budget from the Budgets list.';
+            return;
+        }
+
+        if (!flushPendingMonthlyAmounts()) {
+            clientSubmitErrors.value = 'Fix the highlighted monthly amounts before saving.';
+            return;
+        }
+
+        if (!flushPendingEnvelopes()) {
+            clientSubmitErrors.value = 'Fix the highlighted envelope amounts before saving.';
+            return;
+        }
+
+        if (anyFxRowsLoading()) {
+            clientSubmitErrors.value =
+                'Exchange rates are still loading for some lines. Wait a moment, fix any rate errors, then save again.';
+            return;
+        }
+
+        const budgetCurrencyCode = trimUnknown(form.currency).toUpperCase();
+
+        const payloadTry = {
+            name: trimUnknown(form.name),
+            period_type: form.period_type,
+            start_date: form.start_date,
+            end_date: form.end_date,
+            currency: budgetCurrencyCode,
+            set_active: form.set_active,
+            categories: form.categories.map((cat) => ({
+                name: trimUnknown(cat.name),
+                envelope_cents: Number(cat.envelope_cents) || 0,
+                account_id:
+                    cat.account_id === '' || cat.account_id === null ? null : Number(cat.account_id),
+                items: cat.items
+                    .filter(
+                        (it) =>
+                            trimUnknown(it.label) !== '' || Number(it.monthly_amount_cents) > 0,
+                    )
+                    .map((it) => {
+                        const lineCcy = trimUnknown(it.currency || form.currency).toUpperCase();
+                        return {
+                            label: trimUnknown(it.label) || '—',
+                            monthly_amount_cents: Number(it.monthly_amount_cents) || 0,
+                            currency: lineCcy,
+                            fx_budget_per_line_major:
+                                lineCcy === budgetCurrencyCode
+                                    ? null
+                                    : trimUnknown(it.fx_budget_per_line_major) || null,
+                        };
+                    }),
+            })),
+        };
+
+        const parsed = submitSchema.safeParse(payloadTry);
+        if (!parsed.success) {
+            clientSubmitErrors.value =
+                parsed.error.issues.map((issue) => issue.message).join(' ') ||
+                'Check the form and try again.';
+            return;
+        }
+
+        const plain = JSON.parse(JSON.stringify(parsed.data)) as typeof parsed.data;
+
+        const visitOptions = {
+            preserveScroll: true,
+            onSuccess: () => {
+                clientSubmitErrors.value = null;
+            },
+            onError: (errors: Record<string, string | string[]>) => {
+                const msgs = collectNestedErrorStrings(errors as unknown);
+                if (msgs.length) {
+                    clientSubmitErrors.value = msgs.join(' ');
+                }
+            },
+        };
+
+        if (props.isEditing && props.budget) {
+            router.put(route('budgeting.update', props.budget.id), plain, visitOptions);
+            return;
+        }
+        router.post(route('budgeting.store'), plain, visitOptions);
+    } catch (err) {
+        console.error(err);
+        clientSubmitErrors.value =
+            err instanceof Error
+                ? err.message
+                : 'Something went wrong while preparing the budget to save.';
     }
-
-    const payloadTry = {
-        name: form.name,
-        period_type: form.period_type,
-        start_date: form.start_date,
-        end_date: form.end_date,
-        currency: form.currency.toUpperCase(),
-        set_active: form.set_active,
-        categories: form.categories.map((cat) => ({
-            name: cat.name,
-            envelope_cents: Number(cat.envelope_cents) || 0,
-            account_id:
-                cat.account_id === '' || cat.account_id === null ? null : Number(cat.account_id),
-            items: cat.items
-                .filter((it) => it.label.trim() !== '' || Number(it.monthly_amount_cents) > 0)
-                .map((it) => ({
-                    label: it.label.trim() || '—',
-                    monthly_amount_cents: Number(it.monthly_amount_cents) || 0,
-                    currency: (it.currency || form.currency).toUpperCase(),
-                    fx_budget_per_line_major:
-                        (it.currency || '').toUpperCase() === form.currency.toUpperCase()
-                            ? null
-                            : (it.fx_budget_per_line_major || '').trim() || null,
-                })),
-        })),
-    };
-
-    const parsed = submitSchema.safeParse(payloadTry);
-    if (!parsed.success) return;
-
-    const payload = parsed.data;
-    if (props.isEditing && props.budget) {
-        router.put(route('budgeting.update', props.budget.id), payload);
-        return;
-    }
-    router.post(route('budgeting.store'), payload);
 };
 </script>
 
@@ -767,6 +1005,14 @@ const submit = () => {
             :title="isEditing ? 'Edit Budget' : 'Create Budget'"
             subtitle="Planning: categories with envelopes, known monthly costs, and optional links to ledger accounts for oversight"
         />
+
+        <div
+            v-if="combinedSaveBanner"
+            class="mt-4 w-full rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+            role="alert"
+        >
+            {{ combinedSaveBanner }}
+        </div>
 
         <AppCard
             class="mt-5 border-slate-200/90 bg-gradient-to-br from-slate-50 via-white to-brand-50/20 shadow-sm ring-1 ring-slate-200/40"
@@ -846,13 +1092,25 @@ const submit = () => {
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Envelope (period, {{ form.currency }})</label>
                             <AppInput
-                                :model-value="centsToMajorStr(cat.envelope_cents, form.currency)"
-                                type="number"
-                                min="0"
-                                :step="stepForCurrency(form.currency)"
-                                @update:model-value="cat.envelope_cents = majorStrToCents($event, form.currency)"
+                                :model-value="envelopeDisplay[cat.uid] ?? ''"
+                                type="text"
+                                inputmode="decimal"
+                                placeholder="0.00"
+                                :title="`Envelope cap in ${form.currency} (major units). Applied when you leave the field.`"
+                                :class="
+                                    envelopeError[cat.uid]
+                                        ? 'border-rose-500 ring-1 ring-rose-300/50 focus:ring-rose-400'
+                                        : ''
+                                "
+                                @update:model-value="onEnvelopeInput(cat, $event)"
+                                @blur="onEnvelopeBlur(cat)"
                             />
-                            <p class="mt-0.5 text-xs text-slate-500">Whole {{ form.currency }} amount (not cents)</p>
+                            <p v-if="envelopeError[cat.uid]" class="mt-0.5 text-xs text-rose-600">
+                                {{ envelopeError[cat.uid] }}
+                            </p>
+                            <p v-else class="mt-0.5 text-xs text-slate-500">
+                                Major units (not raw minor units); validated on blur and when saving.
+                            </p>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Ledger account (optional, for spend tracking)</label>
@@ -886,17 +1144,21 @@ const submit = () => {
 
                         <AppTable
                             class="mt-2"
-                            table-class="min-w-[64rem]"
+                            table-class="min-w-[52rem]"
                             :show-pagination="false"
                             :tbody-ref-fn="tbodyRefForCategory(cat.uid)"
                             :columns="[
                                 { key: 'ord', label: '', widthClass: 'w-10 px-2' },
-                                { key: 'label', label: 'Expense', widthClass: 'min-w-[18rem] w-[26rem]' },
-                                { key: 'cur', label: 'Line currency', widthClass: 'w-36 min-w-[9rem] whitespace-nowrap' },
-                                { key: 'monthly', label: 'Monthly', widthClass: 'w-32 min-w-[8rem]' },
-                                { key: 'fx', label: 'Exchange Rate', widthClass: 'min-w-[9rem] max-w-[12rem]' },
-                                { key: 'period', label: 'Period total', widthClass: 'text-right whitespace-nowrap tabular-nums' },
-                                { key: 'annual', label: 'Annualised', widthClass: 'text-right whitespace-nowrap tabular-nums' },
+                                { key: 'label', label: 'Expense', widthClass: 'min-w-[12rem] w-full max-w-[20rem]' },
+                                { key: 'cur', label: 'Currency', widthClass: 'w-32 min-w-[8.5rem] whitespace-nowrap' },
+                                { key: 'monthly', label: 'Monthly', widthClass: 'w-28 min-w-[7rem]' },
+                                { key: 'fx', label: 'FX rate', widthClass: 'min-w-[8rem] max-w-[11rem]' },
+                                { key: 'period', label: 'Period', widthClass: 'text-right whitespace-nowrap tabular-nums' },
+                                {
+                                    key: 'annual',
+                                    label: 'Annual',
+                                    widthClass: 'hidden text-right whitespace-nowrap tabular-nums lg:table-cell',
+                                },
                                 { key: 'x', label: '', widthClass: 'w-12 px-2' },
                             ]"
                             :page="1"
@@ -914,8 +1176,8 @@ const submit = () => {
                                 </button>
                             </div>
                         </td>
-                        <td class="min-w-[18rem] px-3 py-2 align-middle">
-                            <AppInput v-model="item.label" class="w-full" placeholder="e.g. Rent" />
+                        <td class="min-w-0 max-w-[20rem] px-3 py-2 align-middle">
+                            <AppInput v-model="item.label" class="w-full min-w-0" placeholder="e.g. Rent" />
                         </td>
                         <td class="whitespace-nowrap px-3 py-2 align-middle">
                             <AppSelect
@@ -994,10 +1256,12 @@ const submit = () => {
                             <span v-else class="inline-block pt-2 text-xs text-slate-400">—</span>
                         </td>
                         <td class="px-3 py-2 align-middle text-right text-sm font-medium tabular-nums text-slate-800">
-                            {{ formatIn(itemPeriodTotal(item), form.currency) }}
+                            {{ formatBudgetMinor(itemPeriodTotal(item), form.currency) }}
                         </td>
-                        <td class="px-3 py-2 align-middle text-right text-sm font-medium tabular-nums text-slate-800">
-                            {{ formatIn(itemAnnualized(item), form.currency) }}
+                        <td
+                            class="hidden px-3 py-2 align-middle text-right text-sm font-medium tabular-nums text-slate-800 lg:table-cell"
+                        >
+                            {{ formatBudgetMinor(itemAnnualized(item), form.currency) }}
                         </td>
                         <td class="px-2 py-2 align-middle text-right">
                             <AppButton
@@ -1027,9 +1291,11 @@ const submit = () => {
             </div>
         </div>
 
-        <div class="mt-6 flex justify-end gap-2">
-            <AppButton variant="ghost" @click="router.visit(route('budgeting.index'))">Cancel</AppButton>
-            <AppButton variant="primary" @click="submit">Save budget</AppButton>
+        <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <div class="flex gap-2">
+                <AppButton variant="ghost" @click="router.visit(route('budgeting.index'))">Cancel</AppButton>
+                <AppButton variant="primary" @click="submit">Save budget</AppButton>
+            </div>
         </div>
     </AppLayout>
 </template>
