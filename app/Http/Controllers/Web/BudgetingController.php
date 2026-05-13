@@ -59,11 +59,13 @@ class BudgetingController extends Controller
         $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $companyCurrency, $months): array {
             $allocated = (int) $budget->categories->sum('envelope_cents');
             $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
+            $monthsInPeriod = $this->monthsInBudgetPeriod($budget->start_date, $budget->end_date);
 
             return [
                 'id' => $budget->id,
                 'name' => $budget->name,
                 'period' => $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y'),
+                'months_in_period' => $monthsInPeriod,
                 'currency' => $budget->currency,
                 'total_allocated' => $allocated,
                 'total_spent' => $spent,

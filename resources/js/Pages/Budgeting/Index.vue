@@ -38,6 +38,37 @@ const toggleBudgetExpanded = (id) => {
     expandedBudgetId.value = expandedBudgetId.value === id ? null : id;
 };
 
+/** Sum a numeric field across line items in a category. */
+function sumItemField(items, key) {
+    return (items ?? []).reduce((sum, it) => sum + (Number(it[key]) || 0), 0);
+}
+
+/** Grand totals for the budget overview table (budget currency except envelope is already budget ccy). */
+function budgetOverviewGrandTotals(budget) {
+    const cats = budget.categories ?? [];
+    let monthlyBudget = 0;
+    let periodPlanned = 0;
+    let annualised = 0;
+    let envelope = 0;
+    let linkedSpent = 0;
+    let remainingLinked = 0;
+    let hasLinked = false;
+    for (const c of cats) {
+        monthlyBudget += Number(c.monthly_planned_cents) || 0;
+        periodPlanned += Number(c.period_planned_cents) || 0;
+        envelope += Number(c.envelope_cents) || 0;
+        if (c.has_account) {
+            hasLinked = true;
+            linkedSpent += Number(c.spent_cents) || 0;
+            remainingLinked += Number(c.remaining_cents) || 0;
+        }
+        for (const it of c.items ?? []) {
+            annualised += Number(it.annualized_budget_cents) || 0;
+        }
+    }
+    return { monthlyBudget, periodPlanned, annualised, envelope, linkedSpent, remainingLinked, hasLinked };
+}
+
 function budgetVarianceChartOption(budget) {
     const rows = budget.monthly_variance ?? [];
     const sym = budget.currency === 'ZAR' ? 'R' : budget.currency;
@@ -159,8 +190,8 @@ function budgetVarianceChartOption(budget) {
                     </tr>
                     <tr v-show="expandedBudgetId === budget.id" class="bg-slate-50/80">
                         <td colspan="8" class="border-t border-slate-100 px-4 py-5">
-                            <div class="grid gap-6 xl:grid-cols-3">
-                                <div class="xl:col-span-1">
+                            <div class="flex flex-col gap-8 xl:flex-row xl:items-start">
+                                <div class="shrink-0 xl:max-w-sm xl:pr-2">
                                     <h4 class="text-base font-semibold text-slate-900">{{ budget.name }}</h4>
                                     <p class="text-sm text-slate-500">{{ budget.period }}</p>
                                     <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4">
@@ -184,46 +215,178 @@ function budgetVarianceChartOption(budget) {
                                     </div>
                                 </div>
 
-                                <div class="xl:col-span-2">
-                                    <h4 class="mb-3 text-base font-semibold text-slate-900">Categories & line items</h4>
-                                    <div class="grid gap-3 md:grid-cols-2">
-                                        <div
-                                            v-for="row in budget.categories ?? []"
-                                            :key="row.name"
-                                            class="rounded-lg border border-slate-200 bg-white p-3"
+                                <div class="min-w-0 flex-1 space-y-3">
+                                    <div>
+                                        <h4 class="text-base font-semibold text-slate-900">Budget overview</h4>
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            Known monthly expenses and category envelopes. Monetary columns use
+                                            {{ budget.currency }} except “Monthly (line)”, which uses each line’s currency. Period
+                                            totals assume
+                                            {{ budget.months_in_period ?? '—' }} month(s) in range (× monthly in
+                                            {{ budget.currency }}).
+                                        </p>
+                                    </div>
+                                    <div
+                                        class="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm ring-1 ring-slate-900/5"
+                                    >
+                                        <table
+                                            class="min-w-[52rem] w-full border-collapse text-left text-sm text-slate-800"
+                                            :aria-label="`Budget overview for ${budget.name}`"
                                         >
-                                            <p class="font-medium text-slate-900">{{ row.name }}</p>
-                                            <p class="mt-1 text-xs text-slate-500">
-                                                Envelope (period): {{ formatCents(row.envelope_cents, budget.currency) }} · Planned
-                                                from lines: {{ formatCents(row.period_planned_cents, budget.currency) }}
-                                                <span v-if="row.planned_fill_percent > 100" class="text-rose-600">
-                                                    (over envelope)
-                                                </span>
-                                            </p>
-                                            <p v-if="row.has_account" class="text-xs text-slate-500">
-                                                Spent (linked account): {{ formatCents(row.spent_cents, budget.currency) }} ·
-                                                Remaining: {{ formatCents(row.remaining_cents, budget.currency) }}
-                                            </p>
-                                            <p v-else class="text-xs text-slate-400">No ledger account linked — spend bar is hidden.</p>
-                                            <div v-if="row.has_account" class="mt-2 h-2 w-full rounded-full bg-slate-100">
-                                                <div
-                                                    :class="progressColor(row.percentage)"
-                                                    class="h-2 rounded-full"
-                                                    :style="{ width: `${Math.min(100, row.percentage)}%` }"
-                                                />
-                                            </div>
-                                            <ul
-                                                v-if="row.items?.length"
-                                                class="mt-2 space-y-1 border-t border-slate-100 pt-2 text-xs text-slate-600"
+                                            <thead>
+                                                <tr class="border-b border-slate-200 bg-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                                    <th class="sticky left-0 z-[1] border-r border-slate-200 bg-slate-100 px-3 py-2.5 whitespace-nowrap">
+                                                        Category
+                                                    </th>
+                                                    <th class="px-3 py-2.5 whitespace-nowrap">Expense</th>
+                                                    <th class="px-3 py-2.5 whitespace-nowrap">Line ccy</th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">Monthly (line)</th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">
+                                                        Monthly ({{ budget.currency }})
+                                                    </th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">Period total</th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">Annualised</th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">Envelope</th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">Linked spend</th>
+                                                    <th class="px-3 py-2.5 text-right whitespace-nowrap">Remaining</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody
+                                                v-for="(cat, catIdx) in budget.categories ?? []"
+                                                :key="`cat-${catIdx}-${cat.name}`"
+                                                class="border-b border-slate-100"
                                             >
-                                                <li v-for="(it, idx) in row.items" :key="idx">
-                                                    {{ it.label }} — {{ formatCents(it.monthly_budget_currency_cents, budget.currency) }}/mo
-                                                    in budget currency (line {{ formatCents(it.monthly_amount_cents, it.currency) }}/mo);
-                                                    period {{ formatCents(it.period_total_budget_cents, budget.currency) }}, annualised
-                                                    {{ formatCents(it.annualized_budget_cents, budget.currency) }}
-                                                </li>
-                                            </ul>
-                                        </div>
+                                                <tr
+                                                    v-for="(it, idx) in cat.items?.length ? cat.items : [{}]"
+                                                    :key="`cat-${catIdx}-line-${idx}`"
+                                                    class="border-b border-slate-100 bg-white"
+                                                >
+                                                    <td
+                                                        class="sticky left-0 z-[1] border-r border-slate-200 bg-white px-3 py-2 align-top font-medium text-slate-900 whitespace-nowrap"
+                                                    >
+                                                        {{ idx === 0 ? cat.name : '' }}
+                                                    </td>
+                                                    <td class="max-w-[14rem] px-3 py-2 align-top text-slate-800">
+                                                        {{ it.label != null && it.label !== '' ? it.label : '—' }}
+                                                    </td>
+                                                    <td class="px-3 py-2 align-top tabular-nums text-slate-600 whitespace-nowrap">
+                                                        {{ it.currency ?? '—' }}
+                                                    </td>
+                                                    <td class="px-3 py-2 text-right align-top tabular-nums whitespace-nowrap">
+                                                        <template v-if="it.label != null && it.label !== ''">
+                                                            {{ formatCents(it.monthly_amount_cents, it.currency) }}
+                                                        </template>
+                                                        <template v-else>—</template>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-right align-top tabular-nums whitespace-nowrap">
+                                                        <template v-if="it.label != null && it.label !== ''">
+                                                            {{ formatCents(it.monthly_budget_currency_cents, budget.currency) }}
+                                                        </template>
+                                                        <template v-else>—</template>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-right align-top tabular-nums whitespace-nowrap">
+                                                        <template v-if="it.label != null && it.label !== ''">
+                                                            {{ formatCents(it.period_total_budget_cents, budget.currency) }}
+                                                        </template>
+                                                        <template v-else>—</template>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-right align-top tabular-nums whitespace-nowrap">
+                                                        <template v-if="it.label != null && it.label !== ''">
+                                                            {{ formatCents(it.annualized_budget_cents, budget.currency) }}
+                                                        </template>
+                                                        <template v-else>—</template>
+                                                    </td>
+                                                    <td class="px-3 py-2 text-right align-top text-slate-400 whitespace-nowrap">—</td>
+                                                    <td class="px-3 py-2 text-right align-top text-slate-400 whitespace-nowrap">—</td>
+                                                    <td class="px-3 py-2 text-right align-top text-slate-400 whitespace-nowrap">—</td>
+                                                </tr>
+                                                <tr class="border-b-2 border-slate-200 bg-slate-100/95 text-slate-900">
+                                                    <td
+                                                        class="sticky left-0 z-[1] border-r border-slate-200 bg-slate-100/95 px-3 py-2 font-semibold whitespace-nowrap"
+                                                        colspan="4"
+                                                    >
+                                                        {{ cat.name }} — category total
+                                                        <span
+                                                            v-if="cat.planned_fill_percent > 100"
+                                                            class="ml-2 font-normal text-rose-600"
+                                                        >
+                                                            (planned over envelope)
+                                                        </span>
+                                                    </td>
+                                                    <td class="bg-slate-100/95 px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(cat.monthly_planned_cents, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-slate-100/95 px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-slate-100/95 px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap">
+                                                        {{
+                                                            formatCents(
+                                                                sumItemField(cat.items, 'annualized_budget_cents'),
+                                                                budget.currency,
+                                                            )
+                                                        }}
+                                                    </td>
+                                                    <td class="bg-slate-100/95 px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(cat.envelope_cents, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-slate-100/95 px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap">
+                                                        <template v-if="cat.has_account">
+                                                            {{ formatCents(cat.spent_cents, budget.currency) }}
+                                                        </template>
+                                                        <template v-else>—</template>
+                                                    </td>
+                                                    <td class="bg-slate-100/95 px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap">
+                                                        <template v-if="cat.has_account">
+                                                            {{ formatCents(cat.remaining_cents, budget.currency) }}
+                                                        </template>
+                                                        <template v-else>—</template>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                            <tfoot>
+                                                <tr class="border-t-2 border-slate-300 bg-brand-50/90 font-bold text-slate-900">
+                                                    <td
+                                                        class="sticky left-0 z-[1] border-r border-slate-200 bg-brand-50/90 px-3 py-2.5 whitespace-nowrap"
+                                                        colspan="4"
+                                                    >
+                                                        All categories — grand total
+                                                    </td>
+                                                    <td class="bg-brand-50/90 px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(budgetOverviewGrandTotals(budget).monthlyBudget, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-brand-50/90 px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(budgetOverviewGrandTotals(budget).periodPlanned, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-brand-50/90 px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(budgetOverviewGrandTotals(budget).annualised, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-brand-50/90 px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                        {{ formatCents(budgetOverviewGrandTotals(budget).envelope, budget.currency) }}
+                                                    </td>
+                                                    <td class="bg-brand-50/90 px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                        {{
+                                                            budgetOverviewGrandTotals(budget).hasLinked
+                                                                ? formatCents(
+                                                                      budgetOverviewGrandTotals(budget).linkedSpent,
+                                                                      budget.currency,
+                                                                  )
+                                                                : '—'
+                                                        }}
+                                                    </td>
+                                                    <td class="bg-brand-50/90 px-3 py-2.5 text-right tabular-nums whitespace-nowrap">
+                                                        {{
+                                                            budgetOverviewGrandTotals(budget).hasLinked
+                                                                ? formatCents(
+                                                                      budgetOverviewGrandTotals(budget).remainingLinked,
+                                                                      budget.currency,
+                                                                  )
+                                                                : '—'
+                                                        }}
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
