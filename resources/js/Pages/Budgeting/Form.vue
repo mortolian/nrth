@@ -1293,7 +1293,7 @@ const submit = () => {
 
         <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <div class="flex gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('budgeting.index'))">Cancel</AppButton>
+                <AppButton variant="ghost" @click="router.visit(route('budgeting.index'))">Back to budgets</AppButton>
                 <AppButton variant="primary" @click="submit">Save budget</AppButton>
             </div>
         </div>
