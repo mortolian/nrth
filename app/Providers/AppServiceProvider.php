@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Domain\Banking\Importers\CsvBankStatementImporter;
+use App\Domain\Banking\Importers\OfxBankStatementImporter;
+use App\Domain\Banking\Services\BankingStatementImporterRegistry;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\UserProfileController;
 use App\Support\EnsureTeamSpatieRoles;
@@ -18,6 +21,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(JetstreamUserProfileController::class, UserProfileController::class);
         $this->app->bind(JetstreamTeamController::class, AppTeamController::class);
+
+        $this->app->singleton(BankingStatementImporterRegistry::class, fn ($app): BankingStatementImporterRegistry => new BankingStatementImporterRegistry(
+            $app->make(CsvBankStatementImporter::class),
+            $app->make(OfxBankStatementImporter::class),
+        ));
     }
 
     /**

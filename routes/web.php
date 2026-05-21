@@ -5,6 +5,9 @@ use App\Http\Controllers\Web\Accounting\AccountStatementController;
 use App\Http\Controllers\Web\Accounting\ChartOfAccountsController;
 use App\Http\Controllers\Web\Accounting\GeneralLedgerController;
 use App\Http\Controllers\Web\Accounting\TransactionController;
+use App\Http\Controllers\Web\Banking\BankingAccountController;
+use App\Http\Controllers\Web\Banking\BankingStatementImportController;
+use App\Http\Controllers\Web\Banking\BankingTransactionController;
 use App\Http\Controllers\Web\BudgetingController;
 use App\Http\Controllers\Web\Contracting\ContractController;
 use App\Http\Controllers\Web\DashboardController;
@@ -58,6 +61,17 @@ Route::middleware([
     Route::post('/settings/company', [CompanySettingsController::class, 'update'])->name('settings.company.update');
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
     Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');
+    Route::prefix('banking')->name('banking.')->group(function () {
+        Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
+        Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
+        Route::post('/accounts', [BankingAccountController::class, 'store'])->name('accounts.store');
+        Route::get('/import', [BankingStatementImportController::class, 'create'])->name('import.create');
+        Route::post('/import', [BankingStatementImportController::class, 'store'])->name('import.store');
+        Route::get('/import/{import}/map', [BankingStatementImportController::class, 'map'])->name('import.map');
+        Route::post('/import/{import}/map', [BankingStatementImportController::class, 'parseMapping'])->name('import.map.store');
+        Route::get('/import/{import}/preview', [BankingStatementImportController::class, 'preview'])->name('import.preview');
+        Route::post('/import/{import}/confirm', [BankingStatementImportController::class, 'confirm'])->name('import.confirm');
+    });
     Route::get('/expenses', [ExpensesController::class, 'index'])->name('expenses.index');
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');

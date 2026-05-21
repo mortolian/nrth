@@ -105,6 +105,12 @@ const navItems = computed<MenuItem[]>(() => {
             group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: route('suppliers.index') }] }],
         },
         {
+            label: 'Banking',
+            href: route('banking.transactions.index'),
+            icon: Building2,
+            group: [{ title: 'Banking', items: [{ label: 'Transactions', href: route('banking.transactions.index') }, { label: 'Import statement', href: route('banking.import.create') }, { label: 'Accounts', href: route('banking.accounts.index') }] }],
+        },
+        {
             label: 'Accounting',
             href: route('accounting.transactions.index'),
             icon: BookOpen,
