@@ -5,15 +5,17 @@ nrth can run on a laptop for development or on a server for daily use. **Docker 
 | Guide | Audience | Summary |
 |-------|----------|---------|
 | **[docs/SELF_HOST.md](docs/SELF_HOST.md)** | Anyone self-hosting | Clone → `.env` → `docker compose up` → `app:install` |
+| **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Contributors | Local dev, tests, architecture |
 | **[docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md)** | Project maintainer | Homelab Docker server that auto-deploys on push to `master` |
-| **[README.md](README.md)** | Local developers | PHP + Node on the host, or Laravel Sail |
+| **[CONTRIBUTING.md](CONTRIBUTING.md)** | Contributors | How to report issues and open PRs |
+| **[SECURITY.md](SECURITY.md)** | Everyone | Vulnerability reporting |
 
 ---
 
 ## Self-host quick start
 
 ```bash
-git clone <repository-url> nrth && cd nrth
+git clone https://github.com/mortolian/nrth.git nrth && cd nrth
 cp .env.example .env
 # Edit .env — set APP_URL, passwords, APP_ENV=production, APP_DEBUG=false
 chmod +x scripts/self-host-install.sh
@@ -29,7 +31,7 @@ Full production checklist, HTTPS, and updates: **[docs/SELF_HOST.md](docs/SELF_H
 ## Personal server quick start
 
 ```bash
-git clone <repository-url> /opt/nrth && cd /opt/nrth
+git clone https://github.com/mortolian/nrth.git /opt/nrth && cd /opt/nrth
 cp .env.example .env
 docker compose up -d --build
 docker compose exec app php artisan key:generate

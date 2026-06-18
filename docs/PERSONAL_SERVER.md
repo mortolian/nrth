@@ -44,7 +44,7 @@ This is ideal for an active development server. When you later want a stricter p
 ```bash
 sudo mkdir -p /opt/nrth
 sudo chown "$USER:$USER" /opt/nrth
-git clone git@github.com:YOUR_ORG/nrth.git /opt/nrth
+git clone git@github.com:mortolian/nrth.git /opt/nrth
 cd /opt/nrth
 ```
 

@@ -1,95 +1,89 @@
-# Contractor accounting & finance
+<p align="center">
+  <img src="public/images/nrth-logo.svg" alt="nrth" width="80" />
+</p>
 
-South African contractor–focused accounting and finance app (set `APP_NAME` in `.env` for the UI and document title). Built with Laravel 13, Jetstream (Inertia + Teams), Vue 3, Tailwind CSS v4, and domain logic under `app/Domain`.
+<h1 align="center">nrth</h1>
 
-## Requirements
+<p align="center">
+  Open-source accounting &amp; finance for contractors and small businesses.<br />
+  Built for South Africa — invoicing, expenses, VAT, ledger, and bank statement imports.
+</p>
 
-- PHP 8.3+ (project rules target 8.4+ when your runtime allows)
-- [Composer](https://getcomposer.org/)
-- **Node.js 20.19+ or 22.12+** (required by Vite 8 and `@tailwindcss/vite` 4)
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose v2 (optional, for Sail or the self-hosted stack)
+<p align="center">
+  <a href="https://github.com/mortolian/nrth/actions/workflows/tests.yml"><img src="https://github.com/mortolian/nrth/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/mortolian/nrth" alt="License"></a>
+  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Alpha">
+</p>
 
-## Local setup
+> **Early development (alpha).** Features and data models are still changing. Not financial or tax advice — evaluate carefully before production use. See [SECURITY.md](SECURITY.md).
+
+---
+
+## Features
+
+- **Invoicing & estimates** — clients, PDFs, payments, online pay links
+- **Expenses & suppliers** — receipts, categories, VAT on purchases
+- **Accounting** — chart of accounts, journal, general ledger, account statements
+- **Banking** — import CSV/OFX statements, duplicate detection, transaction list
+- **Tax** — VAT returns and rates (South African defaults on install)
+- **Teams** — multi-user companies via Jetstream
+- **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included
+
+## Quick start (Docker)
+
+The fastest way to try nrth with the full stack:
 
 ```bash
+git clone https://github.com/mortolian/nrth.git
+cd nrth
 cp .env.example .env
-composer install
-php artisan key:generate
-php artisan migrate
-npm install
-npm run dev
-```
-
-In another terminal:
-
-```bash
-php artisan serve
-```
-
-Run tests (Vite is stubbed in `tests/TestCase.php` so a production build is not required for PHPUnit):
-
-```bash
-php artisan test
-```
-
-## Frontend stack
-
-- Inertia.js v2 (`@inertiajs/vue3`), Pinia, Ziggy
-- Tailwind CSS v4 via `@tailwindcss/vite` (see `resources/css/app.css`)
-- **shadcn-vue**: `components.json` and `resources/js/lib/utils.ts` are in place. Add primitives with the upstream CLI, for example:
-
-```bash
-npx shadcn-vue@latest add button
-```
-
-- Charts: `vue-echarts` and `echarts`
-- Forms: `vee-validate` and `zod`; dates: `dayjs`
-
-## Backend packages (high level)
-
-`brick/money`, Spatie (permission, activity log, media library, backup, PDF), `maatwebsite/excel`, Laravel Pennant, Cashier, Horizon, Sanctum, and `barryvdh/laravel-ide-helper` (dev). Publish/migrate steps for these are already applied where the installers require it.
-
-**Horizon** expects Redis. Set `QUEUE_CONNECTION=redis` and run Redis locally (or use `QUEUE_CONNECTION=database` without Horizon for simple development).
-
-**Cashier** needs Stripe keys in `.env` (`STRIPE_KEY`, `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET`) when you enable billing.
-
-## Docker Compose (self-hosted)
-
-One image (`docker/Dockerfile`, PHP **8.4** + **Swoole**, **Redis**, **pgsql**, **GD**, **Horizon**) powers **app** (Laravel **Octane** on port **8000**), **worker** (**Supervisor** + **Horizon**), and **scheduler** (`php artisan schedule:work`). Data services: **PostgreSQL 16**, **Redis 7**, **MinIO** (S3 API **9000**, console **9001**). The `createbuckets` one-shot service creates the `nrth` bucket.
-
-**Hosting guides:** see **[INSTALL.md](INSTALL.md)** — [self-host for others](docs/SELF_HOST.md) and [personal auto-deploy server](docs/PERSONAL_SERVER.md).
-
-```bash
-cp .env.example .env
-# edit .env, then:
 chmod +x scripts/self-host-install.sh
 ./scripts/self-host-install.sh
 ```
 
-Or manually: `docker compose up -d --build` then `docker compose exec app php artisan app:install`.
+Open **http://localhost:8000** and complete the installer (`app:install`).
 
-## Laravel Sail (local)
+Full production checklist and HTTPS: **[docs/SELF_HOST.md](docs/SELF_HOST.md)** · **[INSTALL.md](INSTALL.md)**
 
-[Sail](https://laravel.com/docs/sail) uses **`compose.sail.yaml`** so it does not replace the production **`compose.yaml`**. Services mirror that stack: **PostgreSQL 16**, **Redis 7**, **MinIO** (API **9000**, console **9001**), **Mailpit** (SMTP **1025**, UI **8025**), plus **`createbuckets`** for the `nrth` bucket. The app container is **`laravel.test`** (PHP **8.4** + Swoole from Sail’s runtime).
+## Development setup
+
+For hacking on the codebase (PHP + Node on the host):
 
 ```bash
-composer sail -- up -d
-composer sail -- artisan migrate
-# App: http://localhost (default APP_PORT=80) — Vite: composer sail -- npm run dev
+cp .env.example .env
+composer install && php artisan key:generate && php artisan migrate
+npm install && npm run dev
+php artisan serve   # second terminal
 ```
 
-Stop containers: `composer sail -- down`.
+Details, Docker dev workflow, architecture, and tests: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**
 
-Use a `.env` tuned for Sail (see `.env.example`): `DB_HOST=pgsql`, `REDIS_HOST=redis`, `SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` set to **redis**, MinIO **`AWS_*`** values matching the production compose defaults, and **`MAIL_HOST=mailpit`**. The Composer script sets `SAIL_FILES=compose.sail.yaml` automatically.
+## Documentation
 
-## Multi-tenancy
+| Guide | Description |
+|-------|-------------|
+| [INSTALL.md](INSTALL.md) | Installation hub |
+| [docs/SELF_HOST.md](docs/SELF_HOST.md) | Self-host with Docker |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
+| [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer auto-deploy server |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
-Use `App\Domain\Shared\HasTeamScope` on team-owned Eloquent models so queries are limited to `auth()->user()->current_team_id`. For admin or Filament contexts that must see all teams, use `Model::queryWithoutTeamScope()` (see the trait).
+## Contributing
 
-## Project rules
+Contributions are welcome — issues, docs, and pull requests.
 
-See `.cursor/rules` for architecture (actions, DTOs, `brick/money`, double-entry, Filament boundaries). Prompt sequences live in `CURSOR_PROMPTS.md`.
+- [Contributing guide](CONTRIBUTING.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md) — report vulnerabilities privately
+
+Please search [existing issues](https://github.com/mortolian/nrth/issues) before opening a new one.
+
+## Tech stack
+
+Laravel 13 · Jetstream (Inertia + Teams) · Vue 3 · Tailwind CSS v4 · PostgreSQL · Redis · Octane (Swoole) · Horizon
+
+Domain logic lives under `app/Domain/`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for more.
 
 ## License
 
-MIT (same as Laravel skeleton). Adjust if you distribute differently.
+[MIT](LICENSE) — Copyright (c) nrth contributors.

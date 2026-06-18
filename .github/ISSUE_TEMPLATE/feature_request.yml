@@ -1,0 +1,60 @@
+name: Feature request
+description: Suggest an idea or improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem you are trying to solve. Feature requests that explain **why** are easier to evaluate than implementation sketches alone.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? Who is it for?
+      placeholder: As a contractor, I want to... so that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like this to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Invoicing & estimates
+        - Expenses & suppliers
+        - Accounting & ledger
+        - Banking & imports
+        - Tax & VAT
+        - Reports
+        - Self-hosting & ops
+        - UI / UX
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I am willing to help implement this (optional follow-up PR)
+          required: false

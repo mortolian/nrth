@@ -31,7 +31,7 @@ The default `compose.yaml` stack runs:
 ### 2. Get the code
 
 ```bash
-git clone https://github.com/YOUR_ORG/nrth.git
+git clone https://github.com/mortolian/nrth.git
 cd nrth
 ```
 

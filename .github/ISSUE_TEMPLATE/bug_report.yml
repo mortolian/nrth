@@ -1,0 +1,73 @@
+name: Bug report
+description: Report something that is broken or does not work as expected
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please search [existing issues](https://github.com/mortolian/nrth/issues) first.
+
+        **Do not use this form for security vulnerabilities** — see [SECURITY.md](https://github.com/mortolian/nrth/blob/master/SECURITY.md).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps so we can reproduce the issue.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Git tag, commit SHA, or approximate date
+      placeholder: e.g. v0.1.0 or abc1234
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: How are you running nrth?
+      options:
+        - Docker Compose (self-hosted)
+        - Local PHP + Node (development)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Relevant log output, browser console errors, or screenshots.
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I am not reporting a security vulnerability in this public issue
+          required: true
