@@ -57,12 +57,16 @@ npx shadcn-vue@latest add button
 
 One image (`docker/Dockerfile`, PHP **8.4** + **Swoole**, **Redis**, **pgsql**, **GD**, **Horizon**) powers **app** (Laravel **Octane** on port **8000**), **worker** (**Supervisor** + **Horizon**), and **scheduler** (`php artisan schedule:work`). Data services: **PostgreSQL 16**, **Redis 7**, **MinIO** (S3 API **9000**, console **9001**). The `createbuckets` one-shot service creates the `nrth` bucket.
 
+**Hosting guides:** see **[INSTALL.md](INSTALL.md)** — [self-host for others](docs/SELF_HOST.md) and [personal auto-deploy server](docs/PERSONAL_SERVER.md).
+
 ```bash
-docker compose build
-docker compose up -d
+cp .env.example .env
+# edit .env, then:
+chmod +x scripts/self-host-install.sh
+./scripts/self-host-install.sh
 ```
 
-Replace the example `APP_KEY` and MinIO credentials in `compose.yaml` (or inject via `--env-file`) before any internet-facing deployment. The volume name `mysql_data` is used for PostgreSQL data to match the phase-1.2 spec wording.
+Or manually: `docker compose up -d --build` then `docker compose exec app php artisan app:install`.
 
 ## Laravel Sail (local)
 

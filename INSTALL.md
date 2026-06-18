@@ -1,178 +1,114 @@
-# Self-hosted installation guide
+# Installation & hosting
 
-This guide covers production deployment. Set `APP_NAME` in `.env` for the application display name in the UI.
+nrth can run on a laptop for development or on a server for daily use. **Docker Compose is the recommended path** for self-hosters and for a personal staging server.
 
-## Requirements
+| Guide | Audience | Summary |
+|-------|----------|---------|
+| **[docs/SELF_HOST.md](docs/SELF_HOST.md)** | Anyone self-hosting | Clone → `.env` → `docker compose up` → `app:install` |
+| **[docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md)** | Project maintainer | Homelab Docker server that auto-deploys on push to `master` |
+| **[README.md](README.md)** | Local developers | PHP + Node on the host, or Laravel Sail |
 
-- PHP 8.3+
-- Composer 2.7+
-- Node.js 20.19+ (or 22.12+)
-- npm 10+
-- A database server (MySQL 8 recommended for this guide)
-- Redis (cache + queues)
-- `cron` for scheduler
+---
 
-## Option A: Docker Compose (Recommended)
-
-### 1) Prepare host
-
-- Install Docker Engine + Docker Compose plugin.
-- Create a deployment directory, for example `/opt/nrth`.
-
-### 2) Deploy release archive
-
-1. Copy release files:
-   - `nrth-<version>.tar.gz`
-   - `nrth-<version>.tar.gz.sha256`
-2. Verify checksum:
-   ```bash
-   ARCHIVE="nrth-<version>.tar.gz"
-   EXPECTED="$(cat "${ARCHIVE}.sha256")"
-   ACTUAL="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
-   [ "$EXPECTED" = "$ACTUAL" ] && echo "Checksum OK"
-   ```
-3. Extract:
-   ```bash
-   tar -xzf nrth-<version>.tar.gz
-   ```
-
-### 3) Configure environment
-
-1. Copy `.env.example` to `.env`.
-2. Set production values:
-   - `APP_ENV=production`
-   - `APP_DEBUG=false`
-   - `APP_URL=https://your-domain`
-   - `DB_*` (MySQL host/database/user/password)
-   - `REDIS_*`
-   - `MAIL_*`
-3. Generate app key:
-   ```bash
-   php artisan key:generate
-   ```
-
-### 4) Bring up services
+## Self-host quick start
 
 ```bash
-docker compose up -d
-```
-
-### 5) Run installer
-
-```bash
-php artisan app:install
-```
-
-This command sets up application prerequisites and initial bootstrap tasks.
-
-## Option B: Manual Installation (PHP 8.3, MySQL 8, Redis)
-
-### 1) System packages
-
-- PHP 8.3 with required extensions (`mbstring`, `openssl`, `pdo`, `pdo_mysql`, `tokenizer`, `xml`, `curl`, `bcmath`, `intl`, `zip`, `fileinfo`)
-- MySQL 8
-- Redis
-- Nginx or Apache
-- Supervisor (for queue workers)
-
-### 2) Application setup
-
-```bash
-composer install --no-dev --optimize-autoloader
-npm ci
-npm run build
+git clone <repository-url> nrth && cd nrth
 cp .env.example .env
-php artisan key:generate
-php artisan app:install
+# Edit .env — set APP_URL, passwords, APP_ENV=production, APP_DEBUG=false
+chmod +x scripts/self-host-install.sh
+./scripts/self-host-install.sh
 ```
 
-### 3) Web + workers
+Open `http://localhost:8000` (or your `APP_PORT`).
 
-- Point web root to `public/`.
-- Run queues with Supervisor:
-  - `php artisan queue:work --sleep=1 --tries=3 --timeout=120`
-- Add cron entry for scheduler:
-  ```cron
-  * * * * * cd /path/to/nrth && php artisan schedule:run >> /dev/null 2>&1
-  ```
+Full production checklist, HTTPS, and updates: **[docs/SELF_HOST.md](docs/SELF_HOST.md)**.
 
-## Backups
+---
 
-This project includes `spatie/laravel-backup`.
-
-### 1) Configure backup destinations
-
-- Set filesystems/disks in `config/filesystems.php`.
-- Configure backup settings in `config/backup.php`.
-- Ensure destination credentials are present in `.env`.
-
-### 2) Run and schedule
+## Personal server quick start
 
 ```bash
-php artisan backup:run
-php artisan backup:list
+git clone <repository-url> /opt/nrth && cd /opt/nrth
+cp .env.example .env
+docker compose up -d --build
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan app:install
 ```
 
-Recommended scheduler entries:
-- `backup:run` daily
-- `backup:clean` daily
+Install a **GitHub Actions self-hosted runner** on the same machine (label: `nrth-server`). Pushes to `master` run `/opt/nrth/scripts/deploy.sh` automatically.
 
-## Updating to New Versions
+Details: **[docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md)**.
 
-### 1) Deploy new release archive
+---
 
-Extract new release to a versioned directory, keep previous release until verified.
+## Artisan commands
 
-### 2) Reinstall dependencies + assets
+| Command | When |
+|---------|------|
+| `php artisan app:install` | First install on an empty database (interactive admin setup) |
+| `php artisan app:update` | Production upgrades (migrate, caches, restart workers) |
+
+Inside Docker, prefix with `docker compose exec app`, e.g.:
 
 ```bash
-composer install --no-dev --optimize-autoloader
-npm ci
-npm run build
+docker compose exec app php artisan app:update
 ```
 
-### 3) Run update command
+---
+
+## Stack (Docker Compose)
+
+- **PostgreSQL 16** — database (`pgsql`)
+- **Redis 7** — cache, sessions, queues
+- **MinIO** — S3-compatible file storage
+- **Octane (Swoole)** — HTTP
+- **Horizon** — queue worker
+- **Mailpit** — local mail capture (replace with SMTP in production)
+
+---
+
+## Release archives (optional)
+
+To build a tarball for air-gapped or non-git installs:
 
 ```bash
-php artisan app:update
+./scripts/build-release.sh
 ```
 
-### 4) Restart workers/services
+Extract on the target host and follow [docs/SELF_HOST.md](docs/SELF_HOST.md).
 
-- Restart queue workers and PHP-FPM container/service.
-- Confirm health checks and dashboard load.
+---
 
 ## Troubleshooting
 
-### “Vite manifest not found”
+| Problem | Fix |
+|---------|-----|
+| Vite manifest missing | `docker compose exec app npm ci && npm run build` |
+| Missing tables | `docker compose exec app php artisan migrate` |
+| `storage/` permissions | Ensure the container can write to `storage` and `bootstrap/cache` |
+| Queues stuck | `docker compose restart worker` |
+| Mail not sent | Configure `MAIL_*` (Mailpit is dev-only) |
 
-Run:
+---
+
+## Manual install (without Docker)
+
+Only if you cannot use Docker:
+
+- PHP 8.3+ with extensions listed in `app:install`
+- PostgreSQL 16 (or MySQL 8 with `DB_CONNECTION=mysql`)
+- Redis
+- Node 20.19+ for `npm run build`
+- Nginx/Apache → `public/`
+- Supervisor for `php artisan horizon`
+- Cron: `* * * * * php artisan schedule:run`
+
 ```bash
-npm run build
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+cp .env.example .env && php artisan key:generate
+php artisan app:install
 ```
 
-### “relation does not exist” / missing table
-
-Run:
-```bash
-php artisan migrate
-```
-
-### Permission issues in `storage/` or `bootstrap/cache/`
-
-Ensure web/queue user can write:
-```bash
-chmod -R ug+rw storage bootstrap/cache
-```
-
-### Queue jobs not processing
-
-- Verify Redis is reachable.
-- Check Supervisor status/logs.
-- Restart workers.
-
-### Emails not sending
-
-- Verify `MAIL_*` config and SMTP connectivity.
-- Use `php artisan tinker` to send a test mail.
-
+Docker remains simpler because dependencies and services are bundled.
