@@ -36,6 +36,8 @@ DEFAULT_INSTALL_DIR="/opt/nrth"
 DEFAULT_RUNNER_NAME="nrth-server"
 DEFAULT_RUNNER_LABEL="nrth-server"
 
+DOCKER_GROUP_ADDED=0
+
 REPO_URL="$DEFAULT_REPO_URL"
 GITHUB_REPO="$DEFAULT_GITHUB_REPO"
 RUNNER_NAME="$DEFAULT_RUNNER_NAME"
@@ -209,8 +211,35 @@ install_docker() {
 
     local target_user="${SUDO_USER:-${USER:-}}"
     if [[ -n "$target_user" && "$target_user" != "root" ]]; then
-        usermod -aG docker "$target_user" || true
-        log "Added user '$target_user' to the docker group (log out/in if docker permission denied)"
+        if usermod -aG docker "$target_user" 2>/dev/null; then
+            DOCKER_GROUP_ADDED=1
+            log "Added user '$target_user' to the docker group (log out/in to use docker without sudo)"
+        fi
+    fi
+}
+
+docker_accessible() {
+    docker info >/dev/null 2>&1
+}
+
+configure_compose() {
+    COMPOSE="${COMPOSE:-docker compose}"
+    if [[ "$COMPOSE" == "docker compose" ]] && ! docker_accessible; then
+        if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+            COMPOSE="sudo docker compose"
+            log "Using sudo for Docker (log out/in after install, or stay on sudo docker compose)"
+        fi
+    fi
+    export COMPOSE
+}
+
+compose_hint_for_user() {
+    if docker_accessible; then
+        echo "docker compose"
+    elif command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+        echo "sudo docker compose"
+    else
+        echo "docker compose"
     fi
 }
 
@@ -356,7 +385,7 @@ ensure_app_key() {
 run_first_install() {
     if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
         log "Skipping interactive app:install (non-interactive). Run manually:"
-        echo "  cd ${ROOT_DIR} && docker compose exec -it app php artisan app:install"
+        echo "  cd ${ROOT_DIR} && $(compose_hint_for_user) exec -it app php artisan app:install"
         return 0
     fi
     log "Running interactive installer (admin user + default chart of accounts)"
@@ -459,15 +488,23 @@ setup_auto_deploy() {
 }
 
 print_success() {
-    local app_port
+    local app_port compose_hint target_user
     app_port="$(grep -E '^APP_PORT=' "$ROOT_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo 8000)"
+    compose_hint="$(compose_hint_for_user)"
+    target_user="${SUDO_USER:-${USER:-}}"
     echo ""
     echo "Installation complete."
     echo "  Open: http://localhost:${app_port}"
     if [[ "$NON_INTERACTIVE" -eq 1 ]] && ! users_exist; then
-        echo "  Finish setup: cd ${ROOT_DIR} && docker compose exec -it app php artisan app:install"
+        echo "  Finish setup: cd ${ROOT_DIR} && ${compose_hint} exec -it app php artisan app:install"
     fi
     echo "  Updates: ${ROOT_DIR}/scripts/deploy.sh"
+    if [[ "$DOCKER_GROUP_ADDED" -eq 1 && -n "$target_user" && "$target_user" != "root" ]]; then
+        echo "  Docker CLI: log out and back in as ${target_user} to use docker without sudo,"
+        echo "              or prefix commands with sudo (e.g. ${compose_hint} ps)"
+    elif [[ "$(id -u)" -ne 0 ]] && ! docker_accessible; then
+        echo "  Docker CLI: use ${compose_hint} (permission denied on /var/run/docker.sock without sudo or docker group)"
+    fi
     if [[ "$MODE" == "production" ]]; then
         echo "  Production checklist: docs/SELF_HOST.md"
     fi
@@ -501,8 +538,7 @@ main() {
     ROOT_DIR="$(cd "$INSTALL_DIR" && pwd)"
     cd "$ROOT_DIR"
 
-    COMPOSE="${COMPOSE:-docker compose}"
-    export COMPOSE
+    configure_compose
 
     # Re-run on an existing install: pull and apply updates.
     if [[ -f .env ]] && stack_running && users_exist; then

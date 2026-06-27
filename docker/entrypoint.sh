@@ -38,6 +38,12 @@ if [ "${DOCKER_ROLE:-app}" = "app" ] && { [ ! -d node_modules/vite ] || [ ! -f n
     npm ci --no-audit --no-fund
 fi
 
+# Bind mount `.:/var/www/html` replaces image-built public/build; host clones omit it (.gitignore).
+if [ "${DOCKER_ROLE:-app}" = "app" ] && [ ! -f public/build/manifest.json ]; then
+    echo "Building frontend assets (Vite manifest missing)..."
+    npm run build
+fi
+
 # Octane runs `node file-watcher.cjs` with cwd `vendor/laravel/octane/bin`. Node resolves
 # `require('chokidar')` starting at `vendor/laravel/octane/bin/node_modules` — the *first* search
 # path — before walking up through vendor. A symlink to the app tree avoids duplicate installs and
