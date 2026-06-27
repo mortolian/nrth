@@ -45,7 +45,18 @@ From an existing clone:
 ./scripts/install.sh --production --install-dir /opt/nrth
 ```
 
-Re-running `install.sh` on an already-installed instance runs `scripts/deploy.sh` instead of a full bootstrap. Existing Docker volumes and database data are preserved.
+Re-running `install.sh` on an already-installed instance runs `scripts/deploy.sh` instead of a full bootstrap. Existing Docker volumes and database data are preserved. If the stack is unhealthy, install automatically runs `scripts/repair.sh`.
+
+### Recovering a broken install
+
+| Goal | Command |
+|------|---------|
+| Fix in place (keep data) | `./scripts/repair.sh --ip 192.168.1.204` |
+| HTTPS via Caddy on LAN | `./scripts/repair.sh --mode https --ip 192.168.1.204` |
+| Wipe everything and reinstall | `./scripts/reset.sh --force --lan` |
+| Re-run install + auto-repair | `./scripts/install.sh --lan --install-dir /opt/nrth` |
+
+Full walkthrough: **[SELF_HOST.md — Recovering a broken installation](SELF_HOST.md#recovering-a-broken-installation)**.
 
 ### Auto-deploy token
 
@@ -133,6 +144,7 @@ Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when d
 |--------|----------------|
 | `./scripts/compose.sh down -v` | All Docker volumes: database, uploads, Redis, MinIO objects |
 | `./scripts/compose.sh down -v --force` | Same as above; `--force` is required to bypass the safety guard |
+| `./scripts/reset.sh --force` | Stops stack, removes all volumes, re-runs `install.sh` (backs up old `.env`) |
 | `php artisan migrate:fresh` | All database tables and rows |
 | `php artisan db:wipe` | Database contents |
 | Re-generating `DB_PASSWORD` / `MINIO_ROOT_PASSWORD` in `.env` **after** volumes exist | App cannot connect until passwords are synced (data still on disk) |
@@ -147,7 +159,9 @@ On re-run, `install.sh` preserves `DB_PASSWORD` and MinIO credentials when data 
 
 | Problem | Fix |
 |---------|-----|
-| `password authentication failed for user "dbuser"` | Re-running install rotated `DB_PASSWORD` in `.env` while Postgres kept the old password in its volume. **Keep data:** sync Postgres to `.env` (see below). **Fresh start (destructive):** `./scripts/compose.sh down -v --force` then re-run `./scripts/install.sh`. |
+| Broken install (multiple issues) | `./scripts/repair.sh --ip YOUR_LAN_IP` — see [SELF_HOST.md](SELF_HOST.md#recovering-a-broken-installation) |
+| Start over (no data to keep) | `./scripts/reset.sh --force --lan` |
+| `password authentication failed for user "dbuser"` | Re-running install rotated `DB_PASSWORD` in `.env` while Postgres kept the old password in its volume. **Keep data:** `./scripts/repair.sh` (syncs password) or manual `ALTER USER` below. **Fresh start (destructive):** `./scripts/reset.sh --force` |
 | `permission denied` on `/var/run/docker.sock` | `./scripts/compose.sh …` (auto-sudo), or `newgrp docker`, or log out/in after install |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Missing tables | `./scripts/compose.sh exec app php artisan migrate` |

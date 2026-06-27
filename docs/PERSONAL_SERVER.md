@@ -132,8 +132,9 @@ rm -f storage/framework/.deploy-composer-hash storage/framework/.deploy-npm-hash
 ./scripts/deploy.sh
 
 # Nuclear reset (destroys all Docker volumes — database, uploads, etc.)
-./scripts/compose.sh down -v --force
-./scripts/install.sh --dev
+./scripts/reset.sh --force --lan
+# or manually:
+# ./scripts/compose.sh down -v --force && ./scripts/install.sh --lan
 ```
 
 ---
