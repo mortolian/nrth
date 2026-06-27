@@ -70,4 +70,19 @@ class HttpsEnforcementTest extends TestCase
 
         $response->assertOk();
     }
+
+    public function test_hsts_is_not_sent_when_http_is_allowed(): void
+    {
+        config([
+            'https.allow_http' => true,
+            'https.force' => true,
+            'https.hsts.enabled' => true,
+        ]);
+
+        $response = $this->call('GET', '/login', [], [], [], [
+            'HTTP_X_FORWARDED_PROTO' => 'https',
+        ]);
+
+        $response->assertHeaderMissing('Strict-Transport-Security');
+    }
 }

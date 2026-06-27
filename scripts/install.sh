@@ -18,13 +18,13 @@
 #   --install-dir PATH   Install location (default: repo root or /opt/nrth when piping)
 #   --branch NAME        Git branch (default: master)
 #   --production         APP_ENV=production, APP_DEBUG=false
-#   --dev                Dev/staging defaults (default)
+#   --dev                Dev/LAN defaults: HTTP on :8000, no Caddy (default)
 #   --with-caddy         Enable Compose Caddy TLS proxy (default for --production)
 #   --no-caddy           Do not start the optional Caddy reverse proxy
 #   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server)
 #   --non-interactive    Skip env prompts; use generated defaults
-#   --allow-http         Permit plain HTTP (pragmatic LAN dev; sets APP_ALLOW_HTTP=true)
-#   --lan                Shorthand: --dev --allow-http --no-caddy (fastest LAN access)
+#   --allow-http         Permit plain HTTP (default for --dev; sets APP_ALLOW_HTTP=true)
+#   --lan                Shorthand for default dev install (same as plain --dev today)
 #   --lan-ip ADDR        LAN IP for APP_URL (with --lan or --allow-http)
 #   --repair             Delegate to scripts/repair.sh (non-destructive fix)
 #   -h, --help           Show help
@@ -336,6 +336,21 @@ resolve_with_caddy_default() {
     fi
 }
 
+# Dev installs target pragmatic LAN access (HTTP on :8000). Production keeps HTTPS + Caddy.
+resolve_access_defaults() {
+    resolve_with_caddy_default
+    if [[ "$MODE" == "production" ]]; then
+        ALLOW_HTTP=0
+        return 0
+    fi
+    if [[ "$WITH_CADDY" -eq 1 ]]; then
+        ALLOW_HTTP=0
+    else
+        ALLOW_HTTP=1
+        WITH_CADDY=0
+    fi
+}
+
 gen_app_key() {
     if command -v openssl >/dev/null 2>&1; then
         echo "base64:$(openssl rand -base64 32)"
@@ -471,10 +486,11 @@ configure_env() {
         aws_secret="$(gen_secret)"
     fi
 
+    resolve_access_defaults
+
     if [[ "$MODE" == "production" ]]; then
         set_env_var APP_ENV production "$env_file"
         set_env_var APP_DEBUG false "$env_file"
-        resolve_with_caddy_default
         if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
             if [[ "$WITH_CADDY" -eq 1 ]]; then
                 app_url="https://localhost"
@@ -488,7 +504,6 @@ configure_env() {
     else
         set_env_var APP_ENV local "$env_file"
         set_env_var APP_DEBUG true "$env_file"
-        resolve_with_caddy_default
         if [[ "$ALLOW_HTTP" -eq 1 ]]; then
             local lan_ip
             lan_ip="$(detect_lan_ip)"
@@ -660,6 +675,7 @@ handle_existing_install() {
         setup_auto_deploy
     fi
     ensure_install_dir_ownership "$ROOT_DIR"
+    print_success
     exit 0
 }
 
@@ -671,14 +687,18 @@ ensure_app_key() {
     set_env_var APP_KEY "$(gen_app_key)" "$ROOT_DIR/.env"
 }
 
+# Returns 0 when app:install ran (it prints the user-facing summary); 1 when skipped or failed.
 run_first_install() {
     if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
         log "Skipping interactive app:install (non-interactive). Run manually:"
         echo "  cd ${ROOT_DIR} && $(compose_hint_for_user) exec -it app php artisan app:install"
-        return 0
+        return 1
     fi
     log "Running interactive installer (admin user and company)"
-    $COMPOSE exec -it app php artisan app:install
+    if $COMPOSE exec -it app php artisan app:install; then
+        return 0
+    fi
+    return 1
 }
 
 print_auto_deploy_manual_steps() {
@@ -808,6 +828,8 @@ print_success() {
         if grep -qE '^COMPOSE_PROFILES=.*proxy' "$ROOT_DIR/.env" 2>/dev/null; then
             echo "  5. HTTPS via Caddy on ports 80/443 (accept browser warning for LAN self-signed certs)"
         fi
+    elif grep -qE '^APP_ALLOW_HTTP=true' "$ROOT_DIR/.env" 2>/dev/null; then
+        echo "  Note: use http:// (not https://) and include :8000 unless Caddy is enabled"
     fi
     if [[ "$DOCKER_GROUP_ADDED" -eq 1 && -n "$target_user" && "$target_user" != "root" ]]; then
         echo ""
@@ -826,12 +848,17 @@ main() {
     parse_args "$@"
 
     if [[ "$REPAIR" -eq 1 ]]; then
+        resolve_access_defaults
         local repair_script
         repair_script="$(script_path)/repair.sh"
         [[ -f "$repair_script" ]] || die "repair.sh not found next to install.sh"
         local -a repair_args=()
         [[ -n "$INSTALL_DIR" ]] && repair_args+=(--install-dir "$INSTALL_DIR")
-        [[ "$ALLOW_HTTP" -eq 1 ]] && repair_args+=(--mode http)
+        if [[ "$ALLOW_HTTP" -eq 1 ]]; then
+            repair_args+=(--mode http)
+        else
+            repair_args+=(--mode https)
+        fi
         [[ -n "$LAN_IP" ]] && repair_args+=(--ip "$LAN_IP")
         [[ "$NON_INTERACTIVE" -eq 1 ]] && repair_args+=(--non-interactive)
         exec "$repair_script" "${repair_args[@]}"
@@ -862,6 +889,8 @@ main() {
     ROOT_DIR="$(cd "$INSTALL_DIR" && pwd)"
     cd "$ROOT_DIR"
 
+    resolve_access_defaults
+
     configure_compose
 
     ensure_env_file
@@ -883,10 +912,11 @@ main() {
 
     wait_for_app_health
 
+    local app_install_ran=0
     if users_exist; then
         log "Users already exist — skipping app:install"
-    else
-        run_first_install
+    elif run_first_install; then
+        app_install_ran=1
     fi
 
     if [[ "$AUTO_DEPLOY" -eq 1 ]]; then
@@ -894,7 +924,11 @@ main() {
     fi
 
     ensure_install_dir_ownership "$ROOT_DIR"
-    print_success
+
+    # app:install already printed the installation summary; avoid a second banner.
+    if [[ "$app_install_ran" -eq 0 ]]; then
+        print_success
+    fi
 }
 
 main "$@"

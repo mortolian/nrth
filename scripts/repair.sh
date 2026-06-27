@@ -17,7 +17,7 @@
 #   --sync-db-password   Align Postgres password with .env (safe, keeps data)
 #   --rebuild-assets     Force npm ci && npm run build
 #   --skip-env           Do not change APP_URL / HTTPS / Caddy settings
-#   --bootstrap-env      Create .env from .env.example when missing (then run repair)
+#   --bootstrap-env      (deprecated) .env is created automatically when missing
 #   --non-interactive    No prompts
 #   -h, --help           Show help
 
@@ -280,6 +280,22 @@ data_volumes_exist() {
         || compose_data_volume_exists storage_data
 }
 
+gen_app_key() {
+    if command -v openssl >/dev/null 2>&1; then
+        echo "base64:$(openssl rand -base64 32)"
+    else
+        die "openssl is required to generate APP_KEY"
+    fi
+}
+
+ensure_app_key() {
+    if grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null; then
+        return 0
+    fi
+    log "Generating APP_KEY"
+    set_env_var APP_KEY "$(gen_app_key)" "$ROOT_DIR/.env"
+}
+
 bootstrap_env_file() {
     local example="$ROOT_DIR/.env.example"
 
@@ -287,7 +303,7 @@ bootstrap_env_file() {
     [[ -f "$example" ]] || die "missing .env.example — cannot bootstrap .env"
 
     cp "$example" "$ROOT_DIR/.env"
-    log "Created .env from .env.example (--bootstrap-env)"
+    log "Created .env from .env.example (missing .env auto-bootstrap)"
 
     if data_volumes_exist; then
         echo "" >&2
@@ -334,11 +350,8 @@ main() {
     COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
 
     if [[ ! -f .env ]]; then
-        if [[ "$BOOTSTRAP_ENV" -eq 1 ]]; then
-            bootstrap_env_file
-        else
-            die ".env missing in ${ROOT_DIR} — restore .env, run ./scripts/install.sh, or pass --bootstrap-env"
-        fi
+        bootstrap_env_file
+        ensure_app_key
     fi
 
     if [[ "$NON_INTERACTIVE" -eq 0 && ! -t 0 ]]; then

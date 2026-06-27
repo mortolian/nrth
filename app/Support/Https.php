@@ -17,6 +17,10 @@ class Https
 
     public static function shouldSendHsts(): bool
     {
+        if (filter_var(config('https.allow_http'), FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
         return static::shouldForce()
             && filter_var(config('https.hsts.enabled'), FILTER_VALIDATE_BOOLEAN);
     }

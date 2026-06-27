@@ -139,7 +139,7 @@ class AppInstallCommand extends Command
         $this->line('  <fg=green;options=bold>└──────────────────────────────────────────────────────────────┘</>');
         $this->newLine();
         $this->line('  <fg=gray>Application</>  <fg=cyan;options=bold>'.$url.'</>');
-        $this->line('  <fg=gray>Administrator</>  '.$name.' <fg=gray>&lt;</>'.$email.'<fg=gray>&gt;</>');
+        $this->line('  <fg=gray>Administrator</>  '.$name.' <fg=gray>\<</>'.$email.'<fg=gray>\></>');
         $this->line('  <fg=gray>Company</>       '.$companyName);
         $this->newLine();
         $this->line('  <fg=yellow;options=bold>Next steps</>');
