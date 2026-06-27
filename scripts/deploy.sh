@@ -58,10 +58,8 @@ if [[ "${SKIP_GIT:-0}" != "1" ]]; then
     git reset --hard "origin/${GIT_BRANCH}"
 fi
 
-if ! $COMPOSE ps --status running app 2>/dev/null | grep -q app; then
-    echo "==> App container is not running. Starting stack..."
-    $COMPOSE up -d --build
-fi
+echo "==> Ensuring stack is up (applies compose/.env changes; volumes preserved)"
+$COMPOSE up -d
 
 run_app() {
     $COMPOSE exec -T app "$@"
@@ -101,6 +99,9 @@ else
     run_app php artisan horizon:terminate 2>/dev/null || true
     $COMPOSE restart worker 2>/dev/null || true
 fi
+
+echo "==> Restarting app (Octane picks up code and environment changes)"
+$COMPOSE restart app
 
 echo ""
 echo "Deploy finished ($(date -u +"%Y-%m-%d %H:%M:%S UTC"))."
