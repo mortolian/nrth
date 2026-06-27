@@ -243,6 +243,20 @@ compose_hint_for_user() {
     fi
 }
 
+# curl | sudo bash clones as root; the invoking user (SUDO_USER) needs to own the tree for git pull.
+ensure_install_dir_ownership() {
+    local target_user="${SUDO_USER:-}"
+    local dir="${1:-$INSTALL_DIR}"
+
+    if [[ "$(id -u)" -ne 0 ]] || [[ -z "$target_user" || "$target_user" == "root" ]]; then
+        return 0
+    fi
+    [[ -d "$dir" ]] || return 0
+
+    log "Setting ownership of ${dir} to ${target_user} (git without sudo)"
+    chown -R "${target_user}:${target_user}" "$dir"
+}
+
 ensure_install_dir() {
     if [[ -z "$INSTALL_DIR" ]]; then
         if ROOT="$(detect_root_from_script 2>/dev/null)"; then
@@ -265,6 +279,10 @@ ensure_install_dir() {
     fi
 
     [[ -f "$INSTALL_DIR/compose.yaml" ]] || die "compose.yaml not found in ${INSTALL_DIR}"
+
+    if [[ -d "$INSTALL_DIR/.git" ]]; then
+        ensure_install_dir_ownership
+    fi
 }
 
 configure_env() {
@@ -549,6 +567,7 @@ main() {
         if [[ "$AUTO_DEPLOY" -eq 1 ]]; then
             setup_auto_deploy
         fi
+        ensure_install_dir_ownership "$ROOT_DIR"
         exit 0
     fi
 
@@ -570,6 +589,7 @@ main() {
         setup_auto_deploy
     fi
 
+    ensure_install_dir_ownership "$ROOT_DIR"
     print_success
 }
 

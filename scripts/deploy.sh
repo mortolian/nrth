@@ -33,6 +33,16 @@ if [[ ! -f compose.yaml ]]; then
     exit 1
 fi
 
+if [[ "${SKIP_GIT:-0}" != "1" ]] && [[ -d .git ]] && [[ "$(id -u)" -ne 0 ]]; then
+    git_owner="$(stat -c '%U' .git 2>/dev/null || stat -f '%Su' .git)"
+    current_user="$(id -un)"
+    if [[ "$git_owner" == "root" && "$git_owner" != "$current_user" ]]; then
+        echo "error: ${ROOT_DIR} is owned by root (install was run with sudo)." >&2
+        echo "Fix: sudo chown -R ${current_user}:${current_user} ${ROOT_DIR}" >&2
+        exit 1
+    fi
+fi
+
 if [[ "${SKIP_GIT:-0}" != "1" ]]; then
     echo "==> Pulling latest from origin/${GIT_BRANCH}"
     git fetch origin "${GIT_BRANCH}"
