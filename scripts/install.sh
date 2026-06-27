@@ -440,15 +440,23 @@ ensure_install_dir() {
     fi
 }
 
-configure_env() {
+ensure_env_file() {
     local env_file="$ROOT_DIR/.env"
     local example="$ROOT_DIR/.env.example"
 
-    if [[ ! -f "$env_file" ]]; then
-        [[ -f "$example" ]] || die "missing .env.example"
-        cp "$example" "$env_file"
-        log "Created .env from .env.example"
+    if [[ -f "$env_file" ]]; then
+        return 0
     fi
+
+    [[ -f "$example" ]] || die "missing .env.example"
+    cp "$example" "$env_file"
+    log "Created .env from .env.example"
+}
+
+configure_env() {
+    local env_file="$ROOT_DIR/.env"
+
+    ensure_env_file
 
     local db_pass minio_pass aws_key aws_secret app_url
 
@@ -589,13 +597,20 @@ app_healthy() {
 
 recover_broken_stack() {
     [[ -f "$ROOT_DIR/.env" ]] || return 1
+    grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null || return 1
     data_volumes_exist || return 1
     stack_running && app_healthy && return 1
 
     log "Broken or unhealthy stack detected — running repair (data preserved)"
     local -a repair_args=(--install-dir "$ROOT_DIR" --non-interactive)
     [[ "$ALLOW_HTTP" -eq 1 ]] && repair_args+=(--mode http) || repair_args+=(--mode https)
-    [[ -n "$LAN_IP" ]] && repair_args+=(--ip "$LAN_IP")
+    local detected_ip
+    detected_ip="$(detect_lan_ip)"
+    if [[ -n "$LAN_IP" ]]; then
+        repair_args+=(--ip "$LAN_IP")
+    elif [[ -n "$detected_ip" ]]; then
+        repair_args+=(--ip "$detected_ip")
+    fi
     "$ROOT_DIR/scripts/repair.sh" "${repair_args[@]}"
     exit 0
 }
@@ -849,9 +864,12 @@ main() {
 
     configure_compose
 
-    recover_broken_stack
+    ensure_env_file
 
-    handle_existing_install
+    # These return 1 to continue install; without `|| true`, set -e exits the script.
+    recover_broken_stack || true
+
+    handle_existing_install || true
 
     if [[ -f .env ]] && data_volumes_exist; then
         log "Existing Docker volumes detected — DB/MinIO passwords will be preserved"

@@ -17,6 +17,7 @@
 #   --sync-db-password   Align Postgres password with .env (safe, keeps data)
 #   --rebuild-assets     Force npm ci && npm run build
 #   --skip-env           Do not change APP_URL / HTTPS / Caddy settings
+#   --bootstrap-env      Create .env from .env.example when missing (then run repair)
 #   --non-interactive    No prompts
 #   -h, --help           Show help
 
@@ -29,6 +30,7 @@ LAN_IP=""
 SYNC_DB=1
 REBUILD_ASSETS=0
 SKIP_ENV=0
+BOOTSTRAP_ENV=0
 NON_INTERACTIVE=0
 
 usage() {
@@ -73,6 +75,10 @@ parse_args() {
                 ;;
             --skip-env)
                 SKIP_ENV=1
+                shift
+                ;;
+            --bootstrap-env)
+                BOOTSTRAP_ENV=1
                 shift
                 ;;
             --non-interactive)
@@ -263,6 +269,36 @@ wait_for_app_health() {
     log "App is healthy"
 }
 
+compose_data_volume_exists() {
+    local suffix="$1"
+    $COMPOSE volume ls -q 2>/dev/null | grep -qE "(^|_)${suffix}$" || return 1
+}
+
+data_volumes_exist() {
+    compose_data_volume_exists mysql_data \
+        || compose_data_volume_exists minio_data \
+        || compose_data_volume_exists storage_data
+}
+
+bootstrap_env_file() {
+    local example="$ROOT_DIR/.env.example"
+
+    [[ -f "$ROOT_DIR/.env" ]] && return 0
+    [[ -f "$example" ]] || die "missing .env.example — cannot bootstrap .env"
+
+    cp "$example" "$ROOT_DIR/.env"
+    log "Created .env from .env.example (--bootstrap-env)"
+
+    if data_volumes_exist; then
+        echo "" >&2
+        echo "warning: Docker data volumes already exist. DB/MinIO passwords in the new" >&2
+        echo "         .env may not match initialized volumes. Restore .env.backup.* if" >&2
+        echo "         you have one, or run ./scripts/install.sh to regenerate secrets and" >&2
+        echo "         use --sync-db-password on repair if the app fails to connect." >&2
+        echo "" >&2
+    fi
+}
+
 print_result() {
     local env_file="$1"
     local app_url
@@ -294,9 +330,16 @@ main() {
     ROOT_DIR="$(detect_install_dir)"
     cd "$ROOT_DIR"
     [[ -f compose.yaml ]] || die "compose.yaml not found in ${ROOT_DIR}"
-    [[ -f .env ]] || die ".env missing in ${ROOT_DIR} — run ./scripts/install.sh first or restore .env"
 
     COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
+
+    if [[ ! -f .env ]]; then
+        if [[ "$BOOTSTRAP_ENV" -eq 1 ]]; then
+            bootstrap_env_file
+        else
+            die ".env missing in ${ROOT_DIR} — restore .env, run ./scripts/install.sh, or pass --bootstrap-env"
+        fi
+    fi
 
     if [[ "$NON_INTERACTIVE" -eq 0 && ! -t 0 ]]; then
         NON_INTERACTIVE=1
