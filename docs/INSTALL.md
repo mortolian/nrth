@@ -57,6 +57,15 @@ See [PERSONAL_SERVER.md](PERSONAL_SERVER.md) for maintainer workflow details.
 
 Open **https://localhost:8000** (or your `APP_URL`). Production hardening (HTTPS, backups, mail): **[SELF_HOST.md](SELF_HOST.md)**.
 
+If the installer did not create your admin account (non-interactive install, or `permission denied` on docker.sock), run:
+
+```bash
+cd /opt/nrth
+./scripts/compose.sh exec -it app php artisan app:install
+```
+
+(`./scripts/compose.sh` auto-sudo's until you log out/in or run `newgrp docker` after being added to the docker group.)
+
 Updates:
 
 ```bash
@@ -96,10 +105,10 @@ Updates:
 | `php artisan app:install` | First install on an empty database |
 | `php artisan app:update` | Production upgrades |
 
-Inside Docker:
+Inside Docker (use `./scripts/compose.sh` — auto-sudo when docker.sock is not accessible yet):
 
 ```bash
-docker compose exec app php artisan app:update
+./scripts/compose.sh exec app php artisan app:update
 ```
 
 ---
@@ -108,8 +117,9 @@ docker compose exec app php artisan app:update
 
 | Problem | Fix |
 |---------|-----|
-| Vite manifest missing | `docker compose exec app npm ci && npm run build` |
-| Missing tables | `docker compose exec app php artisan migrate` |
+| `permission denied` on `/var/run/docker.sock` | `./scripts/compose.sh …` (auto-sudo), or `newgrp docker`, or log out/in after install |
+| Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
+| Missing tables | `./scripts/compose.sh exec app php artisan migrate` |
 | `storage/` permissions | Ensure the container can write to `storage` and `bootstrap/cache` |
-| Queues stuck | `docker compose restart worker` |
+| Queues stuck | `./scripts/compose.sh restart worker` |
 | Mail not sent | Configure `MAIL_*` (Mailpit is dev-only) |

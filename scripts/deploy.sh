@@ -9,7 +9,7 @@
 # Environment:
 #   SKIP_GIT=1     Skip git pull (e.g. when a CI job already updated the tree)
 #   GIT_BRANCH=master   Branch to pull (default: master)
-#   COMPOSE="docker compose"  Override compose command
+#   COMPOSE="docker compose"  Override compose command (default: scripts/compose.sh)
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ cd "$ROOT_DIR"
 
 MODE="${1:-dev}"
 GIT_BRANCH="${GIT_BRANCH:-master}"
-COMPOSE="${COMPOSE:-docker compose}"
+COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
 
 hash_file() {
     if command -v sha256sum >/dev/null 2>&1; then

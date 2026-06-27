@@ -223,24 +223,26 @@ docker_accessible() {
 }
 
 configure_compose() {
-    COMPOSE="${COMPOSE:-docker compose}"
-    if [[ "$COMPOSE" == "docker compose" ]] && ! docker_accessible; then
-        if command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
-            COMPOSE="sudo docker compose"
-            log "Using sudo for Docker (log out/in after install, or stay on sudo docker compose)"
-        fi
+    if [[ -n "${COMPOSE:-}" ]]; then
+        export COMPOSE
+        return
+    fi
+
+    if [[ -f "$ROOT_DIR/scripts/compose.sh" ]]; then
+        COMPOSE="$ROOT_DIR/scripts/compose.sh"
+    elif docker_accessible; then
+        COMPOSE="docker compose"
+    elif command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
+        COMPOSE="sudo docker compose"
+        log "Using sudo for Docker (log out/in after install, or use scripts/compose.sh)"
+    else
+        COMPOSE="docker compose"
     fi
     export COMPOSE
 }
 
 compose_hint_for_user() {
-    if docker_accessible; then
-        echo "docker compose"
-    elif command -v sudo >/dev/null 2>&1 && sudo docker info >/dev/null 2>&1; then
-        echo "sudo docker compose"
-    else
-        echo "docker compose"
-    fi
+    echo "./scripts/compose.sh"
 }
 
 # curl | sudo bash clones as root; the invoking user (SUDO_USER) needs to own the tree for git pull.
@@ -534,8 +536,10 @@ print_success() {
     fi
     if [[ "$DOCKER_GROUP_ADDED" -eq 1 && -n "$target_user" && "$target_user" != "root" ]]; then
         echo ""
-        echo "  Docker: log out and back in as ${target_user} to use docker without sudo,"
-        echo "          or prefix commands with sudo (e.g. ${compose_hint} ps)"
+        echo "  Docker: ${target_user} was added to the docker group."
+        echo "          Use ${compose_hint} now (auto-sudo until re-login), or run:"
+        echo "            newgrp docker    # apply group in this shell"
+        echo "            log out/in       # permanent fix"
     elif [[ "$(id -u)" -ne 0 ]] && ! docker_accessible; then
         echo ""
         echo "  Docker: use ${compose_hint} (permission denied on /var/run/docker.sock without sudo or docker group)"

@@ -76,18 +76,20 @@ Or re-run install (detects existing install and delegates to `deploy.sh`):
 
 ## Useful commands
 
+Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when your user cannot access the Docker socket yet (common right after install).
+
 ```bash
 # View logs
-docker compose logs -f app
+./scripts/compose.sh logs -f app
 
 # Run artisan
-docker compose exec app php artisan migrate:status
+./scripts/compose.sh exec app php artisan migrate:status
 
 # Stop everything
-docker compose down
+./scripts/compose.sh down
 
 # Stop and remove data volumes (destructive)
-docker compose down -v
+./scripts/compose.sh down -v
 ```
 
 ---
@@ -96,10 +98,11 @@ docker compose down -v
 
 | Problem | Fix |
 |---------|-----|
-| "Vite manifest not found" | `docker compose exec app npm ci && npm run build` |
+| `permission denied` on docker.sock | `./scripts/compose.sh …`, or `newgrp docker`, or log out/in |
+| "Vite manifest not found" | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Database connection errors | Wait for Postgres healthcheck; check `DB_*` in `.env` |
-| Blank page / 500 | `docker compose logs app`; ensure `APP_KEY` is set |
-| Queues not running | `docker compose ps worker`; `docker compose restart worker` |
+| Blank page / 500 | `./scripts/compose.sh logs app`; ensure `APP_KEY` is set |
+| Queues not running | `./scripts/compose.sh ps worker`; `./scripts/compose.sh restart worker` |
 | Emails not delivered | Configure real `MAIL_*`; Mailpit only captures mail locally |
 
 More detail: [INSTALL.md](INSTALL.md).
