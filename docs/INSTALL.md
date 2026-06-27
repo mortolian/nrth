@@ -25,8 +25,10 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 
 | Flag | Purpose |
 |------|---------|
-| `--production` | `APP_ENV=production`, `APP_DEBUG=false` |
+| `--production` | `APP_ENV=production`, `APP_DEBUG=false`, Caddy TLS proxy enabled |
 | `--dev` | Dev/staging defaults (default) |
+| `--with-caddy` | Enable Compose Caddy reverse proxy on ports 80/443 |
+| `--no-caddy` | Skip Caddy; you must terminate TLS elsewhere |
 | `--auto-deploy` | Install GitHub Actions self-hosted runner (label `nrth-server`) |
 | `--install-dir PATH` | Clone/install location (default `/opt/nrth` when piping) |
 | `--repo-url URL` | Git remote (default `https://github.com/mortolian/nrth.git`) |
@@ -55,7 +57,7 @@ See [PERSONAL_SERVER.md](PERSONAL_SERVER.md) for maintainer workflow details.
 
 ## After install
 
-Open **https://localhost:8000** (or your `APP_URL`). **HTTPS is required** — the app redirects plain HTTP and sets secure session cookies. Put Caddy or Nginx in front of port 8000 for TLS. Production hardening: **[SELF_HOST.md](SELF_HOST.md)**.
+Open the URL shown at the end of install (your `APP_URL`). **HTTPS is required for browsers** — Octane serves plain HTTP on port 8000 inside Docker; TLS terminates in Caddy (included with `--production`) or an external reverse proxy. Production hardening: **[SELF_HOST.md](SELF_HOST.md)**.
 
 If the installer did not create your admin account (non-interactive install, or `permission denied` on docker.sock), run:
 

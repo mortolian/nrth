@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 
 Or from a clone: `./scripts/install.sh`
 
-Open **https://localhost:8000** and complete the installer (`app:install`).
+Open **https://localhost** (with production Caddy) or set `APP_ALLOW_HTTP=true` for local HTTP on port 8000 — see [docs/SELF_HOST.md](docs/SELF_HOST.md).
 
 Production checklist and HTTPS: **[docs/SELF_HOST.md](docs/SELF_HOST.md)** · Flags and options: **[docs/INSTALL.md](docs/INSTALL.md)**
 

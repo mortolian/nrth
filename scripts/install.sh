@@ -19,6 +19,8 @@
 #   --branch NAME        Git branch (default: master)
 #   --production         APP_ENV=production, APP_DEBUG=false
 #   --dev                Dev/staging defaults (default)
+#   --with-caddy         Enable Compose Caddy TLS proxy (default for --production)
+#   --no-caddy           Do not start the optional Caddy reverse proxy
 #   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server)
 #   --non-interactive    Skip env prompts; use generated defaults
 #   -h, --help           Show help
@@ -47,6 +49,7 @@ BRANCH="$DEFAULT_BRANCH"
 MODE="dev"
 AUTO_DEPLOY=0
 NON_INTERACTIVE=0
+WITH_CADDY=-1
 
 usage() {
     sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
@@ -90,6 +93,14 @@ parse_args() {
                 ;;
             --non-interactive)
                 NON_INTERACTIVE=1
+                shift
+                ;;
+            --with-caddy)
+                WITH_CADDY=1
+                shift
+                ;;
+            --no-caddy)
+                WITH_CADDY=0
                 shift
                 ;;
             -h|--help)
@@ -217,6 +228,68 @@ normalize_app_url() {
     [[ -n "$host" ]] || die "APP_URL has no host (got: ${url})"
 
     printf '%s' "$url"
+}
+
+app_url_host() {
+    local url="$1"
+    local host="${url#*://}"
+    host="${host%%/*}"
+    host="${host%%:*}"
+    printf '%s' "$host"
+}
+
+is_ip_address() {
+    [[ "$1" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]
+}
+
+strip_app_url_port_for_proxy() {
+    local url="$1"
+    local scheme="${url%%://*}"
+    local rest="${url#*://}"
+    local host="${rest%%/*}"
+    local path="${rest#"$host"}"
+    local port=""
+
+    if [[ "$host" == *:* ]]; then
+        port="${host##*:}"
+        host="${host%%:*}"
+        if [[ "$port" == "8000" ]]; then
+            url="${scheme}://${host}${path}"
+        fi
+    fi
+
+    printf '%s' "$url"
+}
+
+configure_caddy_proxy() {
+    local env_file="$1"
+    local app_url="$2"
+    local host
+
+    host="$(app_url_host "$app_url")"
+    app_url="$(strip_app_url_port_for_proxy "$app_url")"
+
+    set_env_var APP_URL "$app_url" "$env_file"
+    set_env_var COMPOSE_PROFILES proxy "$env_file"
+    set_env_var CADDY_SITE "$host" "$env_file"
+    if is_ip_address "$host"; then
+        set_env_var CADDY_TLS internal "$env_file"
+        log "Caddy proxy enabled (self-signed TLS for LAN IP ${host})"
+    else
+        set_env_var CADDY_TLS off "$env_file"
+        log "Caddy proxy enabled (automatic TLS for ${host})"
+    fi
+}
+
+resolve_with_caddy_default() {
+    if [[ "$WITH_CADDY" -ne -1 ]]; then
+        return 0
+    fi
+    if [[ "$MODE" == "production" ]]; then
+        WITH_CADDY=1
+    else
+        WITH_CADDY=0
+    fi
 }
 
 gen_app_key() {
@@ -349,8 +422,13 @@ configure_env() {
     if [[ "$MODE" == "production" ]]; then
         set_env_var APP_ENV production "$env_file"
         set_env_var APP_DEBUG false "$env_file"
+        resolve_with_caddy_default
         if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
-            app_url="https://localhost:8000"
+            if [[ "$WITH_CADDY" -eq 1 ]]; then
+                app_url="https://localhost"
+            else
+                app_url="https://localhost:8000"
+            fi
         else
             read -r -p "Public APP_URL [https://books.example.com]: " app_url
             app_url="${app_url:-https://books.example.com}"
@@ -358,6 +436,7 @@ configure_env() {
     else
         set_env_var APP_ENV local "$env_file"
         set_env_var APP_DEBUG true "$env_file"
+        resolve_with_caddy_default
         if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
             app_url="https://localhost:8000"
         else
@@ -368,7 +447,11 @@ configure_env() {
 
     app_url="$(normalize_app_url "$app_url")"
 
-    set_env_var APP_URL "$app_url" "$env_file"
+    if [[ "$WITH_CADDY" -eq 1 ]]; then
+        configure_caddy_proxy "$env_file" "$app_url"
+    else
+        set_env_var APP_URL "$app_url" "$env_file"
+    fi
     set_env_var APP_FORCE_HTTPS true "$env_file"
     set_env_var APP_ALLOW_HTTP false "$env_file"
     set_env_var TRUSTED_PROXIES "*" "$env_file"
@@ -627,6 +710,9 @@ print_success() {
     echo "     (or ./scripts/compose.sh exec app php artisan app:update)"
     if [[ "$MODE" == "production" ]]; then
         echo "  4. Production checklist: ${ROOT_DIR}/docs/SELF_HOST.md"
+        if grep -qE '^COMPOSE_PROFILES=.*proxy' "$ROOT_DIR/.env" 2>/dev/null; then
+            echo "  5. HTTPS via Caddy on ports 80/443 (accept browser warning for LAN self-signed certs)"
+        fi
     fi
     if [[ "$DOCKER_GROUP_ADDED" -eq 1 && -n "$target_user" && "$target_user" != "root" ]]; then
         echo ""
