@@ -78,6 +78,7 @@ if [ "${DOCKER_ROLE:-app}" = "app" ]; then
     fi
 
     if [ ! -f storage/app/.docker_bootstrapped ]; then
+        echo "First container boot: running incremental migrations (not migrate:fresh)..."
         php artisan migrate --force --no-interaction
         php artisan storage:link --force --no-interaction || true
         : > storage/app/.docker_bootstrapped

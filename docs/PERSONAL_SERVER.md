@@ -91,9 +91,11 @@ Production-style update (maintenance mode + cache rebuild):
 
 ## What `deploy.sh` does
 
+Data-safe: no volume removal, no `migrate:fresh`. `git reset --hard` only affects tracked files in the git clone (not Docker volumes).
+
 | Step | When |
 |------|------|
-| `git fetch` + `git reset --hard origin/master` | Unless `SKIP_GIT=1` |
+| `git fetch` + `git reset --hard origin/master` | Unless `SKIP_GIT=1` (discards uncommitted changes in the clone) |
 | `composer install` | Only if `composer.lock` hash changed |
 | `npm ci` + `npm run build` | Only if `package-lock.json` hash changed |
 | `php artisan migrate` | **dev** mode (default) |
@@ -129,8 +131,8 @@ docker compose logs -f worker
 rm -f storage/framework/.deploy-composer-hash storage/framework/.deploy-npm-hash
 ./scripts/deploy.sh
 
-# Nuclear reset (destroys DB volumes)
-docker compose down -v
+# Nuclear reset (destroys all Docker volumes — database, uploads, etc.)
+./scripts/compose.sh down -v --force
 ./scripts/install.sh --dev
 ```
 

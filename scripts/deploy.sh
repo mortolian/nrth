@@ -2,6 +2,11 @@
 #
 # Pull latest code and apply updates inside the Docker Compose stack.
 #
+# Data safety: this script does NOT remove Docker volumes, run migrate:fresh, or
+# rotate database/MinIO passwords. Migrations are applied incrementally. The only
+# destructive git step is `git reset --hard`, which affects tracked files in this
+# clone only (not Postgres, Redis, MinIO, or storage volumes).
+#
 # Usage:
 #   ./scripts/deploy.sh          # dev/staging (fast: migrate + restart queues)
 #   ./scripts/deploy.sh production   # production (runs php artisan app:update)
@@ -44,7 +49,11 @@ if [[ "${SKIP_GIT:-0}" != "1" ]] && [[ -d .git ]] && [[ "$(id -u)" -ne 0 ]]; the
 fi
 
 if [[ "${SKIP_GIT:-0}" != "1" ]]; then
-    echo "==> Pulling latest from origin/${GIT_BRANCH}"
+    if [[ -d .git ]] && { ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; }; then
+        echo "warning: uncommitted changes in ${ROOT_DIR} will be discarded by git reset --hard"
+        echo "         (Docker volumes and database data are not affected)"
+    fi
+    echo "==> Pulling latest from origin/${GIT_BRANCH} (git reset --hard — code tree only)"
     git fetch origin "${GIT_BRANCH}"
     git reset --hard "origin/${GIT_BRANCH}"
 fi
@@ -97,3 +106,4 @@ echo ""
 echo "Deploy finished ($(date -u +"%Y-%m-%d %H:%M:%S UTC"))."
 echo "  Mode: ${MODE}"
 echo "  Commit: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+echo "  Data: volumes and database preserved; pending migrations applied only"

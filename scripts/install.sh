@@ -426,6 +426,54 @@ stack_running() {
     $COMPOSE ps --status running app 2>/dev/null | grep -q app
 }
 
+data_volumes_exist() {
+    compose_data_volume_exists mysql_data \
+        || compose_data_volume_exists minio_data \
+        || compose_data_volume_exists storage_data
+}
+
+is_configured_install() {
+    [[ -f "$ROOT_DIR/.env" ]] \
+        && grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null \
+        && data_volumes_exist
+}
+
+log_existing_install_safety() {
+    echo ""
+    log "Existing installation detected"
+    echo "  Preserved: Docker volumes (database, redis, minio, storage, vendor, node_modules)"
+    echo "  Preserved: DB and MinIO credentials in .env (when volumes are already initialized)"
+    echo "  Will run:  code update, incremental migrations, queue/cache refresh"
+    echo "  Will NOT:   compose down -v, migrate:fresh, password rotation, or app:install"
+    echo ""
+}
+
+handle_existing_install() {
+    is_configured_install || return 1
+
+    if ! stack_running; then
+        log "Existing data volumes found — starting stack (volumes preserved, no down -v)"
+        $COMPOSE up -d --build
+        wait_for_app_health
+    fi
+
+    if ! users_exist; then
+        log "Existing volumes found but no admin user yet — continuing first-time setup"
+        log "Database and file storage will not be wiped; secrets in .env are preserved"
+        return 1
+    fi
+
+    log_existing_install_safety
+    local deploy_mode="dev"
+    [[ "$MODE" == "production" ]] && deploy_mode="production"
+    "$ROOT_DIR/scripts/deploy.sh" "$deploy_mode"
+    if [[ "$AUTO_DEPLOY" -eq 1 ]]; then
+        setup_auto_deploy
+    fi
+    ensure_install_dir_ownership "$ROOT_DIR"
+    exit 0
+}
+
 ensure_app_key() {
     if grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null; then
         return 0
@@ -564,7 +612,8 @@ print_success() {
         echo "  1. Sign in at the URL above with your admin credentials"
         echo "  2. Complete the in-app setup wizard (company details and preferences)"
     fi
-    echo "  3. Apply updates with ${ROOT_DIR}/scripts/deploy.sh"
+    echo "  3. After upgrades: ./scripts/deploy.sh production"
+    echo "     (or ./scripts/compose.sh exec app php artisan app:update)"
     if [[ "$MODE" == "production" ]]; then
         echo "  4. Production checklist: ${ROOT_DIR}/docs/SELF_HOST.md"
     fi
@@ -611,23 +660,16 @@ main() {
 
     configure_compose
 
-    # Re-run on an existing install: pull and apply updates.
-    if [[ -f .env ]] && stack_running && users_exist; then
-        log "Existing installation detected — running deploy.sh"
-        local deploy_mode="dev"
-        [[ "$MODE" == "production" ]] && deploy_mode="production"
-        "$ROOT_DIR/scripts/deploy.sh" "$deploy_mode"
-        if [[ "$AUTO_DEPLOY" -eq 1 ]]; then
-            setup_auto_deploy
-        fi
-        ensure_install_dir_ownership "$ROOT_DIR"
-        exit 0
+    handle_existing_install
+
+    if [[ -f .env ]] && data_volumes_exist; then
+        log "Existing Docker volumes detected — DB/MinIO passwords will be preserved"
     fi
 
     configure_env
     ensure_app_key
 
-    log "Building and starting containers (first run may take several minutes)"
+    log "Building and starting containers (first run may take several minutes; existing volumes are preserved)"
     $COMPOSE up -d --build
 
     wait_for_app_health

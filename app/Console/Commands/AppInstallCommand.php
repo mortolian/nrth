@@ -30,7 +30,8 @@ class AppInstallCommand extends Command
 
         if (User::query()->exists()) {
             $this->components->error('At least one user already exists. This installer is meant for an empty database.');
-            $this->line('Run <fg=cyan>php artisan migrate:fresh</> on a non-production database, or create users via the application.');
+            $this->line('Create additional users in the application, or run <fg=cyan>./scripts/deploy.sh production</> to upgrade.');
+            $this->line('<fg=yellow>Warning:</> <fg=cyan>migrate:fresh</> and <fg=cyan>db:wipe</> are destructive and will delete all data.');
 
             return self::FAILURE;
         }
@@ -144,7 +145,7 @@ class AppInstallCommand extends Command
         $this->line('  <fg=yellow;options=bold>Next steps</>');
         $this->line('  <fg=gray>1.</> Sign in at the URL above with your email and password');
         $this->line('  <fg=gray>2.</> Complete the in-app setup wizard (company details and preferences)');
-        $this->line('  <fg=gray>3.</> Run <fg=cyan>php artisan app:update</> after future upgrades');
+        $this->line('  <fg=gray>3.</> After upgrades, run <fg=cyan>./scripts/deploy.sh production</> (or <fg=cyan>./scripts/compose.sh exec app php artisan app:update</>)');
         $this->newLine();
         $this->components->info($appName.' is ready.');
         $this->newLine();

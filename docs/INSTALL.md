@@ -39,7 +39,7 @@ From an existing clone:
 ./scripts/install.sh --production --install-dir /opt/nrth
 ```
 
-Re-running `install.sh` on an already-installed instance runs `scripts/deploy.sh` instead of a full bootstrap.
+Re-running `install.sh` on an already-installed instance runs `scripts/deploy.sh` instead of a full bootstrap. Existing Docker volumes and database data are preserved.
 
 ### Auto-deploy token
 
@@ -102,14 +102,38 @@ Updates:
 
 | Command | When |
 |---------|------|
-| `php artisan app:install` | First install on an empty database |
-| `php artisan app:update` | Production upgrades |
+| `./scripts/compose.sh exec -it app php artisan app:install` | First install on an empty database |
+| `./scripts/deploy.sh production` | Production upgrades (recommended) |
+| `./scripts/compose.sh exec app php artisan app:update` | Manual production upgrade |
 
-Inside Docker (use `./scripts/compose.sh` — auto-sudo when docker.sock is not accessible yet):
+Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when docker.sock is not accessible yet.
 
-```bash
-./scripts/compose.sh exec app php artisan app:update
-```
+---
+
+## Data safety
+
+**Safe by default (data preserved):**
+
+| Action | What happens |
+|--------|----------------|
+| `./scripts/install.sh` (re-run on existing install) | Detects volumes and admin user; runs `deploy.sh` only |
+| `./scripts/deploy.sh` / `deploy.sh production` | Pulls code, runs **incremental** `migrate`, rebuilds caches; **no** volume removal |
+| `./scripts/compose.sh down` | Stops containers; **keeps** Postgres, Redis, MinIO, and storage volumes |
+| `php artisan app:update` / `migrate` | Applies new migrations only; does not drop tables |
+
+**Destructive (will delete data — use only when you mean to reset):**
+
+| Action | What is lost |
+|--------|----------------|
+| `./scripts/compose.sh down -v` | All Docker volumes: database, uploads, Redis, MinIO objects |
+| `./scripts/compose.sh down -v --force` | Same as above; `--force` is required to bypass the safety guard |
+| `php artisan migrate:fresh` | All database tables and rows |
+| `php artisan db:wipe` | Database contents |
+| Re-generating `DB_PASSWORD` / `MINIO_ROOT_PASSWORD` in `.env` **after** volumes exist | App cannot connect until passwords are synced (data still on disk) |
+
+`./scripts/compose.sh` blocks `down -v` unless you pass `--force` or set `NRTH_FORCE=1`.
+
+On re-run, `install.sh` preserves `DB_PASSWORD` and MinIO credentials when data volumes already exist (Postgres/MinIO only read those env vars on first volume init).
 
 ---
 
@@ -117,7 +141,7 @@ Inside Docker (use `./scripts/compose.sh` — auto-sudo when docker.sock is not 
 
 | Problem | Fix |
 |---------|-----|
-| `password authentication failed for user "dbuser"` | Re-running install rotated `DB_PASSWORD` in `.env` while Postgres kept the old password in its volume. **Keep data:** sync Postgres to `.env` (see below). **Fresh start:** `./scripts/compose.sh down -v` then re-run `./scripts/install.sh`. |
+| `password authentication failed for user "dbuser"` | Re-running install rotated `DB_PASSWORD` in `.env` while Postgres kept the old password in its volume. **Keep data:** sync Postgres to `.env` (see below). **Fresh start (destructive):** `./scripts/compose.sh down -v --force` then re-run `./scripts/install.sh`. |
 | `permission denied` on `/var/run/docker.sock` | `./scripts/compose.sh …` (auto-sudo), or `newgrp docker`, or log out/in after install |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Missing tables | `./scripts/compose.sh exec app php artisan migrate` |

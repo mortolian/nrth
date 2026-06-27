@@ -66,11 +66,29 @@ cd /opt/nrth
 ./scripts/deploy.sh production
 ```
 
+This is **data-safe**: it does not remove Docker volumes or run `migrate:fresh`. Only pending migrations are applied.
+
 Or re-run install (detects existing install and delegates to `deploy.sh`):
 
 ```bash
 ./scripts/install.sh --production
 ```
+
+---
+
+## Data safety
+
+Normal upgrades and re-runs of `install.sh` / `deploy.sh` preserve your database, uploaded files (MinIO/storage volumes), and Redis data.
+
+**Do not run these unless you intend to wipe data:**
+
+- `./scripts/compose.sh down -v` — blocked unless you add `--force` (deletes all Compose volumes)
+- `php artisan migrate:fresh` or `db:wipe` — empties the database
+- Manually changing `DB_PASSWORD` or `MINIO_ROOT_PASSWORD` in `.env` after first boot — breaks auth until you sync credentials (see [INSTALL.md](INSTALL.md#troubleshooting))
+
+Safe shutdown: `./scripts/compose.sh down` (containers stop; volumes remain).
+
+Full reference: [INSTALL.md — Data safety](INSTALL.md#data-safety).
 
 ---
 
@@ -85,11 +103,11 @@ Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when y
 # Run artisan
 ./scripts/compose.sh exec app php artisan migrate:status
 
-# Stop everything
+# Stop everything (containers only — data preserved)
 ./scripts/compose.sh down
 
-# Stop and remove data volumes (destructive)
-./scripts/compose.sh down -v
+# Stop and remove data volumes (destructive — requires --force)
+./scripts/compose.sh down -v --force
 ```
 
 ---
