@@ -35,68 +35,33 @@ This is ideal for an active development server. When you later want a stricter p
 
 ## One-time server setup
 
-### 1. Prerequisites
-
-- Linux host (Ubuntu 22.04+ is fine) with Docker Engine + Compose plugin
-- Git
-- Clone location, e.g. `/opt/nrth`:
+On Ubuntu 22.04/24.04, one command installs Docker, clones to `/opt/nrth`, configures `.env`, starts the stack, runs `app:install`, and sets up auto-deploy:
 
 ```bash
-sudo mkdir -p /opt/nrth
-sudo chown "$USER:$USER" /opt/nrth
-git clone git@github.com:mortolian/nrth.git /opt/nrth
-cd /opt/nrth
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --dev --auto-deploy --install-dir /opt/nrth
 ```
 
-### 2. Environment
+Or from a clone:
 
 ```bash
-cp .env.example .env
+./scripts/install.sh --dev --auto-deploy --install-dir /opt/nrth
 ```
 
-Suggested values for a **private dev/staging** server:
-
-```env
-APP_ENV=local          # or staging
-APP_DEBUG=true         # okay on a trusted LAN / VPN
-APP_URL=http://192.168.1.50:8000   # or https://nrth.home.example
-
-DB_PASSWORD=choose-a-password
-MINIO_ROOT_PASSWORD=choose-a-password
-```
-
-Generate `APP_KEY`:
+When prompted for auto-deploy, paste a runner registration token from GitHub (**Settings → Actions → Runners → New self-hosted runner**), or provide it up front:
 
 ```bash
-docker compose run --rm app php artisan key:generate
+GITHUB_RUNNER_TOKEN=<token> ./scripts/install.sh --auto-deploy --install-dir /opt/nrth
 ```
 
-### 3. Start the stack
-
-```bash
-docker compose up -d --build
-docker compose exec app php artisan app:install
-```
+The installer configures a runner with label **`nrth-server`**.
 
 Bookmark: `http://<server-ip>:8000`
 
-### 4. Install a GitHub Actions self-hosted runner
+### Enable the workflow
 
-This is the **recommended** auto-deploy method: no inbound webhook port, works on a private LAN as long as the runner can reach GitHub.
+The workflow file `.github/workflows/deploy-personal-server.yml` runs on that runner when you push to `master`. It calls `/opt/nrth/scripts/deploy.sh` — adjust the path in the workflow if you used a different `--install-dir`.
 
-On the server ([official docs](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)):
-
-1. GitHub repo → **Settings → Actions → Runners → New self-hosted runner**
-2. Follow the Linux install commands (download, configure, install service)
-3. Give the runner a label, e.g. `nrth-server`
-
-The workflow file `.github/workflows/deploy-personal-server.yml` (in this repo) runs on that runner when you push to `master`.
-
-**Important:** the workflow calls `/opt/nrth/scripts/deploy.sh` — adjust the path in the workflow if you cloned elsewhere.
-
-### 5. Enable the workflow
-
-The workflow is limited to `runs-on: self-hosted` with your label. After the runner is online, every push to `master` triggers:
+After the runner is online, every push to `master` triggers:
 
 1. `git pull` on the server (via `deploy.sh`)
 2. Conditional `composer install` / `npm build`
@@ -135,19 +100,7 @@ Production-style update (maintenance mode + cache rebuild):
 | `php artisan app:update` | **production** mode |
 | `queue:restart` + restart `worker` | **dev** mode |
 
-Octane’s file watcher reloads PHP workers for code edits; you usually **do not** need `docker compose build` on every push.
-
----
-
-## Alternative: GitHub webhook (if you prefer)
-
-If the server is reachable from the internet and you do not want a self-hosted runner:
-
-1. Run a tiny webhook listener (e.g. [webhook](https://github.com/adnanh/webhook)) on the server
-2. Configure GitHub **Settings → Webhooks** on push to `master`
-3. On valid payload, run `/opt/nrth/scripts/deploy.sh`
-
-Use a shared secret and HTTPS. The self-hosted runner is simpler for home networks.
+Octane's file watcher reloads PHP workers for code edits; you usually **do not** need `docker compose build` on every push.
 
 ---
 
@@ -178,8 +131,7 @@ rm -f storage/framework/.deploy-composer-hash storage/framework/.deploy-npm-hash
 
 # Nuclear reset (destroys DB volumes)
 docker compose down -v
-docker compose up -d --build
-docker compose exec app php artisan app:install
+./scripts/install.sh --dev
 ```
 
 ---

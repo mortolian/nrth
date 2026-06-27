@@ -32,7 +32,7 @@ npm run dev
 php artisan serve
 ```
 
-Or use Docker: [INSTALL.md](INSTALL.md) and [docs/SELF_HOST.md](docs/SELF_HOST.md).
+Or use the unified installer from a clone: `./scripts/install.sh --dev`
 
 ## Pull request process
 
@@ -72,8 +72,8 @@ Or use Docker: [INSTALL.md](INSTALL.md) and [docs/SELF_HOST.md](docs/SELF_HOST.m
 
 ## Documentation
 
-- Update README, `docs/`, or `INSTALL.md` when you change setup, hosting, or user-visible behavior.
-- Link new docs from [INSTALL.md](INSTALL.md) or README if they are entry points.
+- Update README, `docs/`, or [docs/INSTALL.md](docs/INSTALL.md) when you change setup, hosting, or user-visible behavior.
+- Link new docs from [docs/INSTALL.md](docs/INSTALL.md) or README if they are entry points.
 
 ## Community
 

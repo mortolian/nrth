@@ -1,7 +1,7 @@
 # Deploys to a self-hosted runner on your Docker server when master changes.
 #
-# Setup: install a GitHub Actions self-hosted runner on the server and label it
-# `nrth-server`. See docs/PERSONAL_SERVER.md.
+# Setup: curl install.sh --auto-deploy (or install.sh --auto-deploy from a clone).
+# Registers a self-hosted runner labeled `nrth-server`. See docs/PERSONAL_SERVER.md.
 #
 # If the repo is cloned somewhere other than /opt/nrth, change the script path below.
 

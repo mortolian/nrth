@@ -34,20 +34,18 @@
 The fastest way to try nrth with the full stack:
 
 ```bash
-git clone https://github.com/mortolian/nrth.git
-cd nrth
-cp .env.example .env
-chmod +x scripts/self-host-install.sh
-./scripts/self-host-install.sh
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash
 ```
+
+Or from a clone: `./scripts/install.sh`
 
 Open **http://localhost:8000** and complete the installer (`app:install`).
 
-Full production checklist and HTTPS: **[docs/SELF_HOST.md](docs/SELF_HOST.md)** · **[INSTALL.md](INSTALL.md)**
+Production checklist and HTTPS: **[docs/SELF_HOST.md](docs/SELF_HOST.md)** · Flags and options: **[docs/INSTALL.md](docs/INSTALL.md)**
 
 ## Development setup
 
-For hacking on the codebase (PHP + Node on the host):
+For hacking on the codebase after cloning from git (not an end-user install path):
 
 ```bash
 cp .env.example .env
@@ -62,7 +60,7 @@ Details, Docker dev workflow, architecture, and tests: **[docs/DEVELOPMENT.md](d
 
 | Guide | Description |
 |-------|-------------|
-| [INSTALL.md](INSTALL.md) | Installation hub |
+| [docs/INSTALL.md](docs/INSTALL.md) | Installation hub |
 | [docs/SELF_HOST.md](docs/SELF_HOST.md) | Self-host with Docker |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer auto-deploy server |

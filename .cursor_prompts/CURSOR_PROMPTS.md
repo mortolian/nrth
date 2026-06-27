@@ -476,36 +476,6 @@ Create:
 
 ---
 
-## PHASE 7 — Self-Hosted Packaging
-
-### 7.1 — Release Build Script
-```
-Create a build and release script for self-hosted distribution.
-
-Create: scripts/build-release.sh
-
-The script should:
-1. Run tests (php artisan test) — abort if any fail
-2. Build frontend assets (npm run build)
-3. Run composer install --no-dev --optimize-autoloader
-4. Generate optimized autoloader
-5. Create a versioned release archive (.tar.gz) excluding:
-   node_modules, .git, tests, .env, storage/app/*, storage/logs/*
-6. Generate a SHA256 checksum file for the archive
-7. Output the release filename and checksum
-
-Also create: INSTALL.md
-Self-hosted installation guide covering:
-- Docker Compose installation (recommended)
-- Manual installation (PHP 8.3, MySQL 8, Redis)
-- Running php artisan app:install
-- Configuring backups
-- Updating to new versions with php artisan app:update
-- Troubleshooting common issues
-```
-
----
-
 ## ONGOING — Feature Development Prompt Template
 
 Use this template for any new feature you build:

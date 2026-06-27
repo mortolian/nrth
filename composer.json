@@ -51,6 +51,7 @@
     },
     "scripts": {
         "setup": [
+            "@php -r \"fwrite(STDERR, 'composer setup is for local contributor dev only; server install: scripts/install.sh (docs/INSTALL.md)'.PHP_EOL);\"",
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",

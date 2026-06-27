@@ -1,6 +1,6 @@
 # Development guide
 
-This document is for contributors and local development. For self-hosting, see [SELF_HOST.md](SELF_HOST.md).
+This document is for **contributors** who have cloned the repository from git. It is not an end-user installation path — to run nrth on a server, use **[INSTALL.md](INSTALL.md)** (`scripts/install.sh`).
 
 ## Requirements
 
@@ -10,6 +10,8 @@ This document is for contributors and local development. For self-hosting, see [
 - PostgreSQL, Redis, and S3-compatible storage for full parity — or use Docker Compose
 
 ## Local setup (PHP on the host)
+
+For contributors hacking on the codebase without Docker:
 
 ```bash
 cp .env.example .env
@@ -46,9 +48,17 @@ Vite is stubbed in `tests/TestCase.php` — a production asset build is not requ
 ./vendor/bin/pint
 ```
 
-## Docker Compose (recommended for full stack)
+## Docker Compose (full stack while developing)
 
-The same `compose.yaml` used for self-hosting works for development: Postgres, Redis, MinIO, Octane, Horizon, Mailpit.
+If you need Postgres, Redis, MinIO, and queues while working on a clone, you can use the same `compose.yaml` as production — but **new installs should use `scripts/install.sh`**, not manual `docker compose` steps.
+
+After cloning:
+
+```bash
+./scripts/install.sh --dev
+```
+
+Or, if you prefer manual container control on an existing clone:
 
 ```bash
 cp .env.example .env
