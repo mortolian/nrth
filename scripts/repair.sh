@@ -182,6 +182,9 @@ configure_http_access() {
     set_env_var APP_ALLOW_HTTP true "$env_file"
     set_env_var APP_FORCE_HTTPS false "$env_file"
     set_env_var TRUSTED_PROXIES "*" "$env_file"
+    # Unset so config/session.php derives secure=false from APP_ALLOW_HTTP.
+    sed -i '/^SESSION_SECURE_COOKIE=/d' "$env_file" 2>/dev/null || true
+    sed -i '/^SESSION_DOMAIN=/d' "$env_file" 2>/dev/null || true
     sed -i '/^COMPOSE_PROFILES=/d' "$env_file" 2>/dev/null || true
     sed -i '/^CADDY_SITE=/d' "$env_file" 2>/dev/null || true
     sed -i '/^CADDY_TLS=/d' "$env_file" 2>/dev/null || true

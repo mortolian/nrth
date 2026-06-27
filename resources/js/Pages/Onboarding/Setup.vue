@@ -121,11 +121,23 @@ function loadLocal(): { step?: number; wizard?: Partial<Wizard> } | null {
 }
 
 let progressTimer: ReturnType<typeof setTimeout> | null = null;
-function queueProgressSave(): void {
+
+function cancelProgressSave(): void {
     if (progressTimer) {
         clearTimeout(progressTimer);
+        progressTimer = null;
     }
+}
+
+function queueProgressSave(): void {
+    if (step.value >= 5 || finishing.value) {
+        return;
+    }
+    cancelProgressSave();
     progressTimer = setTimeout(() => {
+        if (step.value >= 5 || finishing.value) {
+            return;
+        }
         router.post(
             route('onboarding.progress'),
             { step: step.value, wizard: wizard.value },
@@ -133,6 +145,54 @@ function queueProgressSave(): void {
         );
     }, 500);
 }
+
+function normalizeWizard(raw: Partial<Wizard>, initial: InitialPayload): Wizard {
+    const merged = { ...defaultWizard(initial), ...raw };
+    merged.invoiceUseRandomSuffix =
+        merged.invoiceUseRandomSuffix === true || String(merged.invoiceUseRandomSuffix) === 'true';
+    merged.invoiceStartNumber = Math.max(1, Number(merged.invoiceStartNumber) || 1);
+    merged.invoicePrefix = (merged.invoicePrefix || 'INV').trim() || 'INV';
+    merged.paymentTermsDays = Math.min(365, Math.max(0, Number(merged.paymentTermsDays) || 30));
+
+    return merged;
+}
+
+const errorStepMap: Record<string, number> = {
+    company_name: 2,
+    companyName: 2,
+    vat_registered: 2,
+    vat_number: 2,
+    vatNumber: 2,
+    financial_year_end_month: 2,
+    industry: 2,
+    has_existing_books: 3,
+    opening_bank: 3,
+    opening_ar: 3,
+    opening_ap: 3,
+    bank_name: 4,
+    bank_account_holder: 4,
+    bank_account_number: 4,
+    bank_branch_code: 4,
+    bank_account_type: 4,
+    logo: 4,
+    invoice_default_payment_terms_days: 4,
+    invoice_prefix: 4,
+    invoice_next_sequence: 4,
+    invoice_number_use_random_suffix: 4,
+};
+
+function stepForErrors(errors: Record<string, string>): number | null {
+    for (const key of Object.keys(errors)) {
+        const mapped = errorStepMap[key];
+        if (mapped) {
+            return mapped;
+        }
+    }
+
+    return null;
+}
+
+const finishErrorMessages = computed(() => Object.values(fieldErrors.value).filter(Boolean));
 
 function fireConfetti(): void {
     void import('canvas-confetti').then((mod) => {
@@ -144,13 +204,10 @@ function fireConfetti(): void {
 onMounted(() => {
     const local = loadLocal();
     if (local?.wizard) {
-        wizard.value = { ...defaultWizard(props.initial), ...local.wizard };
+        wizard.value = normalizeWizard(local.wizard, props.initial);
         step.value = Math.min(5, Math.max(1, local.step ?? 1));
     } else if (props.session_wizard && typeof props.session_wizard === 'object') {
-        wizard.value = {
-            ...defaultWizard(props.initial),
-            ...(props.session_wizard as Partial<Wizard>),
-        };
+        wizard.value = normalizeWizard(props.session_wizard as Partial<Wizard>, props.initial);
         step.value = Math.min(5, Math.max(1, props.session_step ?? 1));
     }
     persistLocal();
@@ -212,42 +269,83 @@ function onLogoChange(ev: Event): void {
     logoFile.value = f ?? null;
 }
 
-function buildFormData(): FormData {
-    const fd = new FormData();
-    fd.append('company_name', wizard.value.companyName.trim());
-    fd.append('vat_registered', wizard.value.vatRegistered ? '1' : '0');
-    fd.append('vat_number', wizard.value.vatRegistered ? wizard.value.vatNumber.trim() : '');
-    fd.append('financial_year_end_month', String(wizard.value.financialYearEndMonth));
-    fd.append('industry', wizard.value.industry);
-    fd.append('has_existing_books', wizard.value.hasExistingBooks ? '1' : '0');
-    fd.append('opening_bank', wizard.value.openingBank || '');
-    fd.append('opening_ar', wizard.value.openingAr || '');
-    fd.append('opening_ap', wizard.value.openingAp || '');
-    fd.append('invoice_default_payment_terms_days', String(wizard.value.paymentTermsDays));
-    fd.append('invoice_prefix', wizard.value.invoicePrefix.trim());
-    fd.append('invoice_next_sequence', String(wizard.value.invoiceStartNumber));
-    fd.append('invoice_number_use_random_suffix', wizard.value.invoiceUseRandomSuffix ? '1' : '0');
-    fd.append('bank_name', wizard.value.bankName.trim());
-    fd.append('bank_account_holder', wizard.value.bankAccountHolder.trim());
-    fd.append('bank_account_number', wizard.value.bankAccountNumber.trim());
-    fd.append('bank_branch_code', wizard.value.bankBranchCode.trim());
-    fd.append('bank_account_type', wizard.value.bankAccountType);
+function buildPayload(): Record<string, string | number | File> {
+    const prefix = (wizard.value.invoicePrefix || 'INV').trim() || 'INV';
+    const sequence = Math.max(1, Number(wizard.value.invoiceStartNumber) || 1);
+
+    const payload: Record<string, string | number | File> = {
+        company_name: wizard.value.companyName.trim(),
+        vat_registered: wizard.value.vatRegistered ? 1 : 0,
+        vat_number: wizard.value.vatRegistered ? wizard.value.vatNumber.trim() : '',
+        financial_year_end_month: wizard.value.financialYearEndMonth,
+        industry: wizard.value.industry,
+        has_existing_books: wizard.value.hasExistingBooks ? 1 : 0,
+        opening_bank: wizard.value.openingBank || '',
+        opening_ar: wizard.value.openingAr || '',
+        opening_ap: wizard.value.openingAp || '',
+        invoice_default_payment_terms_days: wizard.value.paymentTermsDays,
+        invoice_prefix: prefix,
+        invoice_next_sequence: sequence,
+        invoice_number_use_random_suffix: wizard.value.invoiceUseRandomSuffix ? 1 : 0,
+        bank_name: wizard.value.bankName.trim(),
+        bank_account_holder: wizard.value.bankAccountHolder.trim(),
+        bank_account_number: wizard.value.bankAccountNumber.trim(),
+        bank_branch_code: wizard.value.bankBranchCode.trim(),
+        bank_account_type: wizard.value.bankAccountType,
+    };
+
     if (logoFile.value) {
-        fd.append('logo', logoFile.value);
+        payload.logo = logoFile.value;
     }
-    return fd;
+
+    return payload;
+}
+
+function validateBeforeFinish(): boolean {
+    fieldErrors.value = {};
+
+    if (!wizard.value.companyName.trim()) {
+        fieldErrors.value.company_name = 'Company name is required.';
+        step.value = 2;
+        return false;
+    }
+
+    if (wizard.value.vatRegistered && !/^4\d{9}$/.test(wizard.value.vatNumber.trim())) {
+        fieldErrors.value.vat_number = 'Enter a valid 10-digit SA VAT number.';
+        step.value = 2;
+        return false;
+    }
+
+    if (!(wizard.value.invoicePrefix || 'INV').trim()) {
+        fieldErrors.value.invoice_prefix = 'Invoice prefix is required.';
+        step.value = 4;
+        return false;
+    }
+
+    return true;
 }
 
 function finish(): void {
+    if (!validateBeforeFinish()) {
+        return;
+    }
+
+    cancelProgressSave();
     finishing.value = true;
     fieldErrors.value = {};
-    router.post(route('onboarding.complete'), buildFormData(), {
+
+    router.post(route('onboarding.complete'), buildPayload(), {
         preserveScroll: true,
+        forceFormData: Boolean(logoFile.value),
         onFinish: () => {
             finishing.value = false;
         },
-        onError: (e) => {
-            fieldErrors.value = e as Record<string, string>;
+        onError: (errors) => {
+            fieldErrors.value = errors;
+            const targetStep = stepForErrors(errors);
+            if (targetStep !== null) {
+                step.value = targetStep;
+            }
         },
         onSuccess: () => {
             try {
@@ -698,6 +796,16 @@ const liveInvoicePreview = computed(() => {
                             }}, {{ wizard.paymentTermsDays }}-day terms
                         </li>
                     </ul>
+
+                    <div
+                        v-if="finishErrorMessages.length"
+                        class="rounded-lg border border-red-900/50 bg-red-950/40 p-4"
+                    >
+                        <p class="text-sm font-medium text-red-300">Could not finish setup:</p>
+                        <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-red-400">
+                            <li v-for="(msg, idx) in finishErrorMessages" :key="idx">{{ msg }}</li>
+                        </ul>
+                    </div>
 
                     <div class="flex justify-between gap-3">
                         <button

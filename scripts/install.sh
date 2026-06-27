@@ -536,6 +536,8 @@ configure_env() {
     if [[ "$ALLOW_HTTP" -eq 1 ]]; then
         set_env_var APP_ALLOW_HTTP true "$env_file"
         set_env_var APP_FORCE_HTTPS false "$env_file"
+        sed -i '/^SESSION_SECURE_COOKIE=/d' "$env_file" 2>/dev/null || true
+        sed -i '/^SESSION_DOMAIN=/d' "$env_file" 2>/dev/null || true
     else
         set_env_var APP_FORCE_HTTPS true "$env_file"
         set_env_var APP_ALLOW_HTTP false "$env_file"

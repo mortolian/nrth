@@ -156,7 +156,11 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    'domain' => ($domain = env('SESSION_DOMAIN')) !== null
+        && $domain !== ''
+        && strtolower((string) $domain) !== 'null'
+        ? $domain
+        : null,
 
     /*
     |--------------------------------------------------------------------------
@@ -167,9 +171,14 @@ return [
     | to the server if the browser has a HTTPS connection. This will keep
     | the cookie from being sent to you when it can't be done securely.
     |
+    | When unset, defaults to the inverse of APP_ALLOW_HTTP so LAN HTTP installs
+    | (install.sh --lan / repair.sh --mode http) receive non-secure cookies.
+    |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE', ! filter_var(env('APP_ALLOW_HTTP', false), FILTER_VALIDATE_BOOLEAN)),
+    'secure' => ($secure = env('SESSION_SECURE_COOKIE')) === null || $secure === ''
+        ? ! filter_var(env('APP_ALLOW_HTTP', false), FILTER_VALIDATE_BOOLEAN)
+        : filter_var($secure, FILTER_VALIDATE_BOOLEAN),
 
     /*
     |--------------------------------------------------------------------------

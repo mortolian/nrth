@@ -158,7 +158,7 @@ class OnboardingController extends Controller
             'invoice_default_payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'invoice_prefix' => ['required', 'string', 'max:32'],
             'invoice_next_sequence' => ['required', 'integer', 'min:1', 'max:999999'],
-            'invoice_number_use_random_suffix' => ['required', 'boolean'],
+            'invoice_number_use_random_suffix' => ['sometimes', 'boolean'],
             'bank_name' => ['nullable', 'string', 'max:255'],
             'bank_account_holder' => ['nullable', 'string', 'max:255'],
             'bank_account_number' => ['nullable', 'string', 'max:64'],
@@ -170,6 +170,8 @@ class OnboardingController extends Controller
         if (! $validated['vat_registered']) {
             $validated['vat_number'] = null;
         }
+
+        $validated['invoice_number_use_random_suffix'] = $request->boolean('invoice_number_use_random_suffix');
 
         $this->ensureChartForTeam($team);
 
