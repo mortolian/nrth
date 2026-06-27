@@ -295,8 +295,13 @@ ensure_app_key() {
 }
 
 run_first_install() {
+    if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
+        log "Skipping interactive app:install (non-interactive). Run manually:"
+        echo "  cd ${ROOT_DIR} && docker compose exec -it app php artisan app:install"
+        return 0
+    fi
     log "Running interactive installer (admin user + default chart of accounts)"
-    $COMPOSE exec app php artisan app:install
+    $COMPOSE exec -it app php artisan app:install
 }
 
 print_auto_deploy_manual_steps() {
@@ -400,6 +405,9 @@ print_success() {
     echo ""
     echo "Installation complete."
     echo "  Open: http://localhost:${app_port}"
+    if [[ "$NON_INTERACTIVE" -eq 1 ]] && ! users_exist; then
+        echo "  Finish setup: cd ${ROOT_DIR} && docker compose exec -it app php artisan app:install"
+    fi
     echo "  Updates: ${ROOT_DIR}/scripts/deploy.sh"
     if [[ "$MODE" == "production" ]]; then
         echo "  Production checklist: docs/SELF_HOST.md"
@@ -412,6 +420,12 @@ main() {
     local piped=0
     if ! detect_root_from_script >/dev/null 2>&1; then
         piped=1
+    fi
+
+    # curl | bash leaves stdin as the script stream; read would consume script lines.
+    if [[ "$NON_INTERACTIVE" -eq 0 ]] && { [[ "$piped" -eq 1 ]] || ! [[ -t 0 ]]; }; then
+        NON_INTERACTIVE=1
+        log "Non-interactive mode (piped install or no TTY on stdin)"
     fi
 
     if [[ "$piped" -eq 1 ]] || ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
