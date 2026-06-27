@@ -22,7 +22,7 @@ All flags and options: **[INSTALL.md](INSTALL.md)**.
 
 | Service | Purpose |
 |---------|---------|
-| **app** | Laravel Octane (HTTP on port **8000**) |
+| **app** | Laravel Octane (HTTP on port **8000** internally — TLS terminates in front) |
 | **worker** | Horizon (queues) |
 | **scheduler** | `schedule:work` |
 | **postgres** | Database |
@@ -30,7 +30,20 @@ All flags and options: **[INSTALL.md](INSTALL.md)**.
 | **minio** | S3-compatible storage (receipts, uploads) |
 | **mailpit** | Catches outbound mail in dev (replace with real SMTP for production) |
 
-Open **https://localhost:8000** (or the host port set in `APP_PORT`). Browsers may warn about the certificate until you terminate TLS in front of the app.
+Open **https://localhost:8000** (or the host port set in `APP_PORT`) via a TLS-terminating reverse proxy. **Plain HTTP is blocked** for browser traffic — the app redirects to HTTPS and sets secure session cookies. Docker health checks still use `http://127.0.0.1:8000/up` inside the container.
+
+---
+
+## HTTPS is required
+
+nrth is a financial application. **Do not expose plain HTTP to users.**
+
+- The app listens on **HTTP port 8000 inside Docker** (Octane/Swoole). That is normal — put **Caddy or Nginx** in front to terminate TLS on ports **443** (and redirect **80** → **443**).
+- Set `APP_URL` to your public **https://** URL. The installer defaults to HTTPS and sets `APP_FORCE_HTTPS=true`, `APP_ALLOW_HTTP=false`.
+- `TRUSTED_PROXIES=*` lets the app read `X-Forwarded-Proto` from your reverse proxy so redirects and secure cookies work correctly.
+- Do **not** publish port 8000 to the public internet without TLS in front. Firewall to **80/443** only.
+
+For local development on your laptop, set `APP_ALLOW_HTTP=true` in `.env` (see [DEVELOPMENT.md](DEVELOPMENT.md)). Never enable that on a server others can reach.
 
 ---
 
@@ -39,15 +52,16 @@ Open **https://localhost:8000** (or the host port set in `APP_PORT`). Browsers m
 Before putting the app on the internet:
 
 1. **`APP_DEBUG=false`** and **`APP_ENV=production`** (set by `--production` install)
-2. **HTTPS** in front of port 8000 (Caddy or Nginx reverse proxy — example below)
-3. **Firewall**: expose only 80/443; do not publish Postgres/Redis/MinIO ports publicly
-4. **Real mail**: set `MAIL_*` to your SMTP provider (Mailpit is for testing only)
-5. **Backups**: schedule `php artisan backup:run` (Spatie Backup is included) and back up Postgres + `storage` volumes
-6. **Secrets**: never commit `.env`
+2. **HTTPS** in front of port 8000 — **required**; plain HTTP is redirected/blocked for users (Caddy or Nginx reverse proxy — example below)
+3. **`APP_URL=https://your-domain`** — must use `https://` (installer enforces this in production)
+4. **Firewall**: expose only 80/443; do not publish Postgres/Redis/MinIO ports publicly
+5. **Real mail**: set `MAIL_*` to your SMTP provider (Mailpit is for testing only)
+6. **Backups**: schedule `php artisan backup:run` (Spatie Backup is included) and back up Postgres + `storage` volumes
+7. **Secrets**: never commit `.env`
 
 ### HTTPS with Caddy (simple)
 
-On the same host as Docker, install [Caddy](https://caddyserver.com/) and use a site block:
+On the same host as Docker, install [Caddy](https://caddyserver.com/) and use a site block. Caddy terminates TLS and forwards plain HTTP to the app container on localhost:
 
 ```caddy
 books.example.com {
@@ -55,7 +69,9 @@ books.example.com {
 }
 ```
 
-Caddy obtains and renews Let's Encrypt certificates automatically.
+Caddy obtains and renews Let's Encrypt certificates automatically. Users hit **https://books.example.com**; the app sees `X-Forwarded-Proto: https` and serves secure cookies + HSTS.
+
+**Do not** point users at `http://your-server:8000` — that port is for the reverse proxy only.
 
 ---
 

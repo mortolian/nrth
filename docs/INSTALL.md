@@ -55,7 +55,7 @@ See [PERSONAL_SERVER.md](PERSONAL_SERVER.md) for maintainer workflow details.
 
 ## After install
 
-Open **https://localhost:8000** (or your `APP_URL`). Production hardening (HTTPS, backups, mail): **[SELF_HOST.md](SELF_HOST.md)**.
+Open **https://localhost:8000** (or your `APP_URL`). **HTTPS is required** — the app redirects plain HTTP and sets secure session cookies. Put Caddy or Nginx in front of port 8000 for TLS. Production hardening: **[SELF_HOST.md](SELF_HOST.md)**.
 
 If the installer did not create your admin account (non-interactive install, or `permission denied` on docker.sock), run:
 

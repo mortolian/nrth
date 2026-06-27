@@ -203,6 +203,14 @@ normalize_app_url() {
         url="${default_scheme}://${url}"
     fi
 
+    if [[ "$url" =~ ^http:// ]]; then
+        if [[ "$MODE" == "production" ]]; then
+            die "APP_URL must use https:// — plain HTTP is not permitted for production"
+        fi
+        echo "warning: converting http:// APP_URL to https:// (plain HTTP is not supported)" >&2
+        url="https://${url#http://}"
+    fi
+
     local host="${url#*://}"
     host="${host%%/*}"
     host="${host%%:*}"
@@ -361,6 +369,9 @@ configure_env() {
     app_url="$(normalize_app_url "$app_url")"
 
     set_env_var APP_URL "$app_url" "$env_file"
+    set_env_var APP_FORCE_HTTPS true "$env_file"
+    set_env_var APP_ALLOW_HTTP false "$env_file"
+    set_env_var TRUSTED_PROXIES "*" "$env_file"
     set_env_var DB_CONNECTION pgsql "$env_file"
     set_env_var DB_HOST 127.0.0.1 "$env_file"
     set_env_var DB_PORT 5432 "$env_file"

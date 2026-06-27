@@ -169,7 +169,7 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE', ! filter_var(env('APP_ALLOW_HTTP', false), FILTER_VALIDATE_BOOLEAN)),
 
     /*
     |--------------------------------------------------------------------------

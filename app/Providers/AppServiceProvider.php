@@ -8,6 +8,8 @@ use App\Domain\Banking\Services\BankingStatementImporterRegistry;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\UserProfileController;
 use App\Support\EnsureTeamSpatieRoles;
+use App\Support\Https;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamController;
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
@@ -33,6 +35,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (Https::shouldForce()) {
+            URL::forceScheme('https');
+        }
+
         $this->mergeNodePathForOctaneFileWatcher();
 
         EnsureTeamSpatieRoles::sync();

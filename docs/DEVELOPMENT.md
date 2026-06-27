@@ -28,7 +28,7 @@ In another terminal:
 php artisan serve
 ```
 
-Set `APP_URL=https://localhost:8000` in `.env`. Open that URL (accept the browser certificate warning if you have not configured TLS yet).
+Set `APP_URL=https://localhost:8000` in `.env`. For local development without a reverse proxy, set `APP_ALLOW_HTTP=true` so the app accepts plain HTTP. **Never use `APP_ALLOW_HTTP=true` on a server others can reach** — see [SELF_HOST.md](SELF_HOST.md).
 
 ### SQLite (minimal)
 

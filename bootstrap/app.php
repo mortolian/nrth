@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectIncompleteOnboarding;
 use App\Http\Middleware\SyncSpatieTeamRole;
@@ -16,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
+
+        $middleware->append(ForceHttps::class);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
