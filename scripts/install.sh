@@ -159,6 +159,36 @@ set_env_var() {
     fi
 }
 
+# Laravel requires a scheme; users often enter "books.example.com" without http(s)://.
+normalize_app_url() {
+    local url="$1"
+    local default_scheme="${2:-http}"
+
+    url="${url#"${url%%[![:space:]]*}"}"
+    url="${url%"${url##*[![:space:]]}"}"
+    [[ -n "$url" ]] || die "APP_URL cannot be empty"
+
+    if [[ ! "$url" =~ ^https?:// ]]; then
+        echo "warning: APP_URL missing http:// or https:// — using ${default_scheme}://${url}" >&2
+        url="${default_scheme}://${url}"
+    fi
+
+    local host="${url#*://}"
+    host="${host%%/*}"
+    host="${host%%:*}"
+    [[ -n "$host" ]] || die "APP_URL has no host (got: ${url})"
+
+    printf '%s' "$url"
+}
+
+gen_app_key() {
+    if command -v openssl >/dev/null 2>&1; then
+        echo "base64:$(openssl rand -base64 32)"
+    else
+        die "openssl is required to generate APP_KEY"
+    fi
+}
+
 install_system_packages() {
     if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
         log "Installing git and curl"
@@ -245,6 +275,10 @@ configure_env() {
         fi
     fi
 
+    local default_scheme="http"
+    [[ "$MODE" == "production" ]] && default_scheme="https"
+    app_url="$(normalize_app_url "$app_url" "$default_scheme")"
+
     set_env_var APP_URL "$app_url" "$env_file"
     set_env_var DB_CONNECTION pgsql "$env_file"
     set_env_var DB_HOST 127.0.0.1 "$env_file"
@@ -267,16 +301,40 @@ configure_env() {
     log "Configured .env for Docker Compose (${MODE} mode)"
 }
 
+show_app_startup_diagnostics() {
+    echo "" >&2
+    echo "--- docker compose ps app ---" >&2
+    $COMPOSE ps app 2>&1 >&2 || true
+    echo "" >&2
+    echo "--- last 50 lines: docker compose logs app ---" >&2
+    $COMPOSE logs --tail=50 app 2>&1 >&2 || true
+    echo "" >&2
+    echo "--- probe http://127.0.0.1:8000/up inside app container ---" >&2
+    $COMPOSE exec -T app curl -sv --max-time 5 http://127.0.0.1:8000/up 2>&1 >&2 || true
+    echo "" >&2
+    if ! grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null; then
+        echo "hint: APP_KEY is missing — Laravel will not boot until it is set." >&2
+    fi
+    local raw_url
+    raw_url="$(grep -E '^APP_URL=' "$ROOT_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || true)"
+    if [[ -n "$raw_url" && ! "$raw_url" =~ ^https?:// ]]; then
+        echo "hint: APP_URL should include http:// or https:// (current: ${raw_url})" >&2
+    fi
+}
+
 wait_for_app_health() {
     log "Waiting for the app container to become healthy..."
-    local tries=60
+    # First boot may install composer/npm deps, run migrations, and start Octane (compose start_period is 120s).
+    local tries=120
     until $COMPOSE exec -T app curl -fsS http://127.0.0.1:8000/up >/dev/null 2>&1; do
         tries=$((tries - 1))
         if [[ "$tries" -le 0 ]]; then
-            die "app did not become ready in time — check: docker compose logs app"
+            show_app_startup_diagnostics
+            die "app did not become ready in time — see diagnostics above"
         fi
         sleep 3
     done
+    log "App is healthy"
 }
 
 users_exist() {
@@ -288,10 +346,11 @@ stack_running() {
 }
 
 ensure_app_key() {
-    if ! grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null; then
-        log "Generating APP_KEY"
-        $COMPOSE run --rm -T app php artisan key:generate --force --no-interaction
+    if grep -qE '^APP_KEY=base64:.+' "$ROOT_DIR/.env" 2>/dev/null; then
+        return 0
     fi
+    log "Generating APP_KEY"
+    set_env_var APP_KEY "$(gen_app_key)" "$ROOT_DIR/.env"
 }
 
 run_first_install() {
@@ -458,12 +517,12 @@ main() {
     fi
 
     configure_env
+    ensure_app_key
 
     log "Building and starting containers (first run may take several minutes)"
     $COMPOSE up -d --build
 
     wait_for_app_health
-    ensure_app_key
 
     if users_exist; then
         log "Users already exist — skipping app:install"
