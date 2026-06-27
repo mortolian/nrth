@@ -23,6 +23,10 @@
 #   --no-caddy           Do not start the optional Caddy reverse proxy
 #   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server)
 #   --non-interactive    Skip env prompts; use generated defaults
+#   --allow-http         Permit plain HTTP (pragmatic LAN dev; sets APP_ALLOW_HTTP=true)
+#   --lan                Shorthand: --dev --allow-http --no-caddy (fastest LAN access)
+#   --lan-ip ADDR        LAN IP for APP_URL (with --lan or --allow-http)
+#   --repair             Delegate to scripts/repair.sh (non-destructive fix)
 #   -h, --help           Show help
 #
 # Environment:
@@ -50,6 +54,9 @@ MODE="dev"
 AUTO_DEPLOY=0
 NON_INTERACTIVE=0
 WITH_CADDY=-1
+ALLOW_HTTP=0
+LAN_IP=""
+REPAIR=0
 
 usage() {
     sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
@@ -101,6 +108,24 @@ parse_args() {
                 ;;
             --no-caddy)
                 WITH_CADDY=0
+                shift
+                ;;
+            --allow-http)
+                ALLOW_HTTP=1
+                shift
+                ;;
+            --lan)
+                MODE="dev"
+                ALLOW_HTTP=1
+                WITH_CADDY=0
+                shift
+                ;;
+            --lan-ip)
+                LAN_IP="${2:?--lan-ip requires a value}"
+                shift 2
+                ;;
+            --repair)
+                REPAIR=1
                 shift
                 ;;
             -h|--help)
@@ -200,6 +225,21 @@ preserve_or_gen_secret() {
     gen_secret
 }
 
+detect_lan_ip() {
+    if [[ -n "$LAN_IP" ]]; then
+        printf '%s' "$LAN_IP"
+        return 0
+    fi
+    local ip=""
+    if command -v ip >/dev/null 2>&1; then
+        ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -1)"
+    fi
+    if [[ -z "$ip" ]] && command -v hostname >/dev/null 2>&1; then
+        ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    fi
+    printf '%s' "$ip"
+}
+
 # Laravel requires a scheme; users often enter "books.example.com" without http(s)://.
 normalize_app_url() {
     local url="$1"
@@ -215,10 +255,14 @@ normalize_app_url() {
     fi
 
     if [[ "$url" =~ ^http:// ]]; then
-        if [[ "$MODE" == "production" ]]; then
-            die "APP_URL must use https:// — plain HTTP is not permitted for production"
+        if [[ "$ALLOW_HTTP" -eq 1 ]]; then
+            printf '%s' "$url"
+            return 0
         fi
-        echo "warning: converting http:// APP_URL to https:// (plain HTTP is not supported)" >&2
+        if [[ "$MODE" == "production" ]]; then
+            die "APP_URL must use https:// — plain HTTP is not permitted for production (use --allow-http only for LAN dev)"
+        fi
+        echo "warning: converting http:// APP_URL to https:// (pass --allow-http for plain HTTP on LAN)" >&2
         url="https://${url#http://}"
     fi
 
@@ -437,7 +481,19 @@ configure_env() {
         set_env_var APP_ENV local "$env_file"
         set_env_var APP_DEBUG true "$env_file"
         resolve_with_caddy_default
-        if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
+        if [[ "$ALLOW_HTTP" -eq 1 ]]; then
+            local lan_ip
+            lan_ip="$(detect_lan_ip)"
+            if [[ -n "$lan_ip" ]]; then
+                app_url="http://${lan_ip}:8000"
+            else
+                app_url="http://localhost:8000"
+            fi
+            if [[ "$NON_INTERACTIVE" -eq 0 ]]; then
+                read -r -p "APP_URL [${app_url}]: " custom_url
+                app_url="${custom_url:-$app_url}"
+            fi
+        elif [[ "$NON_INTERACTIVE" -eq 1 ]]; then
             app_url="https://localhost:8000"
         else
             read -r -p "APP_URL [https://localhost:8000]: " app_url
@@ -445,15 +501,22 @@ configure_env() {
         fi
     fi
 
-    app_url="$(normalize_app_url "$app_url")"
+    local url_scheme="https"
+    [[ "$ALLOW_HTTP" -eq 1 ]] && url_scheme="http"
+    app_url="$(normalize_app_url "$app_url" "$url_scheme")"
 
     if [[ "$WITH_CADDY" -eq 1 ]]; then
         configure_caddy_proxy "$env_file" "$app_url"
     else
         set_env_var APP_URL "$app_url" "$env_file"
     fi
-    set_env_var APP_FORCE_HTTPS true "$env_file"
-    set_env_var APP_ALLOW_HTTP false "$env_file"
+    if [[ "$ALLOW_HTTP" -eq 1 ]]; then
+        set_env_var APP_ALLOW_HTTP true "$env_file"
+        set_env_var APP_FORCE_HTTPS false "$env_file"
+    else
+        set_env_var APP_FORCE_HTTPS true "$env_file"
+        set_env_var APP_ALLOW_HTTP false "$env_file"
+    fi
     set_env_var TRUSTED_PROXIES "*" "$env_file"
     set_env_var DB_CONNECTION pgsql "$env_file"
     set_env_var DB_HOST 127.0.0.1 "$env_file"
@@ -518,6 +581,23 @@ users_exist() {
 
 stack_running() {
     $COMPOSE ps --status running app 2>/dev/null | grep -q app
+}
+
+app_healthy() {
+    $COMPOSE exec -T app curl -fsS http://127.0.0.1:8000/up >/dev/null 2>&1
+}
+
+recover_broken_stack() {
+    [[ -f "$ROOT_DIR/.env" ]] || return 1
+    data_volumes_exist || return 1
+    stack_running && app_healthy && return 1
+
+    log "Broken or unhealthy stack detected — running repair (data preserved)"
+    local -a repair_args=(--install-dir "$ROOT_DIR" --non-interactive)
+    [[ "$ALLOW_HTTP" -eq 1 ]] && repair_args+=(--mode http) || repair_args+=(--mode https)
+    [[ -n "$LAN_IP" ]] && repair_args+=(--ip "$LAN_IP")
+    "$ROOT_DIR/scripts/repair.sh" "${repair_args[@]}"
+    exit 0
 }
 
 data_volumes_exist() {
@@ -730,6 +810,18 @@ print_success() {
 main() {
     parse_args "$@"
 
+    if [[ "$REPAIR" -eq 1 ]]; then
+        local repair_script
+        repair_script="$(script_path)/repair.sh"
+        [[ -f "$repair_script" ]] || die "repair.sh not found next to install.sh"
+        local -a repair_args=()
+        [[ -n "$INSTALL_DIR" ]] && repair_args+=(--install-dir "$INSTALL_DIR")
+        [[ "$ALLOW_HTTP" -eq 1 ]] && repair_args+=(--mode http)
+        [[ -n "$LAN_IP" ]] && repair_args+=(--ip "$LAN_IP")
+        [[ "$NON_INTERACTIVE" -eq 1 ]] && repair_args+=(--non-interactive)
+        exec "$repair_script" "${repair_args[@]}"
+    fi
+
     local piped=0
     if ! detect_root_from_script >/dev/null 2>&1; then
         piped=1
@@ -756,6 +848,8 @@ main() {
     cd "$ROOT_DIR"
 
     configure_compose
+
+    recover_broken_stack
 
     handle_existing_install
 

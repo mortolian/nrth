@@ -244,3 +244,133 @@ Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when y
 | Emails not delivered | Configure real `MAIL_*`; Mailpit only captures mail locally |
 
 More detail: [INSTALL.md](INSTALL.md).
+
+---
+
+## Recovering a broken installation
+
+If HTTPS errors, deploy failures, docker permission errors, Postgres password mismatches, Vite manifest errors, or wrong `APP_URL` have left the app unusable, use one of these paths.
+
+### Choose a path
+
+| Situation | Path | Data |
+|-----------|------|------|
+| No data to keep — start over | **A: Nuclear reset** | Wiped |
+| Users/transactions exist — fix in place | **B: Surgical repair** | Preserved |
+
+### Path A — Nuclear reset (no data to keep)
+
+Destroys all Docker volumes (database, uploads, Redis, MinIO) and re-runs install.
+
+```bash
+cd /opt/nrth
+git pull origin master   # get latest scripts (repair.sh, reset.sh)
+./scripts/reset.sh --force --lan --install-dir /opt/nrth
+```
+
+`--lan` sets pragmatic defaults: plain HTTP on port 8000, `APP_URL=http://YOUR_LAN_IP:8000`.
+
+After install completes, create your admin account if prompted:
+
+```bash
+./scripts/compose.sh exec -it app php artisan app:install
+```
+
+**Open:** `http://192.168.1.204:8000` (replace with your server IP).
+
+### Path B — Surgical repair (keep database/users)
+
+Fixes `.env`, syncs Postgres password to match `.env`, rebuilds Vite assets, and restarts the stack **without** deleting volumes.
+
+```bash
+cd /opt/nrth
+git pull origin master
+sudo chown -R "$USER:$USER" /opt/nrth    # if install was run with sudo
+./scripts/repair.sh --install-dir /opt/nrth --ip 192.168.1.204
+```
+
+Default mode is **HTTP** (fastest way to get a working browser session on a LAN dev server).
+
+For **HTTPS with Caddy** (self-signed cert on port 443):
+
+```bash
+./scripts/repair.sh --install-dir /opt/nrth --mode https --ip 192.168.1.204
+```
+
+**Open:** `https://192.168.1.204/` (accept the certificate warning). Do **not** use `:8000` with HTTPS.
+
+### Recommended LAN dev defaults
+
+For a private LAN server (e.g. `192.168.1.204`) where you need the app working today:
+
+| Setting | HTTP (simplest) | HTTPS (Caddy) |
+|---------|-----------------|---------------|
+| `APP_URL` | `http://192.168.1.204:8000` | `https://192.168.1.204` |
+| `APP_ALLOW_HTTP` | `true` | `false` |
+| `COMPOSE_PROFILES` | *(unset)* | `proxy` |
+| `CADDY_TLS` | — | `internal` |
+| Browser URL | `http://192.168.1.204:8000` | `https://192.168.1.204/` |
+
+`repair.sh --mode http` or `install.sh --lan` applies the HTTP column automatically.
+
+### Manual fixes (if scripts are unavailable)
+
+**Docker permission denied:**
+
+```bash
+./scripts/compose.sh ps          # auto-sudo wrapper
+newgrp docker                    # or log out/in after install
+sudo usermod -aG docker "$USER"
+```
+
+**Postgres password mismatch** (`.env` rotated but volume kept old password):
+
+```bash
+cd /opt/nrth
+DB_PASS="$(grep '^DB_PASSWORD=' .env | cut -d= -f2-)"
+./scripts/compose.sh exec -T postgres psql -U dbuser -d postgres \
+  -c "ALTER USER dbuser WITH PASSWORD '${DB_PASS}';"
+./scripts/compose.sh restart app worker scheduler
+```
+
+**Vite manifest not found:**
+
+```bash
+./scripts/compose.sh exec app npm ci && ./scripts/compose.sh exec app npm run build
+./scripts/compose.sh restart app
+```
+
+**Wrong APP_URL** (redirect loops, `2.wire.1`, hostname confusion):
+
+```bash
+# HTTP LAN access — edit /opt/nrth/.env:
+#   APP_URL=http://192.168.1.204:8000
+#   APP_ALLOW_HTTP=true
+#   APP_FORCE_HTTPS=false
+# Remove COMPOSE_PROFILES, CADDY_SITE, CADDY_TLS lines if present
+./scripts/compose.sh restart app
+```
+
+### Verify after repair
+
+```bash
+cd /opt/nrth
+./scripts/compose.sh ps
+./scripts/compose.sh exec app curl -fsS http://127.0.0.1:8000/up
+curl -v http://127.0.0.1:8000/up
+```
+
+If internal `/up` succeeds but the browser fails, the problem is URL/TLS — not the app container.
+
+### Re-run install on a half-broken instance
+
+`install.sh` detects an unhealthy stack and runs `repair.sh` automatically:
+
+```bash
+cd /opt/nrth
+./scripts/install.sh --lan --install-dir /opt/nrth
+# or explicitly:
+./scripts/install.sh --repair --lan-ip 192.168.1.204
+```
+
+If users and data already exist and the stack is healthy, re-run install delegates to `deploy.sh` (data-safe upgrade).

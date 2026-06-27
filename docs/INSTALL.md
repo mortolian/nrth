@@ -34,6 +34,10 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 | `--repo-url URL` | Git remote (default `https://github.com/mortolian/nrth.git`) |
 | `--branch NAME` | Git branch (default `master`) |
 | `--non-interactive` | Skip env prompts; use generated secrets |
+| `--allow-http` | Permit plain HTTP (`APP_ALLOW_HTTP=true`; LAN dev only) |
+| `--lan` | Shorthand: `--dev --allow-http --no-caddy` with auto-detected LAN IP |
+| `--lan-ip ADDR` | Set LAN IP for `APP_URL` (with `--lan` or `--allow-http`) |
+| `--repair` | Non-destructive fix via `scripts/repair.sh` |
 
 From an existing clone:
 
