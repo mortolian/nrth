@@ -44,4 +44,24 @@ class Https
 
         return $value;
     }
+
+    /**
+     * Build the HTTPS redirect target from APP_URL so plain HTTP on Octane (:8000)
+     * redirects to the public URL (e.g. https://192.168.1.204/) instead of
+     * https://host:8000 which has no TLS listener.
+     */
+    public static function secureRedirectUrl(string $requestUri): string
+    {
+        $root = rtrim((string) config('app.url'), '/');
+
+        if ($root === '') {
+            return 'https://localhost'.$requestUri;
+        }
+
+        $parsed = parse_url($root);
+        $host = $parsed['host'] ?? 'localhost';
+        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+
+        return 'https://'.$host.$port.$requestUri;
+    }
 }

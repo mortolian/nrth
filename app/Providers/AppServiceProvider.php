@@ -36,7 +36,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if (Https::shouldForce()) {
-            URL::forceScheme('https');
+            $rootUrl = rtrim((string) config('app.url'), '/');
+
+            // Use APP_URL (e.g. https://192.168.1.204) for redirects and generated URLs,
+            // not the incoming request host:port (e.g. :8000 plain HTTP from Octane).
+            if ($rootUrl !== '') {
+                URL::forceRootUrl($rootUrl);
+            } else {
+                URL::forceScheme('https');
+            }
         }
 
         $this->mergeNodePathForOctaneFileWatcher();

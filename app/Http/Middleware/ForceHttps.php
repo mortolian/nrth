@@ -22,7 +22,7 @@ class ForceHttps
         }
 
         if (! $request->secure() && ! Https::isInternalHealthCheck($request)) {
-            return redirect()->secure($request->getRequestUri(), 301);
+            return redirect(Https::secureRedirectUrl($request->getRequestUri()), 301);
         }
 
         $response = $next($request);

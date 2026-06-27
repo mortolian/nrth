@@ -27,6 +27,18 @@ class HttpsEnforcementTest extends TestCase
         $this->assertStringStartsWith('https://', $response->headers->get('Location'));
     }
 
+    public function test_http_redirect_uses_app_url_not_request_port(): void
+    {
+        config(['app.url' => 'https://192.168.1.204']);
+
+        $response = $this->call('GET', '/login', [], [], [], [
+            'HTTP_HOST' => '192.168.1.204:8000',
+            'SERVER_PORT' => '8000',
+        ]);
+
+        $response->assertRedirect('https://192.168.1.204/login');
+    }
+
     public function test_loopback_health_check_is_not_redirected(): void
     {
         $response = $this->call('GET', '/up', [], [], [], [
