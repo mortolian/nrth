@@ -28,7 +28,7 @@ In another terminal:
 php artisan serve
 ```
 
-Open `http://localhost:8000`.
+Set `APP_URL=https://localhost:8000` in `.env`. Open that URL (accept the browser certificate warning if you have not configured TLS yet).
 
 ### SQLite (minimal)
 
@@ -110,7 +110,7 @@ On an empty database:
 php artisan app:install
 ```
 
-Interactive admin user, company team, default chart of accounts, and VAT rates.
+Interactive admin user and company team. Further setup (company profile, chart of accounts, VAT) happens in the in-app wizard after sign-in.
 
 ## Useful commands
 

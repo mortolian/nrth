@@ -164,7 +164,7 @@ set_env_var() {
 # Laravel requires a scheme; users often enter "books.example.com" without http(s)://.
 normalize_app_url() {
     local url="$1"
-    local default_scheme="${2:-http}"
+    local default_scheme="${2:-https}"
 
     url="${url#"${url%%[![:space:]]*}"}"
     url="${url%"${url##*[![:space:]]}"}"
@@ -306,7 +306,7 @@ configure_env() {
         set_env_var APP_ENV production "$env_file"
         set_env_var APP_DEBUG false "$env_file"
         if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
-            app_url="http://localhost:8000"
+            app_url="https://localhost:8000"
         else
             read -r -p "Public APP_URL [https://books.example.com]: " app_url
             app_url="${app_url:-https://books.example.com}"
@@ -315,16 +315,14 @@ configure_env() {
         set_env_var APP_ENV local "$env_file"
         set_env_var APP_DEBUG true "$env_file"
         if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
-            app_url="http://localhost:8000"
+            app_url="https://localhost:8000"
         else
-            read -r -p "APP_URL [http://localhost:8000]: " app_url
-            app_url="${app_url:-http://localhost:8000}"
+            read -r -p "APP_URL [https://localhost:8000]: " app_url
+            app_url="${app_url:-https://localhost:8000}"
         fi
     fi
 
-    local default_scheme="http"
-    [[ "$MODE" == "production" ]] && default_scheme="https"
-    app_url="$(normalize_app_url "$app_url" "$default_scheme")"
+    app_url="$(normalize_app_url "$app_url")"
 
     set_env_var APP_URL "$app_url" "$env_file"
     set_env_var DB_CONNECTION pgsql "$env_file"
@@ -406,7 +404,7 @@ run_first_install() {
         echo "  cd ${ROOT_DIR} && $(compose_hint_for_user) exec -it app php artisan app:install"
         return 0
     fi
-    log "Running interactive installer (admin user + default chart of accounts)"
+    log "Running interactive installer (admin user and company)"
     $COMPOSE exec -it app php artisan app:install
 }
 
@@ -506,26 +504,43 @@ setup_auto_deploy() {
 }
 
 print_success() {
-    local app_port compose_hint target_user
+    local app_port compose_hint target_user app_url
     app_port="$(grep -E '^APP_PORT=' "$ROOT_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo 8000)"
     compose_hint="$(compose_hint_for_user)"
     target_user="${SUDO_USER:-${USER:-}}"
+    app_url="$(grep -E '^APP_URL=' "$ROOT_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' || echo "https://localhost:${app_port}")"
+    app_url="${app_url%/}"
+
     echo ""
-    echo "Installation complete."
-    echo "  Open: http://localhost:${app_port}"
+    echo "  ┌──────────────────────────────────────────────────────────────┐"
+    echo "  │  Installation complete                                       │"
+    echo "  └──────────────────────────────────────────────────────────────┘"
+    echo ""
+    echo "  Application   ${app_url}"
+    echo "  Install dir   ${ROOT_DIR}"
+    echo ""
+    echo "  Next steps"
     if [[ "$NON_INTERACTIVE" -eq 1 ]] && ! users_exist; then
-        echo "  Finish setup: cd ${ROOT_DIR} && ${compose_hint} exec -it app php artisan app:install"
+        echo "  1. Create your admin account:"
+        echo "       cd ${ROOT_DIR} && ${compose_hint} exec -it app php artisan app:install"
+        echo "  2. Sign in and complete the setup wizard"
+    else
+        echo "  1. Sign in at the URL above with your admin credentials"
+        echo "  2. Complete the in-app setup wizard (company details and preferences)"
     fi
-    echo "  Updates: ${ROOT_DIR}/scripts/deploy.sh"
-    if [[ "$DOCKER_GROUP_ADDED" -eq 1 && -n "$target_user" && "$target_user" != "root" ]]; then
-        echo "  Docker CLI: log out and back in as ${target_user} to use docker without sudo,"
-        echo "              or prefix commands with sudo (e.g. ${compose_hint} ps)"
-    elif [[ "$(id -u)" -ne 0 ]] && ! docker_accessible; then
-        echo "  Docker CLI: use ${compose_hint} (permission denied on /var/run/docker.sock without sudo or docker group)"
-    fi
+    echo "  3. Apply updates with ${ROOT_DIR}/scripts/deploy.sh"
     if [[ "$MODE" == "production" ]]; then
-        echo "  Production checklist: docs/SELF_HOST.md"
+        echo "  4. Production checklist: ${ROOT_DIR}/docs/SELF_HOST.md"
     fi
+    if [[ "$DOCKER_GROUP_ADDED" -eq 1 && -n "$target_user" && "$target_user" != "root" ]]; then
+        echo ""
+        echo "  Docker: log out and back in as ${target_user} to use docker without sudo,"
+        echo "          or prefix commands with sudo (e.g. ${compose_hint} ps)"
+    elif [[ "$(id -u)" -ne 0 ]] && ! docker_accessible; then
+        echo ""
+        echo "  Docker: use ${compose_hint} (permission denied on /var/run/docker.sock without sudo or docker group)"
+    fi
+    echo ""
 }
 
 main() {

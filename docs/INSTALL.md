@@ -55,7 +55,7 @@ See [PERSONAL_SERVER.md](PERSONAL_SERVER.md) for maintainer workflow details.
 
 ## After install
 
-Open **http://localhost:8000** (or your `APP_URL`). Production hardening (HTTPS, backups, mail): **[SELF_HOST.md](SELF_HOST.md)**.
+Open **https://localhost:8000** (or your `APP_URL`). Production hardening (HTTPS, backups, mail): **[SELF_HOST.md](SELF_HOST.md)**.
 
 Updates:
 

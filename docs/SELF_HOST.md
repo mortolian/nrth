@@ -30,7 +30,7 @@ All flags and options: **[INSTALL.md](INSTALL.md)**.
 | **minio** | S3-compatible storage (receipts, uploads) |
 | **mailpit** | Catches outbound mail in dev (replace with real SMTP for production) |
 
-Open **http://localhost:8000** (or the host port set in `APP_PORT`).
+Open **https://localhost:8000** (or the host port set in `APP_PORT`). Browsers may warn about the certificate until you terminate TLS in front of the app.
 
 ---
 

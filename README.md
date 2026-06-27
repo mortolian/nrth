@@ -25,7 +25,7 @@
 - **Expenses & suppliers** — receipts, categories, VAT on purchases
 - **Accounting** — chart of accounts, journal, general ledger, account statements
 - **Banking** — import CSV/OFX statements, duplicate detection, transaction list
-- **Tax** — VAT returns and rates (South African defaults on install)
+- **Tax** — VAT returns and rates (configure during setup wizard)
 - **Teams** — multi-user companies via Jetstream
 - **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included
 
@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 
 Or from a clone: `./scripts/install.sh`
 
-Open **http://localhost:8000** and complete the installer (`app:install`).
+Open **https://localhost:8000** and complete the installer (`app:install`).
 
 Production checklist and HTTPS: **[docs/SELF_HOST.md](docs/SELF_HOST.md)** · Flags and options: **[docs/INSTALL.md](docs/INSTALL.md)**
 

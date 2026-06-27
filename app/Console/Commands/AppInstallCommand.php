@@ -4,8 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\Team;
 use App\Models\User;
-use Database\Seeders\DefaultChartOfAccountsSeeder;
-use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +17,7 @@ class AppInstallCommand extends Command
 {
     protected $signature = 'app:install';
 
-    protected $description = 'Interactive installer: requirements, key, migrations, admin user, SA chart of accounts, and default VAT rates.';
+    protected $description = 'Interactive installer: requirements, key, migrations, admin user, and company team.';
 
     public function handle(): int
     {
@@ -124,22 +122,32 @@ class AppInstallCommand extends Command
             return self::FAILURE;
         }
 
-        $this->components->task('Seeding default chart of accounts (South Africa)', function () use ($team): void {
-            (new DefaultChartOfAccountsSeeder)->runForTeam($team);
-        });
-
-        $this->components->task('Creating default tax rates (VAT 15%, VAT 0%, VAT Exempt)', function () use ($team): void {
-            (new DefaultTaxRatesSeeder)->runForTeam($team);
-        });
-
-        $this->newLine(2);
-        $url = rtrim((string) config('app.url'), '/');
-        $this->components->success('Installation complete.');
-        $this->line("  Application URL: <fg=cyan>{$url}</>");
-        $this->line('  Sign in with the email and password you just entered.');
-        $this->newLine();
+        $this->printInstallSummary($name, $email, $companyName);
 
         return self::SUCCESS;
+    }
+
+    private function printInstallSummary(string $name, string $email, string $companyName): void
+    {
+        $url = rtrim((string) config('app.url'), '/');
+        $appName = (string) config('app.name');
+
+        $this->newLine();
+        $this->line('  <fg=green;options=bold>┌──────────────────────────────────────────────────────────────┐</>');
+        $this->line('  <fg=green;options=bold>│</>  <fg=green;options=bold>Installation complete</>                                        <fg=green;options=bold>│</>');
+        $this->line('  <fg=green;options=bold>└──────────────────────────────────────────────────────────────┘</>');
+        $this->newLine();
+        $this->line('  <fg=gray>Application</>  <fg=cyan;options=bold>'.$url.'</>');
+        $this->line('  <fg=gray>Administrator</>  '.$name.' <fg=gray>&lt;</>'.$email.'<fg=gray>&gt;</>');
+        $this->line('  <fg=gray>Company</>       '.$companyName);
+        $this->newLine();
+        $this->line('  <fg=yellow;options=bold>Next steps</>');
+        $this->line('  <fg=gray>1.</> Sign in at the URL above with your email and password');
+        $this->line('  <fg=gray>2.</> Complete the in-app setup wizard (company details and preferences)');
+        $this->line('  <fg=gray>3.</> Run <fg=cyan>php artisan app:update</> after future upgrades');
+        $this->newLine();
+        $this->components->info($appName.' is ready.');
+        $this->newLine();
     }
 
     private function checkSystemRequirements(): bool

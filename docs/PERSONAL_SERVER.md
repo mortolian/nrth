@@ -55,7 +55,7 @@ GITHUB_RUNNER_TOKEN=<token> ./scripts/install.sh --auto-deploy --install-dir /op
 
 The installer configures a runner with label **`nrth-server`**.
 
-Bookmark: `http://<server-ip>:8000`
+Bookmark: `https://<server-ip>:8000`
 
 ### Enable the workflow
 
