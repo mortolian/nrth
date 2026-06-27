@@ -664,30 +664,6 @@ const liveInvoicePreview = computed(() => {
                         </li>
                     </ul>
 
-                    <div>
-                        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Quick links (after finish)</p>
-                        <div class="mt-3 flex flex-wrap gap-2">
-                            <span
-                                class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-400"
-                            >
-                                Create first invoice
-                            </span>
-                            <span
-                                class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-400"
-                            >
-                                Add first expense
-                            </span>
-                            <span
-                                class="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs text-slate-400"
-                            >
-                                Explore reports
-                            </span>
-                        </div>
-                        <p class="mt-2 text-xs text-slate-600">
-                            Use the sidebar from your dashboard — finish setup below to unlock navigation everywhere.
-                        </p>
-                    </div>
-
                     <div class="flex justify-between gap-3">
                         <button
                             type="button"
