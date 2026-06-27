@@ -182,7 +182,7 @@ const liveInvoicePreview = computed(() => {
     const raw = (form.invoice_prefix || 'INV').trim().replace(/-+$/, '');
     const base = raw || 'INV';
     const seq = Math.max(1, Number(form.invoice_next_sequence) || 1);
-    const suffix = form.invoice_number_use_random_suffix ? 'sdfg' : String(seq).padStart(4, '0');
+    const suffix = form.invoice_number_use_random_suffix ? 'a3f9' : String(seq).padStart(4, '0');
     return form.invoice_number_include_month
         ? `${base}-${y}-${month}-${suffix}`
         : `${base}-${y}-${suffix}`;
@@ -663,7 +663,7 @@ const removeBankAccount = (index: number) => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Invoice numbers</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">Prefix and sequence; optional month segment or random suffix instead of counting.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Prefix and sequence, or a random identifier instead of counting.</p>
                         <div class="mt-4 grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Prefix</label>
@@ -675,7 +675,30 @@ const removeBankAccount = (index: number) => {
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Next sequence (this year)</label>
                                 <AppInput v-model="form.invoice_next_sequence" type="number" min="1" :disabled="form.invoice_number_use_random_suffix" />
-                                <p class="mt-1 text-xs text-slate-500">Ignored when using a random suffix.</p>
+                                <p class="mt-1 text-xs text-slate-500">Only used for sequential numbering.</p>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Numbering style</p>
+                                <div class="space-y-2.5 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
+                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                        <input
+                                            v-model="form.invoice_number_use_random_suffix"
+                                            type="radio"
+                                            :value="false"
+                                            class="border-slate-300 text-brand-600 focus:ring-brand-500"
+                                        >
+                                        Sequential numbers (0001, 0002, …)
+                                    </label>
+                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                                        <input
+                                            v-model="form.invoice_number_use_random_suffix"
+                                            type="radio"
+                                            :value="true"
+                                            class="border-slate-300 text-brand-600 focus:ring-brand-500"
+                                        >
+                                        Random identifier (e.g. a3f9)
+                                    </label>
+                                </div>
                             </div>
                             <div class="sm:col-span-2">
                                 <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Format options</p>
@@ -683,10 +706,6 @@ const removeBankAccount = (index: number) => {
                                     <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
                                         <input v-model="form.invoice_number_include_month" type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                                         Include month in the number
-                                    </label>
-                                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
-                                        <input v-model="form.invoice_number_use_random_suffix" type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500">
-                                        Use random 4-character suffix instead of sequence
                                     </label>
                                 </div>
                             </div>

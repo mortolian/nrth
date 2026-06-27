@@ -86,6 +86,7 @@ class OnboardingWizardTest extends TestCase
             'invoice_default_payment_terms_days' => '14',
             'invoice_prefix' => 'INV',
             'invoice_next_sequence' => '7',
+            'invoice_number_use_random_suffix' => '0',
             'bank_name' => 'Test Bank',
             'bank_account_holder' => 'Acme Trading',
             'bank_account_number' => '1234567890',
@@ -114,5 +115,38 @@ class OnboardingWizardTest extends TestCase
             'show_on_invoice' => true,
         ]);
         $this->assertSame(1, TeamBankAccount::query()->where('team_id', $team->id)->count());
+    }
+
+    public function test_complete_can_enable_random_invoice_numbers(): void
+    {
+        $user = User::factory()->withPersonalTeam()->withoutCompletedOnboarding()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        $this->actingAs($user);
+
+        $this->post(route('onboarding.complete'), [
+            'company_name' => 'Random Invoices Ltd',
+            'vat_registered' => '0',
+            'vat_number' => '',
+            'financial_year_end_month' => '2',
+            'industry' => 'technology',
+            'has_existing_books' => '0',
+            'opening_bank' => '',
+            'opening_ar' => '',
+            'opening_ap' => '',
+            'invoice_default_payment_terms_days' => '30',
+            'invoice_prefix' => 'INV',
+            'invoice_next_sequence' => '1',
+            'invoice_number_use_random_suffix' => '1',
+            'bank_name' => '',
+            'bank_account_holder' => '',
+            'bank_account_number' => '',
+            'bank_branch_code' => '',
+            'bank_account_type' => 'current',
+        ])->assertRedirect(route('dashboard'));
+
+        $team->refresh();
+        $this->assertTrue($team->mergedCompanySettings()['invoice_number_use_random_suffix']);
     }
 }

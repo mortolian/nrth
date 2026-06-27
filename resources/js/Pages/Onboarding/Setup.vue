@@ -27,6 +27,7 @@ type InitialPayload = {
     invoice_default_payment_terms_days: number;
     invoice_prefix: string;
     invoice_next_sequence: number;
+    invoice_number_use_random_suffix: boolean;
     bank_name: string;
     bank_account_holder: string;
     bank_account_number: string;
@@ -56,6 +57,7 @@ type Wizard = {
     paymentTermsDays: number;
     invoicePrefix: string;
     invoiceStartNumber: number;
+    invoiceUseRandomSuffix: boolean;
     bankName: string;
     bankAccountHolder: string;
     bankAccountNumber: string;
@@ -77,6 +79,7 @@ function defaultWizard(i: InitialPayload): Wizard {
         paymentTermsDays: i.invoice_default_payment_terms_days,
         invoicePrefix: i.invoice_prefix,
         invoiceStartNumber: i.invoice_next_sequence,
+        invoiceUseRandomSuffix: i.invoice_number_use_random_suffix,
         bankName: i.bank_name,
         bankAccountHolder: i.bank_account_holder,
         bankAccountNumber: i.bank_account_number,
@@ -223,6 +226,7 @@ function buildFormData(): FormData {
     fd.append('invoice_default_payment_terms_days', String(wizard.value.paymentTermsDays));
     fd.append('invoice_prefix', wizard.value.invoicePrefix.trim());
     fd.append('invoice_next_sequence', String(wizard.value.invoiceStartNumber));
+    fd.append('invoice_number_use_random_suffix', wizard.value.invoiceUseRandomSuffix ? '1' : '0');
     fd.append('bank_name', wizard.value.bankName.trim());
     fd.append('bank_account_holder', wizard.value.bankAccountHolder.trim());
     fd.append('bank_account_number', wizard.value.bankAccountNumber.trim());
@@ -273,7 +277,8 @@ const liveInvoicePreview = computed(() => {
     const raw = (wizard.value.invoicePrefix || 'INV').trim().replace(/-+$/, '');
     const base = raw || 'INV';
     const seq = Math.max(1, Number(wizard.value.invoiceStartNumber) || 1);
-    return `${base}-${y}-${String(seq).padStart(4, '0')}`;
+    const suffix = wizard.value.invoiceUseRandomSuffix ? 'a3f9' : String(seq).padStart(4, '0');
+    return `${base}-${y}-${suffix}`;
 });
 </script>
 
@@ -603,10 +608,36 @@ const liveInvoicePreview = computed(() => {
                                     v-model.number="wizard.invoiceStartNumber"
                                     type="number"
                                     min="1"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                    :disabled="wizard.invoiceUseRandomSuffix"
+                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100 disabled:opacity-50"
                                 />
                                 <InputError :message="fieldErrors.invoice_next_sequence" class="mt-1" />
                             </div>
+                        </div>
+
+                        <div>
+                            <InputLabel value="Numbering style" class="!text-slate-300" />
+                            <div class="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3">
+                                <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-200">
+                                    <input
+                                        v-model="wizard.invoiceUseRandomSuffix"
+                                        type="radio"
+                                        :value="false"
+                                        class="border-slate-600 bg-slate-950 text-brand-500 focus:ring-brand-500"
+                                    >
+                                    Sequential numbers (0001, 0002, …)
+                                </label>
+                                <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-200">
+                                    <input
+                                        v-model="wizard.invoiceUseRandomSuffix"
+                                        type="radio"
+                                        :value="true"
+                                        class="border-slate-600 bg-slate-950 text-brand-500 focus:ring-brand-500"
+                                    >
+                                    Random identifier (e.g. a3f9)
+                                </label>
+                            </div>
+                            <InputError :message="fieldErrors.invoice_number_use_random_suffix" class="mt-1" />
                         </div>
                         <p class="text-xs text-slate-500">
                             Next invoice preview:
@@ -660,7 +691,11 @@ const liveInvoicePreview = computed(() => {
                         </li>
                         <li>
                             <span class="text-slate-500">Invoices:</span>
-                            {{ liveInvoicePreview }}, {{ wizard.paymentTermsDays }}-day terms
+                            {{
+                                wizard.invoiceUseRandomSuffix
+                                    ? `${liveInvoicePreview} (random)`
+                                    : liveInvoicePreview
+                            }}, {{ wizard.paymentTermsDays }}-day terms
                         </li>
                     </ul>
 
