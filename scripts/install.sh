@@ -161,6 +161,34 @@ set_env_var() {
     fi
 }
 
+read_env_var() {
+    local key="$1"
+    local file="$2"
+    grep -E "^${key}=" "$file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'
+}
+
+# Postgres/MinIO only apply *_PASSWORD on first volume init; rotating .env breaks re-runs.
+compose_data_volume_exists() {
+    local suffix="$1"
+    $COMPOSE volume ls -q 2>/dev/null | grep -qE "(^|_)${suffix}$"
+}
+
+preserve_or_gen_secret() {
+    local key="$1"
+    local env_file="$2"
+    local volume_suffix="$3"
+    local existing
+
+    existing="$(read_env_var "$key" "$env_file")"
+    if [[ -n "$existing" ]] && compose_data_volume_exists "$volume_suffix"; then
+        log "Preserving existing ${key} (${volume_suffix} volume already initialized)"
+        printf '%s' "$existing"
+        return 0
+    fi
+
+    gen_secret
+}
+
 # Laravel requires a scheme; users often enter "books.example.com" without http(s)://.
 normalize_app_url() {
     local url="$1"
@@ -299,10 +327,16 @@ configure_env() {
 
     local db_pass minio_pass aws_key aws_secret app_url
 
-    db_pass="$(gen_secret)"
-    minio_pass="$(gen_secret)"
-    aws_key="nrth$(gen_secret | tr '[:upper:]' '[:lower:]' | head -c 8)"
-    aws_secret="$(gen_secret)"
+    db_pass="$(preserve_or_gen_secret DB_PASSWORD "$env_file" mysql_data)"
+    minio_pass="$(preserve_or_gen_secret MINIO_ROOT_PASSWORD "$env_file" minio_data)"
+    aws_key="$(read_env_var AWS_ACCESS_KEY_ID "$env_file")"
+    aws_secret="$(read_env_var AWS_SECRET_ACCESS_KEY "$env_file")"
+    if [[ -n "$aws_key" && -n "$aws_secret" ]] && compose_data_volume_exists minio_data; then
+        log "Preserving existing MinIO client credentials (minio_data volume already initialized)"
+    else
+        aws_key="nrth$(gen_secret | tr '[:upper:]' '[:lower:]' | head -c 8)"
+        aws_secret="$(gen_secret)"
+    fi
 
     if [[ "$MODE" == "production" ]]; then
         set_env_var APP_ENV production "$env_file"

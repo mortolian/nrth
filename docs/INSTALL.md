@@ -117,9 +117,23 @@ Inside Docker (use `./scripts/compose.sh` — auto-sudo when docker.sock is not 
 
 | Problem | Fix |
 |---------|-----|
+| `password authentication failed for user "dbuser"` | Re-running install rotated `DB_PASSWORD` in `.env` while Postgres kept the old password in its volume. **Keep data:** sync Postgres to `.env` (see below). **Fresh start:** `./scripts/compose.sh down -v` then re-run `./scripts/install.sh`. |
 | `permission denied` on `/var/run/docker.sock` | `./scripts/compose.sh …` (auto-sudo), or `newgrp docker`, or log out/in after install |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Missing tables | `./scripts/compose.sh exec app php artisan migrate` |
 | `storage/` permissions | Ensure the container can write to `storage` and `bootstrap/cache` |
 | Queues stuck | `./scripts/compose.sh restart worker` |
 | Mail not sent | Configure `MAIL_*` (Mailpit is dev-only) |
+
+**DB password mismatch (keep existing data):**
+
+```bash
+cd /opt/nrth   # or your install dir
+DB_PASS="$(grep '^DB_PASSWORD=' .env | cut -d= -f2-)"
+./scripts/compose.sh exec -T postgres psql -U dbuser -d postgres \
+  -c "ALTER USER dbuser WITH PASSWORD '${DB_PASS}';"
+./scripts/compose.sh restart app worker scheduler
+./scripts/compose.sh exec -it app php artisan app:install
+```
+
+If you still have the original `.env` from the first install, you can instead restore that `DB_PASSWORD` value and restart the app containers.
