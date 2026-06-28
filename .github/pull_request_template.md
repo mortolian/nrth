@@ -1,6 +1,6 @@
 ## Summary
 
-<!-- What does this PR change and why? -->
+<!-- What does this PR change and why? Use a conventional commit prefix in the PR title if this will be squash-merged (feat:, fix:, docs:, chore:). See docs/RELEASE.md. -->
 
 ## Related issue
 

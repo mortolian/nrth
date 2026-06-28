@@ -73,7 +73,7 @@ To set expectations during alpha:
 ## Versioning
 
 - **`master`** — active development; may break without notice during alpha.
-- **Tags (`v0.x.y`)** — snapshot releases; read [CHANGELOG.md](../CHANGELOG.md) before upgrading.
+- **Tags (`v0.x.y`)** — created automatically when you merge a Release Please PR; see [docs/RELEASE.md](RELEASE.md).
 - **1.0** — not planned until data models, install/upgrade story, and core workflows are stable enough for production-minded self-hosters.
 
 ---

@@ -49,7 +49,7 @@ GitHub presence, first release, and visible polish.
 - [x] **Enable GitHub Discussions** — Settings → General → Features → Discussions (for Q&A, ideas, and community support)
 - [x] **Enable private vulnerability reporting** — Settings → Security → Private vulnerability reporting (complements [SECURITY.md](../SECURITY.md) GitHub Advisories link)
 - [ ] **Optional: verify security contact email** — [SECURITY.md](../SECURITY.md) lists `security@mortolian.com`; confirm the inbox is monitored or update the address
-- [x] **Expand CHANGELOG.md** — [CHANGELOG.md](../CHANGELOG.md) should cover more than the initial `0.1.0` entry; keep it updated for each release ([update-changelog.yml](../.github/workflows/update-changelog.yml) may assist)
+- [x] **Expand CHANGELOG.md** — [CHANGELOG.md](../CHANGELOG.md) is maintained by [Release Please](../docs/RELEASE.md) (`release-please.yml`) after the initial `0.1.0` baseline
 
 ---
 

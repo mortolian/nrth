@@ -41,7 +41,16 @@ Or use the unified installer from a clone: `./scripts/install.sh --dev`
    - `feat/short-description` for features
    - `docs/short-description` for documentation only
 
-2. **Make your changes** with focused commits.
+2. **Make your changes** with focused commits. Use [Conventional Commits](https://www.conventionalcommits.org/) so release automation can update the changelog (see [docs/RELEASE.md](docs/RELEASE.md)):
+
+   ```
+   feat: add bank reconciliation matching
+   fix: correct VAT total on expense form
+   docs: clarify install flags
+   chore: bump dependencies
+   ```
+
+   If you squash-merge PRs, the **PR title** becomes the commit message — format the title accordingly.
 
 3. **Run checks** before opening the PR:
 
