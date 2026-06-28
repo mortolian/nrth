@@ -2,11 +2,15 @@
 
 nrth installs with **one command** on Ubuntu 22.04/24.04 (recommended). The script installs Docker if needed, clones to `/opt/nrth`, configures `.env`, starts the Compose stack, and runs the first-time `app:install` wizard.
 
+Before any system changes, the installer asks you to confirm that **this machine is backed up** and that **nrth accepts no responsibility for lost data**. Piped or non-interactive installs require `--accept-data-risk` instead of the prompt.
+
 ## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash
 ```
+
+Interactive installs (from a clone or with a TTY) show the backup confirmation when you run the script.
 
 ### Flags
 
@@ -14,13 +18,13 @@ Pass flags after `bash -s --`:
 
 ```bash
 # Production server
-curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --production --install-dir /opt/nrth
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --production --install-dir /opt/nrth
 
 # Personal dev server with GitHub Actions auto-deploy
-curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --dev --auto-deploy --install-dir /opt/nrth
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --dev --auto-deploy --install-dir /opt/nrth
 
 # Non-interactive (generated secrets, localhost URL)
-curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --production --non-interactive
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --production --non-interactive
 ```
 
 | Flag | Purpose |
@@ -34,6 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 | `--repo-url URL` | Git remote (default `https://github.com/mortolian/nrth.git`) |
 | `--branch NAME` | Git branch (default `master`) |
 | `--non-interactive` | Skip env prompts; use generated secrets |
+| `--accept-data-risk` | Acknowledge backup responsibility (required when piping or with `--non-interactive`) |
 | `--allow-http` | Permit plain HTTP (`APP_ALLOW_HTTP=true`; LAN dev only) |
 | `--lan` | Shorthand: `--dev --allow-http --no-caddy` with auto-detected LAN IP |
 | `--lan-ip ADDR` | Set LAN IP for `APP_URL` (with `--lan` or `--allow-http`) |
@@ -53,7 +58,7 @@ Re-running `install.sh` on an already-installed instance runs `scripts/deploy.sh
 |------|---------|
 | Fix in place (keep data) | `./scripts/repair.sh --ip 192.168.1.204` |
 | HTTPS via Caddy on LAN | `./scripts/repair.sh --mode https --ip 192.168.1.204` |
-| Wipe everything and reinstall | `./scripts/reset.sh --force --lan` |
+| Wipe everything and reinstall | `./scripts/reset.sh --force` (interactive prompt) or `./scripts/reset.sh --force --accept-data-risk --lan` |
 | Re-run install + auto-repair | `./scripts/install.sh --lan --install-dir /opt/nrth` |
 
 Full walkthrough: **[SELF_HOST.md — Recovering a broken installation](SELF_HOST.md#recovering-a-broken-installation)**.
@@ -144,7 +149,7 @@ Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when d
 |--------|----------------|
 | `./scripts/compose.sh down -v` | All Docker volumes: database, uploads, Redis, MinIO objects |
 | `./scripts/compose.sh down -v --force` | Same as above; `--force` is required to bypass the safety guard |
-| `./scripts/reset.sh --force` | Stops stack, removes all volumes, re-runs `install.sh` (backs up old `.env`) |
+| `./scripts/reset.sh --force` | Stops stack, removes all volumes, re-runs `install.sh` (backs up old `.env`; prompts for backup acknowledgment) |
 | `php artisan migrate:fresh` | All database tables and rows |
 | `php artisan db:wipe` | Database contents |
 | Re-generating `DB_PASSWORD` / `MINIO_ROOT_PASSWORD` in `.env` **after** volumes exist | App cannot connect until passwords are synced (data still on disk) |
@@ -160,7 +165,7 @@ On re-run, `install.sh` preserves `DB_PASSWORD` and MinIO credentials when data 
 | Problem | Fix |
 |---------|-----|
 | Broken install (multiple issues) | `./scripts/repair.sh --ip YOUR_LAN_IP` — see [SELF_HOST.md](SELF_HOST.md#recovering-a-broken-installation) |
-| Start over (no data to keep) | `./scripts/reset.sh --force --lan` |
+| Start over (no data to keep) | `./scripts/reset.sh --force` (or add `--accept-data-risk` for non-interactive) |
 | `password authentication failed for user "dbuser"` | Re-running install rotated `DB_PASSWORD` in `.env` while Postgres kept the old password in its volume. **Keep data:** `./scripts/repair.sh` (syncs password) or manual `ALTER USER` below. **Fresh start (destructive):** `./scripts/reset.sh --force` |
 | `permission denied` on `/var/run/docker.sock` | `./scripts/compose.sh …` (auto-sudo), or `newgrp docker`, or log out/in after install |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |

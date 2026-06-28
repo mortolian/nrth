@@ -34,7 +34,7 @@
 The fastest way to try nrth with the full stack:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk
 ```
 
 Or from a clone: `./scripts/install.sh`

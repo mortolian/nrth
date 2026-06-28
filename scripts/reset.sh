@@ -5,14 +5,15 @@
 #
 # Usage:
 #   ./scripts/reset.sh --force
-#   ./scripts/reset.sh --force --lan --install-dir /opt/nrth
-#   ./scripts/reset.sh --force --production --non-interactive
+#   ./scripts/reset.sh --force --accept-data-risk --lan --install-dir /opt/nrth
+#   ./scripts/reset.sh --force --accept-data-risk --production --non-interactive
 #
 # Requires --force (or NRTH_FORCE=1). Backs up .env before wiping volumes.
 # Remaining arguments are passed to scripts/install.sh after the reset.
 #
 # Options:
 #   --force              Required — confirms you intend to delete all data volumes
+#   --accept-data-risk   Acknowledge backup responsibility (required for non-interactive)
 #   --install-dir PATH   Install location (default: repo root or /opt/nrth)
 #   --keep-env             Do not back up or regenerate .env (advanced; usually wrong)
 #   -h, --help           Show help
@@ -23,6 +24,7 @@ DEFAULT_INSTALL_DIR="/opt/nrth"
 INSTALL_DIR=""
 FORCE=0
 KEEP_ENV=0
+ACCEPT_DATA_RISK=0
 INSTALL_ARGS=()
 
 usage() {
@@ -38,11 +40,51 @@ die() {
     exit 1
 }
 
+confirm_data_risk() {
+    if [[ "$ACCEPT_DATA_RISK" -eq 1 ]]; then
+        return 0
+    fi
+
+    local non_interactive=0
+    for arg in "${INSTALL_ARGS[@]}"; do
+        [[ "$arg" == "--non-interactive" ]] && non_interactive=1
+    done
+    if ! [[ -t 0 && -t 1 ]]; then
+        non_interactive=1
+    fi
+
+    if [[ "$non_interactive" -eq 1 ]]; then
+        die "non-interactive reset requires --accept-data-risk (back up this machine first; see --help)"
+    fi
+
+    echo ""
+    echo "This will permanently delete all Docker volumes (database, uploads, Redis, MinIO)."
+    echo ""
+    echo "Before continuing, please confirm:"
+    echo "  • You have verified this machine is backed up."
+    echo "  • nrth and its maintainers are not responsible for any data loss."
+    echo ""
+    read -r -p "Continue? [y/N]: " confirm
+    case "$confirm" in
+        [yY]|[yY][eE][sS])
+            ACCEPT_DATA_RISK=1
+            ;;
+        *)
+            die "reset cancelled"
+            ;;
+    esac
+}
+
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --force)
                 FORCE=1
+                shift
+                ;;
+            --accept-data-risk)
+                ACCEPT_DATA_RISK=1
+                INSTALL_ARGS+=("$1")
                 shift
                 ;;
             --install-dir)
@@ -115,6 +157,8 @@ main() {
     cd "$ROOT_DIR"
     [[ -f compose.yaml ]] || die "compose.yaml not found in ${ROOT_DIR}"
 
+    confirm_data_risk
+
     COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
 
     if [[ -f .env ]]; then
@@ -136,6 +180,9 @@ main() {
 
     log "Re-running install (fresh volumes)"
     local -a install_cmd=("$ROOT_DIR/scripts/install.sh" "--install-dir" "$ROOT_DIR")
+    if [[ "$ACCEPT_DATA_RISK" -eq 1 ]]; then
+        install_cmd+=("--accept-data-risk")
+    fi
     if [[ ${#INSTALL_ARGS[@]} -gt 0 ]]; then
         install_cmd+=("${INSTALL_ARGS[@]}")
     fi

@@ -6,7 +6,7 @@
 #
 #   # Fresh Ubuntu server (pipe args after --)
 #   curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash
-#   curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --production --auto-deploy
+#   curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --production --auto-deploy
 #
 #   # From a clone
 #   ./scripts/install.sh
@@ -23,6 +23,7 @@
 #   --no-caddy           Do not start the optional Caddy reverse proxy
 #   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server)
 #   --non-interactive    Skip env prompts; use generated defaults
+#   --accept-data-risk   Acknowledge backup responsibility (required with --non-interactive)
 #   --allow-http         Permit plain HTTP (default for --dev; sets APP_ALLOW_HTTP=true)
 #   --lan                Shorthand for default dev install (same as plain --dev today)
 #   --lan-ip ADDR        LAN IP for APP_URL (with --lan or --allow-http)
@@ -53,13 +54,14 @@ BRANCH="$DEFAULT_BRANCH"
 MODE="dev"
 AUTO_DEPLOY=0
 NON_INTERACTIVE=0
+ACCEPT_DATA_RISK=0
 WITH_CADDY=-1
 ALLOW_HTTP=0
 LAN_IP=""
 REPAIR=0
 
 usage() {
-    sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 log() {
@@ -69,6 +71,31 @@ log() {
 die() {
     echo "error: $*" >&2
     exit 1
+}
+
+confirm_data_risk() {
+    if [[ "$ACCEPT_DATA_RISK" -eq 1 ]]; then
+        return 0
+    fi
+
+    if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
+        die "non-interactive install requires --accept-data-risk (back up this machine first; see --help)"
+    fi
+
+    echo ""
+    echo "Before continuing, please confirm:"
+    echo "  • You have verified this machine is backed up."
+    echo "  • nrth and its maintainers are not responsible for any data loss."
+    echo ""
+    read -r -p "Continue? [y/N]: " confirm
+    case "$confirm" in
+        [yY]|[yY][eE][sS])
+            ACCEPT_DATA_RISK=1
+            ;;
+        *)
+            die "installation cancelled"
+            ;;
+    esac
 }
 
 parse_args() {
@@ -100,6 +127,10 @@ parse_args() {
                 ;;
             --non-interactive)
                 NON_INTERACTIVE=1
+                shift
+                ;;
+            --accept-data-risk)
+                ACCEPT_DATA_RISK=1
                 shift
                 ;;
             --with-caddy)
@@ -876,6 +907,8 @@ main() {
         NON_INTERACTIVE=1
         log "Non-interactive mode (piped install or no TTY on stdin)"
     fi
+
+    confirm_data_risk
 
     if [[ "$piped" -eq 1 ]] || ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
         is_ubuntu || echo "warning: this script is tested on Ubuntu 22.04/24.04; continuing anyway" >&2
