@@ -1,26 +1,30 @@
-# Personal server (auto-deploy on push)
+# Personal server (maintainer dev host)
 
-This guide is for **you** (the project maintainer): run nrth on a **home or office Docker server** that tracks `master` with almost no manual upgrade work while the project is still changing quickly.
+**Maintainer-only.** This guide is for **you** (the project maintainer): run nrth on a **home or office Docker server** for fast iteration while the project is still changing quickly.
+
+**Self-hosters and production deployments:** follow [SELF_HOST.md](SELF_HOST.md) and [INSTALL.md](INSTALL.md) — not this guide.
 
 **Goals:**
 
-- Push to `master` → server updates itself within a minute or two
+- Pull latest `master` and deploy with one command (`./scripts/deploy.sh`)
 - No Kubernetes, no complex GitOps
-- Fast iteration: most pushes only need `git pull` + migrations, not full image rebuilds
+- Fast iteration: most updates only need `git pull` + migrations, not full image rebuilds
 
 ---
 
 ## Architecture (keep it simple)
 
 ```
-GitHub (master) ──push──► GitHub Actions (self-hosted runner on your server)
-                              │
-                              ▼
-                    /opt/nrth/scripts/deploy.sh
-                              │
-              git pull + migrate + restart queues
-                              │
-                    Docker Compose (bind-mounted code)
+Your workstation ──git push──► GitHub (master)
+                                    │
+Server (manual or custom workflow) ─┘
+        │
+        ▼
+/opt/nrth/scripts/deploy.sh
+        │
+git pull + migrate + restart queues
+        │
+Docker Compose (bind-mounted code)
 ```
 
 The included `compose.yaml` **bind-mounts your source tree** into the app container and runs Octane with `--watch`. That means:
@@ -29,62 +33,90 @@ The included `compose.yaml` **bind-mounts your source tree** into the app contai
 - **composer.lock** or **package-lock.json** changes trigger install/build automatically via `deploy.sh`
 - **Database changes** run via `migrate` on each deploy
 
-This is ideal for an active development server. When you later want a stricter production host, use `./scripts/deploy.sh production` and a non-bind-mounted production compose overlay.
+This is ideal for an active development server. When you later want a stricter production host, use `./scripts/deploy.sh production` and a non-bind-mounted production compose overlay — see [SELF_HOST.md](SELF_HOST.md).
+
+Use `./scripts/compose.sh` for all Docker Compose commands (auto-sudo when needed). Do not use bare `docker compose` on the server.
 
 ---
 
 ## One-time server setup
 
-On Ubuntu 22.04/24.04, one command installs Docker, clones to `/opt/nrth`, configures `.env`, starts the stack, runs `app:install`, and sets up auto-deploy:
+On Ubuntu 22.04/24.04, one command installs Docker, clones to `/opt/nrth`, configures `.env`, starts the stack, and runs `app:install`.
+
+Piped installs are non-interactive and require `--accept-data-risk` (you will be prompted interactively when running from a clone):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --dev --auto-deploy --install-dir /opt/nrth
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --lan --install-dir /opt/nrth
 ```
 
 Or from a clone:
 
 ```bash
-./scripts/install.sh --dev --auto-deploy --install-dir /opt/nrth
+./scripts/install.sh --lan --install-dir /opt/nrth
 ```
 
-When prompted for auto-deploy, paste a runner registration token from GitHub (**Settings → Actions → Runners → New self-hosted runner**), or provide it up front:
+`--lan` sets pragmatic LAN dev defaults: plain HTTP on port 8000, `APP_URL=http://YOUR_LAN_IP:8000`, no Caddy.
 
-```bash
-GITHUB_RUNNER_TOKEN=<token> ./scripts/install.sh --auto-deploy --install-dir /opt/nrth
-```
+When prompted (or before install), confirm you have verified backups — the installer asks you to acknowledge backup responsibility before it changes anything.
 
-The installer configures a runner with label **`nrth-server`**.
+**Bookmark:**
 
-Bookmark: `https://<server-ip>:8000`
+| Mode | URL |
+|------|-----|
+| LAN dev (`--lan`, default here) | `http://<server-ip>:8000` |
+| Production with Caddy | `https://<server-ip>/` or `https://your-domain/` (port 443, not `:8000`) |
 
-### Enable the workflow
-
-The workflow file `.github/workflows/deploy-personal-server.yml` runs on that runner when you push to `master`. It calls `/opt/nrth/scripts/deploy.sh` — adjust the path in the workflow if you used a different `--install-dir`.
-
-After the runner is online, every push to `master` triggers:
-
-1. `git pull` on the server (via `deploy.sh`)
-2. Conditional `composer install` / `npm build`
-3. `php artisan migrate`
-4. Queue / Horizon restart
-
-Typical deploy time: **15–60 seconds** when only PHP/Vue files changed.
+See [SELF_HOST.md](SELF_HOST.md) for HTTPS/Caddy setup when you move off plain HTTP.
 
 ---
 
-## Manual deploy
+## Deploy updates
 
-Any time you want to sync without pushing:
+After you push to `master`, sync the server manually:
 
 ```bash
 cd /opt/nrth
 ./scripts/deploy.sh
 ```
 
+This runs:
+
+1. `git pull` on the server
+2. Conditional `composer install` / `npm build`
+3. `php artisan migrate`
+4. Queue / Horizon restart
+
+Typical deploy time: **15–60 seconds** when only PHP/Vue files changed.
+
 Production-style update (maintenance mode + cache rebuild):
 
 ```bash
 ./scripts/deploy.sh production
+```
+
+---
+
+## Optional: GitHub Actions self-hosted runner
+
+The repo does **not** ship a deploy workflow. If you want push-to-deploy, add your own workflow under `.github/workflows/` on your fork or in a private overlay, and point it at `${INSTALL_DIR}/scripts/deploy.sh`.
+
+`install.sh --auto-deploy` only registers a self-hosted runner (label **`nrth-server`**) on this machine — useful once you have a workflow that targets that label.
+
+When prompted, paste a runner registration token from GitHub (**Settings → Actions → Runners → New self-hosted runner**), or provide it up front:
+
+```bash
+GITHUB_RUNNER_TOKEN=<token> ./scripts/install.sh --accept-data-risk --lan --auto-deploy --install-dir /opt/nrth
+```
+
+Example workflow step (adjust the install path if you used a different `--install-dir`):
+
+```yaml
+jobs:
+  deploy:
+    runs-on: [self-hosted, nrth-server]
+    steps:
+      - name: Deploy latest master
+        run: /opt/nrth/scripts/deploy.sh
 ```
 
 ---
@@ -102,7 +134,23 @@ Data-safe: no volume removal, no `migrate:fresh`. `git reset --hard` only affect
 | `php artisan app:update` | **production** mode |
 | `queue:restart` + restart `worker` | **dev** mode |
 
-Octane's file watcher reloads PHP workers for code edits; you usually **do not** need `docker compose build` on every push.
+Octane's file watcher reloads PHP workers for code edits; you usually **do not** need `./scripts/compose.sh build` on every push.
+
+---
+
+## Data safety
+
+Normal upgrades via `deploy.sh` and re-runs of `install.sh` preserve your database, uploaded files (MinIO/storage volumes), and Redis data.
+
+**Do not run these unless you intend to wipe data:**
+
+- `./scripts/compose.sh down -v` — blocked unless you add `--force` (deletes all Compose volumes)
+- `php artisan migrate:fresh` or `db:wipe` — empties the database
+- Manually changing `DB_PASSWORD` or `MINIO_ROOT_PASSWORD` in `.env` after first boot — breaks auth until you sync credentials
+
+Safe shutdown: `./scripts/compose.sh down` (containers stop; volumes remain).
+
+Full reference: [SELF_HOST.md — Data safety](SELF_HOST.md#data-safety) and [INSTALL.md](INSTALL.md).
 
 ---
 
@@ -111,7 +159,7 @@ Octane's file watcher reloads PHP workers for code edits; you usually **do not**
 For hot module reload while testing on the LAN:
 
 ```bash
-docker compose exec app npm run dev
+./scripts/compose.sh exec app npm run dev
 ```
 
 Ensure `VITE_*` / HMR settings in `.env.example` match how you reach the server from your browser.
@@ -120,21 +168,50 @@ Ensure `VITE_*` / HMR settings in `.env.example` match how you reach the server 
 
 ## When things go wrong
 
+### Logs and deploy refresh
+
 ```bash
 # App logs
-docker compose logs -f app
+./scripts/compose.sh logs -f app
 
 # Worker / Horizon
-docker compose logs -f worker
+./scripts/compose.sh logs -f worker
 
 # Force full dependency refresh
 rm -f storage/framework/.deploy-composer-hash storage/framework/.deploy-npm-hash
 ./scripts/deploy.sh
+```
 
-# Nuclear reset (destroys all Docker volumes — database, uploads, etc.)
-./scripts/reset.sh --force --lan
-# or manually:
-# ./scripts/compose.sh down -v --force && ./scripts/install.sh --lan
+### Surgical repair (keep database and users)
+
+Fixes `.env`, syncs Postgres password, rebuilds Vite assets, and restarts the stack **without** deleting volumes:
+
+```bash
+cd /opt/nrth
+git pull origin master
+./scripts/repair.sh --install-dir /opt/nrth --ip <server-ip>
+```
+
+Default mode is HTTP (`http://<server-ip>:8000`). For HTTPS with Caddy:
+
+```bash
+./scripts/repair.sh --install-dir /opt/nrth --mode https --ip <server-ip>
+```
+
+More detail: [SELF_HOST.md — Recovering a broken installation](SELF_HOST.md#recovering-a-broken-installation).
+
+### Nuclear reset (destroys all data)
+
+Destroys all Docker volumes — database, uploads, Redis, MinIO:
+
+```bash
+./scripts/reset.sh --force --accept-data-risk --lan --install-dir /opt/nrth
+```
+
+After reset, create your admin account if needed:
+
+```bash
+./scripts/compose.sh exec -it app php artisan app:install
 ```
 
 ---
@@ -144,8 +221,6 @@ rm -f storage/framework/.deploy-composer-hash storage/framework/.deploy-npm-hash
 When the project stabilises:
 
 - Use `APP_ENV=production`, `APP_DEBUG=false`
-- Put Caddy/Nginx in front with HTTPS ([SELF_HOST.md](SELF_HOST.md))
+- Put Caddy in front with HTTPS ([SELF_HOST.md](SELF_HOST.md))
 - Switch deploys to `./scripts/deploy.sh production`
 - Consider a production compose file without bind mounts and without Octane `--watch`
-
-You do not need to change the auto-deploy mechanism — only the deploy mode and environment.

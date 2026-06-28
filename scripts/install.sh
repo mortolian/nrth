@@ -21,7 +21,7 @@
 #   --dev                Dev/LAN defaults: HTTP on :8000, no Caddy (default)
 #   --with-caddy         Enable Compose Caddy TLS proxy (default for --production)
 #   --no-caddy           Do not start the optional Caddy reverse proxy
-#   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server)
+#   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server); no deploy workflow in repo
 #   --non-interactive    Skip env prompts; use generated defaults
 #   --accept-data-risk   Acknowledge backup responsibility (required with --non-interactive)
 #   --allow-http         Permit plain HTTP (default for --dev; sets APP_ALLOW_HTTP=true)
@@ -737,11 +737,13 @@ run_first_install() {
 print_auto_deploy_manual_steps() {
     cat <<EOF
 
-GitHub Actions self-hosted runner (auto-deploy on push to master)
------------------------------------------------------------------
+GitHub Actions self-hosted runner (optional)
+--------------------------------------------
 
-The workflow .github/workflows/deploy-personal-server.yml runs:
+No deploy workflow ships with this repo. To deploy, run manually:
   ${ROOT_DIR}/scripts/deploy.sh
+
+Or add your own workflow that runs on a self-hosted runner with label ${RUNNER_LABEL}.
 
 1. Open: ${GITHUB_REPO}/settings/actions/runners/new
 2. Select Linux x64 and copy the registration token.
@@ -750,7 +752,6 @@ The workflow .github/workflows/deploy-personal-server.yml runs:
    GITHUB_RUNNER_TOKEN=<token> ${ROOT_DIR}/scripts/install.sh --auto-deploy
 
 4. Ensure the runner has label: ${RUNNER_LABEL}
-5. Push to master — the workflow should run on this runner within ~1 minute.
 
 Docs: ${ROOT_DIR}/docs/PERSONAL_SERVER.md
 
@@ -808,12 +809,12 @@ install_github_runner() {
 }
 
 setup_auto_deploy() {
-    log "Auto-deploy setup (GitHub Actions self-hosted runner, label: ${RUNNER_LABEL})"
+    log "Self-hosted runner setup (GitHub Actions, label: ${RUNNER_LABEL})"
 
     if [[ -n "${GITHUB_RUNNER_TOKEN:-}" ]]; then
         install_github_runner "$GITHUB_RUNNER_TOKEN"
         echo ""
-        echo "Runner setup complete. Pushes to master will trigger ${ROOT_DIR}/scripts/deploy.sh"
+        echo "Runner setup complete. Deploy with ${ROOT_DIR}/scripts/deploy.sh or add your own workflow."
         return 0
     fi
 

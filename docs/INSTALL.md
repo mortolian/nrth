@@ -20,8 +20,8 @@ Pass flags after `bash -s --`:
 # Production server
 curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --production --install-dir /opt/nrth
 
-# Personal dev server with GitHub Actions auto-deploy
-curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --dev --auto-deploy --install-dir /opt/nrth
+# Personal dev server (maintainer; manual deploy via deploy.sh)
+curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --dev --install-dir /opt/nrth
 
 # Non-interactive (generated secrets, localhost URL)
 curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/install.sh | sudo bash -s -- --accept-data-risk --production --non-interactive
@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 | `--dev` | Dev/staging defaults (default) |
 | `--with-caddy` | Enable Compose Caddy reverse proxy on ports 80/443 |
 | `--no-caddy` | Skip Caddy; you must terminate TLS elsewhere |
-| `--auto-deploy` | Install GitHub Actions self-hosted runner (label `nrth-server`) |
+| `--auto-deploy` | Install GitHub Actions self-hosted runner (label `nrth-server`); no deploy workflow ships with the repo — add your own or deploy manually |
 | `--install-dir PATH` | Clone/install location (default `/opt/nrth` when piping) |
 | `--repo-url URL` | Git remote (default `https://github.com/mortolian/nrth.git`) |
 | `--branch NAME` | Git branch (default `master`) |
@@ -63,15 +63,15 @@ Re-running `install.sh` on an already-installed instance runs `scripts/deploy.sh
 
 Full walkthrough: **[SELF_HOST.md — Recovering a broken installation](SELF_HOST.md#recovering-a-broken-installation)**.
 
-### Auto-deploy token
+### Self-hosted runner token (optional)
 
-With `--auto-deploy`, paste a runner registration token when prompted, or set:
+With `--auto-deploy`, the installer registers a GitHub Actions runner on this machine. Paste a registration token when prompted, or set:
 
 ```bash
 GITHUB_RUNNER_TOKEN=<token> ./scripts/install.sh --auto-deploy
 ```
 
-See [PERSONAL_SERVER.md](PERSONAL_SERVER.md) for maintainer workflow details.
+The repo does not include a deploy workflow — use `./scripts/deploy.sh` for manual upgrades, or add your own workflow. See [PERSONAL_SERVER.md](PERSONAL_SERVER.md) for maintainer details.
 
 ---
 
@@ -114,7 +114,7 @@ Updates:
 |-------|----------|
 | [SELF_HOST.md](SELF_HOST.md) | Production checklist, HTTPS, backups |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Contributors (local dev after cloning from git) |
-| [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | Maintainer auto-deploy server |
+| [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | Maintainer personal dev server |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | How to report issues and open PRs |
 | [SECURITY.md](../SECURITY.md) | Vulnerability reporting |
 

@@ -1,6 +1,6 @@
 # Self-hosting nrth
 
-Run your own copy of nrth with one install command. For day-to-day development on your laptop, see [DEVELOPMENT.md](DEVELOPMENT.md). For the maintainer's auto-updating homelab server, see [PERSONAL_SERVER.md](PERSONAL_SERVER.md).
+Run your own copy of nrth with one install command. For day-to-day development on your laptop, see [DEVELOPMENT.md](DEVELOPMENT.md). For the maintainer's personal dev server (manual deploy), see [PERSONAL_SERVER.md](PERSONAL_SERVER.md).
 
 ---
 

@@ -10,13 +10,12 @@ This document consolidates all open TODO items and recommendations from planning
 
 Minimum items to complete **before** making the repository public:
 
-- [ ] Set GitHub repo **About** description, website URL, and **topics**
-- [ ] Upload **social preview image** (Settings → General → Social preview)
+- [x] Set GitHub repo **About** description, website URL, and **topics**
+- [x] Upload **social preview image** (Settings → General → Social preview)
 - [ ] Create first **GitHub Release** (`v0.1.0` or later) with [CHANGELOG](../CHANGELOG.md) notes
 - [ ] Add **screenshots or demo** to [README.md](../README.md) ([images/](images/))
-- [ ] Enable **GitHub Discussions**
-- [ ] Enable **private vulnerability reporting** (Settings → Security → Private vulnerability reporting)
-- [ ] Review [deploy-personal-server.yml](../.github/workflows/deploy-personal-server.yml) visibility or document as maintainer-only
+- [x] Enable **GitHub Discussions**
+- [x] Enable **private vulnerability reporting** (Settings → Security → Private vulnerability reporting)
 - [ ] Expand [CHANGELOG.md](../CHANGELOG.md) beyond the initial `0.1.0` entry
 
 ---
@@ -43,14 +42,13 @@ Community and documentation foundations are in place:
 
 GitHub presence, first release, and visible polish.
 
-- [ ] **GitHub repo description + topics** — Set in Settings → General → About. Suggested topics: `laravel`, `accounting`, `invoicing`, `vue`, `south-africa`, `self-hosted`, `bookkeeping`, `saas`
-- [ ] **Social preview image** — Logo + tagline (1200×630 px recommended). Upload under Settings → General → Social preview
+- [x] **GitHub repo description + topics** — Set in Settings → General → About. Suggested topics: `laravel`, `accounting`, `invoicing`, `vue`, `south-africa`, `self-hosted`, `bookkeeping`, `saas`
+- [x] **Social preview image** — Logo + tagline (1200×630 px recommended). Upload under Settings → General → Social preview
 - [ ] **First GitHub Release** — Tag `v0.1.0` (or current version) with release notes drawn from [CHANGELOG.md](../CHANGELOG.md)
 - [ ] **Screenshots or demo in README** — Add assets under [images/](images/) and reference them in [README.md](../README.md)
-- [ ] **Enable GitHub Discussions** — Settings → General → Features → Discussions (for Q&A, ideas, and community support)
-- [ ] **Enable private vulnerability reporting** — Settings → Security → Private vulnerability reporting (complements [SECURITY.md](../SECURITY.md) GitHub Advisories link)
+- [x] **Enable GitHub Discussions** — Settings → General → Features → Discussions (for Q&A, ideas, and community support)
+- [x] **Enable private vulnerability reporting** — Settings → Security → Private vulnerability reporting (complements [SECURITY.md](../SECURITY.md) GitHub Advisories link)
 - [ ] **Optional: verify security contact email** — [SECURITY.md](../SECURITY.md) lists `security@mortolian.com`; confirm the inbox is monitored or update the address
-- [ ] **Review deploy-personal-server workflow** — [.github/workflows/deploy-personal-server.yml](../.github/workflows/deploy-personal-server.yml) deploys to a self-hosted runner on push to `master`. Either restrict visibility (maintainer-only docs), add a workflow guard, or document clearly that this is for the maintainer's personal server only (see [PERSONAL_SERVER.md](PERSONAL_SERVER.md))
 - [ ] **Expand CHANGELOG.md** — [CHANGELOG.md](../CHANGELOG.md) should cover more than the initial `0.1.0` entry; keep it updated for each release ([update-changelog.yml](../.github/workflows/update-changelog.yml) may assist)
 
 ---
@@ -99,9 +97,9 @@ One install script for everyone; deploy script for updates.
 | Audience | Document | Scripts / automation |
 | -------- | -------- | -------------------- |
 | **Community / self-hosters** | [SELF_HOST.md](SELF_HOST.md) | [scripts/install.sh](../scripts/install.sh) |
-| **Maintainer personal server** | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | `install.sh --auto-deploy`, [scripts/deploy.sh](../scripts/deploy.sh), [.github/workflows/deploy-personal-server.yml](../.github/workflows/deploy-personal-server.yml) |
+| **Maintainer personal server** | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | [scripts/deploy.sh](../scripts/deploy.sh) (manual deploy); optional `install.sh --auto-deploy` for a self-hosted runner |
 
-- [ ] Ensure [PERSONAL_SERVER.md](PERSONAL_SERVER.md) is clearly labeled **maintainer-only** in README or hosting index so self-hosters do not follow the wrong path
+- [x] Ensure [PERSONAL_SERVER.md](PERSONAL_SERVER.md) is clearly labeled **maintainer-only** in README or hosting index so self-hosters do not follow the wrong path
 - [ ] Confirm [SELF_HOST.md](SELF_HOST.md) is linked from [README.md](../README.md) and [INSTALL.md](INSTALL.md) as the primary self-host entry point
 
 ---
