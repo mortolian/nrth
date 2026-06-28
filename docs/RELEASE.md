@@ -64,6 +64,7 @@ Older commits like `UPDATE:` or `FEATURE:` are **not** parsed. Only messages aft
 | [version.txt](../version.txt) | Canonical semver for the `simple` release type |
 | [.env.example](../.env.example) | `APP_VERSION` (via `# x-release-please-version`) |
 | [.github/.release-please-manifest.json](../.github/.release-please-manifest.json) | Internal version tracker |
+| [.github/release-please-config.json](../.github/release-please-config.json) | Release Please settings |
 
 ## One-time setup: v0.1.0 baseline
 
