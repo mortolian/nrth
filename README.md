@@ -64,6 +64,7 @@ Details, Docker dev workflow, architecture, and tests: **[docs/DEVELOPMENT.md](d
 | [docs/SELF_HOST.md](docs/SELF_HOST.md) | Self-host with Docker |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer-only personal dev server |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Alpha scope, plans, and out-of-scope items |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
 ## Contributing
