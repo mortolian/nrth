@@ -19,6 +19,7 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
         <env name="APP_FORCE_HTTPS" value="false"/>
         <env name="APP_ALLOW_HTTP" value="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

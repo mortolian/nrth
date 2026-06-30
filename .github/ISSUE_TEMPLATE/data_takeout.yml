@@ -1,0 +1,21 @@
+name: Data takeout (tracking)
+description: Track implementation of period data takeout export
+title: "feat(tax): period data takeout export"
+labels:
+  - enhancement
+body:
+  - type: markdown
+    value: |
+      Implementation spec: [docs/specs/data-takeout.md](../blob/master/docs/specs/data-takeout.md)
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Implementation checklist
+      options:
+        - label: TakeoutRun model + migration + owner policy
+        - label: GenerateTakeoutJob — figures (CSV + xlsx) + README/gaps
+        - label: Download route + takeouts:prune scheduled command
+        - label: Documents — invoices, receipts, bank files, contracts
+        - label: Tax → Documents UI + database notifications
+        - label: Feature tests per spec

@@ -5,6 +5,9 @@ namespace App\Providers;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
+use App\Domain\Takeout\Models\TakeoutRun;
+use App\Policies\TakeoutRunPolicy;
+use Illuminate\Support\Facades\Gate;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\UserProfileController;
 use App\Support\EnsureTeamSpatieRoles;
@@ -50,6 +53,8 @@ class AppServiceProvider extends ServiceProvider
         $this->mergeNodePathForOctaneFileWatcher();
 
         EnsureTeamSpatieRoles::sync();
+
+        Gate::policy(TakeoutRun::class, TakeoutRunPolicy::class);
     }
 
     /**

@@ -234,7 +234,7 @@ read_env_var() {
     grep -E "^${key}=" "$file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'
 }
 
-# Postgres/MinIO only apply *_PASSWORD on first volume init; rotating .env breaks re-runs.
+# Postgres only applies DB_PASSWORD on first volume init; rotating .env breaks re-runs.
 compose_data_volume_exists() {
     local suffix="$1"
     $COMPOSE volume ls -q 2>/dev/null | grep -qE "(^|_)${suffix}$"
@@ -504,18 +504,9 @@ configure_env() {
 
     ensure_env_file
 
-    local db_pass minio_pass aws_key aws_secret app_url
+    local db_pass app_url
 
     db_pass="$(preserve_or_gen_secret DB_PASSWORD "$env_file" mysql_data)"
-    minio_pass="$(preserve_or_gen_secret MINIO_ROOT_PASSWORD "$env_file" minio_data)"
-    aws_key="$(read_env_var AWS_ACCESS_KEY_ID "$env_file")"
-    aws_secret="$(read_env_var AWS_SECRET_ACCESS_KEY "$env_file")"
-    if [[ -n "$aws_key" && -n "$aws_secret" ]] && compose_data_volume_exists minio_data; then
-        log "Preserving existing MinIO client credentials (minio_data volume already initialized)"
-    else
-        aws_key="nrth$(gen_secret | tr '[:upper:]' '[:lower:]' | head -c 8)"
-        aws_secret="$(gen_secret)"
-    fi
 
     resolve_access_defaults
 
@@ -585,12 +576,6 @@ configure_env() {
     set_env_var SESSION_DRIVER redis "$env_file"
     set_env_var REDIS_HOST 127.0.0.1 "$env_file"
     set_env_var REDIS_PORT 6379 "$env_file"
-    set_env_var MINIO_ROOT_USER minio "$env_file"
-    set_env_var MINIO_ROOT_PASSWORD "$minio_pass" "$env_file"
-    set_env_var AWS_ACCESS_KEY_ID "$aws_key" "$env_file"
-    set_env_var AWS_SECRET_ACCESS_KEY "$aws_secret" "$env_file"
-    set_env_var AWS_BUCKET nrth "$env_file"
-    set_env_var AWS_DEFAULT_REGION us-east-1 "$env_file"
 
     log "Configured .env for Docker Compose (${MODE} mode)"
 }
@@ -665,7 +650,6 @@ recover_broken_stack() {
 
 data_volumes_exist() {
     compose_data_volume_exists mysql_data \
-        || compose_data_volume_exists minio_data \
         || compose_data_volume_exists storage_data
 }
 
@@ -678,8 +662,8 @@ is_configured_install() {
 log_existing_install_safety() {
     echo ""
     log "Existing installation detected"
-    echo "  Preserved: Docker volumes (database, redis, minio, storage, vendor, node_modules)"
-    echo "  Preserved: DB and MinIO credentials in .env (when volumes are already initialized)"
+    echo "  Preserved: Docker volumes (database, redis, storage, vendor, node_modules)"
+    echo "  Preserved: DB credentials in .env (when volumes are already initialized)"
     echo "  Will run:  code update, incremental migrations, queue/cache refresh"
     echo "  Will NOT:   compose down -v, migrate:fresh, password rotation, or app:install"
     echo ""
@@ -937,7 +921,7 @@ main() {
     handle_existing_install || true
 
     if [[ -f .env ]] && data_volumes_exist; then
-        log "Existing Docker volumes detected — DB/MinIO passwords will be preserved"
+        log "Existing Docker volumes detected — DB password will be preserved"
     fi
 
     configure_env

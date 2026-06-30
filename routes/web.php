@@ -27,6 +27,7 @@ use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
 use App\Http\Controllers\Web\SupplierController;
 use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
+use App\Http\Controllers\Web\Tax\TakeoutController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
 use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
@@ -114,6 +115,8 @@ Route::middleware([
     Route::post('/tax/vat/periods/{period}/submit', [VATController::class, 'submit'])->name('tax.vat.submit');
     Route::get('/tax/provisional', [ProvisionalTaxController::class, 'index'])->name('tax.provisional.index');
     Route::get('/tax/documents', TaxDocumentsController::class)->name('tax.documents.index');
+    Route::post('/tax/takeouts', [TakeoutController::class, 'store'])->name('tax.takeouts.store');
+    Route::get('/tax/takeouts/{takeoutRun}/download', [TakeoutController::class, 'download'])->name('tax.takeouts.download');
     Route::get('/reports/profit-loss', [ReportsController::class, 'profitLoss'])->name('reports.profit-loss');
     Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');
