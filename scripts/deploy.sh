@@ -95,6 +95,7 @@ if [[ "$MODE" == "production" ]]; then
 else
     echo "==> Running development update (migrate + queue restart)"
     run_app php artisan migrate --force --no-interaction
+    run_app php artisan nrth:promote-first-operator
     run_app php artisan queue:restart
     run_app php artisan horizon:terminate 2>/dev/null || true
     $COMPOSE restart worker 2>/dev/null || true

@@ -101,10 +101,11 @@ Updates:
 
 - **PostgreSQL 16** — database
 - **Redis 7** — cache, sessions, queues
-- **MinIO** — S3-compatible file storage
 - **Octane (Swoole)** — HTTP
 - **Horizon** — queue worker
 - **Mailpit** — local mail capture (replace with SMTP in production)
+
+Uploads and Spatie backups use the local `storage` volume by default. After `app:install`, the first admin is an **instance operator** (Settings → Instance, Backups & exports). No `NRTH_OPERATOR_EMAILS` is required for a normal install. See [SELF_HOST.md](SELF_HOST.md) for backup/restore notes.
 
 ---
 
@@ -127,6 +128,7 @@ Updates:
 | `./scripts/compose.sh exec -it app php artisan app:install` | First install on an empty database |
 | `./scripts/deploy.sh production` | Production upgrades (recommended) |
 | `./scripts/compose.sh exec app php artisan app:update` | Manual production upgrade |
+| `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` | Upgrade safety: promote oldest user if no operators exist yet (also run by `app:update`) |
 
 Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when docker.sock is not accessible yet.
 
@@ -140,23 +142,23 @@ Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when d
 |--------|----------------|
 | `./scripts/install.sh` (re-run on existing install) | Detects volumes and admin user; runs `deploy.sh` only |
 | `./scripts/deploy.sh` / `deploy.sh production` | Pulls code, runs **incremental** `migrate`, rebuilds caches; **no** volume removal |
-| `./scripts/compose.sh down` | Stops containers; **keeps** Postgres, Redis, MinIO, and storage volumes |
+| `./scripts/compose.sh down` | Stops containers; **keeps** Postgres, Redis, and storage volumes |
 | `php artisan app:update` / `migrate` | Applies new migrations only; does not drop tables |
 
 **Destructive (will delete data — use only when you mean to reset):**
 
 | Action | What is lost |
 |--------|----------------|
-| `./scripts/compose.sh down -v` | All Docker volumes: database, uploads, Redis, MinIO objects |
+| `./scripts/compose.sh down -v` | All Docker volumes: database, uploads, Redis |
 | `./scripts/compose.sh down -v --force` | Same as above; `--force` is required to bypass the safety guard |
 | `./scripts/reset.sh --force` | Stops stack, removes all volumes, re-runs `install.sh` (backs up old `.env`; prompts for backup acknowledgment) |
 | `php artisan migrate:fresh` | All database tables and rows |
 | `php artisan db:wipe` | Database contents |
-| Re-generating `DB_PASSWORD` / `MINIO_ROOT_PASSWORD` in `.env` **after** volumes exist | App cannot connect until passwords are synced (data still on disk) |
+| Re-generating `DB_PASSWORD` in `.env` **after** volumes exist | App cannot connect until passwords are synced (data still on disk) |
 
 `./scripts/compose.sh` blocks `down -v` unless you pass `--force` or set `NRTH_FORCE=1`.
 
-On re-run, `install.sh` preserves `DB_PASSWORD` and MinIO credentials when data volumes already exist (Postgres/MinIO only read those env vars on first volume init).
+On re-run, `install.sh` preserves `DB_PASSWORD` when data volumes already exist (Postgres only reads that env var on first volume init).
 
 ---
 

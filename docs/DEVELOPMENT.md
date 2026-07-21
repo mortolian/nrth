@@ -7,7 +7,7 @@ This document is for **contributors** who have cloned the repository from git. I
 - PHP 8.3+ (8.4+ recommended; Docker image uses 8.4)
 - Composer 2.7+
 - Node.js 20.19+ or 22.12+
-- PostgreSQL, Redis, and S3-compatible storage for full parity — or use Docker Compose
+- PostgreSQL and Redis for full parity — or use Docker Compose
 
 ## Local setup (PHP on the host)
 
@@ -50,7 +50,7 @@ Vite is stubbed in `tests/TestCase.php` — a production asset build is not requ
 
 ## Docker Compose (full stack while developing)
 
-If you need Postgres, Redis, MinIO, and queues while working on a clone, you can use the same `compose.yaml` as production — but **new installs should use `scripts/install.sh`**, not manual `docker compose` steps.
+If you need Postgres, Redis, and queues while working on a clone, you can use the same `compose.yaml` as production — but **new installs should use `scripts/install.sh`**, not manual `docker compose` steps.
 
 After cloning:
 
@@ -77,6 +77,11 @@ composer sail -- npm run dev
 ```
 
 See `.env.example` for Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
+
+### Backups & exports (local)
+
+- Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).
+- The first user created is an instance operator. Manage operators under **Settings → Instance**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
 
 ## Architecture
 

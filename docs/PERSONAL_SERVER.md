@@ -140,13 +140,13 @@ Octane's file watcher reloads PHP workers for code edits; you usually **do not**
 
 ## Data safety
 
-Normal upgrades via `deploy.sh` and re-runs of `install.sh` preserve your database, uploaded files (MinIO/storage volumes), and Redis data.
+Normal upgrades via `deploy.sh` and re-runs of `install.sh` preserve your database, uploaded files (storage volume), and Redis data.
 
 **Do not run these unless you intend to wipe data:**
 
 - `./scripts/compose.sh down -v` — blocked unless you add `--force` (deletes all Compose volumes)
 - `php artisan migrate:fresh` or `db:wipe` — empties the database
-- Manually changing `DB_PASSWORD` or `MINIO_ROOT_PASSWORD` in `.env` after first boot — breaks auth until you sync credentials
+- Manually changing `DB_PASSWORD` in `.env` after first boot — breaks auth until you sync credentials
 
 Safe shutdown: `./scripts/compose.sh down` (containers stop; volumes remain).
 
@@ -202,7 +202,7 @@ More detail: [SELF_HOST.md — Recovering a broken installation](SELF_HOST.md#re
 
 ### Nuclear reset (destroys all data)
 
-Destroys all Docker volumes — database, uploads, Redis, MinIO:
+Destroys all Docker volumes — database, uploads, Redis:
 
 ```bash
 ./scripts/reset.sh --force --accept-data-risk --lan --install-dir /opt/nrth

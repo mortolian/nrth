@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\Accounting\AccountStatementController;
 use App\Http\Controllers\Web\Accounting\ChartOfAccountsController;
 use App\Http\Controllers\Web\Accounting\GeneralLedgerController;
 use App\Http\Controllers\Web\Accounting\TransactionController;
+use App\Http\Controllers\Web\BackupsExportsController;
 use App\Http\Controllers\Web\Banking\BankingAccountController;
 use App\Http\Controllers\Web\Banking\BankingStatementImportController;
 use App\Http\Controllers\Web\Banking\BankingTransactionController;
@@ -23,10 +24,12 @@ use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\PublicInvoicePayController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\CompanySettingsController;
+use App\Http\Controllers\Web\Settings\InstanceSettingsController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
 use App\Http\Controllers\Web\SupplierController;
 use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
+use App\Http\Controllers\Web\Tax\TakeoutController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
 use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
@@ -60,7 +63,18 @@ Route::middleware([
     Route::get('/settings/company', [CompanySettingsController::class, 'edit'])->name('settings.company');
     Route::post('/settings/company', [CompanySettingsController::class, 'update'])->name('settings.company.update');
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
+    Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
+    Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
+    Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');
     Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');
+    Route::get('/backups-exports', [BackupsExportsController::class, 'index'])->name('backups-exports.index');
+    Route::post('/backups-exports/backups', [BackupsExportsController::class, 'storeBackup'])->name('backups-exports.backups.store');
+    Route::get('/backups-exports/backups/{filename}/download', [BackupsExportsController::class, 'downloadBackup'])
+        ->where('filename', '[A-Za-z0-9._-]+\.zip')
+        ->name('backups-exports.backups.download');
+    Route::delete('/backups-exports/backups/{filename}', [BackupsExportsController::class, 'destroyBackup'])
+        ->where('filename', '[A-Za-z0-9._-]+\.zip')
+        ->name('backups-exports.backups.destroy');
     Route::prefix('banking')->name('banking.')->group(function () {
         Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
@@ -114,6 +128,10 @@ Route::middleware([
     Route::post('/tax/vat/periods/{period}/submit', [VATController::class, 'submit'])->name('tax.vat.submit');
     Route::get('/tax/provisional', [ProvisionalTaxController::class, 'index'])->name('tax.provisional.index');
     Route::get('/tax/documents', TaxDocumentsController::class)->name('tax.documents.index');
+    Route::post('/tax/takeouts', [TakeoutController::class, 'store'])->name('tax.takeouts.store');
+    Route::get('/tax/takeouts/{takeoutRun}/download', [TakeoutController::class, 'download'])->name('tax.takeouts.download');
+    Route::delete('/tax/takeouts/{takeoutRun}', [TakeoutController::class, 'destroy'])->name('tax.takeouts.destroy');
+    Route::post('/tax/takeouts/{takeoutRun}/retry', [TakeoutController::class, 'retry'])->name('tax.takeouts.retry');
     Route::get('/reports/profit-loss', [ReportsController::class, 'profitLoss'])->name('reports.profit-loss');
     Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');

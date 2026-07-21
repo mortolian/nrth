@@ -28,8 +28,9 @@ All flags and options: **[INSTALL.md](INSTALL.md)**.
 | **scheduler** | `schedule:work` |
 | **postgres** | Database |
 | **redis** | Cache, sessions, queues |
-| **minio** | S3-compatible storage (receipts, uploads) |
 | **mailpit** | Catches outbound mail in dev (replace with real SMTP for production) |
+
+Uploads (receipts, invoice PDFs, contracts, logos) are stored on the **local** filesystem disk (`storage/app/private` in the `storage_data` Docker volume). Optional S3 is supported via `FILESYSTEM_DISK=s3` in `.env` if you point at an external provider.
 
 **Users should open `https://your-host/` (port 443), not `https://your-host:8000`.** Port 8000 is Octane's internal HTTP port. Docker health checks use `http://127.0.0.1:8000/up` inside the container.
 
@@ -167,10 +168,33 @@ Before putting the app on the internet:
 1. **`APP_DEBUG=false`** and **`APP_ENV=production`** (set by `--production` install)
 2. **HTTPS on 443** — Caddy in Compose or on the host; plain HTTP on 8000 is not for browsers
 3. **`APP_URL=https://your-domain`** — must use `https://` without `:8000` when using standard 443
-4. **Firewall**: expose only 80/443; do not publish Postgres/Redis/MinIO ports publicly
+4. **Firewall**: expose only 80/443; do not publish Postgres/Redis ports publicly
 5. **Real mail**: set `MAIL_*` to your SMTP provider (Mailpit is for testing only)
-6. **Backups**: schedule `php artisan backup:run` (Spatie Backup is included) and back up Postgres + `storage` volumes
+6. **Backups**: Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first registered user is an **instance operator** automatically. Manage operators under **Settings → Instance**. Optional break-glass: `NRTH_OPERATOR_EMAILS`. Also back up Postgres + `storage` volumes at the host level.
 7. **Secrets**: never commit `.env`
+
+### Instance backups vs data takeout
+
+| | **Data takeout** | **Instance backup** |
+|--|------------------|---------------------|
+| Who | Team **owner** | Instance operators (`is_instance_operator`, or optional `NRTH_OPERATOR_EMAILS`) |
+| What | Period export of books/docs (tax/audit zip) | Whole install: DB dump + app files (Spatie) |
+| UI | **Backups & exports** → Data takeout (Tax → Documents redirects here) | **Backups & exports** → Instance backup; operators under **Settings → Instance** |
+| Restore | N/A (re-import elsewhere) | **CLI only** — not available in the app |
+
+Existing install with no operators yet:
+
+```bash
+./scripts/compose.sh exec app php artisan nrth:promote-first-operator
+```
+
+Optional break-glass `.env` (not required for normal use):
+
+```env
+NRTH_OPERATOR_EMAILS=you@example.com
+```
+
+To restore a Spatie backup zip, follow Spatie’s docs: stop the app, restore the database dump and files from the zip onto the host volumes, then bring the stack back up. Prefer testing restore on a copy of the volumes first.
 
 ---
 
@@ -193,13 +217,13 @@ Or re-run install (detects existing install and delegates to `deploy.sh`):
 
 ## Data safety
 
-Normal upgrades and re-runs of `install.sh` / `deploy.sh` preserve your database, uploaded files (MinIO/storage volumes), and Redis data.
+Normal upgrades and re-runs of `install.sh` / `deploy.sh` preserve your database, uploaded files (storage volume), and Redis data.
 
 **Do not run these unless you intend to wipe data:**
 
 - `./scripts/compose.sh down -v` — blocked unless you add `--force` (deletes all Compose volumes)
 - `php artisan migrate:fresh` or `db:wipe` — empties the database
-- Manually changing `DB_PASSWORD` or `MINIO_ROOT_PASSWORD` in `.env` after first boot — breaks auth until you sync credentials (see [INSTALL.md](INSTALL.md#troubleshooting))
+- Manually changing `DB_PASSWORD` in `.env` after first boot — breaks auth until you sync credentials (see [INSTALL.md](INSTALL.md#troubleshooting))
 
 Safe shutdown: `./scripts/compose.sh down` (containers stop; volumes remain).
 
@@ -260,7 +284,7 @@ If HTTPS errors, deploy failures, docker permission errors, Postgres password mi
 
 ### Path A — Nuclear reset (no data to keep)
 
-Destroys all Docker volumes (database, uploads, Redis, MinIO) and re-runs install.
+Destroys all Docker volumes (database, uploads, Redis) and re-runs install.
 
 ```bash
 cd /opt/nrth

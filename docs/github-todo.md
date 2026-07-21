@@ -59,7 +59,7 @@ Deeper docs for contributors and self-hosters.
 
 - [ ] **docs/ARCHITECTURE.md** — Document domains, actions pattern, team scoping ([app/Domain/](../app/Domain/), [TeamScope](../app/Domain/Shared/Scopes/TeamScope.php)), and high-level request/data flow
 - [x] **docs/ROADMAP.md** — Planned features, alpha scope, and what is explicitly out of scope for now
-- [ ] **.env.example production warnings** — Add prominent comments for default passwords and secrets ([.env.example](../.env.example): `MINIO_ROOT_PASSWORD`, `DB_PASSWORD`, `APP_KEY`, etc.)
+- [ ] **.env.example production warnings** — Add prominent comments for default passwords and secrets ([.env.example](../.env.example): `DB_PASSWORD`, `APP_KEY`, etc.)
 - [ ] **Spatie Backup documentation** — Document [config/backup.php](../config/backup.php) and backup/restore steps more prominently in [SELF_HOST.md](SELF_HOST.md) or [INSTALL.md](INSTALL.md) if self-hosters need it
 - [ ] **Multi-tenant security note** — Add guidance for self-hosters on team isolation, registration settings, and hardening a multi-tenant deployment (relevant to Jetstream teams model)
 

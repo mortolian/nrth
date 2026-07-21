@@ -24,7 +24,7 @@ x-laravel-env: &laravel-env
   SESSION_LIFETIME: "${SESSION_LIFETIME}"
   SESSION_ENCRYPT: "${SESSION_ENCRYPT}"
   SESSION_PATH: "${SESSION_PATH}"
-  SESSION_DOMAIN: "${SESSION_DOMAIN}"
+  SESSION_DOMAIN: "${SESSION_DOMAIN:-}"
   SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-}"
   BROADCAST_CONNECTION: "${BROADCAST_CONNECTION}"
   FILESYSTEM_DISK: "${FILESYSTEM_DISK}"
@@ -56,7 +56,7 @@ x-laravel-env: &laravel-env
   VITE_DEV_SERVER_HMR_PORT: "${VITE_DEV_SERVER_HMR_PORT:-5173}"
   VITE_DEV_SERVER_USE_POLLING: "${VITE_DEV_SERVER_USE_POLLING:-false}"
 
-# Service names (postgres, redis, minio, mailpit) only resolve inside the Compose network.
+# Service names (postgres, redis, mailpit) only resolve inside the Compose network.
 # `.env` can use 127.0.0.1 + forwarded ports for `php artisan` on the host; app/worker/scheduler
 # override those keys below so containers always use in-network hosts.
 
@@ -92,42 +92,6 @@ services:
       retries: 10
       start_period: 5s
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
-    volumes:
-      - minio_data:/data
-    ports:
-      - "${FORWARD_MINIO_PORT:-9000}:9000"
-      - "${FORWARD_MINIO_CONSOLE_PORT:-9001}:9001"
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:9000/minio/health/live']
-      interval: 15s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
-
-  createbuckets:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
-      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
-      AWS_BUCKET: "${AWS_BUCKET}"
-    entrypoint: ['/bin/sh', '-c']
-    command:
-      - |
-        until mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD; do
-          sleep 2
-        done
-        mc mb local/$$AWS_BUCKET --ignore-existing
-    restart: 'no'
-
   mailpit:
     image: axllent/mailpit:latest
     ports:
@@ -150,7 +114,6 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
-      AWS_ENDPOINT: 'http://minio:9000'
       DOCKER_ROLE: app
       LARAVEL_SAIL: '1'
       # Octane's file-watcher.cjs runs under vendor/laravel/octane/bin; NODE_PATH guarantees
@@ -161,10 +124,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      createbuckets:
-        condition: service_completed_successfully
       mailpit:
         condition: service_started
     volumes:
@@ -189,17 +148,12 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
-      AWS_ENDPOINT: 'http://minio:9000'
       DOCKER_ROLE: worker
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      createbuckets:
-        condition: service_completed_successfully
       app:
         condition: service_started
     volumes:
@@ -222,17 +176,12 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
-      AWS_ENDPOINT: 'http://minio:9000'
       DOCKER_ROLE: worker
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      createbuckets:
-        condition: service_completed_successfully
       app:
         condition: service_started
     volumes:
@@ -279,7 +228,6 @@ services:
 volumes:
   mysql_data:
   redis_data:
-  minio_data:
   storage_data:
   vendor_data:
   node_modules_data:

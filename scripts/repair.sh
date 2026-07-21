@@ -279,7 +279,6 @@ compose_data_volume_exists() {
 
 data_volumes_exist() {
     compose_data_volume_exists mysql_data \
-        || compose_data_volume_exists minio_data \
         || compose_data_volume_exists storage_data
 }
 

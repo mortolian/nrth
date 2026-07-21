@@ -11,3 +11,15 @@ Artisan::command('inspire', function () {
 Schedule::command('estimates:expire')
     ->dailyAt('01:00')
     ->withoutOverlapping();
+
+Schedule::command('takeouts:prune')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();
+
+Schedule::command('backup:run')
+    ->dailyAt('03:00')
+    ->withoutOverlapping();
+
+Schedule::command('backup:clean')
+    ->dailyAt('03:30')
+    ->withoutOverlapping();
