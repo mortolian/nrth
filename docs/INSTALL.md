@@ -105,6 +105,8 @@ Updates:
 - **Horizon** — queue worker
 - **Mailpit** — local mail capture (replace with SMTP in production)
 
+Uploads and Spatie backups use the local `storage` volume by default. After `app:install`, the first admin is an **instance operator** (Settings → Instance, Backups & exports). No `NRTH_OPERATOR_EMAILS` is required for a normal install. See [SELF_HOST.md](SELF_HOST.md) for backup/restore notes.
+
 ---
 
 ## Guides
@@ -126,6 +128,7 @@ Updates:
 | `./scripts/compose.sh exec -it app php artisan app:install` | First install on an empty database |
 | `./scripts/deploy.sh production` | Production upgrades (recommended) |
 | `./scripts/compose.sh exec app php artisan app:update` | Manual production upgrade |
+| `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` | Upgrade safety: promote oldest user if no operators exist yet (also run by `app:update`) |
 
 Use `./scripts/compose.sh` instead of `docker compose` — it auto-sudo's when docker.sock is not accessible yet.
 

@@ -78,6 +78,11 @@ composer sail -- npm run dev
 
 See `.env.example` for Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
 
+### Backups & exports (local)
+
+- Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).
+- The first user created is an instance operator. Manage operators under **Settings → Instance**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
+
 ## Architecture
 
 - Business logic lives under `app/Domain/{Context}/` (actions, DTOs, models, services).

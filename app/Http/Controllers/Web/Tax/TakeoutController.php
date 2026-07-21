@@ -36,11 +36,12 @@ class TakeoutController extends Controller
         GenerateTakeoutJob::dispatch($run->id);
 
         return redirect()
-            ->route('tax.documents.index', [
+            ->route('backups-exports.index', [
+                'section' => 'takeout',
                 'from' => $validated['from_date'],
                 'to' => $validated['to_date'],
             ])
-            ->with('success', 'Your data takeout is being prepared. You will be notified when it is ready to download.');
+            ->with('success', 'Your data takeout is being prepared. Refresh this page when it is ready to download.');
     }
 
     public function download(Request $request, TakeoutRun $takeoutRun): StreamedResponse
@@ -70,5 +71,62 @@ class TakeoutController extends Controller
         return $disk->download((string) $takeoutRun->storage_path, $filename, [
             'Content-Type' => 'application/zip',
         ]);
+    }
+
+    public function destroy(Request $request, TakeoutRun $takeoutRun): RedirectResponse
+    {
+        Gate::authorize('delete', $takeoutRun);
+
+        if (in_array($takeoutRun->status, [TakeoutRunStatus::Queued, TakeoutRunStatus::Processing], true)) {
+            return redirect()
+                ->route('backups-exports.index', ['section' => 'takeout'])
+                ->with('error', 'Cannot delete a takeout that is still being prepared.');
+        }
+
+        if ($takeoutRun->storage_path) {
+            Storage::disk('local')->delete($takeoutRun->storage_path);
+        }
+
+        $takeoutRun->delete();
+
+        return redirect()
+            ->route('backups-exports.index', array_filter([
+                'section' => 'takeout',
+                'from' => $request->string('from')->toString() ?: null,
+                'to' => $request->string('to')->toString() ?: null,
+            ]))
+            ->with('success', 'Takeout deleted.');
+    }
+
+    public function retry(Request $request, TakeoutRun $takeoutRun): RedirectResponse
+    {
+        Gate::authorize('retry', $takeoutRun);
+
+        abort_unless($takeoutRun->status === TakeoutRunStatus::Failed, 422);
+
+        if ($takeoutRun->storage_path) {
+            Storage::disk('local')->delete($takeoutRun->storage_path);
+        }
+
+        $takeoutRun->forceFill([
+            'status' => TakeoutRunStatus::Queued,
+            'storage_path' => null,
+            'file_size_bytes' => null,
+            'manifest' => null,
+            'error_message' => null,
+            'expires_at' => null,
+            'completed_at' => null,
+            'download_token' => TakeoutRun::generateDownloadToken(),
+        ])->save();
+
+        GenerateTakeoutJob::dispatch($takeoutRun->id);
+
+        return redirect()
+            ->route('backups-exports.index', [
+                'section' => 'takeout',
+                'from' => $takeoutRun->from_date->toDateString(),
+                'to' => $takeoutRun->to_date->toDateString(),
+            ])
+            ->with('success', 'Takeout has been re-queued.');
     }
 }

@@ -170,8 +170,31 @@ Before putting the app on the internet:
 3. **`APP_URL=https://your-domain`** — must use `https://` without `:8000` when using standard 443
 4. **Firewall**: expose only 80/443; do not publish Postgres/Redis ports publicly
 5. **Real mail**: set `MAIL_*` to your SMTP provider (Mailpit is for testing only)
-6. **Backups**: schedule `php artisan backup:run` (Spatie Backup is included) and back up Postgres + `storage` volumes
+6. **Backups**: Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first registered user is an **instance operator** automatically. Manage operators under **Settings → Instance**. Optional break-glass: `NRTH_OPERATOR_EMAILS`. Also back up Postgres + `storage` volumes at the host level.
 7. **Secrets**: never commit `.env`
+
+### Instance backups vs data takeout
+
+| | **Data takeout** | **Instance backup** |
+|--|------------------|---------------------|
+| Who | Team **owner** | Instance operators (`is_instance_operator`, or optional `NRTH_OPERATOR_EMAILS`) |
+| What | Period export of books/docs (tax/audit zip) | Whole install: DB dump + app files (Spatie) |
+| UI | **Backups & exports** → Data takeout (Tax → Documents redirects here) | **Backups & exports** → Instance backup; operators under **Settings → Instance** |
+| Restore | N/A (re-import elsewhere) | **CLI only** — not available in the app |
+
+Existing install with no operators yet:
+
+```bash
+./scripts/compose.sh exec app php artisan nrth:promote-first-operator
+```
+
+Optional break-glass `.env` (not required for normal use):
+
+```env
+NRTH_OPERATOR_EMAILS=you@example.com
+```
+
+To restore a Spatie backup zip, follow Spatie’s docs: stop the app, restore the database dump and files from the zip onto the host volumes, then bring the stack back up. Prefer testing restore on a copy of the volumes first.
 
 ---
 

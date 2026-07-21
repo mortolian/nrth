@@ -5,6 +5,7 @@ namespace Tests\Feature\Tax;
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Domain\Takeout\Notifications\TakeoutReady;
+use App\Domain\Takeout\Services\TakeoutBuilder;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +23,7 @@ class TaxDocumentsControllerTest extends TestCase
         $this->actingAs($user);
     }
 
-    public function test_owner_can_view_tax_documents_page(): void
+    public function test_tax_documents_redirects_to_backups_exports_hub(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -30,27 +31,9 @@ class TaxDocumentsControllerTest extends TestCase
 
         $response = $this->get(route('tax.documents.index'));
 
-        $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('Tax/Documents/Index')
-            ->has('period')
-            ->has('preview')
-            ->has('recent_takeouts')
-            ->where('can_generate_takeout', true));
-    }
-
-    public function test_non_owner_cannot_view_tax_documents_page(): void
-    {
-        $owner = User::factory()->withPersonalTeam()->create();
-        $team = $owner->currentTeam;
-
-        $member = User::factory()->create();
-        $team->users()->attach($member, ['role' => 'editor']);
-        $this->actingAsTeamOwner($member, $team);
-
-        $response = $this->get(route('tax.documents.index'));
-
-        $response->assertForbidden();
+        $response->assertRedirect(route('backups-exports.index', [
+            'section' => 'takeout',
+        ]));
     }
 
     public function test_job_notifies_owner_when_takeout_is_ready(): void
@@ -67,7 +50,7 @@ class TaxDocumentsControllerTest extends TestCase
             'to_date' => now()->endOfYear()->toDateString(),
         ]);
 
-        (new GenerateTakeoutJob($run->id))->handle(app(\App\Domain\Takeout\Services\TakeoutBuilder::class));
+        (new GenerateTakeoutJob($run->id))->handle(app(TakeoutBuilder::class));
 
         Notification::assertSentTo($user, TakeoutReady::class);
     }

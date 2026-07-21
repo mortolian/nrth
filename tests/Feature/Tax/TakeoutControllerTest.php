@@ -42,7 +42,8 @@ class TakeoutControllerTest extends TestCase
             'to_date' => '2027-02-28',
         ]);
 
-        $response->assertRedirect(route('tax.documents.index', [
+        $response->assertRedirect(route('backups-exports.index', [
+            'section' => 'takeout',
             'from' => '2026-03-01',
             'to' => '2027-02-28',
         ]));

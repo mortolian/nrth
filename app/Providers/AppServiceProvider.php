@@ -5,13 +5,15 @@ namespace App\Providers;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
+use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Models\TakeoutRun;
-use App\Policies\TakeoutRunPolicy;
-use Illuminate\Support\Facades\Gate;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\UserProfileController;
+use App\Models\User;
+use App\Policies\TakeoutRunPolicy;
 use App\Support\EnsureTeamSpatieRoles;
 use App\Support\Https;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamController;
@@ -55,6 +57,14 @@ class AppServiceProvider extends ServiceProvider
         EnsureTeamSpatieRoles::sync();
 
         Gate::policy(TakeoutRun::class, TakeoutRunPolicy::class);
+
+        Gate::define('manageInstanceBackups', function (?User $user): bool {
+            if ($user === null) {
+                return false;
+            }
+
+            return app(InstanceOperatorService::class)->userCanManageInstance($user);
+        });
     }
 
     /**

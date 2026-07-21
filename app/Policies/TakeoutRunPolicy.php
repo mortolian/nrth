@@ -29,4 +29,14 @@ class TakeoutRunPolicy
     {
         return $user->ownsTeam($takeoutRun->team);
     }
+
+    public function delete(User $user, TakeoutRun $takeoutRun): bool
+    {
+        return $user->ownsTeam($takeoutRun->team);
+    }
+
+    public function retry(User $user, TakeoutRun $takeoutRun): bool
+    {
+        return $user->ownsTeam($takeoutRun->team);
+    }
 }

@@ -97,6 +97,7 @@ class AppInstallCommand extends Command
                     'email' => $email,
                     'password' => $password,
                     'email_verified_at' => now(),
+                    'is_instance_operator' => true,
                 ]);
 
                 $team = $user->ownedTeams()->create([
@@ -145,7 +146,8 @@ class AppInstallCommand extends Command
         $this->line('  <fg=yellow;options=bold>Next steps</>');
         $this->line('  <fg=gray>1.</> Sign in at the URL above with your email and password');
         $this->line('  <fg=gray>2.</> Complete the in-app setup wizard (company details and preferences)');
-        $this->line('  <fg=gray>3.</> After upgrades, run <fg=cyan>./scripts/deploy.sh production</> (or <fg=cyan>./scripts/compose.sh exec app php artisan app:update</>)');
+        $this->line('  <fg=gray>3.</> You are the instance operator: use <fg=cyan>Settings → Instance</> and <fg=cyan>Backups & exports</>');
+        $this->line('  <fg=gray>4.</> After upgrades, run <fg=cyan>./scripts/deploy.sh production</> (or <fg=cyan>./scripts/compose.sh exec app php artisan app:update</>)');
         $this->newLine();
         $this->components->info($appName.' is ready.');
         $this->newLine();

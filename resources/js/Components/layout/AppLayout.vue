@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
+    Archive,
     Bell,
     BookOpen,
     Briefcase,
@@ -88,6 +89,8 @@ const teams = computed(() => page.props.auth?.user?.all_teams ?? []);
 const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeatures));
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
+const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
+const canManageBackups = computed(() => Boolean(page.props.can_manage_backups));
 
 const navItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = [
@@ -145,6 +148,14 @@ const navItems = computed<MenuItem[]>(() => {
             href: route('reports.profit-loss'),
             icon: ChartColumnBig,
             group: [{ title: 'Reports', items: [{ label: 'Profit And Loss', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
+        });
+    }
+
+    if (canAccessBackupsExports.value) {
+        items.push({
+            label: 'Backups & exports',
+            href: route('backups-exports.index'),
+            icon: Archive,
         });
     }
 
@@ -214,7 +225,11 @@ const isTeamSettingsPath = computed(
 );
 
 const isSettingsSectionActive = computed(
-    () => isActivePath(route('profile.show')) || isActivePath(route('settings.company')) || isTeamSettingsPath.value,
+    () => isActivePath(route('profile.show'))
+        || isActivePath(route('settings.company'))
+        || isActivePath(route('settings.instance'))
+        || isTeamSettingsPath.value,
+
 );
 
 /** Collapsed unless the user explicitly opens the section (not auto-expanded on settings routes). */
@@ -445,6 +460,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         >
                             Teams and Members
                         </a>
+                        <Link
+                            v-if="canManageBackups"
+                            :href="route('settings.instance')"
+                            :class="[
+                                'block rounded px-2 py-1 text-xs transition',
+                                isActivePath(route('settings.instance'))
+                                    ? 'bg-brand-500/30 font-medium text-brand-800'
+                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
+                            ]"
+                        >
+                            Instance
+                        </Link>
                     </div>
                 </div>
             </aside>
@@ -618,6 +645,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         >
                             Teams and Members
                         </a>
+                        <Link
+                            v-if="canManageBackups"
+                            :href="route('settings.instance')"
+                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
+                            @click="mobileOpen = false"
+                        >
+                            Instance
+                        </Link>
                     </div>
                 </div>
             </aside>

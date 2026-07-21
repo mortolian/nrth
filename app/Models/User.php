@@ -37,6 +37,7 @@ class User extends Authenticatable
         'password',
         'preferences',
         'completed_onboarding_at',
+        'is_instance_operator',
     ];
 
     /**
@@ -60,6 +61,15 @@ class User extends Authenticatable
         'profile_photo_url',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (User $user): void {
+            if (static::query()->count() === 1 && ! $user->is_instance_operator) {
+                $user->forceFill(['is_instance_operator' => true])->saveQuietly();
+            }
+        });
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -72,6 +82,7 @@ class User extends Authenticatable
             'completed_onboarding_at' => 'datetime',
             'password' => 'hashed',
             'preferences' => 'array',
+            'is_instance_operator' => 'boolean',
         ];
     }
 

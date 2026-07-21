@@ -29,6 +29,13 @@ class AppUpdateCommand extends Command
                 }
             });
 
+            $this->components->task('Ensuring an instance operator exists', function (): void {
+                Artisan::call('nrth:promote-first-operator', ['--ansi' => true]);
+                if (Artisan::output() !== '') {
+                    $this->output->write(Artisan::output());
+                }
+            });
+
             $this->components->task('Clearing config, route, and view caches', function (): void {
                 Artisan::call('config:clear', ['--ansi' => true]);
                 Artisan::call('route:clear', ['--ansi' => true]);

@@ -49,4 +49,13 @@ class TakeoutRunFactory extends Factory
             'expires_at' => now()->addDays(7),
         ]);
     }
+
+    public function failed(): static
+    {
+        return $this->state(fn (): array => [
+            'status' => TakeoutRunStatus::Failed,
+            'error_message' => 'Export failed',
+            'completed_at' => now(),
+        ]);
+    }
 }

@@ -8,6 +8,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
@@ -58,6 +59,18 @@ class HandleInertiaRequests extends Middleware
                 ? PaymentMethodOptions::forInertia()
                 : [],
             'commandPalette' => fn () => $this->commandPaletteData($request),
+            'can_manage_backups' => fn () => $request->user() !== null
+                && Gate::forUser($request->user())->allows('manageInstanceBackups'),
+            'can_access_backups_exports' => function () use ($request) {
+                $user = $request->user();
+                if ($user === null) {
+                    return false;
+                }
+                $team = $user->currentTeam;
+                $isOwner = $team !== null && $user->ownsTeam($team);
+
+                return $isOwner || Gate::forUser($user)->allows('manageInstanceBackups');
+            },
         ];
     }
 
