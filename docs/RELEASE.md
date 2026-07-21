@@ -106,14 +106,31 @@ Pre-1.0, treat breaking changes as minor bumps or note them explicitly in the Re
 feat!: remove legacy quote API
 ```
 
+## One-time repo setting (required)
+
+Release Please opens PRs with `GITHUB_TOKEN`. Workflow YAML already requests `pull-requests: write`, but GitHub also needs this **repository** toggle:
+
+**Settings → Actions → General → Workflow permissions**
+
+- ✅ Read and write permissions  
+- ✅ **Allow GitHub Actions to create and approve pull requests**
+
+Without the second checkbox, the workflow fails with:  
+`GitHub Actions is not permitted to create or approve pull requests`.
+
+Re-run the failed **Release please** workflow after enabling it.
+
 ## Troubleshooting
 
 | Problem | Fix |
 |---------|-----|
+| `not permitted to create or approve pull requests` | Enable the repo setting above, then re-run the workflow |
 | No Release PR after pushing | Commits may not use conventional prefixes, or no releasable changes since last tag |
-| Release PR has empty changelog | Only `chore:` / `refactor:` commits since last release — bump still happens for patches |
+| Squash merge title not conventional | PR #3-style titles like `Refactor … (#3)` are skipped; use `feat:` / `fix:` in the **PR title** |
+| Release PR has empty changelog | Only `chore:` / `refactor:` / `docs:` (etc.) since last release — bump still happens for patches |
 | Wrong version bumped | Check prefix (`feat` vs `fix`); see [config](../.github/release-please-config.json) |
 | Need to edit notes before release | Edit the Release PR branch changelog section, then merge |
+| Node 20 deprecation warning on the action | Harmless for now; comes from `googleapis/release-please-action` runtime. Do not set `ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION` unless a run actually fails |
 
 ## What we removed
 
