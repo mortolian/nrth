@@ -32,10 +32,16 @@ const submit = () => {
     <Head title="Log in" />
 
     <div
-        class="relative flex min-h-screen flex-col justify-center px-6 py-12"
-        style="background: linear-gradient(180deg, #f3f1ec 0%, #faf9f7 42%, #f0eeea 100%);"
+        class="relative flex min-h-screen flex-col justify-center overflow-hidden px-6 py-12"
+        style="background: linear-gradient(180deg, #d9d5cc 0%, #ebe8e1 40%, #f3f1ec 70%, #f7f6f3 100%);"
     >
-        <div class="login-form-enter mx-auto w-full max-w-[22rem]">
+        <div
+            class="pointer-events-none absolute inset-0 opacity-[0.45]"
+            aria-hidden="true"
+            style="background-image: radial-gradient(circle at 1px 1px, rgba(120, 110, 95, 0.18) 1px, transparent 0); background-size: 20px 20px;"
+        />
+
+        <div class="login-form-enter relative z-10 mx-auto w-full max-w-[22rem]">
             <div class="mb-10 flex flex-col items-center text-center">
                 <AuthenticationCardLogo :size="48" />
             </div>
