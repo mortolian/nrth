@@ -6,14 +6,11 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
-import { useAppDisplayName } from '@/lib/appName';
 
 defineProps({
     canResetPassword: Boolean,
     status: String,
 });
-
-const appDisplayName = useAppDisplayName();
 
 const form = useForm({
     email: '',
@@ -34,22 +31,30 @@ const submit = () => {
 <template>
     <Head title="Log in" />
 
-    <div class="flex min-h-screen flex-col bg-white lg:flex-row">
-        <!-- Form panel (left on lg+, top on mobile) -->
-        <div
-            class="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 lg:w-1/2 lg:px-16 lg:py-12"
-        >
-            <div class="mx-auto w-full max-w-md">
+    <div
+        class="relative flex min-h-screen flex-col justify-center px-6 py-12"
+        style="background: linear-gradient(180deg, #f3f1ec 0%, #faf9f7 42%, #f0eeea 100%);"
+    >
+        <div class="login-form-enter mx-auto w-full max-w-[22rem]">
+            <div class="mb-10 flex flex-col items-center text-center">
+                <AuthenticationCardLogo :size="48" />
+            </div>
 
-                <h1 class="text-2xl font-semibold tracking-tight text-slate-900">
+            <div
+                class="rounded-2xl border border-stone-200/90 bg-white px-6 py-7 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-24px_rgba(15,23,42,0.18)]"
+            >
+                <h2 class="text-base font-semibold tracking-tight text-slate-900">
                     Sign in
-                </h1>
+                </h2>
 
-                <div v-if="status" class="mt-6 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800">
+                <div
+                    v-if="status"
+                    class="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800"
+                >
                     {{ status }}
                 </div>
 
-                <form class="mt-8 space-y-5" @submit.prevent="submit">
+                <form class="mt-6 space-y-5" @submit.prevent="submit">
                     <div>
                         <InputLabel for="email" value="Email" />
                         <TextInput
@@ -84,41 +89,47 @@ const submit = () => {
                         </label>
                     </div>
 
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                        <Link
-                            v-if="canResetPassword"
-                            :href="route('password.request')"
-                            class="order-2 text-center text-sm text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900 sm:order-1 sm:me-auto sm:text-left"
-                        >
-                            Forgot your password?
-                        </Link>
+                    <div class="flex flex-col gap-3">
                         <PrimaryButton
-                            class="order-1 sm:order-2"
+                            class="w-full justify-center"
                             :class="{ 'opacity-25': form.processing }"
                             :disabled="form.processing"
                         >
                             Log in
                         </PrimaryButton>
+                        <Link
+                            v-if="canResetPassword"
+                            :href="route('password.request')"
+                            class="text-center text-sm text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800"
+                        >
+                            Forgot your password?
+                        </Link>
                     </div>
                 </form>
             </div>
         </div>
-
-        <!-- Visual panel (right on lg+, bottom band on mobile) -->
-        <div class="relative h-44 shrink-0 overflow-hidden lg:h-auto lg:min-h-screen lg:w-1/2 hidden lg:block">
-            <img
-                src="/images/login-side.jpg"
-                alt=""
-                class="absolute inset-0 h-full w-full object-cover"
-                width="900"
-                height="1200"
-            >
-
-            <div
-                class="relative flex h-full flex-col items-center justify-center px-8 py-6 text-center lg:p-12"
-            >
-                <AuthenticationCardLogo class="opacity-70 drop-shadow-sm" />
-            </div>
-        </div>
     </div>
 </template>
+
+<style scoped>
+@keyframes login-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-form-enter {
+    animation: login-fade-up 0.5s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-form-enter {
+        animation: none;
+    }
+}
+</style>
