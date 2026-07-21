@@ -34,7 +34,7 @@ Community and documentation foundations are in place:
 - [x] [DEVELOPMENT.md](DEVELOPMENT.md) (dev details moved from README)
 - [x] [INSTALL.md](INSTALL.md) updated with community doc links
 - [x] Clone URLs fixed to `mortolian/nrth` in docs
-- [x] Hosting guides: [SELF_HOST.md](SELF_HOST.md), [PERSONAL_SERVER.md](PERSONAL_SERVER.md), [scripts/install.sh](../scripts/install.sh), [scripts/deploy.sh](../scripts/deploy.sh)
+- [x] Hosting guides: [SELF_HOST.md](SELF_HOST.md), [PERSONAL_SERVER.md](PERSONAL_SERVER.md), [scripts/install.sh](../scripts/install.sh), [scripts/update](../scripts/update)
 
 ---
 
@@ -97,7 +97,7 @@ One install script for everyone; deploy script for updates.
 | Audience | Document | Scripts / automation |
 | -------- | -------- | -------------------- |
 | **Community / self-hosters** | [SELF_HOST.md](SELF_HOST.md) | [scripts/install.sh](../scripts/install.sh) |
-| **Maintainer personal server** | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | [scripts/deploy.sh](../scripts/deploy.sh) (manual deploy); optional `install.sh --auto-deploy` for a self-hosted runner |
+| **Maintainer personal server** | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | [scripts/update](../scripts/update); optional `install.sh --auto-deploy` + [deploy-server.yml](../.github/workflows/deploy-server.yml) |
 
 - [x] Ensure [PERSONAL_SERVER.md](PERSONAL_SERVER.md) is clearly labeled **maintainer-only** in README or hosting index so self-hosters do not follow the wrong path
 - [ ] Confirm [SELF_HOST.md](SELF_HOST.md) is linked from [README.md](../README.md) and [INSTALL.md](INSTALL.md) as the primary self-host entry point
