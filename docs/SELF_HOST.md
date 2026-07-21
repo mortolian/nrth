@@ -14,6 +14,8 @@ nrth is a financial app — do not expose plain HTTP long-term.
 - Browsers should use **HTTPS on 443** via Compose Caddy (`--production`) or a host reverse proxy.
 - Set `APP_URL` to the public `https://…` URL (**no** `:8000` when using Caddy on 443).
 - Never open `https://host:8000` — nothing speaks TLS on that port.
+- `--lan` / HTTP on `:8000` is **trusted private network only**. Do not port-forward the app (or Postgres/Redis/Mailpit) to the internet.
+- Production: do not publish Postgres, Redis, or Mailpit on `0.0.0.0`; firewall should allow **80/443 only** to the host.
 
 ### LAN IP (self-signed)
 
@@ -42,8 +44,8 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 ## Production checklist
 
 1. `APP_DEBUG=false`, `APP_ENV=production`
-2. HTTPS on 443; firewall only 80/443
-3. Real `MAIL_*` (Mailpit is for testing)
+2. HTTPS on 443; firewall only 80/443 (not `:8000`, and not Postgres/Redis/Mailpit)
+3. Real `MAIL_*` (Mailpit is for testing — do not expose `:8025` publicly)
 4. Host-level backups of Postgres + `storage` volumes, plus in-app instance backups
 5. Never commit `.env`
 
