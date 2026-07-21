@@ -1,0 +1,33 @@
+name: Deploy server
+
+# Runs on a self-hosted runner registered with label `nrth-server`
+# (install.sh --auto-deploy). Updates the install at NRTH_INSTALL_DIR (default /opt/nrth).
+#
+# Enable by registering the runner on your server; no secrets required beyond the runner itself.
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    name: Update nrth on server
+    runs-on: [self-hosted, nrth-server]
+    steps:
+      - name: Pull and apply update
+        env:
+          NRTH_INSTALL_DIR: ${{ vars.NRTH_INSTALL_DIR }}
+        run: |
+          set -euo pipefail
+          install_dir="${NRTH_INSTALL_DIR:-/opt/nrth}"
+          cd "${install_dir}"
+          if [[ ! -x ./scripts/update ]]; then
+            echo "error: ${install_dir}/scripts/update not found or not executable" >&2
+            exit 1
+          fi
+          ./scripts/update

@@ -21,7 +21,7 @@
 #   --dev                Dev/LAN defaults: HTTP on :8000, no Caddy (default)
 #   --with-caddy         Enable Compose Caddy TLS proxy (default for --production)
 #   --no-caddy           Do not start the optional Caddy reverse proxy
-#   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server); no deploy workflow in repo
+#   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server); uses deploy-server.yml
 #   --non-interactive    Skip env prompts; use generated defaults
 #   --accept-data-risk   Acknowledge backup responsibility (required with --non-interactive)
 #   --allow-http         Permit plain HTTP (default for --dev; sets APP_ALLOW_HTTP=true)
@@ -685,9 +685,7 @@ handle_existing_install() {
     fi
 
     log_existing_install_safety
-    local deploy_mode="dev"
-    [[ "$MODE" == "production" ]] && deploy_mode="production"
-    "$ROOT_DIR/scripts/deploy.sh" "$deploy_mode"
+    "$ROOT_DIR/scripts/update"
     if [[ "$AUTO_DEPLOY" -eq 1 ]]; then
         setup_auto_deploy
     fi
@@ -724,8 +722,12 @@ print_auto_deploy_manual_steps() {
 GitHub Actions self-hosted runner (optional)
 --------------------------------------------
 
-No deploy workflow ships with this repo. To deploy, run manually:
-  ${ROOT_DIR}/scripts/deploy.sh
+No deploy workflow is required for manual upgrades. To update, run:
+  ${ROOT_DIR}/scripts/update
+
+With --auto-deploy, a self-hosted runner is registered (label nrth-server). The
+repo ships .github/workflows/deploy-server.yml which runs ./scripts/update on
+push to master when that runner is online.
 
 Or add your own workflow that runs on a self-hosted runner with label ${RUNNER_LABEL}.
 
@@ -798,7 +800,7 @@ setup_auto_deploy() {
     if [[ -n "${GITHUB_RUNNER_TOKEN:-}" ]]; then
         install_github_runner "$GITHUB_RUNNER_TOKEN"
         echo ""
-        echo "Runner setup complete. Deploy with ${ROOT_DIR}/scripts/deploy.sh or add your own workflow."
+        echo "Runner setup complete. Push to master triggers deploy-server.yml, or run: ${ROOT_DIR}/scripts/update"
         return 0
     fi
 
@@ -839,8 +841,7 @@ print_success() {
         echo "  1. Sign in at the URL above with your admin credentials"
         echo "  2. Complete the in-app setup wizard (company details and preferences)"
     fi
-    echo "  3. After upgrades: ./scripts/deploy.sh production"
-    echo "     (or ./scripts/compose.sh exec app php artisan app:update)"
+    echo "  3. After upgrades: ./scripts/update"
     if [[ "$MODE" == "production" ]]; then
         echo "  4. Production checklist: ${ROOT_DIR}/docs/SELF_HOST.md"
         if grep -qE '^COMPOSE_PROFILES=.*proxy' "$ROOT_DIR/.env" 2>/dev/null; then
