@@ -253,13 +253,22 @@ function onSettingsRowClick(): void {
 
 const commandPaletteData = computed<PaletteData>(() => ({
     quickActions: page.props.commandPalette?.quickActions ?? [
-        { id: 'new-invoice', label: 'New Invoice', href: '#', icon: 'invoice' },
-        { id: 'new-expense', label: 'New Expense', href: '#', icon: 'expense' },
-        { id: 'record-payment', label: 'Record Payment', href: '#', icon: 'payment' },
-        { id: 'new-client', label: 'New Client', href: '#', icon: 'client' },
+        { id: 'new-invoice', label: 'New Invoice', href: route('invoicing.invoices.create'), icon: 'invoice' },
+        { id: 'new-expense', label: 'New Expense', href: route('expenses.create'), icon: 'expense' },
+        { id: 'record-payment', label: 'Record Payment', href: `${route('dashboard')}#outstanding-invoices`, icon: 'payment' },
+        { id: 'new-client', label: 'New Client', href: route('invoicing.clients.create'), icon: 'client' },
     ],
     navigation: page.props.commandPalette?.navigation ?? [
         { id: 'dashboard', label: 'Dashboard', href: route('dashboard') },
+        { id: 'invoices', label: 'Invoices', href: route('invoicing.invoices.index') },
+        { id: 'estimates', label: 'Estimates', href: route('invoicing.estimates.index') },
+        { id: 'clients', label: 'Clients', href: route('invoicing.clients.index') },
+        { id: 'expenses', label: 'Expenses', href: route('expenses.index') },
+        { id: 'suppliers', label: 'Suppliers', href: route('suppliers.index') },
+        { id: 'banking-transactions', label: 'Banking Transactions', href: route('banking.transactions.index') },
+        { id: 'accounting-transactions', label: 'Accounting Transactions', href: route('accounting.transactions.index') },
+        { id: 'budgets', label: 'Budgets', href: route('budgeting.index') },
+        { id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') },
         { id: 'profile', label: 'Profile Settings', href: route('profile.show') },
     ],
     recent: page.props.commandPalette?.recent ?? {},

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
@@ -81,18 +82,47 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $teamId = $user?->current_team_id;
+        $team = $user?->currentTeam;
+        $vatEnabled = $team?->chargesVat() ?? false;
 
         $quickActions = [
-            ['id' => 'new-invoice', 'label' => 'New Invoice', 'href' => '#', 'icon' => 'invoice'],
-            ['id' => 'new-expense', 'label' => 'New Expense', 'href' => '#', 'icon' => 'expense'],
-            ['id' => 'record-payment', 'label' => 'Record Payment', 'href' => '#', 'icon' => 'payment'],
-            ['id' => 'new-client', 'label' => 'New Client', 'href' => '#', 'icon' => 'client'],
+            ['id' => 'new-invoice', 'label' => 'New Invoice', 'href' => route('invoicing.invoices.create'), 'icon' => 'invoice'],
+            ['id' => 'new-expense', 'label' => 'New Expense', 'href' => route('expenses.create'), 'icon' => 'expense'],
+            ['id' => 'record-payment', 'label' => 'Record Payment', 'href' => route('dashboard').'#outstanding-invoices', 'icon' => 'payment'],
+            ['id' => 'new-client', 'label' => 'New Client', 'href' => route('invoicing.clients.create'), 'icon' => 'client'],
         ];
 
         $navigation = [
             ['id' => 'dashboard', 'label' => 'Dashboard', 'href' => route('dashboard')],
+            ['id' => 'invoices', 'label' => 'Invoices', 'href' => route('invoicing.invoices.index')],
+            ['id' => 'estimates', 'label' => 'Estimates', 'href' => route('invoicing.estimates.index')],
+            ['id' => 'clients', 'label' => 'Clients', 'href' => route('invoicing.clients.index')],
+            ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')],
+            ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')],
+            ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')],
+            ['id' => 'banking-accounts', 'label' => 'Bank Accounts', 'href' => route('banking.accounts.index')],
+            ['id' => 'accounting-transactions', 'label' => 'Accounting Transactions', 'href' => route('accounting.transactions.index')],
+            ['id' => 'general-ledger', 'label' => 'General Ledger', 'href' => route('accounting.journal.index')],
+            ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts', 'href' => route('accounting.accounts.index')],
+            ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')],
+            ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')],
+            ['id' => 'company-settings', 'label' => 'Company Settings', 'href' => route('settings.company')],
             ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('profile.show')],
         ];
+
+        if ($vatEnabled) {
+            $navigation = [
+                ...$navigation,
+                ['id' => 'vat-returns', 'label' => 'VAT Returns', 'href' => route('tax.vat.index')],
+                ['id' => 'vat-rates', 'label' => 'VAT Rates', 'href' => route('tax.vat-rates.index')],
+                ['id' => 'tax-periods', 'label' => 'Tax Periods', 'href' => route('tax.provisional.index')],
+                ['id' => 'tax-documents', 'label' => 'Tax Documents', 'href' => route('tax.documents.index')],
+                ['id' => 'profit-loss', 'label' => 'Profit And Loss', 'href' => route('reports.profit-loss')],
+                ['id' => 'balance-sheet', 'label' => 'Balance Sheet', 'href' => route('reports.balance-sheet')],
+                ['id' => 'cash-flow', 'label' => 'Cash Flow', 'href' => route('reports.cash-flow')],
+                ['id' => 'trial-balance', 'label' => 'Trial Balance', 'href' => route('reports.trial-balance')],
+            ];
+        }
 
         if (! $teamId) {
             return ['quickActions' => $quickActions, 'navigation' => $navigation, 'recent' => []];
@@ -109,7 +139,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $invoice->id,
                     'label' => 'Invoice '.$invoice->number,
                     'subtitle' => optional($invoice->issue_date)->format('d M Y'),
-                    'href' => '#',
+                    'href' => route('invoicing.invoices.show', $invoice),
                 ])
                 ->all();
         }
@@ -125,7 +155,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $client->id,
                     'label' => $client->name,
                     'subtitle' => $client->email,
-                    'href' => '#',
+                    'href' => route('invoicing.clients.show', $client),
                 ])
                 ->all();
         }
@@ -137,12 +167,20 @@ class HandleInertiaRequests extends Middleware
                 ->latest('updated_at')
                 ->limit(5)
                 ->get()
-                ->map(fn (Transaction $transaction) => [
-                    'id' => $transaction->id,
-                    'label' => $transaction->description ?: ucfirst($transaction->type->value),
-                    'subtitle' => optional($transaction->transaction_date)->format('d M Y'),
-                    'href' => '#',
-                ])
+                ->map(function (Transaction $transaction) {
+                    $href = $transaction->type === TransactionType::Expense
+                        ? route('expenses.edit', $transaction)
+                        : route('accounting.transactions.index', array_filter([
+                            'search' => $transaction->reference ?: $transaction->description,
+                        ]));
+
+                    return [
+                        'id' => $transaction->id,
+                        'label' => $transaction->description ?: ucfirst($transaction->type->value),
+                        'subtitle' => optional($transaction->transaction_date)->format('d M Y'),
+                        'href' => $href,
+                    ];
+                })
                 ->all();
         }
 
