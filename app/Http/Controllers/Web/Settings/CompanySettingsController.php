@@ -79,6 +79,7 @@ class CompanySettingsController extends Controller
                 ['value' => 'current', 'label' => 'Current'],
                 ['value' => 'savings', 'label' => 'Savings'],
             ],
+            'session_lifetime_minutes' => (int) config('session.lifetime'),
         ]);
     }
 
@@ -153,6 +154,12 @@ class CompanySettingsController extends Controller
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
             'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('team_id', $teamId)],
             'payment_pages_enabled' => ['sometimes', 'boolean'],
+            'session_idle_timeout_minutes' => [
+                'required',
+                'integer',
+                'min:0',
+                'max:'.(int) config('session.lifetime'),
+            ],
             'payment_gateways' => ['required', 'array'],
             'payment_gateways.payfast' => ['required', 'array'],
             'payment_gateways.payfast.enabled' => ['required', 'boolean'],
@@ -222,6 +229,7 @@ class CompanySettingsController extends Controller
             'invoice_email_subject_template', 'invoice_email_body_template',
             'vat_registered', 'vat_period_type', 'default_tax_rate_id',
             'payment_pages_enabled',
+            'session_idle_timeout_minutes',
             'payment_gateways',
         ];
 
@@ -275,7 +283,7 @@ class CompanySettingsController extends Controller
         }
 
         $tab = (string) $request->input('tab', 'profile');
-        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages'], true)) {
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security'], true)) {
             $tab = 'profile';
         }
 

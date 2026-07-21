@@ -30,6 +30,7 @@ import Banner from '@/Components/Banner.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
+import SessionIdleWatcher from '@/Components/layout/SessionIdleWatcher.vue';
 import { useAppDisplayName } from '@/lib/appName';
 
 const NAV_SECTIONS_EXPANDED_KEY = 'nrth:nav-sections-expanded:v1';
@@ -786,5 +787,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
         </Teleport>
 
         <CommandPalette v-model:open="commandPaletteOpen" :data="commandPaletteData" />
+        <SessionIdleWatcher />
     </div>
 </template>

@@ -57,15 +57,16 @@ const props = defineProps<{
     financial_year_months: Array<{ value: number; label: string }>;
     vat_period_types: Array<{ value: string; label: string }>;
     bank_account_types: Array<{ value: string; label: string }>;
+    session_lifetime_minutes: number;
 }>();
 
-type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages';
+type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages' | 'security';
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages'];
+const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
 
@@ -118,6 +119,7 @@ const form = useForm({
     vat_period_type: String(props.settings.vat_period_type ?? 'bi_monthly'),
     default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
     payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? true),
+    session_idle_timeout_minutes: String(Number(props.settings.session_idle_timeout_minutes ?? 0)),
     payment_gateways: {
         payfast: {
             enabled: Boolean((props.settings.payment_gateways as any)?.payfast?.enabled ?? false),
@@ -273,7 +275,21 @@ const tabs = [
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
     { id: 'payment_pages' as const, label: 'Online payments' },
+    { id: 'security' as const, label: 'Security' },
 ];
+
+const idleTimeoutOptions = computed(() => {
+    const max = Math.max(0, Number(props.session_lifetime_minutes ?? 120));
+    const presets = [
+        { label: 'Off', value: '0' },
+        { label: '15 minutes', value: '15' },
+        { label: '30 minutes', value: '30' },
+        { label: '60 minutes', value: '60' },
+        { label: '120 minutes', value: '120' },
+    ];
+
+    return presets.filter((option) => Number(option.value) <= max);
+});
 
 const activeTaxRates = computed(() => props.tax_rates.filter((rate) => rate.is_active));
 const validTaxRateIds = computed(() => new Set(activeTaxRates.value.map((rate) => String(rate.id))));
@@ -323,6 +339,7 @@ const submit = () => {
         vat_period_type: form.vat_period_type,
         default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
         payment_pages_enabled: form.payment_pages_enabled,
+        session_idle_timeout_minutes: Number(form.session_idle_timeout_minutes),
         payment_gateways: {
             payfast: {
                 enabled: form.payment_gateways.payfast.enabled,
@@ -1069,6 +1086,26 @@ const removeBankAccount = (index: number) => {
                             <div><label class="mb-1 block text-xs text-slate-500">API key</label><AppInput v-model="form.payment_gateways.zapper.api_key" /></div>
                         </div>
                     </div>
+                </div>
+            </AppCard>
+
+            <AppCard v-show="tab === 'security'">
+                <h3 class="text-base font-semibold text-slate-900">Security</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Control how long users can stay signed in without activity. Off uses only the server session lifetime ({{ session_lifetime_minutes }} minutes).
+                </p>
+                <div class="mt-4 max-w-md">
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Idle session timeout</label>
+                    <AppSelect
+                        v-model="form.session_idle_timeout_minutes"
+                        :options="idleTimeoutOptions"
+                    />
+                    <p class="mt-2 text-xs text-slate-500">
+                        After this period with no activity, users are signed out automatically. The maximum is the server session lifetime.
+                    </p>
+                    <p v-if="form.errors.session_idle_timeout_minutes" class="mt-1 text-xs text-rose-600">
+                        {{ form.errors.session_idle_timeout_minutes }}
+                    </p>
                 </div>
             </AppCard>
         </div>

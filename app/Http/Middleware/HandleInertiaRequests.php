@@ -60,6 +60,9 @@ class HandleInertiaRequests extends Middleware
                 ? PaymentMethodOptions::forInertia()
                 : [],
             'commandPalette' => fn () => $this->commandPaletteData($request),
+            'session_idle_timeout_minutes' => fn () => (int) (
+                $request->user()?->currentTeam?->mergedCompanySettings()['session_idle_timeout_minutes'] ?? 0
+            ),
             'can_manage_backups' => fn () => $request->user() !== null
                 && Gate::forUser($request->user())->allows('manageInstanceBackups'),
             'can_access_backups_exports' => function () use ($request) {

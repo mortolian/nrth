@@ -212,6 +212,8 @@ class Team extends JetstreamTeam implements HasMedia
             'default_tax_rate_id' => null,
             /** Master switch: hosted checkout on invoice + public pay page (Stripe, PayFast, …). */
             'payment_pages_enabled' => true,
+            /** 0 = off (Laravel SESSION_LIFETIME only). Cap at config('session.lifetime'). */
+            'session_idle_timeout_minutes' => 0,
             'bank_name' => null,
             'bank_account_holder' => null,
             'bank_account_number' => null,

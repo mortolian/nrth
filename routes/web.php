@@ -54,6 +54,7 @@ Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
+    \App\Http\Middleware\EnforceSessionIdleTimeout::class,
 ])->group(function () {
     Route::get('/onboarding/setup', [OnboardingController::class, 'show'])->name('onboarding.setup');
     Route::post('/onboarding/progress', [OnboardingController::class, 'saveProgress'])->name('onboarding.progress');
