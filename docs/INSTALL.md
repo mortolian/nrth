@@ -22,6 +22,8 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
   | sudo bash -s -- --accept-data-risk --lan --install-dir /opt/nrth
 ```
 
+`--lan` is **trusted private network only** — plain HTTP, no Caddy. Do not port-forward `:8000` (or Postgres/Redis) to the internet. For anything broader, use `--production` or turn on HTTPS later ([SELF_HOST.md](SELF_HOST.md)).
+
 From a git clone: `./scripts/install.sh --production` (or `--lan`).
 
 The installer installs Docker if needed, writes `.env`, starts Compose, and runs `app:install` (admin + company). Open the URL it prints and sign in.
@@ -62,8 +64,8 @@ Install a self-hosted runner once (`install.sh --auto-deploy`, label `nrth-serve
 
 | Flag | Purpose |
 |------|---------|
-| `--production` | Production env + Caddy TLS |
-| `--lan` | Dev LAN: HTTP on :8000, no Caddy |
+| `--production` | Production env + Caddy TLS (use this if the host is reachable beyond a trusted LAN) |
+| `--lan` | Trusted LAN only: HTTP on :8000, no Caddy — not internet-safe |
 | `--install-dir PATH` | Default `/opt/nrth` when piping |
 | `--accept-data-risk` | Required for piped / non-interactive |
 | `--auto-deploy` | Register GitHub Actions runner (`nrth-server`) |

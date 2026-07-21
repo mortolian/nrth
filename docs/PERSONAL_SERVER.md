@@ -4,6 +4,8 @@
 
 Self-host users: follow [INSTALL.md](INSTALL.md) — same install and `./scripts/update` commands.
 
+**Security:** the default below is `--lan` (plain HTTP on `:8000`). That is fine only on a **trusted private LAN**. It is not secure on the public internet. Compose may also publish Postgres, Redis, and Mailpit on the host — keep those off the internet (no port-forward; firewall if unsure). For HTTPS on the same box, switch to the Caddy/`proxy` setup in [SELF_HOST.md](SELF_HOST.md).
+
 ---
 
 ## One-time setup
@@ -21,7 +23,7 @@ GITHUB_RUNNER_TOKEN=<token> ./scripts/install.sh --auto-deploy --install-dir /op
 
 Register the runner with label **`nrth-server`** (the installer does this). Workflow: [.github/workflows/deploy-server.yml](../.github/workflows/deploy-server.yml).
 
-Bookmark: `http://<server-ip>:8000` (LAN) or your HTTPS URL if you switched to Caddy later ([SELF_HOST.md](SELF_HOST.md)).
+Bookmark: `http://<server-ip>:8000` only while on a trusted LAN. Prefer an HTTPS URL once Caddy is enabled ([SELF_HOST.md](SELF_HOST.md)).
 
 ---
 
