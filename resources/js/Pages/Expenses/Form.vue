@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref, toRaw, watch, withDefaults } from 'vue';
+import { computed, onUnmounted, reactive, ref, toRaw, watch, withDefaults } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { Camera, ScanLine, Upload } from 'lucide-vue-next';
+import { Camera, ScanLine, Upload, X } from 'lucide-vue-next';
 import { FALLBACK_EXPENSE_TAX_RATES, type ExpenseTaxRateOption } from './fallbackTaxRates';
 
 type CategoryOption = { id: number; name: string };
@@ -125,6 +125,7 @@ const form = reactive(initialFromProps());
 
 const receiptFiles = ref<File[]>([]);
 const receiptPreviewUrls = ref<string[]>([]);
+const receiptPreviewIndex = ref<number | null>(null);
 const showAdvanced = ref(false);
 
 const selectedTax = computed(
@@ -180,6 +181,11 @@ const onReceiptChange = (event: Event) => {
 };
 
 const removeReceiptAt = (index: number) => {
+    if (receiptPreviewIndex.value === index) {
+        receiptPreviewIndex.value = null;
+    } else if (receiptPreviewIndex.value !== null && receiptPreviewIndex.value > index) {
+        receiptPreviewIndex.value -= 1;
+    }
     const url = receiptPreviewUrls.value[index];
     if (url) URL.revokeObjectURL(url);
     receiptFiles.value = receiptFiles.value.filter((_, i) => i !== index);
@@ -187,6 +193,7 @@ const removeReceiptAt = (index: number) => {
 };
 
 const clearReceipts = () => {
+    receiptPreviewIndex.value = null;
     receiptPreviewUrls.value.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
     });
@@ -195,6 +202,52 @@ const clearReceipts = () => {
     scanReceiptApplied.value = false;
     scanReceiptError.value = null;
 };
+
+const openReceiptPreview = (index: number) => {
+    if (!receiptPreviewUrls.value[index]) {
+        return;
+    }
+    receiptPreviewIndex.value = index;
+};
+
+const closeReceiptPreview = () => {
+    receiptPreviewIndex.value = null;
+};
+
+const previewedReceipt = computed(() => {
+    const index = receiptPreviewIndex.value;
+    if (index === null) {
+        return null;
+    }
+    const file = receiptFiles.value[index];
+    const url = receiptPreviewUrls.value[index];
+    if (!file || !url) {
+        return null;
+    }
+
+    return { file, url, index };
+});
+
+watch(receiptPreviewIndex, (index, _prev, onCleanup) => {
+    if (index === null) {
+        return;
+    }
+
+    const onKeydown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+            closeReceiptPreview();
+        }
+    };
+    window.addEventListener('keydown', onKeydown);
+    onCleanup(() => window.removeEventListener('keydown', onKeydown));
+});
+
+onUnmounted(() => {
+    receiptPreviewIndex.value = null;
+    receiptPreviewUrls.value.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+    });
+});
 
 const scanReceipt = async () => {
     if (!aiEnabled.value || !receiptFiles.value.length || scanReceiptLoading.value) {
@@ -403,7 +456,13 @@ const submit = () => {
                         :key="`${file.name}-${file.size}-${index}`"
                         class="group relative"
                     >
-                        <div class="aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                        <button
+                            type="button"
+                            class="aspect-square w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 text-left transition hover:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                            :aria-label="`Preview ${file.name}`"
+                            :disabled="!receiptPreviewUrls[index]"
+                            @click="openReceiptPreview(index)"
+                        >
                             <img
                                 v-if="isImageFile(file) && receiptPreviewUrls[index]"
                                 :src="receiptPreviewUrls[index]"
@@ -431,13 +490,13 @@ const submit = () => {
                                 <Camera class="h-5 w-5" />
                                 <span class="text-[10px] font-medium uppercase tracking-wide">File</span>
                             </div>
-                        </div>
+                        </button>
                         <p class="mt-1 truncate text-[11px] text-slate-600" :title="file.name">{{ file.name }}</p>
                         <button
                             type="button"
                             class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900"
                             :aria-label="`Remove ${file.name}`"
-                            @click="removeReceiptAt(index)"
+                            @click.stop="removeReceiptAt(index)"
                         >
                             <span class="text-sm leading-none" aria-hidden="true">×</span>
                         </button>
@@ -577,5 +636,47 @@ const submit = () => {
                 </AppButton>
             </div>
         </AppCard>
+
+        <Teleport to="body">
+            <div
+                v-if="previewedReceipt"
+                class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+                role="dialog"
+                aria-modal="true"
+                :aria-label="`Preview ${previewedReceipt.file.name}`"
+                @click.self="closeReceiptPreview"
+            >
+                <div class="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+                    <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                        <p class="truncate text-sm font-medium text-slate-900" :title="previewedReceipt.file.name">
+                            {{ previewedReceipt.file.name }}
+                        </p>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                            aria-label="Close preview"
+                            @click="closeReceiptPreview"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+                    <div class="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-3 sm:p-4">
+                        <img
+                            v-if="isImageFile(previewedReceipt.file)"
+                            :src="previewedReceipt.url"
+                            :alt="previewedReceipt.file.name"
+                            class="max-h-[75vh] max-w-full rounded object-contain"
+                        >
+                        <iframe
+                            v-else-if="isPdfFile(previewedReceipt.file)"
+                            :src="previewedReceipt.url"
+                            class="h-[75vh] w-full rounded border-0 bg-white"
+                            :title="previewedReceipt.file.name"
+                        />
+                        <p v-else class="text-sm text-slate-500">Preview is not available for this file type.</p>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>
