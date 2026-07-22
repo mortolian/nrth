@@ -263,6 +263,21 @@ class ExpenseCrudTest extends TestCase
 
         $this->assertGreaterThanOrEqual(1, $txn->fresh()->getMedia('attachments')->count());
 
+        $media = $txn->fresh()->getMedia('attachments')->first();
+        $this->assertNotNull($media);
+
+        $this->get(route('expenses.edit', $txn->fresh()))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Form')
+                ->has('expense.attachments', 1)
+                ->where('expense.attachments.0.id', $media->id)
+                ->where('expense.attachments.0.name', $media->file_name));
+
+        $this->get(route('expenses.attachments.show', [$txn->fresh(), $media]))
+            ->assertOk()
+            ->assertHeader('content-type', $media->mime_type ?: 'application/pdf');
+
         $this->delete(route('expenses.destroy', $txn->fresh()))->assertRedirect(route('expenses.index'));
         $this->assertNull(Transaction::queryWithoutTeamScope()->find($txn->id));
     }

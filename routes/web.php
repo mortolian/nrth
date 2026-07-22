@@ -97,6 +97,7 @@ Route::middleware([
     Route::put('/expenses/{transaction}', [ExpensesController::class, 'update'])->name('expenses.update');
     Route::delete('/expenses/{transaction}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
     Route::post('/expenses/{transaction}/receipt', [ExpensesController::class, 'storeReceipt'])->name('expenses.receipt.store');
+    Route::get('/expenses/{transaction}/attachments/{media}', [ExpensesController::class, 'showAttachment'])->name('expenses.attachments.show');
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::get('/suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');

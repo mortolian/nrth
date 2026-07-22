@@ -33,6 +33,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ExpensesController extends Controller
 {
@@ -395,6 +397,20 @@ class ExpensesController extends Controller
         $this->attachReceiptUploads($request, $transaction);
 
         return back();
+    }
+
+    public function showAttachment(Request $request, Transaction $transaction, Media $media): BinaryFileResponse
+    {
+        $transaction = $this->resolveTeamExpense($request, $transaction);
+
+        abort_unless($media->model_type === $transaction->getMorphClass(), 404);
+        abort_unless((int) $media->model_id === (int) $transaction->id, 404);
+        abort_unless($media->collection_name === 'attachments', 404);
+
+        return response()->file($media->getPath(), [
+            'Content-Type' => $media->mime_type ?: 'application/octet-stream',
+            'Content-Disposition' => 'inline; filename="'.$media->file_name.'"',
+        ]);
     }
 
     private function attachReceiptUploads(Request $request, Transaction $transaction): void
@@ -762,6 +778,14 @@ class ExpensesController extends Controller
         $meta = $transaction->expense_meta ?? [];
         $paidFromBankingAccountId = $this->resolvePaidFromBankingAccountIdForForm($transaction, $creditLine, $team);
 
+        $attachments = $transaction->getMedia('attachments')->map(fn (Media $media) => [
+            'id' => $media->id,
+            'name' => $media->file_name,
+            'mime_type' => (string) ($media->mime_type ?? ''),
+            'size' => (int) $media->size,
+            'url' => route('expenses.attachments.show', [$transaction, $media]),
+        ])->values()->all();
+
         return [
             'id' => $transaction->id,
             'date' => optional($transaction->transaction_date)->toDateString(),
@@ -778,6 +802,7 @@ class ExpensesController extends Controller
             'office_percentage' => (float) ($meta['office_percentage'] ?? 15),
             'distance_km' => (float) ($meta['distance_km'] ?? 0),
             'rate_per_km' => (float) ($meta['rate_per_km'] ?? 4.84),
+            'attachments' => $attachments,
         ];
     }
 

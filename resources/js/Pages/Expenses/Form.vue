@@ -12,6 +12,14 @@ type PaidFromOption = { id: number; name: string; gl_account_id: number; gl_labe
 type SupplierOption = { id: number; name: string };
 type TaxRateOption = ExpenseTaxRateOption;
 
+type ExpenseAttachment = {
+    id: number;
+    name: string;
+    mime_type: string;
+    size: number;
+    url: string;
+};
+
 type ExpenseFormRow = {
     id: number;
     date: string | null;
@@ -28,6 +36,7 @@ type ExpenseFormRow = {
     office_percentage: number;
     distance_km: number;
     rate_per_km: number;
+    attachments?: ExpenseAttachment[];
 };
 
 const props = withDefaults(
@@ -157,7 +166,6 @@ watch(
 
 const receiptFiles = ref<File[]>([]);
 const receiptPreviewUrls = ref<string[]>([]);
-const receiptPreviewIndex = ref<number | null>(null);
 const showAdvanced = ref(false);
 
 const selectedTax = computed(
@@ -185,9 +193,13 @@ watch(
     { immediate: true },
 );
 
-const isImageFile = (file: File) => file.type.startsWith('image/');
-const isPdfFile = (file: File) =>
-    file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+const isImageMime = (mime: string, name = '') =>
+    mime.startsWith('image/') || /\.(jpe?g|png|gif|webp|heic)$/i.test(name);
+const isPdfMime = (mime: string, name = '') =>
+    mime === 'application/pdf' || /\.pdf$/i.test(name);
+
+const isImageFile = (file: File) => isImageMime(file.type, file.name);
+const isPdfFile = (file: File) => isPdfMime(file.type, file.name);
 
 const previewUrlFor = (file: File) => {
     if (isImageFile(file) || isPdfFile(file)) {
@@ -195,6 +207,78 @@ const previewUrlFor = (file: File) => {
     }
     return '';
 };
+
+const existingAttachments = computed<ExpenseAttachment[]>(() => props.expense?.attachments ?? []);
+
+type ReceiptPreviewItem =
+    | { kind: 'existing'; attachment: ExpenseAttachment }
+    | { kind: 'new'; file: File; url: string; index: number };
+
+const receiptPreviewTarget = ref<ReceiptPreviewItem | null>(null);
+
+const openExistingAttachmentPreview = (attachment: ExpenseAttachment) => {
+    if (!isImageMime(attachment.mime_type, attachment.name) && !isPdfMime(attachment.mime_type, attachment.name)) {
+        window.open(attachment.url, '_blank', 'noopener');
+        return;
+    }
+    receiptPreviewTarget.value = { kind: 'existing', attachment };
+};
+
+const openReceiptPreview = (index: number) => {
+    const url = receiptPreviewUrls.value[index];
+    const file = receiptFiles.value[index];
+    if (!file || !url) {
+        return;
+    }
+    receiptPreviewTarget.value = { kind: 'new', file, url, index };
+};
+
+const closeReceiptPreview = () => {
+    receiptPreviewTarget.value = null;
+};
+
+const previewedReceipt = computed(() => {
+    const target = receiptPreviewTarget.value;
+    if (!target) {
+        return null;
+    }
+    if (target.kind === 'existing') {
+        return {
+            name: target.attachment.name,
+            url: target.attachment.url,
+            isImage: isImageMime(target.attachment.mime_type, target.attachment.name),
+            isPdf: isPdfMime(target.attachment.mime_type, target.attachment.name),
+        };
+    }
+
+    return {
+        name: target.file.name,
+        url: target.url,
+        isImage: isImageFile(target.file),
+        isPdf: isPdfFile(target.file),
+    };
+});
+
+watch(receiptPreviewTarget, (target, _prev, onCleanup) => {
+    if (target === null) {
+        return;
+    }
+
+    const onKeydown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+            closeReceiptPreview();
+        }
+    };
+    window.addEventListener('keydown', onKeydown);
+    onCleanup(() => window.removeEventListener('keydown', onKeydown));
+});
+
+onUnmounted(() => {
+    receiptPreviewTarget.value = null;
+    receiptPreviewUrls.value.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+    });
+});
 
 const onReceiptChange = (event: Event) => {
     const input = event.target as HTMLInputElement;
@@ -213,10 +297,13 @@ const onReceiptChange = (event: Event) => {
 };
 
 const removeReceiptAt = (index: number) => {
-    if (receiptPreviewIndex.value === index) {
-        receiptPreviewIndex.value = null;
-    } else if (receiptPreviewIndex.value !== null && receiptPreviewIndex.value > index) {
-        receiptPreviewIndex.value -= 1;
+    const current = receiptPreviewTarget.value;
+    if (current?.kind === 'new') {
+        if (current.index === index) {
+            receiptPreviewTarget.value = null;
+        } else if (current.index > index) {
+            receiptPreviewTarget.value = { ...current, index: current.index - 1 };
+        }
     }
     const url = receiptPreviewUrls.value[index];
     if (url) URL.revokeObjectURL(url);
@@ -225,7 +312,7 @@ const removeReceiptAt = (index: number) => {
 };
 
 const clearReceipts = () => {
-    receiptPreviewIndex.value = null;
+    receiptPreviewTarget.value = null;
     receiptPreviewUrls.value.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
     });
@@ -234,52 +321,6 @@ const clearReceipts = () => {
     scanReceiptApplied.value = false;
     scanReceiptError.value = null;
 };
-
-const openReceiptPreview = (index: number) => {
-    if (!receiptPreviewUrls.value[index]) {
-        return;
-    }
-    receiptPreviewIndex.value = index;
-};
-
-const closeReceiptPreview = () => {
-    receiptPreviewIndex.value = null;
-};
-
-const previewedReceipt = computed(() => {
-    const index = receiptPreviewIndex.value;
-    if (index === null) {
-        return null;
-    }
-    const file = receiptFiles.value[index];
-    const url = receiptPreviewUrls.value[index];
-    if (!file || !url) {
-        return null;
-    }
-
-    return { file, url, index };
-});
-
-watch(receiptPreviewIndex, (index, _prev, onCleanup) => {
-    if (index === null) {
-        return;
-    }
-
-    const onKeydown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
-            closeReceiptPreview();
-        }
-    };
-    window.addEventListener('keydown', onKeydown);
-    onCleanup(() => window.removeEventListener('keydown', onKeydown));
-});
-
-onUnmounted(() => {
-    receiptPreviewIndex.value = null;
-    receiptPreviewUrls.value.forEach((url) => {
-        if (url) URL.revokeObjectURL(url);
-    });
-});
 
 const scanReceipt = async () => {
     if (!aiEnabled.value || !receiptFiles.value.length || scanReceiptLoading.value) {
@@ -631,7 +672,7 @@ const submit = () => {
                 >
                     <Upload class="h-4 w-4 shrink-0 text-slate-500" />
                     <span class="text-sm font-medium text-slate-800">
-                        {{ receiptFiles.length ? 'Add more' : 'Upload receipts' }}
+                        {{ receiptFiles.length || existingAttachments.length ? 'Add more' : 'Upload receipts' }}
                     </span>
                     <span class="hidden text-xs text-slate-500 sm:inline">Photos or PDFs</span>
                     <input type="file" accept="image/*,.pdf" multiple class="hidden" @change="onReceiptChange">
@@ -660,10 +701,54 @@ const submit = () => {
                     {{ scanReceiptError }}
                 </p>
 
-                <ul v-if="receiptFiles.length" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                <ul
+                    v-if="existingAttachments.length || receiptFiles.length"
+                    class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
+                >
+                    <li
+                        v-for="attachment in existingAttachments"
+                        :key="`existing-${attachment.id}`"
+                        class="group relative"
+                    >
+                        <button
+                            type="button"
+                            class="aspect-square w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 text-left transition hover:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                            :aria-label="`Preview ${attachment.name}`"
+                            @click="openExistingAttachmentPreview(attachment)"
+                        >
+                            <img
+                                v-if="isImageMime(attachment.mime_type, attachment.name)"
+                                :src="attachment.url"
+                                :alt="attachment.name"
+                                class="h-full w-full object-cover"
+                            >
+                            <div
+                                v-else-if="isPdfMime(attachment.mime_type, attachment.name)"
+                                class="relative h-full w-full overflow-hidden bg-white"
+                            >
+                                <iframe
+                                    :src="`${attachment.url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`"
+                                    class="pointer-events-none absolute inset-0 h-[180%] w-[180%] origin-top-left scale-[0.56] border-0"
+                                    tabindex="-1"
+                                    :title="`Preview of ${attachment.name}`"
+                                />
+                                <span class="pointer-events-none absolute bottom-1 left-1 rounded bg-slate-900/75 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                                    PDF
+                                </span>
+                            </div>
+                            <div
+                                v-else
+                                class="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-slate-500"
+                            >
+                                <Camera class="h-5 w-5" />
+                                <span class="text-[10px] font-medium uppercase tracking-wide">File</span>
+                            </div>
+                        </button>
+                        <p class="mt-1 truncate text-[11px] text-slate-600" :title="attachment.name">{{ attachment.name }}</p>
+                    </li>
                     <li
                         v-for="(file, index) in receiptFiles"
-                        :key="`${file.name}-${file.size}-${index}`"
+                        :key="`new-${file.name}-${file.size}-${index}`"
                         class="group relative"
                     >
                         <button
@@ -883,13 +968,13 @@ const submit = () => {
                 class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
                 role="dialog"
                 aria-modal="true"
-                :aria-label="`Preview ${previewedReceipt.file.name}`"
+                :aria-label="`Preview ${previewedReceipt.name}`"
                 @click.self="closeReceiptPreview"
             >
                 <div class="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
                     <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                        <p class="truncate text-sm font-medium text-slate-900" :title="previewedReceipt.file.name">
-                            {{ previewedReceipt.file.name }}
+                        <p class="truncate text-sm font-medium text-slate-900" :title="previewedReceipt.name">
+                            {{ previewedReceipt.name }}
                         </p>
                         <button
                             type="button"
@@ -902,16 +987,16 @@ const submit = () => {
                     </div>
                     <div class="flex min-h-0 flex-1 items-center justify-center bg-slate-50 p-3 sm:p-4">
                         <img
-                            v-if="isImageFile(previewedReceipt.file)"
+                            v-if="previewedReceipt.isImage"
                             :src="previewedReceipt.url"
-                            :alt="previewedReceipt.file.name"
+                            :alt="previewedReceipt.name"
                             class="max-h-[75vh] max-w-full rounded object-contain"
                         >
                         <iframe
-                            v-else-if="isPdfFile(previewedReceipt.file)"
+                            v-else-if="previewedReceipt.isPdf"
                             :src="previewedReceipt.url"
                             class="h-[75vh] w-full rounded border-0 bg-white"
-                            :title="previewedReceipt.file.name"
+                            :title="previewedReceipt.name"
                         />
                         <p v-else class="text-sm text-slate-500">Preview is not available for this file type.</p>
                     </div>
