@@ -253,6 +253,9 @@ class ExpenseCrudTest extends TestCase
 
         $txn->refresh();
         $this->assertSame('2026-05-02', $txn->transaction_date->toDateString());
+        $this->assertSame('Paper and pens', $txn->description);
+        $this->assertSame('PO-100', $txn->expense_meta['external_reference'] ?? null);
+        $this->assertSame('Updated', $txn->expense_meta['notes'] ?? null);
         $expenseLine = $txn->journalEntries->first(fn ($e) => $e->account?->type === AccountType::Expense);
         $this->assertNotNull($expenseLine);
         $this->assertSame(200_00, (int) $expenseLine->getRawOriginal('amount_cents'));
@@ -419,9 +422,179 @@ class ExpenseCrudTest extends TestCase
 
         $csv = $response->streamedContent();
         $this->assertStringContainsString('Date,Supplier,Category,Description', $csv);
+        $this->assertStringContainsString('Total (ZAR)', $csv);
         $this->assertStringContainsString('Csv Cafe', $csv);
         $this->assertStringContainsString('80.00', $csv);
         $this->assertStringContainsString('REF-1', $csv);
+    }
+
+
+    public function test_update_via_multipart_method_spoof_persists_fields(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Original Co',
+            'category_account_id' => $category->id,
+            'description' => 'Original desc',
+            'amount_excl_vat_cents' => 100_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+            'reference' => 'REF-1',
+            'notes' => 'Note 1',
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+
+        $this->call('POST', route('expenses.update', $txn), [
+            '_method' => 'PUT',
+            'date' => '2026-06-15',
+            'supplier' => 'Updated Co',
+            'category_account_id' => (string) $category->id,
+            'description' => 'Updated desc',
+            'amount_excl_vat_cents' => '25000',
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => '0',
+            'paid_from_banking_account_id' => (string) $banking->id,
+            'reference' => 'REF-2',
+            'notes' => 'Note 2',
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn->refresh();
+        $this->assertSame('2026-06-15', $txn->transaction_date->toDateString());
+        $this->assertSame('Updated desc', $txn->description);
+        $this->assertSame('Updated Co', $txn->reference);
+        $this->assertSame('REF-2', $txn->expense_meta['external_reference'] ?? null);
+        $this->assertSame('Note 2', $txn->expense_meta['notes'] ?? null);
+        $expenseLine = $txn->journalEntries->first(fn ($e) => $e->account?->type === AccountType::Expense);
+        $this->assertSame(250_00, (int) $expenseLine->getRawOriginal('amount_cents'));
+    }
+
+    public function test_home_office_update_does_not_reapply_percentage_to_scaled_amount(): void
+    {
+        [, $team, , , $banking] = $this->teamWithExpenseAccounts();
+        TaxRate::factory()->for($team)->create();
+        $home = Account::factory()->for($team)->expense()->create(['code' => '7700', 'name' => 'Home office']);
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Telkom',
+            'category_account_id' => $home->id,
+            'description' => 'Internet',
+            'amount_excl_vat_cents' => 1000_00,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 150_00,
+            'paid_from_banking_account_id' => $banking->id,
+            'office_percentage' => 25,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+
+        $edit = $this->get(route('expenses.edit', $txn))->assertOk();
+        $edit->assertInertia(fn ($page) => $page
+            ->component('Expenses/Form')
+            ->where('expense.amount_excl_vat', 1000)
+            ->where('expense.vat_amount', 150)
+            ->where('expense.description', 'Internet'));
+
+        $this->put(route('expenses.update', $txn), [
+            'date' => '2026-05-01',
+            'supplier' => 'Telkom',
+            'category_account_id' => $home->id,
+            'description' => 'Internet updated',
+            'amount_excl_vat_cents' => 1000_00,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 150_00,
+            'paid_from_banking_account_id' => $banking->id,
+            'office_percentage' => 25,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn->refresh();
+        $this->assertSame('Internet updated', $txn->description);
+        $this->assertSame(1000_00, (int) ($txn->expense_meta['entered_amount_excl_vat_cents'] ?? 0));
+        $line = $txn->journalEntries->first(fn ($e) => $e->account?->type === AccountType::Expense);
+        $this->assertSame(250_00, (int) $line->getRawOriginal('amount_cents'));
+    }
+
+    public function test_store_and_update_persist_vat_without_preseeded_tax_rate(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->assertSame(
+            0,
+            TaxRate::queryWithoutTeamScope()->where('team_id', $team->id)->count()
+        );
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'VAT Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Lunch',
+            'amount_excl_vat_cents' => 100_00,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 15_00,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+        $this->assertGreaterThan(0, TaxRate::queryWithoutTeamScope()->where('team_id', $team->id)->count());
+        $this->assertSame(15_00, (int) $txn->taxLines->sum('tax_amount_cents'));
+        $vatLine = $txn->journalEntries->first(
+            fn ($e) => $e->type === EntryType::Debit && $e->account?->code === '1200'
+        );
+        $this->assertNotNull($vatLine);
+        $this->assertSame(15_00, (int) $vatLine->getRawOriginal('amount_cents'));
+
+        $this->get(route('expenses.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->where('expenses.data.0.vat_amount', 15_00)
+                ->where('expenses.data.0.total', 115_00));
+
+        $this->put(route('expenses.update', $txn), [
+            'date' => '2026-05-01',
+            'supplier' => 'VAT Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Lunch updated',
+            'amount_excl_vat_cents' => 200_00,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 30_00,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn->refresh();
+        $this->assertSame('Lunch updated', $txn->description);
+        $this->assertSame(30_00, (int) $txn->taxLines->sum('tax_amount_cents'));
+        $vatLine = $txn->journalEntries->first(
+            fn ($e) => $e->type === EntryType::Debit && $e->account?->code === '1200'
+        );
+        $this->assertNotNull($vatLine);
+        $this->assertSame(30_00, (int) $vatLine->getRawOriginal('amount_cents'));
+
+        $this->get(route('expenses.edit', $txn))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Form')
+                ->where('expense.vat_rate', 'vat15')
+                ->where('expense.vat_amount', 30));
     }
 
     public function test_export_csv_rejects_empty_selection(): void

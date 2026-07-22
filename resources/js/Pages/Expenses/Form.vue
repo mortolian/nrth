@@ -630,9 +630,7 @@ const submit = () => {
         return;
     }
 
-    const payload = buildFormData(parsed.data);
     const visitOptions = {
-        forceFormData: true,
         onStart: () => {
             submitting.value = true;
         },
@@ -648,13 +646,49 @@ const submit = () => {
         },
     };
 
-    if (props.isEditing && props.expense) {
-        payload.append('_method', 'put');
-        router.post(route('expenses.update', props.expense.id), payload, visitOptions);
+    const hasNewReceipts = receiptFiles.value.length > 0;
+    const url =
+        props.isEditing && props.expense
+            ? route('expenses.update', props.expense.id)
+            : route('expenses.store');
+
+    if (hasNewReceipts) {
+        const payload = buildFormData(parsed.data);
+        if (props.isEditing && props.expense) {
+            payload.append('_method', 'put');
+        }
+        router.post(url, payload, { ...visitOptions, forceFormData: true });
         return;
     }
 
-    router.post(route('expenses.store'), payload, visitOptions);
+    const data: Record<string, string | number> = {
+        date: parsed.data.date,
+        category_account_id: parsed.data.category_account_id,
+        description: parsed.data.description ?? '',
+        amount_excl_vat_cents: Math.round(parsed.data.amount_excl_vat * 100),
+        vat_rate: parsed.data.vat_rate,
+        vat_amount_cents: Math.round(parsed.data.vat_amount * 100),
+        paid_from_banking_account_id: parsed.data.paid_from_banking_account_id,
+        reference: parsed.data.reference ?? '',
+        notes: parsed.data.notes ?? '',
+    };
+    if (parsed.data.supplier_id > 0) {
+        data.supplier_id = parsed.data.supplier_id;
+    } else {
+        data.supplier = parsed.data.supplier_custom?.trim() ?? '';
+    }
+    if (isHomeOffice.value) {
+        data.office_percentage = parsed.data.office_percentage ?? 0;
+    }
+    if (isTravel.value) {
+        data.distance_km = parsed.data.distance_km ?? 0;
+        data.rate_per_km = parsed.data.rate_per_km ?? props.sars_rate_per_km;
+    }
+    if (props.isEditing && props.expense) {
+        data._method = 'put';
+    }
+
+    router.post(url, data, visitOptions);
 };
 </script>
 
@@ -957,6 +991,7 @@ const submit = () => {
 
             <div v-if="isHomeOffice" class="mt-5 rounded-md border border-slate-200 p-4">
                 <p class="text-sm font-semibold text-slate-900">Home Office Details</p>
+                <p class="mt-1 text-xs text-slate-500">Enter the full bill amount above. Only the office percentage is posted to the ledger.</p>
                 <label class="mt-2 block text-xs font-medium text-slate-500">Office percentage: {{ form.office_percentage }}%</label>
                 <input v-model.number="form.office_percentage" type="range" min="0" max="100" class="mt-2 w-full">
             </div>

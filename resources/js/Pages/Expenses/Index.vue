@@ -15,6 +15,7 @@ type ExpenseRow = {
     description: string | null;
     amount: number;
     vat_amount: number;
+    total: number;
     status: string;
     has_receipt: boolean;
     can_delete: boolean;
@@ -198,7 +199,7 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
         >
 
         <div class="mt-5 grid gap-4 md:grid-cols-3">
-            <StatCard title="Total expenses (MTD)" :value="formatCents(summary.total_this_month)" trend="neutral" />
+            <StatCard title="Total spent (MTD)" :value="formatCents(summary.total_this_month)" trend="neutral" />
             <StatCard title="VAT claimable (MTD)" :value="formatCents(summary.total_vat_claimable)" trend="up" />
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Missing receipts</p>
@@ -292,8 +293,8 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                     { key: 'supplier', label: 'Supplier' },
                     { key: 'category', label: 'Category' },
                     { key: 'description', label: 'Description' },
-                    { key: 'amount', label: 'Amount (excl VAT)' },
-                    { key: 'vat_amount', label: 'VAT amount' },
+                    { key: 'vat_amount', label: 'VAT' },
+                    { key: 'total', label: 'Total' },
                     { key: 'receipt', label: 'Receipt' },
                     { key: 'actions', label: '' },
                 ]"
@@ -335,11 +336,13 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                     </td>
                     <td class="whitespace-nowrap px-3 py-2"><AppBadge variant="info">{{ expense.category }}</AppBadge></td>
                     <td class="px-3 py-2">{{ expense.description || '-' }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatCents(expense.amount) }}</td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">
                         <span :class="expense.vat_amount > 0 ? 'font-medium text-brand-600' : 'text-slate-500'">
                             {{ formatCents(expense.vat_amount) }}
                         </span>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 font-medium tabular-nums text-slate-900">
+                        {{ formatCents(expense.total) }}
                     </td>
                     <td class="px-3 py-2">
                         <Paperclip v-if="expense.has_receipt" class="h-4 w-4 text-slate-600" />

@@ -22,6 +22,7 @@ use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
+use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -107,7 +108,7 @@ class ExpensesController extends Controller
                 );
                 $amountCents = (int) $expenseLines->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents'));
                 $category = (string) ($expenseLines->first()?->account?->name ?? 'Uncategorized');
-                $vatAmount = (int) $transaction->taxLines->sum('tax_amount_cents');
+                $vatAmount = $this->expenseVatAmountCents($transaction);
 
                 return [
                     'id' => $transaction->id,
@@ -119,6 +120,7 @@ class ExpensesController extends Controller
                     'description' => $transaction->description,
                     'amount' => $amountCents,
                     'vat_amount' => $vatAmount,
+                    'total' => $amountCents + $vatAmount,
                     'status' => $transaction->status->value,
                     'has_receipt' => $transaction->media_count > 0,
                     'can_delete' => DeleteTransactionAction::canDelete($transaction),
@@ -136,11 +138,13 @@ class ExpensesController extends Controller
             ->get();
 
         $totalThisMonth = $monthRows->sum(function (Transaction $transaction): int {
-            return (int) $transaction->journalEntries
+            $exclCents = (int) $transaction->journalEntries
                 ->filter(fn ($entry) => $entry->account?->type === AccountType::Expense)
                 ->sum(fn ($entry) => (int) $entry->getRawOriginal('amount_cents'));
+
+            return $exclCents + $this->expenseVatAmountCents($transaction);
         });
-        $totalVat = (int) $monthRows->sum(fn (Transaction $t): int => (int) $t->taxLines->sum('tax_amount_cents'));
+        $totalVat = (int) $monthRows->sum(fn (Transaction $t): int => $this->expenseVatAmountCents($t));
         $awaitingReceipts = $monthRows->filter(fn (Transaction $t): bool => (int) $t->media_count === 0)->count();
 
         $categories = Transaction::queryWithoutTeamScope()
@@ -206,6 +210,7 @@ class ExpensesController extends Controller
                 'Supplier',
                 'Category',
                 'Description',
+                'Total (ZAR)',
                 'Amount excl VAT (ZAR)',
                 'VAT amount (ZAR)',
                 'Status',
@@ -218,7 +223,7 @@ class ExpensesController extends Controller
                     fn ($entry) => $entry->account?->type === AccountType::Expense
                 );
                 $amountCents = (int) $expenseLines->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents'));
-                $vatCents = (int) $transaction->taxLines->sum('tax_amount_cents');
+                $vatCents = $this->expenseVatAmountCents($transaction);
                 $category = (string) ($expenseLines->first()?->account?->name ?? 'Uncategorized');
                 $supplier = $transaction->supplier?->name
                     ?: ($transaction->reference ?: ($transaction->description ?: 'Unknown supplier'));
@@ -229,6 +234,7 @@ class ExpensesController extends Controller
                     $supplier,
                     $category,
                     (string) ($transaction->description ?? ''),
+                    number_format(($amountCents + $vatCents) / 100, 2, '.', ''),
                     number_format($amountCents / 100, 2, '.', ''),
                     number_format($vatCents / 100, 2, '.', ''),
                     $transaction->status->value,
@@ -248,6 +254,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new DefaultTaxRatesSeeder)->runForTeam($team);
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
@@ -271,6 +278,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new DefaultTaxRatesSeeder)->runForTeam($team);
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
@@ -312,6 +320,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new DefaultTaxRatesSeeder)->runForTeam($team);
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
@@ -324,6 +333,7 @@ class ExpensesController extends Controller
         $normalized = $this->normalizedExpenseAmounts($categoryAccount, $payload);
         $amountExclCents = $normalized[0];
         $vatAmountCents = $normalized[1];
+        $vatRate = $normalized[2];
         $isVatClaimable = $normalized[3];
 
         $bankingAccount = $this->resolvePaidFromBankingAccount($teamId, (int) $payload['paid_from_banking_account_id']);
@@ -337,7 +347,7 @@ class ExpensesController extends Controller
 
         $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $bankingAccount, $creditAccount);
 
-        $transaction = DB::transaction(function () use ($payload, $teamId, $userId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): Transaction {
+        $transaction = DB::transaction(function () use ($payload, $teamId, $userId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $vatRate, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): Transaction {
             $transaction = Transaction::queryWithoutTeamScope()->create([
                 'team_id' => $teamId,
                 'supplier_id' => $supplierIdToSave,
@@ -360,6 +370,7 @@ class ExpensesController extends Controller
                 $isVatClaimable,
                 $amountExclCents,
                 $vatAmountCents,
+                $vatRate,
                 $reference
             );
 
@@ -379,6 +390,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new DefaultTaxRatesSeeder)->runForTeam($team);
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
@@ -391,6 +403,7 @@ class ExpensesController extends Controller
         $normalized = $this->normalizedExpenseAmounts($categoryAccount, $payload);
         $amountExclCents = $normalized[0];
         $vatAmountCents = $normalized[1];
+        $vatRate = $normalized[2];
         $isVatClaimable = $normalized[3];
 
         $bankingAccount = $this->resolvePaidFromBankingAccount($teamId, (int) $payload['paid_from_banking_account_id']);
@@ -404,7 +417,7 @@ class ExpensesController extends Controller
 
         $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $bankingAccount, $creditAccount);
 
-        DB::transaction(function () use ($transaction, $payload, $teamId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): void {
+        DB::transaction(function () use ($transaction, $payload, $teamId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $vatRate, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): void {
             $transaction->forceFill([
                 'status' => TransactionStatus::Draft,
                 'supplier_id' => $supplierIdToSave,
@@ -428,6 +441,7 @@ class ExpensesController extends Controller
                 $isVatClaimable,
                 $amountExclCents,
                 $vatAmountCents,
+                $vatRate,
                 $reference
             );
 
@@ -680,6 +694,10 @@ class ExpensesController extends Controller
         ];
         if (str_contains($name, 'home office')) {
             $meta['office_percentage'] = (float) ($payload['office_percentage'] ?? 0);
+            // Persist the bill amounts the user entered so edit does not re-scale the
+            // already-reduced journal figures on every save.
+            $meta['entered_amount_excl_vat_cents'] = (int) $payload['amount_excl_vat_cents'];
+            $meta['entered_vat_amount_cents'] = (int) $payload['vat_amount_cents'];
         }
         if (str_contains($name, 'travel')) {
             $meta['distance_km'] = (float) ($payload['distance_km'] ?? 0);
@@ -787,6 +805,7 @@ class ExpensesController extends Controller
         bool $isVatClaimable,
         int $amountExclCents,
         int $vatAmountCents,
+        string $vatRate,
         string $reference,
     ): void {
         $totalCents = $amountExclCents + $vatAmountCents;
@@ -801,7 +820,13 @@ class ExpensesController extends Controller
         ]);
 
         $creditAmount = $totalCents;
-        if ($isVatClaimable && $vatInputAccount !== null) {
+        if ($isVatClaimable) {
+            if ($vatInputAccount === null) {
+                throw ValidationException::withMessages([
+                    'vat_rate' => __('VAT input account (1200) is missing. Restore it from the chart of accounts.'),
+                ]);
+            }
+
             JournalEntry::query()->create([
                 'transaction_id' => $transaction->id,
                 'account_id' => $vatInputAccount->id,
@@ -823,12 +848,14 @@ class ExpensesController extends Controller
             'description' => 'Expense payment',
         ]);
 
-        $taxRate = TaxRate::queryWithoutTeamScope()
-            ->where('team_id', $teamId)
-            ->where('is_active', true)
-            ->orderByDesc('is_default')
-            ->first();
-        if ($vatAmountCents > 0 && $isVatClaimable && $taxRate !== null) {
+        if ($vatAmountCents > 0 && $isVatClaimable) {
+            $taxRate = $this->resolveExpenseTaxRate($teamId, $vatRate);
+            if ($taxRate === null) {
+                throw ValidationException::withMessages([
+                    'vat_rate' => __('Add a VAT rate in Tax settings before recording claimable VAT on expenses.'),
+                ]);
+            }
+
             TaxLine::query()->create([
                 'transaction_id' => $transaction->id,
                 'tax_rate_id' => $taxRate->id,
@@ -837,6 +864,46 @@ class ExpensesController extends Controller
                 'type' => TaxLineType::Input,
             ]);
         }
+    }
+
+    private function expenseVatAmountCents(Transaction $transaction): int
+    {
+        $fromTaxLines = (int) $transaction->taxLines->sum('tax_amount_cents');
+        if ($fromTaxLines > 0) {
+            return $fromTaxLines;
+        }
+
+        // Legacy expenses may have posted VAT to 1200 without a tax_lines row.
+        return (int) $transaction->journalEntries
+            ->filter(fn ($entry) => $entry->type === EntryType::Debit && $entry->account?->code === '1200')
+            ->sum(fn ($entry) => (int) $entry->getRawOriginal('amount_cents'));
+    }
+
+    private function resolveExpenseTaxRate(int $teamId, string $vatRate): ?TaxRate
+    {
+        $code = match ($vatRate) {
+            'vat15' => 'VAT15',
+            'vat0' => 'VAT0',
+            'exempt' => 'EXEMPT',
+            default => null,
+        };
+
+        if ($code !== null) {
+            $matched = TaxRate::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('code', $code)
+                ->where('is_active', true)
+                ->first();
+            if ($matched !== null) {
+                return $matched;
+            }
+        }
+
+        return TaxRate::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('is_active', true)
+            ->orderByDesc('is_default')
+            ->first();
     }
 
     /**
@@ -856,7 +923,23 @@ class ExpensesController extends Controller
         $amountExclCents = $expenseLine !== null
             ? (int) $expenseLine->getRawOriginal('amount_cents')
             : 0;
-        $vatAmountCents = (int) $transaction->taxLines->sum('tax_amount_cents');
+        $vatAmountCents = $this->expenseVatAmountCents($transaction);
+
+        $meta = $transaction->expense_meta ?? [];
+        $categoryName = strtolower((string) ($expenseLine?->account?->name ?? ''));
+        if (str_contains($categoryName, 'home office')) {
+            if (isset($meta['entered_amount_excl_vat_cents'])) {
+                $amountExclCents = (int) $meta['entered_amount_excl_vat_cents'];
+                $vatAmountCents = (int) ($meta['entered_vat_amount_cents'] ?? 0);
+            } else {
+                $officePct = (float) ($meta['office_percentage'] ?? 0);
+                if ($officePct > 0) {
+                    $factor = $officePct / 100.0;
+                    $amountExclCents = (int) round($amountExclCents / $factor);
+                    $vatAmountCents = (int) round($vatAmountCents / $factor);
+                }
+            }
+        }
 
         $vatRate = 'no_vat';
         if ($vatAmountCents > 0) {
@@ -865,7 +948,6 @@ class ExpensesController extends Controller
             $vatRate = 'vat0';
         }
 
-        $meta = $transaction->expense_meta ?? [];
         $paidFromBankingAccountId = $this->resolvePaidFromBankingAccountIdForForm($transaction, $creditLine, $team);
 
         $attachments = $transaction->getMedia('attachments')->map(fn (Media $media) => [
