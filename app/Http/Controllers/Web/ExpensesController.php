@@ -545,6 +545,8 @@ class ExpensesController extends Controller
             $this->attachReceiptUploads($request, $transaction);
         }
 
+        $this->detachReceiptAttachments($request, $transaction);
+
         return to_route('expenses.index');
     }
 
@@ -660,6 +662,36 @@ class ExpensesController extends Controller
         return $attached;
     }
 
+    private function detachReceiptAttachments(Request $request, Transaction $transaction): void
+    {
+        $ids = $request->input('remove_attachment_ids', []);
+        if (! is_array($ids) || $ids === []) {
+            return;
+        }
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if ($ids === []) {
+            return;
+        }
+
+        foreach ($ids as $mediaId) {
+            $media = Media::query()->find($mediaId);
+            if ($media === null) {
+                continue;
+            }
+
+            if (
+                $media->model_type !== $transaction->getMorphClass()
+                || (int) $media->model_id !== (int) $transaction->id
+                || $media->collection_name !== 'attachments'
+            ) {
+                continue;
+            }
+
+            $media->delete();
+        }
+    }
+
     private function assertReceiptFileIsSafe(UploadedFile $file): void
     {
         $path = $file->getRealPath();
@@ -736,6 +768,8 @@ class ExpensesController extends Controller
             'receipt' => ['nullable', 'file', 'max:10240'],
             'receipts' => ['nullable', 'array', 'max:20'],
             'receipts.*' => ['file', 'max:10240'],
+            'remove_attachment_ids' => ['nullable', 'array', 'max:50'],
+            'remove_attachment_ids.*' => ['integer'],
         ]);
     }
 

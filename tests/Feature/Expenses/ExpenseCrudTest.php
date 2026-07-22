@@ -282,7 +282,31 @@ class ExpenseCrudTest extends TestCase
             ->assertOk()
             ->assertHeader('content-type', $media->mime_type ?: 'application/pdf');
 
-        $this->delete(route('expenses.attachments.destroy', [$txn->fresh(), $media]))
+        $this->put(route('expenses.update', $txn->fresh()), [
+            'date' => '2026-05-02',
+            'supplier' => 'Stationery Co',
+            'category_account_id' => $category->id,
+            'description' => 'Paper and pens',
+            'amount_excl_vat_cents' => 200_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+            'reference' => 'PO-100',
+            'notes' => 'Updated',
+            'remove_attachment_ids' => [$media->id],
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->assertCount(0, $txn->fresh()->getMedia('attachments'));
+
+        $this->post(route('expenses.receipt.store', $txn->fresh()), [
+            'receipt' => UploadedFile::fake()->create('rcpt2.pdf', 80),
+        ])->assertRedirect()
+            ->assertSessionHas('success');
+
+        $media2 = $txn->fresh()->getMedia('attachments')->first();
+        $this->assertNotNull($media2);
+
+        $this->delete(route('expenses.attachments.destroy', [$txn->fresh(), $media2]))
             ->assertRedirect();
 
         $this->assertCount(0, $txn->fresh()->getMedia('attachments'));

@@ -211,13 +211,21 @@ const previewUrlFor = (file: File) => {
 };
 
 const existingAttachments = ref<ExpenseAttachment[]>([...(props.expense?.attachments ?? [])]);
+/** Staged for deletion on Update — not removed from disk until save. */
+const pendingRemoveAttachmentIds = ref<number[]>([]);
 
 watch(
     () => props.expense?.attachments,
     (attachments) => {
         existingAttachments.value = [...(attachments ?? [])];
+        pendingRemoveAttachmentIds.value = [];
     },
 );
+
+const visibleExistingAttachments = computed(() => {
+    const pending = new Set(pendingRemoveAttachmentIds.value);
+    return existingAttachments.value.filter((attachment) => !pending.has(attachment.id));
+});
 
 type ReceiptPreviewItem =
     | { kind: 'existing'; attachment: ExpenseAttachment }
@@ -233,14 +241,20 @@ const openExistingAttachmentPreview = (attachment: ExpenseAttachment) => {
     receiptPreviewTarget.value = { kind: 'existing', attachment };
 };
 
-const removingAttachmentId = ref<number | null>(null);
-
 const removeExistingAttachment = (attachment: ExpenseAttachment) => {
-    if (!props.expense?.id || removingAttachmentId.value !== null) {
+    if (!props.isEditing || !props.expense?.id) {
         return;
     }
 
-    if (!window.confirm(`Remove “${attachment.name}” from this expense? This cannot be undone.`)) {
+    if (pendingRemoveAttachmentIds.value.includes(attachment.id)) {
+        return;
+    }
+
+    if (
+        !window.confirm(
+            `Remove “${attachment.name}” from this expense? It will only be deleted when you click Update Expense. Cancel leaves it unchanged.`,
+        )
+    ) {
         return;
     }
 
@@ -249,16 +263,7 @@ const removeExistingAttachment = (attachment: ExpenseAttachment) => {
         receiptPreviewTarget.value = null;
     }
 
-    removingAttachmentId.value = attachment.id;
-    router.delete(route('expenses.attachments.destroy', [props.expense.id, attachment.id]), {
-        preserveScroll: true,
-        onSuccess: () => {
-            existingAttachments.value = existingAttachments.value.filter((row) => row.id !== attachment.id);
-        },
-        onFinish: () => {
-            removingAttachmentId.value = null;
-        },
-    });
+    pendingRemoveAttachmentIds.value = [...pendingRemoveAttachmentIds.value, attachment.id];
 };
 
 const openReceiptPreview = (index: number) => {
@@ -380,7 +385,7 @@ const clearReceipts = () => {
     receiptUploadSuccess.value = null;
 };
 
-const totalReceiptCount = computed(() => existingAttachments.value.length + receiptFiles.value.length);
+const totalReceiptCount = computed(() => visibleExistingAttachments.value.length + receiptFiles.value.length);
 
 type ScanPayload = {
     date?: string | null;
@@ -510,9 +515,9 @@ const scanAllReceipts = async () => {
         receiptFiles.value.forEach((file, index) => {
             body.append(`receipts[${index}]`, file);
         });
-        if (existingAttachments.value.length && props.expense?.id) {
+        if (visibleExistingAttachments.value.length && props.expense?.id) {
             body.append('transaction_id', String(props.expense.id));
-            existingAttachments.value.forEach((attachment, index) => {
+            visibleExistingAttachments.value.forEach((attachment, index) => {
                 body.append(`attachment_ids[${index}]`, String(attachment.id));
             });
         }
@@ -651,6 +656,9 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
     receiptFiles.value.forEach((file, index) => {
         data.append(`receipts[${index}]`, file);
     });
+    pendingRemoveAttachmentIds.value.forEach((id, index) => {
+        data.append(`remove_attachment_ids[${index}]`, String(id));
+    });
     return data;
 };
 
@@ -737,12 +745,13 @@ const submit = () => {
     };
 
     const hasNewReceipts = receiptFiles.value.length > 0;
+    const hasRemovals = pendingRemoveAttachmentIds.value.length > 0;
     const url =
         props.isEditing && props.expense
             ? route('expenses.update', props.expense.id)
             : route('expenses.store');
 
-    if (hasNewReceipts) {
+    if (hasNewReceipts || hasRemovals) {
         const payload = buildFormData(parsed.data);
         if (props.isEditing && props.expense) {
             payload.append('_method', 'put');
@@ -827,7 +836,7 @@ const submit = () => {
                 >
                     <Upload class="h-4 w-4 shrink-0 text-slate-500" />
                     <span class="text-sm font-medium text-slate-800">
-                        {{ receiptFiles.length || existingAttachments.length ? 'Add more' : 'Upload receipts' }}
+                        {{ receiptFiles.length || visibleExistingAttachments.length ? 'Add more' : 'Upload receipts' }}
                     </span>
                     <span class="hidden text-xs text-slate-500 sm:inline">Photos or PDFs</span>
                     <input type="file" accept="image/*,.pdf" multiple class="hidden" @change="onReceiptChange">
@@ -860,11 +869,11 @@ const submit = () => {
                 </p>
 
                 <ul
-                    v-if="existingAttachments.length || receiptFiles.length"
+                    v-if="visibleExistingAttachments.length || receiptFiles.length"
                     class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5"
                 >
                     <li
-                        v-for="attachment in existingAttachments"
+                        v-for="attachment in visibleExistingAttachments"
                         :key="`existing-${attachment.id}`"
                         class="group relative"
                     >
@@ -916,9 +925,8 @@ const submit = () => {
                         </button>
                         <button
                             type="button"
-                            class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900 disabled:opacity-50"
+                            class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900"
                             :aria-label="`Remove ${attachment.name}`"
-                            :disabled="removingAttachmentId === attachment.id"
                             @click.stop="removeExistingAttachment(attachment)"
                         >
                             <span class="text-sm leading-none" aria-hidden="true">×</span>
