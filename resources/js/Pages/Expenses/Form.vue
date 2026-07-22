@@ -239,6 +239,10 @@ const removeExistingAttachment = (attachment: ExpenseAttachment) => {
         return;
     }
 
+    if (!window.confirm(`Remove “${attachment.name}” from this expense? This cannot be undone.`)) {
+        return;
+    }
+
     const current = receiptPreviewTarget.value;
     if (current?.kind === 'existing' && current.attachment.id === attachment.id) {
         receiptPreviewTarget.value = null;
@@ -329,6 +333,12 @@ const onReceiptChange = (event: Event) => {
 };
 
 const removeReceiptAt = (index: number) => {
+    const file = receiptFiles.value[index];
+    const label = file?.name?.trim() || 'this file';
+    if (!window.confirm(`Remove “${label}” from this expense?`)) {
+        return;
+    }
+
     const current = receiptPreviewTarget.value;
     if (current?.kind === 'new') {
         if (current.index === index) {
@@ -344,6 +354,13 @@ const removeReceiptAt = (index: number) => {
 };
 
 const clearReceipts = () => {
+    if (!receiptFiles.value.length) {
+        return;
+    }
+    if (!window.confirm('Remove all newly added receipts from this expense?')) {
+        return;
+    }
+
     receiptPreviewTarget.value = null;
     receiptPreviewUrls.value.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
