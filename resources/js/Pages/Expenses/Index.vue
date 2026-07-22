@@ -313,8 +313,17 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                         @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
                     >
                 </template>
-                <tr v-for="expense in expenses.data" :key="expense.id" class="hover:bg-slate-50">
-                    <td class="px-3 py-2">
+                <tr
+                    v-for="expense in expenses.data"
+                    :key="expense.id"
+                    class="cursor-pointer hover:bg-slate-50"
+                    role="link"
+                    tabindex="0"
+                    :aria-label="`Edit expense from ${expense.supplier}`"
+                    @click="router.visit(route('expenses.edit', expense.id))"
+                    @keydown.enter.prevent="router.visit(route('expenses.edit', expense.id))"
+                >
+                    <td class="px-3 py-2" @click.stop>
                         <input
                             type="checkbox"
                             :checked="selected.includes(expense.id)"
@@ -348,7 +357,7 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                         <Paperclip v-if="expense.has_receipt" class="h-4 w-4 text-slate-600" />
                         <TriangleAlert v-else class="h-4 w-4 text-rose-500" />
                     </td>
-                    <td class="px-3 py-2">
+                    <td class="px-3 py-2" @click.stop>
                         <div class="flex justify-end">
                             <InvoiceRowActionsMenu
                                 :actions="rowActionItems(expense)"
