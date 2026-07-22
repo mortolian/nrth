@@ -50,6 +50,25 @@ class ChartAccountManagementTest extends TestCase
         ]);
     }
 
+    public function test_create_form_includes_suggested_account_codes(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $this->actingAs($user);
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        (new DefaultChartOfAccountsSeeder)->runForTeam($team);
+
+        $this->get(route('accounting.accounts.create'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Accounting/Accounts/Form')
+                ->where('isEditing', false)
+                ->has('suggested_codes.expense')
+                ->where('suggested_codes.expense', '5910')
+                ->has('code_accounts'));
+    }
+
     public function test_chart_index_includes_management_flags(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

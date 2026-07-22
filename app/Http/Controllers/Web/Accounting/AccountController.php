@@ -10,6 +10,7 @@ use App\Domain\Accounting\DTOs\Unspecified;
 use App\Domain\Accounting\DTOs\UpdateAccountDTO;
 use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Models\Account;
+use App\Domain\Accounting\Services\SuggestAccountCode;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
@@ -38,11 +39,29 @@ class AccountController extends Controller
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
 
+        $suggest = app(SuggestAccountCode::class);
+        $suggestedCodes = [];
+        foreach (AccountType::cases() as $type) {
+            $suggestedCodes[$type->value] = $suggest->for($team->id, $type);
+        }
+
         return Inertia::render('Accounting/Accounts/Form', [
             'isEditing' => false,
             'account' => null,
             'account_types' => $this->accountTypeOptions(),
             'parent_options' => $this->parentOptionsForTeam($team->id),
+            'suggested_codes' => $suggestedCodes,
+            'code_accounts' => Account::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->get(['id', 'code', 'type', 'parent_id'])
+                ->map(fn (Account $account): array => [
+                    'id' => $account->id,
+                    'code' => $account->code,
+                    'type' => $account->type->value,
+                    'parent_id' => $account->parent_id,
+                ])
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -100,6 +119,8 @@ class AccountController extends Controller
             ],
             'account_types' => $this->accountTypeOptions(),
             'parent_options' => $this->parentOptionsForTeam($team->id, $account->id),
+            'suggested_codes' => null,
+            'code_accounts' => [],
         ]);
     }
 

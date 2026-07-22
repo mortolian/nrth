@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
+import { CircleHelp } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
 type AccountTypeOpt = { value: string; label: string };
 type ParentOpt = { id: number; code: string; name: string; type: string };
+type CodeAccount = { id: number; code: string; type: string; parent_id: number | null };
 
 const props = defineProps<{
     isEditing: boolean;
@@ -20,20 +22,94 @@ const props = defineProps<{
     };
     account_types: AccountTypeOpt[];
     parent_options: ParentOpt[];
+    suggested_codes?: Record<string, string> | null;
+    code_accounts?: CodeAccount[];
 }>();
 
 const isSystem = computed(() => props.account?.is_system ?? false);
+const codeAccounts = computed(() => props.code_accounts ?? []);
+const suggestedCodes = computed(() => props.suggested_codes ?? {});
+
+const defaultType = props.account?.type ?? 'expense';
+const initialCode = props.isEditing
+    ? (props.account?.code ?? '')
+    : (suggestedCodes.value[defaultType] ?? '');
 
 const form = useForm({
-    code: props.account?.code ?? '',
+    code: initialCode,
     name: props.account?.name ?? '',
     description: props.account?.description ?? '',
-    type: props.account?.type ?? 'expense',
+    type: defaultType,
     parent_id: props.account?.parent_id != null ? String(props.account.parent_id) : '',
     is_active: props.account?.is_active ?? true,
 });
 
+/** Once the user edits the code, stop overwriting it when type/parent change. */
+const codeCustomized = ref(props.isEditing);
+
 const parentChoices = computed(() => props.parent_options.filter((p) => p.type === form.type));
+
+const numericCode = (code: string): number | null => {
+    const trimmed = code.trim();
+    return /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+};
+
+const typeBase = (type: string): number => {
+    switch (type) {
+        case 'asset': return 1000;
+        case 'liability': return 2000;
+        case 'equity': return 3000;
+        case 'income': return 4000;
+        case 'expense': return 5000;
+        default: return 5000;
+    }
+};
+
+const suggestCode = (type: string, parentId: string): string => {
+    const used = new Set(codeAccounts.value.map((a) => a.code));
+    const base = typeBase(type);
+    let next: number;
+
+    if (parentId !== '') {
+        const parentNumericId = Number(parentId);
+        const parent = props.parent_options.find((p) => p.id === parentNumericId);
+        const siblingNumbers = codeAccounts.value
+            .filter((a) => a.parent_id === parentNumericId)
+            .map((a) => numericCode(a.code))
+            .filter((n): n is number => n !== null);
+        const parentNumber = parent ? numericCode(parent.code) : null;
+        const max = siblingNumbers.length ? Math.max(...siblingNumbers) : null;
+
+        if (max !== null) {
+            next = max + 10;
+        } else if (parentNumber !== null) {
+            next = parentNumber + 10;
+        } else {
+            next = base;
+        }
+    } else if (suggestedCodes.value[type]) {
+        return suggestedCodes.value[type];
+    } else {
+        const typeNumbers = codeAccounts.value
+            .filter((a) => a.type === type)
+            .map((a) => numericCode(a.code))
+            .filter((n): n is number => n !== null);
+        const max = typeNumbers.length ? Math.max(...typeNumbers) : null;
+        next = max !== null ? max + 10 : base;
+        if (next < base) next = base;
+    }
+
+    while (used.has(String(next))) {
+        next += 10;
+    }
+
+    return String(next);
+};
+
+const applySuggestedCode = () => {
+    if (props.isEditing || codeCustomized.value) return;
+    form.code = suggestCode(form.type, form.parent_id);
+};
 
 watch(
     () => form.type,
@@ -42,8 +118,20 @@ watch(
         if (!ok) {
             form.parent_id = '';
         }
+        applySuggestedCode();
     },
 );
+
+watch(
+    () => form.parent_id,
+    () => applySuggestedCode(),
+);
+
+const onCodeInput = () => {
+    if (!props.isEditing) {
+        codeCustomized.value = true;
+    }
+};
 
 const parentSelectOptions = computed(() =>
     parentChoices.value.map((p) => ({
@@ -101,8 +189,35 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
         <AppCard class="mt-5">
             <form class="grid max-w-xl gap-4" @submit.prevent="submit">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Code</label>
-                    <AppInput v-model="form.code" class="font-mono" :disabled="isSystem" required />
+                    <div class="mb-1 flex items-center gap-1.5">
+                        <label class="text-xs font-medium text-slate-500" for="account-code">Code</label>
+                        <span class="group relative inline-flex">
+                            <button
+                                type="button"
+                                class="inline-flex rounded text-slate-400 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                                aria-label="What is an account code?"
+                            >
+                                <CircleHelp class="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                            <span
+                                role="tooltip"
+                                class="pointer-events-none absolute left-0 top-full z-50 mt-2 w-72 rounded-md bg-slate-900 px-3 py-2 text-xs leading-relaxed text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                            >
+                                A short reference used in journals, reports, and mappings. Codes are usually numeric and grouped by type (1000s assets, 2000s liabilities, 5000s expenses, and so on). A suggestion is filled in for you — change it if your chart uses a different scheme.
+                            </span>
+                        </span>
+                    </div>
+                    <AppInput
+                        id="account-code"
+                        v-model="form.code"
+                        class="font-mono"
+                        :disabled="isSystem"
+                        required
+                        @update:model-value="onCodeInput"
+                    />
+                    <p v-if="!isEditing && !codeCustomized" class="mt-1 text-xs text-slate-500">
+                        Suggested next code — edit anytime.
+                    </p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>

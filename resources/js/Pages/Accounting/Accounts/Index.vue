@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 type AccountRow = {
@@ -67,8 +68,45 @@ const filteredGroups = computed(() =>
         .filter((g) => g.accounts.length > 0),
 );
 
-const viewStatement = (id: number) => {
-    router.get(route('accounting.accounts.statement', id));
+const rowActionItems = (account: AccountRow) => {
+    const actions: Array<{ id: string; label: string }> = [];
+    if (account.is_active) {
+        actions.push({ id: 'statement', label: 'View statement' });
+    }
+    if (props.can_manage) {
+        actions.push({ id: 'edit', label: 'Edit' });
+        if (!account.is_system && account.is_active) {
+            actions.push({ id: 'archive', label: 'Archive' });
+        }
+        if (!account.is_system) {
+            actions.push({ id: 'delete', label: 'Delete' });
+        }
+    }
+    return actions;
+};
+
+const onRowAction = (account: AccountRow, actionId: string) => {
+    if (actionId === 'statement') {
+        router.get(route('accounting.accounts.statement', account.id));
+        return;
+    }
+    if (actionId === 'edit') {
+        router.get(route('accounting.accounts.edit', account.id));
+        return;
+    }
+    if (actionId === 'archive') {
+        if (!confirm('Archive this account? It will be hidden from new transactions unless you show inactive accounts.')) {
+            return;
+        }
+        router.post(route('accounting.accounts.deactivate', account.id));
+        return;
+    }
+    if (actionId === 'delete') {
+        if (!confirm('Permanently delete this account? Only allowed when it has no ledger activity or sub-accounts.')) {
+            return;
+        }
+        router.delete(route('accounting.accounts.destroy', account.id));
+    }
 };
 
 const seedDefaultChart = () => {
@@ -76,24 +114,6 @@ const seedDefaultChart = () => {
         return;
     }
     router.post(route('accounting.accounts.seed-default'));
-};
-
-const editAccount = (id: number) => {
-    router.get(route('accounting.accounts.edit', id));
-};
-
-const deactivateAccount = (id: number) => {
-    if (!confirm('Archive this account? It will be hidden from new transactions unless you show inactive accounts.')) {
-        return;
-    }
-    router.post(route('accounting.accounts.deactivate', id));
-};
-
-const deleteAccount = (id: number) => {
-    if (!confirm('Permanently delete this account? Only allowed when it has no ledger activity or sub-accounts.')) {
-        return;
-    }
-    router.delete(route('accounting.accounts.destroy', id));
 };
 
 const typeBadgeClass: Record<string, string> = {
@@ -189,7 +209,7 @@ const typeBadgeClass: Record<string, string> = {
                         { key: 'parent', label: 'Parent' },
                         { key: 'balance', label: 'Balance' },
                         { key: 'flags', label: '' },
-                        { key: 'actions', label: 'Actions' },
+                        { key: 'actions', label: '' },
                     ]"
                 >
                     <tr
@@ -221,42 +241,16 @@ const typeBadgeClass: Record<string, string> = {
                                 <AppBadge v-if="!account.is_active" variant="neutral" class="text-xs">Inactive</AppBadge>
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-right">
-                            <div class="flex flex-wrap items-center justify-end gap-1">
-                                <AppButton
-                                    v-if="account.is_active"
-                                    size="sm"
-                                    variant="ghost"
-                                    @click="viewStatement(account.id)"
-                                >
-                                    Statement
-                                </AppButton>
-                                <AppButton
-                                    v-if="can_manage"
-                                    size="sm"
-                                    variant="ghost"
-                                    @click="editAccount(account.id)"
-                                >
-                                    Edit
-                                </AppButton>
-                                <AppButton
-                                    v-if="can_manage && !account.is_system && account.is_active"
-                                    size="sm"
-                                    variant="ghost"
-                                    class="text-amber-800"
-                                    @click="deactivateAccount(account.id)"
-                                >
-                                    Archive
-                                </AppButton>
-                                <AppButton
-                                    v-if="can_manage && !account.is_system"
-                                    size="sm"
-                                    variant="ghost"
-                                    class="text-rose-700"
-                                    @click="deleteAccount(account.id)"
-                                >
-                                    Delete
-                                </AppButton>
+                        <td class="px-4 py-3 text-right" @click.stop>
+                            <div
+                                v-if="rowActionItems(account).length"
+                                class="inline-flex justify-end"
+                            >
+                                <InvoiceRowActionsMenu
+                                    :actions="rowActionItems(account)"
+                                    :aria-label="`Actions for ${account.code} ${account.name}`"
+                                    @select="(id) => onRowAction(account, id)"
+                                />
                             </div>
                         </td>
                     </tr>

@@ -91,7 +91,7 @@ const submit = () => {
             { label: isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <PageHeader :title="isEditing ? 'Edit Supplier' : 'Create Supplier'" subtitle="Vendors you pay on expenses" />
+        <PageHeader :title="isEditing ? 'Edit Supplier' : 'Create Supplier'" />
 
         <AppCard class="mt-5">
             <div class="grid gap-4 md:grid-cols-2">
