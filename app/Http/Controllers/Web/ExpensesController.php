@@ -402,15 +402,30 @@ class ExpensesController extends Controller
     public function showAttachment(Request $request, Transaction $transaction, Media $media): BinaryFileResponse
     {
         $transaction = $this->resolveTeamExpense($request, $transaction);
-
-        abort_unless($media->model_type === $transaction->getMorphClass(), 404);
-        abort_unless((int) $media->model_id === (int) $transaction->id, 404);
-        abort_unless($media->collection_name === 'attachments', 404);
+        $media = $this->resolveExpenseAttachment($transaction, $media);
 
         return response()->file($media->getPath(), [
             'Content-Type' => $media->mime_type ?: 'application/octet-stream',
             'Content-Disposition' => 'inline; filename="'.$media->file_name.'"',
         ]);
+    }
+
+    public function destroyAttachment(Request $request, Transaction $transaction, Media $media): RedirectResponse
+    {
+        $transaction = $this->resolveTeamExpense($request, $transaction);
+        $media = $this->resolveExpenseAttachment($transaction, $media);
+        $media->delete();
+
+        return back();
+    }
+
+    private function resolveExpenseAttachment(Transaction $transaction, Media $media): Media
+    {
+        abort_unless($media->model_type === $transaction->getMorphClass(), 404);
+        abort_unless((int) $media->model_id === (int) $transaction->id, 404);
+        abort_unless($media->collection_name === 'attachments', 404);
+
+        return $media;
     }
 
     private function attachReceiptUploads(Request $request, Transaction $transaction): void

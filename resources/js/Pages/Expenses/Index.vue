@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { Paperclip, TriangleAlert } from 'lucide-vue-next';
 
@@ -106,6 +107,32 @@ const confirmDelete = (expense: ExpenseRow) => {
     if (!confirm(`Delete expense from ${expense.date ?? 'this date'} (${expense.supplier})? This removes the journal entry.`)) return;
     router.delete(route('expenses.destroy', expense.id), { preserveScroll: true });
 };
+
+const rowActionItems = (expense: ExpenseRow) => {
+    const actions = [
+        { id: 'edit', label: 'Edit' },
+        { id: 'attach_receipt', label: 'Attach receipt' },
+    ];
+    if (expense.can_delete) {
+        actions.push({ id: 'delete', label: 'Delete' });
+    }
+
+    return actions;
+};
+
+const onRowAction = (expense: ExpenseRow, actionId: string) => {
+    if (actionId === 'edit') {
+        router.visit(route('expenses.edit', expense.id));
+        return;
+    }
+    if (actionId === 'attach_receipt') {
+        startAttachReceipt(expense.id);
+        return;
+    }
+    if (actionId === 'delete') {
+        confirmDelete(expense);
+    }
+};
 </script>
 
 <template>
@@ -116,7 +143,7 @@ const confirmDelete = (expense: ExpenseRow) => {
             { label: 'Expenses' },
         ]"
     >
-        <PageHeader title="Expenses" subtitle="Track spend and VAT claimability">
+        <PageHeader title="Expenses">
             <template #actions>
                 <AppButton variant="primary" @click="router.visit(route('expenses.create'))">New Expense</AppButton>
             </template>
@@ -221,7 +248,7 @@ const confirmDelete = (expense: ExpenseRow) => {
                     { key: 'amount', label: 'Amount (excl VAT)' },
                     { key: 'vat_amount', label: 'VAT amount' },
                     { key: 'receipt', label: 'Receipt' },
-                    { key: 'actions', label: 'Actions' },
+                    { key: 'actions', label: '' },
                 ]"
                 :page="expenses.current_page"
                 :last-page="expenses.last_page"
@@ -236,7 +263,7 @@ const confirmDelete = (expense: ExpenseRow) => {
                             @change="toggleSelected(expense.id, ($event.target as HTMLInputElement).checked)"
                         >
                     </td>
-                    <td class="px-4 py-3">{{ expense.date || '-' }}</td>
+                    <td class="whitespace-nowrap px-4 py-3">{{ expense.date || '-' }}</td>
                     <td class="px-4 py-3">
                         <Link
                             v-if="expense.supplier_id"
@@ -261,18 +288,12 @@ const confirmDelete = (expense: ExpenseRow) => {
                         <TriangleAlert v-else class="h-4 w-4 text-rose-500" />
                     </td>
                     <td class="px-4 py-3">
-                        <div class="flex flex-wrap gap-1">
-                            <AppButton size="sm" variant="ghost" @click.stop="router.visit(route('expenses.edit', expense.id))">Edit</AppButton>
-                            <AppButton size="sm" variant="ghost" @click.stop="startAttachReceipt(expense.id)">Attach receipt</AppButton>
-                            <AppButton
-                                size="sm"
-                                variant="ghost"
-                                class="text-rose-600"
-                                :disabled="!expense.can_delete"
-                                @click.stop="confirmDelete(expense)"
-                            >
-                                Delete
-                            </AppButton>
+                        <div class="flex justify-end">
+                            <InvoiceRowActionsMenu
+                                :actions="rowActionItems(expense)"
+                                :aria-label="`Actions for expense ${expense.supplier}`"
+                                @select="(id) => onRowAction(expense, id)"
+                            />
                         </div>
                     </td>
                 </tr>

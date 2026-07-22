@@ -278,6 +278,11 @@ class ExpenseCrudTest extends TestCase
             ->assertOk()
             ->assertHeader('content-type', $media->mime_type ?: 'application/pdf');
 
+        $this->delete(route('expenses.attachments.destroy', [$txn->fresh(), $media]))
+            ->assertRedirect();
+
+        $this->assertCount(0, $txn->fresh()->getMedia('attachments'));
+
         $this->delete(route('expenses.destroy', $txn->fresh()))->assertRedirect(route('expenses.index'));
         $this->assertNull(Transaction::queryWithoutTeamScope()->find($txn->id));
     }

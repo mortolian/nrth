@@ -208,7 +208,14 @@ const previewUrlFor = (file: File) => {
     return '';
 };
 
-const existingAttachments = computed<ExpenseAttachment[]>(() => props.expense?.attachments ?? []);
+const existingAttachments = ref<ExpenseAttachment[]>([...(props.expense?.attachments ?? [])]);
+
+watch(
+    () => props.expense?.attachments,
+    (attachments) => {
+        existingAttachments.value = [...(attachments ?? [])];
+    },
+);
 
 type ReceiptPreviewItem =
     | { kind: 'existing'; attachment: ExpenseAttachment }
@@ -222,6 +229,30 @@ const openExistingAttachmentPreview = (attachment: ExpenseAttachment) => {
         return;
     }
     receiptPreviewTarget.value = { kind: 'existing', attachment };
+};
+
+const removingAttachmentId = ref<number | null>(null);
+
+const removeExistingAttachment = (attachment: ExpenseAttachment) => {
+    if (!props.expense?.id || removingAttachmentId.value !== null) {
+        return;
+    }
+
+    const current = receiptPreviewTarget.value;
+    if (current?.kind === 'existing' && current.attachment.id === attachment.id) {
+        receiptPreviewTarget.value = null;
+    }
+
+    removingAttachmentId.value = attachment.id;
+    router.delete(route('expenses.attachments.destroy', [props.expense.id, attachment.id]), {
+        preserveScroll: true,
+        onSuccess: () => {
+            existingAttachments.value = existingAttachments.value.filter((row) => row.id !== attachment.id);
+        },
+        onFinish: () => {
+            removingAttachmentId.value = null;
+        },
+    });
 };
 
 const openReceiptPreview = (index: number) => {
@@ -745,6 +776,15 @@ const submit = () => {
                             </div>
                         </button>
                         <p class="mt-1 truncate text-[11px] text-slate-600" :title="attachment.name">{{ attachment.name }}</p>
+                        <button
+                            type="button"
+                            class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900 disabled:opacity-50"
+                            :aria-label="`Remove ${attachment.name}`"
+                            :disabled="removingAttachmentId === attachment.id"
+                            @click.stop="removeExistingAttachment(attachment)"
+                        >
+                            <span class="text-sm leading-none" aria-hidden="true">×</span>
+                        </button>
                     </li>
                     <li
                         v-for="(file, index) in receiptFiles"
