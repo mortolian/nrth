@@ -101,6 +101,34 @@ class ExpenseCrudTest extends TestCase
         $this->assertNull(Transaction::queryWithoutTeamScope()->find($txn->id));
     }
 
+    public function test_store_accepts_multiple_receipt_files(): void
+    {
+        [, $team, $category] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Multi Receipt Co',
+            'category_account_id' => $category->id,
+            'description' => 'Office supplies',
+            'amount_excl_vat_cents' => 50_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'payment_method' => 'business_account',
+            'receipts' => [
+                UploadedFile::fake()->image('page1.jpg'),
+                UploadedFile::fake()->create('page2.pdf', 80, 'application/pdf'),
+            ],
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+        $this->assertCount(2, $txn->getMedia('attachments'));
+    }
+
     public function test_travel_category_uses_distance_times_rate(): void
     {
         [, $team] = $this->teamWithExpenseAccounts();

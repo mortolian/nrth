@@ -293,9 +293,8 @@ class ExpensesController extends Controller
             return $postTransactionAction->execute($transaction->fresh());
         });
 
-        if ($request->hasFile('receipt')) {
-            $transaction->clearMediaCollection('attachments');
-            $transaction->addMediaFromRequest('receipt')->toMediaCollection('attachments');
+        if ($request->hasFile('receipts') || $request->hasFile('receipt')) {
+            $this->attachReceiptUploads($request, $transaction);
         }
 
         return to_route('expenses.index');
@@ -354,9 +353,8 @@ class ExpensesController extends Controller
             $postTransactionAction->execute($transaction->fresh());
         });
 
-        if ($request->hasFile('receipt')) {
-            $transaction->clearMediaCollection('attachments');
-            $transaction->addMediaFromRequest('receipt')->toMediaCollection('attachments');
+        if ($request->hasFile('receipts') || $request->hasFile('receipt')) {
+            $this->attachReceiptUploads($request, $transaction);
         }
 
         return to_route('expenses.index');
@@ -379,12 +377,41 @@ class ExpensesController extends Controller
     {
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $request->validate([
-            'receipt' => ['required', 'file', 'max:10240'],
+            'receipt' => ['nullable', 'file', 'max:10240'],
+            'receipts' => ['nullable', 'array', 'max:20'],
+            'receipts.*' => ['file', 'max:10240'],
         ]);
 
-        $transaction->addMediaFromRequest('receipt')->toMediaCollection('attachments');
+        if (! $request->hasFile('receipts') && ! $request->hasFile('receipt')) {
+            throw ValidationException::withMessages([
+                'receipts' => __('Attach at least one receipt file.'),
+            ]);
+        }
+
+        $this->attachReceiptUploads($request, $transaction);
 
         return back();
+    }
+
+    private function attachReceiptUploads(Request $request, Transaction $transaction): void
+    {
+        $files = [];
+
+        if ($request->hasFile('receipts')) {
+            $uploaded = $request->file('receipts');
+            $files = is_array($uploaded) ? $uploaded : [$uploaded];
+        }
+
+        if ($request->hasFile('receipt')) {
+            $files[] = $request->file('receipt');
+        }
+
+        foreach ($files as $file) {
+            if ($file === null) {
+                continue;
+            }
+            $transaction->addMedia($file)->toMediaCollection('attachments');
+        }
     }
 
     /**
@@ -412,6 +439,8 @@ class ExpensesController extends Controller
             'distance_km' => ['nullable', 'numeric', 'min:0'],
             'rate_per_km' => ['nullable', 'numeric', 'min:0'],
             'receipt' => ['nullable', 'file', 'max:10240'],
+            'receipts' => ['nullable', 'array', 'max:20'],
+            'receipts.*' => ['file', 'max:10240'],
         ]);
     }
 

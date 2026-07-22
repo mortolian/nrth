@@ -117,8 +117,8 @@ const initialFromProps = () => {
 
 const form = reactive(initialFromProps());
 
-const receiptFile = ref<File | null>(null);
-const receiptPreviewUrl = ref<string | null>(null);
+const receiptFiles = ref<File[]>([]);
+const receiptPreviewUrls = ref<string[]>([]);
 const showAdvanced = ref(false);
 
 const selectedTax = computed(
@@ -146,16 +146,44 @@ watch(
     { immediate: true },
 );
 
+const isImageFile = (file: File) => file.type.startsWith('image/');
+const isPdfFile = (file: File) =>
+    file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+const previewUrlFor = (file: File) => {
+    if (isImageFile(file) || isPdfFile(file)) {
+        return URL.createObjectURL(file);
+    }
+    return '';
+};
+
 const onReceiptChange = (event: Event) => {
-    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
-    receiptFile.value = file;
-    if (receiptPreviewUrl.value) {
-        URL.revokeObjectURL(receiptPreviewUrl.value);
-        receiptPreviewUrl.value = null;
-    }
-    if (file) {
-        receiptPreviewUrl.value = URL.createObjectURL(file);
-    }
+    const input = event.target as HTMLInputElement;
+    const incoming = Array.from(input.files ?? []);
+    if (!incoming.length) return;
+
+    const nextFiles = [...receiptFiles.value, ...incoming].slice(0, 20);
+    receiptPreviewUrls.value.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+    });
+    receiptFiles.value = nextFiles;
+    receiptPreviewUrls.value = nextFiles.map((file) => previewUrlFor(file));
+    input.value = '';
+};
+
+const removeReceiptAt = (index: number) => {
+    const url = receiptPreviewUrls.value[index];
+    if (url) URL.revokeObjectURL(url);
+    receiptFiles.value = receiptFiles.value.filter((_, i) => i !== index);
+    receiptPreviewUrls.value = receiptPreviewUrls.value.filter((_, i) => i !== index);
+};
+
+const clearReceipts = () => {
+    receiptPreviewUrls.value.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+    });
+    receiptFiles.value = [];
+    receiptPreviewUrls.value = [];
 };
 
 const supplierSelectOptions = computed(() => [
@@ -194,7 +222,9 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
         form.set('distance_km', String(parsed.distance_km ?? 0));
         form.set('rate_per_km', String(parsed.rate_per_km ?? props.sars_rate_per_km));
     }
-    if (receiptFile.value) form.set('receipt', receiptFile.value);
+    receiptFiles.value.forEach((file, index) => {
+        form.append(`receipts[${index}]`, file);
+    });
     return form;
 };
 
@@ -222,7 +252,7 @@ const submit = () => {
             { label: props.isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'" subtitle="Capture expense details and post journal entries" />
+        <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'" />
 
         <AppCard v-if="!hasCategories" class="mt-5">
             <p class="text-sm text-slate-700">Add at least one active expense category in your chart of accounts before recording expenses.</p>
@@ -230,30 +260,75 @@ const submit = () => {
         </AppCard>
 
         <AppCard v-else class="mt-5">
-            <div class="mb-5 flex flex-col gap-3 sm:flex-row md:mb-6">
-                <label
-                    class="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-brand-500 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-900 shadow-sm active:bg-brand-100"
-                >
-                    <Camera class="h-5 w-5 shrink-0" />
-                    Take photo
-                    <input type="file" accept="image/*" capture="environment" class="hidden" @change="onReceiptChange">
-                </label>
-                <label
-                    class="flex min-h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-800 active:bg-slate-50"
-                >
-                    <Upload class="h-5 w-5 shrink-0" />
-                    Gallery / PDF
-                    <input type="file" accept="image/*,.pdf" class="hidden" @change="onReceiptChange">
-                </label>
-            </div>
-
-            <div v-if="receiptFile" class="mb-5 rounded-md border border-slate-200 p-3">
-                <p class="text-xs text-slate-500">{{ receiptFile.name }}</p>
-                <img v-if="receiptPreviewUrl && receiptFile.type.startsWith('image/')" :src="receiptPreviewUrl" alt="Receipt preview" class="mt-2 max-h-44 rounded">
-                <div v-else class="mt-2 inline-flex items-center gap-2 text-sm text-slate-600">
-                    <Camera class="h-4 w-4" />
-                    PDF ready for upload
+            <div class="mb-5">
+                <div class="mb-1 flex items-center justify-between gap-3">
+                    <p class="text-xs font-medium text-slate-500">Receipts</p>
+                    <button
+                        v-if="receiptFiles.length"
+                        type="button"
+                        class="text-xs font-medium text-slate-500 hover:text-slate-800"
+                        @click="clearReceipts"
+                    >
+                        Remove all
+                    </button>
                 </div>
+                <label
+                    class="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center transition hover:border-slate-400 hover:bg-slate-100"
+                >
+                    <Upload class="h-4 w-4 shrink-0 text-slate-500" />
+                    <span class="text-sm font-medium text-slate-800">
+                        {{ receiptFiles.length ? 'Add more' : 'Upload receipts' }}
+                    </span>
+                    <span class="hidden text-xs text-slate-500 sm:inline">Photos or PDFs</span>
+                    <input type="file" accept="image/*,.pdf" multiple class="hidden" @change="onReceiptChange">
+                </label>
+
+                <ul v-if="receiptFiles.length" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    <li
+                        v-for="(file, index) in receiptFiles"
+                        :key="`${file.name}-${file.size}-${index}`"
+                        class="group relative"
+                    >
+                        <div class="aspect-square overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+                            <img
+                                v-if="isImageFile(file) && receiptPreviewUrls[index]"
+                                :src="receiptPreviewUrls[index]"
+                                :alt="file.name"
+                                class="h-full w-full object-cover"
+                            >
+                            <div
+                                v-else-if="isPdfFile(file) && receiptPreviewUrls[index]"
+                                class="relative h-full w-full overflow-hidden bg-white"
+                            >
+                                <iframe
+                                    :src="`${receiptPreviewUrls[index]}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`"
+                                    class="pointer-events-none absolute inset-0 h-[180%] w-[180%] origin-top-left scale-[0.56] border-0"
+                                    tabindex="-1"
+                                    :title="`Preview of ${file.name}`"
+                                />
+                                <span class="pointer-events-none absolute bottom-1 left-1 rounded bg-slate-900/75 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+                                    PDF
+                                </span>
+                            </div>
+                            <div
+                                v-else
+                                class="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-slate-500"
+                            >
+                                <Camera class="h-5 w-5" />
+                                <span class="text-[10px] font-medium uppercase tracking-wide">File</span>
+                            </div>
+                        </div>
+                        <p class="mt-1 truncate text-[11px] text-slate-600" :title="file.name">{{ file.name }}</p>
+                        <button
+                            type="button"
+                            class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900"
+                            :aria-label="`Remove ${file.name}`"
+                            @click="removeReceiptAt(index)"
+                        >
+                            <span class="text-sm leading-none" aria-hidden="true">×</span>
+                        </button>
+                    </li>
+                </ul>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
@@ -379,15 +454,6 @@ const submit = () => {
                     </div>
                 </div>
                 <p class="mt-2 text-xs text-amber-700">Keep logbook for SARS compliance.</p>
-            </div>
-
-            <div class="mt-5 hidden rounded-md border border-dashed border-slate-300 p-4 md:block">
-                <p class="text-sm font-semibold text-slate-900">Receipt (desktop)</p>
-                <label class="mt-2 flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-600 hover:bg-slate-100">
-                    <Upload class="h-4 w-4" />
-                    Drag and drop or click to upload
-                    <input type="file" accept="image/*,.pdf" class="hidden" @change="onReceiptChange">
-                </label>
             </div>
 
             <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
