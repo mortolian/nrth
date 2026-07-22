@@ -4,7 +4,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { Camera, ScanLine, Upload, X } from 'lucide-vue-next';
+import { Camera, Plus, ScanLine, Upload, X } from 'lucide-vue-next';
 import { FALLBACK_EXPENSE_TAX_RATES, type ExpenseTaxRateOption } from './fallbackTaxRates';
 
 type CategoryOption = { id: number; name: string };
@@ -512,13 +512,15 @@ const submit = () => {
                 <div class="md:col-span-2">
                     <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
                         <label class="block text-xs font-medium text-slate-500">Supplier</label>
-                        <button
+                        <AppButton
                             type="button"
-                            class="text-xs font-medium text-brand-600 hover:underline"
+                            variant="secondary"
+                            size="sm"
                             @click="router.get(route('suppliers.create'), { return: props.isEditing && props.expense ? `/expenses/${props.expense.id}/edit` : '/expenses/create' })"
                         >
+                            <Plus class="mr-1 h-3.5 w-3.5" />
                             New supplier
-                        </button>
+                        </AppButton>
                     </div>
                     <AppSelect
                         :model-value="String(form.supplier_id)"
