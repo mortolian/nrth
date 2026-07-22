@@ -389,4 +389,46 @@ class ExpenseCrudTest extends TestCase
                 ->where('prefill.supplier_id', $supplier->id)
                 ->has('paid_from_options'));
     }
+
+    public function test_export_csv_downloads_selected_expenses(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Csv Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Lunch',
+            'amount_excl_vat_cents' => 80_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+            'reference' => 'REF-1',
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+
+        $response = $this->get(route('expenses.export', ['ids' => [$txn->id]]));
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('Date,Supplier,Category,Description', $csv);
+        $this->assertStringContainsString('Csv Cafe', $csv);
+        $this->assertStringContainsString('80.00', $csv);
+        $this->assertStringContainsString('REF-1', $csv);
+    }
+
+    public function test_export_csv_rejects_empty_selection(): void
+    {
+        $this->teamWithExpenseAccounts();
+
+        $this->get(route('expenses.export'))
+            ->assertSessionHasErrors('ids');
+    }
 }

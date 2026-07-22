@@ -83,16 +83,18 @@ const prevPage = () => {
                             :key="column.key"
                             :class="[column.widthClass ?? '', 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500']"
                         >
-                            <button
-                                v-if="column.sortable"
-                                type="button"
-                                class="inline-flex items-center gap-1 hover:text-slate-700"
-                                @click="onSort(column)"
-                            >
-                                {{ column.label }}
-                                <ArrowUpDown class="h-3.5 w-3.5" />
-                            </button>
-                            <span v-else>{{ column.label }}</span>
+                            <slot :name="`header-${column.key}`" :column="column">
+                                <button
+                                    v-if="column.sortable"
+                                    type="button"
+                                    class="inline-flex items-center gap-1 hover:text-slate-700"
+                                    @click="onSort(column)"
+                                >
+                                    {{ column.label }}
+                                    <ArrowUpDown class="h-3.5 w-3.5" />
+                                </button>
+                                <span v-else>{{ column.label }}</span>
+                            </slot>
                         </th>
                     </tr>
                 </thead>

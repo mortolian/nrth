@@ -35,6 +35,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExpensesController extends Controller
 {
@@ -165,6 +166,80 @@ class ExpensesController extends Controller
             ],
             'categories' => $categories,
             'filters' => $this->filters($request),
+        ]);
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $teamId = (int) $request->user()->current_team_id;
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+
+        $transactions = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('type', TransactionType::Expense->value)
+            ->whereIn('id', $ids)
+            ->with(['journalEntries.account', 'taxLines', 'supplier'])
+            ->withCount('media')
+            ->orderByDesc('transaction_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $filename = 'expenses-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($transactions): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+
+            // UTF-8 BOM so Excel / Sheets detect encoding correctly.
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Date',
+                'Supplier',
+                'Category',
+                'Description',
+                'Amount excl VAT (ZAR)',
+                'VAT amount (ZAR)',
+                'Status',
+                'Has receipt',
+                'Reference',
+            ]);
+
+            foreach ($transactions as $transaction) {
+                $expenseLines = $transaction->journalEntries->filter(
+                    fn ($entry) => $entry->account?->type === AccountType::Expense
+                );
+                $amountCents = (int) $expenseLines->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents'));
+                $vatCents = (int) $transaction->taxLines->sum('tax_amount_cents');
+                $category = (string) ($expenseLines->first()?->account?->name ?? 'Uncategorized');
+                $supplier = $transaction->supplier?->name
+                    ?: ($transaction->reference ?: ($transaction->description ?: 'Unknown supplier'));
+                $meta = $transaction->expense_meta ?? [];
+
+                fputcsv($handle, [
+                    optional($transaction->transaction_date)->toDateString() ?? '',
+                    $supplier,
+                    $category,
+                    (string) ($transaction->description ?? ''),
+                    number_format($amountCents / 100, 2, '.', ''),
+                    number_format($vatCents / 100, 2, '.', ''),
+                    $transaction->status->value,
+                    ((int) $transaction->media_count) > 0 ? 'yes' : 'no',
+                    (string) ($meta['external_reference'] ?? ''),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

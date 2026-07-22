@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
@@ -78,6 +78,34 @@ const toggleSelected = (id: number, checked: boolean) => {
     selected.value = selected.value.filter((item) => item !== id);
 };
 
+const pageIds = computed(() => props.expenses.data.map((expense) => expense.id));
+
+const allPageSelected = computed(
+    () => pageIds.value.length > 0 && pageIds.value.every((id) => selected.value.includes(id)),
+);
+
+const somePageSelected = computed(
+    () => pageIds.value.some((id) => selected.value.includes(id)) && !allPageSelected.value,
+);
+
+const selectAllCheckbox = ref<HTMLInputElement | null>(null);
+
+watch([allPageSelected, somePageSelected], async () => {
+    await nextTick();
+    if (selectAllCheckbox.value) {
+        selectAllCheckbox.value.indeterminate = somePageSelected.value;
+    }
+}, { immediate: true });
+
+const toggleSelectAllPage = (checked: boolean) => {
+    if (checked) {
+        selected.value = [...new Set([...selected.value, ...pageIds.value])];
+        return;
+    }
+    const onPage = new Set(pageIds.value);
+    selected.value = selected.value.filter((id) => !onPage.has(id));
+};
+
 const receiptAttachTransactionId = ref<number | null>(null);
 const receiptAttachInput = ref<HTMLInputElement | null>(null);
 
@@ -106,6 +134,18 @@ const confirmDelete = (expense: ExpenseRow) => {
     if (!expense.can_delete) return;
     if (!confirm(`Delete expense from ${expense.date ?? 'this date'} (${expense.supplier})? This removes the journal entry.`)) return;
     router.delete(route('expenses.destroy', expense.id), { preserveScroll: true });
+};
+
+const exportSelectedCsv = () => {
+    if (selected.value.length === 0) {
+        return;
+    }
+
+    const params = new URLSearchParams();
+    selected.value.forEach((id) => {
+        params.append('ids[]', String(id));
+    });
+    window.location.assign(`${route('expenses.export')}?${params.toString()}`);
 };
 
 const rowActionItems = (expense: ExpenseRow) => {
@@ -233,14 +273,21 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
             <div class="mb-3 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-slate-900">Expense list</h3>
                 <div class="flex gap-2">
-                    <AppButton variant="secondary" size="sm" :disabled="selected.length === 0">Export to Excel</AppButton>
-                    <AppButton variant="secondary" size="sm" :disabled="selected.length === 0">Mark as reviewed</AppButton>
+                    <AppButton
+                        variant="secondary"
+                        size="sm"
+                        :disabled="selected.length === 0"
+                        @click="exportSelectedCsv"
+                    >
+                        Export CSV
+                    </AppButton>
                 </div>
             </div>
 
             <AppTable
+                table-class="text-sm"
                 :columns="[
-                    { key: 'select', label: '' },
+                    { key: 'select', label: '', widthClass: 'w-10' },
                     { key: 'date', label: 'Date' },
                     { key: 'supplier', label: 'Supplier' },
                     { key: 'category', label: 'Category' },
@@ -254,8 +301,19 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 :last-page="expenses.last_page"
                 @page-change="applyFilters"
             >
+                <template #header-select>
+                    <input
+                        ref="selectAllCheckbox"
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-slate-300"
+                        :checked="allPageSelected"
+                        :disabled="expenses.data.length === 0"
+                        :aria-label="allPageSelected ? 'Deselect all on this page' : 'Select all on this page'"
+                        @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
+                    >
+                </template>
                 <tr v-for="expense in expenses.data" :key="expense.id" class="hover:bg-slate-50">
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-2">
                         <input
                             type="checkbox"
                             :checked="selected.includes(expense.id)"
@@ -263,8 +321,8 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                             @change="toggleSelected(expense.id, ($event.target as HTMLInputElement).checked)"
                         >
                     </td>
-                    <td class="whitespace-nowrap px-4 py-3">{{ expense.date || '-' }}</td>
-                    <td class="px-4 py-3">
+                    <td class="whitespace-nowrap px-3 py-2">{{ expense.date || '-' }}</td>
+                    <td class="px-3 py-2">
                         <Link
                             v-if="expense.supplier_id"
                             :href="route('suppliers.show', expense.supplier_id)"
@@ -275,19 +333,19 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                         </Link>
                         <span v-else>{{ expense.supplier }}</span>
                     </td>
-                    <td class="px-4 py-3"><AppBadge variant="info">{{ expense.category }}</AppBadge></td>
-                    <td class="px-4 py-3">{{ expense.description || '-' }}</td>
-                    <td class="px-4 py-3">{{ formatCents(expense.amount) }}</td>
-                    <td class="px-4 py-3">
+                    <td class="whitespace-nowrap px-3 py-2"><AppBadge variant="info">{{ expense.category }}</AppBadge></td>
+                    <td class="px-3 py-2">{{ expense.description || '-' }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatCents(expense.amount) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">
                         <span :class="expense.vat_amount > 0 ? 'font-medium text-brand-600' : 'text-slate-500'">
                             {{ formatCents(expense.vat_amount) }}
                         </span>
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-2">
                         <Paperclip v-if="expense.has_receipt" class="h-4 w-4 text-slate-600" />
                         <TriangleAlert v-else class="h-4 w-4 text-rose-500" />
                     </td>
-                    <td class="px-4 py-3">
+                    <td class="px-3 py-2">
                         <div class="flex justify-end">
                             <InvoiceRowActionsMenu
                                 :actions="rowActionItems(expense)"

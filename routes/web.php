@@ -90,6 +90,7 @@ Route::middleware([
         Route::post('/import/{import}/confirm', [BankingStatementImportController::class, 'confirm'])->name('import.confirm');
     });
     Route::get('/expenses', [ExpensesController::class, 'index'])->name('expenses.index');
+    Route::get('/expenses/export', [ExpensesController::class, 'exportCsv'])->name('expenses.export');
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses/parse-receipt', [ExpensesController::class, 'parseReceipt'])->name('expenses.parse-receipt');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
