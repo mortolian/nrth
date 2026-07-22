@@ -4,6 +4,10 @@ namespace Tests\Feature\Expenses;
 
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
+use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Accounting\Enums\TransactionStatus;
+use App\Domain\Accounting\Enums\TransactionType;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,6 +77,198 @@ class ParseExpenseReceiptTest extends TestCase
         $this->postJson(route('expenses.parse-receipt'), [])
             ->assertStatus(422)
             ->assertJsonValidationErrors('receipt');
+    }
+
+    public function test_parse_receipt_accepts_multiple_files(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'date' => '2026-05-01',
+                            'supplier_name' => 'Merged Supplier',
+                            'description' => 'Combined pages',
+                            'amount_excl_vat' => 250.0,
+                            'vat_amount' => 37.5,
+                            'vat_rate' => 'vat15',
+                            'reference' => 'INV-99',
+                            'confidence' => 0.85,
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'receipts' => [
+                UploadedFile::fake()->image('page1.jpg'),
+                UploadedFile::fake()->image('page2.jpg'),
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.supplier', 'Merged Supplier')
+            ->assertJsonPath('data.amount_excl_vat', 250)
+            ->assertJsonPath('data.reference', 'INV-99');
+
+        Http::assertSent(function ($request) {
+            if ($request->url() !== 'https://api.openai.com/v1/chat/completions') {
+                return false;
+            }
+            $content = $request['messages'][1]['content'] ?? [];
+            if (! is_array($content)) {
+                return false;
+            }
+            $imageParts = array_filter(
+                $content,
+                fn ($part) => is_array($part) && ($part['type'] ?? null) === 'image_url'
+            );
+
+            return count($imageParts) === 2;
+        });
+    }
+
+    public function test_parse_receipt_from_saved_attachment(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        $category = Account::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('code', '7500')
+            ->firstOrFail();
+        $bankGl = Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
+        $banking = BankingAccount::factory()->for($team)->create([
+            'name' => 'Bank',
+            'gl_account_id' => $bankGl->id,
+        ]);
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Attach Co',
+            'category_account_id' => $category->id,
+            'description' => 'With receipt',
+            'amount_excl_vat_cents' => 50_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+            'receipt' => UploadedFile::fake()->image('saved.jpg'),
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+        $media = $txn->getMedia('attachments')->first();
+        $this->assertNotNull($media);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'date' => '2026-05-02',
+                            'supplier_name' => 'Attach Co',
+                            'description' => 'From saved file',
+                            'amount_excl_vat' => 50,
+                            'vat_amount' => 0,
+                            'vat_rate' => 'no_vat',
+                            'reference' => 'SAVED-1',
+                            'confidence' => 0.9,
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'attachment_id' => $media->id,
+            'transaction_id' => $txn->id,
+        ])->assertOk()
+            ->assertJsonPath('data.description', 'From saved file')
+            ->assertJsonPath('data.reference', 'SAVED-1');
+    }
+
+    public function test_parse_receipt_rejects_foreign_attachment(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        $otherUser = User::factory()->withPersonalTeam()->create();
+        $otherTeam = $otherUser->currentTeam;
+        $this->assertNotNull($otherTeam);
+
+        $otherTxn = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $otherTeam->id,
+            'type' => TransactionType::Expense,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'Other',
+            'description' => 'Other expense',
+            'transaction_date' => '2026-05-01',
+            'created_by' => $otherUser->id,
+        ]);
+        $otherTxn->addMedia(UploadedFile::fake()->image('other.jpg'))->toMediaCollection('attachments');
+        $foreignMedia = $otherTxn->getMedia('attachments')->first();
+        $this->assertNotNull($foreignMedia);
+
+        $ownCategory = Account::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('code', '7500')
+            ->firstOrFail();
+        $bankGl = Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
+        $banking = BankingAccount::factory()->for($team)->create([
+            'gl_account_id' => $bankGl->id,
+        ]);
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Mine',
+            'category_account_id' => $ownCategory->id,
+            'description' => 'Mine',
+            'amount_excl_vat_cents' => 10_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect();
+        $ownTxn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'attachment_id' => $foreignMedia->id,
+            'transaction_id' => $ownTxn->id,
+        ])->assertNotFound();
+    }
+
+    public function test_parse_receipt_rejects_other_team_transaction(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        $otherUser = User::factory()->withPersonalTeam()->create();
+        $otherTeam = $otherUser->currentTeam;
+        $this->assertNotNull($otherTeam);
+
+        $otherTxn = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $otherTeam->id,
+            'type' => TransactionType::Expense,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'Other',
+            'description' => 'Other expense',
+            'transaction_date' => '2026-05-01',
+            'created_by' => $otherUser->id,
+        ]);
+        $otherTxn->addMedia(UploadedFile::fake()->image('other.jpg'))->toMediaCollection('attachments');
+        $media = $otherTxn->getMedia('attachments')->first();
+        $this->assertNotNull($media);
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'attachment_id' => $media->id,
+            'transaction_id' => $otherTxn->id,
+        ])->assertForbidden();
     }
 
     public function test_parse_receipt_maps_openai_response_and_matches_supplier(): void

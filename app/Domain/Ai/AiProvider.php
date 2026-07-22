@@ -9,12 +9,13 @@ interface AiProvider
     public function key(): string;
 
     /**
-     * Send an image or PDF with a prompt and return decoded JSON.
+     * Send one or more images/PDFs with a prompt and return decoded JSON.
      *
+     * @param  UploadedFile|list<UploadedFile>  $files
      * @return array<string, mixed>
      */
     public function extractStructuredJson(
-        UploadedFile $file,
+        UploadedFile|array $files,
         string $apiKey,
         string $model,
         string $prompt,

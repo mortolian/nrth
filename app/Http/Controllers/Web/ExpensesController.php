@@ -302,17 +302,109 @@ class ExpensesController extends Controller
             ]);
         }
 
-        $validated = $request->validate([
-            'receipt' => ['required', 'file', 'max:10240'],
-        ]);
-
-        /** @var UploadedFile $file */
-        $file = $validated['receipt'];
-        $parsed = $parser->parse($file, $team);
+        $files = $this->resolveReceiptParseFiles($request);
+        $parsed = $parser->parseMany($files, $team);
 
         return response()->json([
             'data' => $parsed->toFormPayload(),
         ]);
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    private function resolveReceiptParseFiles(Request $request): array
+    {
+        if ($request->has('attachment_id') && $request->string('attachment_id')->toString() === '') {
+            $request->merge(['attachment_id' => null]);
+        }
+        if ($request->has('transaction_id') && $request->string('transaction_id')->toString() === '') {
+            $request->merge(['transaction_id' => null]);
+        }
+
+        $request->validate([
+            'receipt' => ['nullable', 'file', 'max:10240'],
+            'receipts' => ['nullable', 'array', 'max:10'],
+            'receipts.*' => ['file', 'max:10240'],
+            'attachment_id' => ['nullable', 'integer'],
+            'attachment_ids' => ['nullable', 'array', 'max:10'],
+            'attachment_ids.*' => ['integer'],
+            'transaction_id' => ['nullable', 'integer'],
+        ]);
+
+        $files = [];
+
+        if ($request->hasFile('receipt')) {
+            /** @var UploadedFile $receipt */
+            $receipt = $request->file('receipt');
+            $files[] = $receipt;
+        }
+
+        if ($request->hasFile('receipts')) {
+            $uploaded = $request->file('receipts');
+            $receipts = is_array($uploaded) ? $uploaded : [$uploaded];
+            foreach ($receipts as $receipt) {
+                if ($receipt instanceof UploadedFile) {
+                    $files[] = $receipt;
+                }
+            }
+        }
+
+        $attachmentIds = [];
+        if ($request->filled('attachment_id')) {
+            $attachmentIds[] = (int) $request->integer('attachment_id');
+        }
+        if ($request->filled('attachment_ids')) {
+            foreach ((array) $request->input('attachment_ids', []) as $id) {
+                $attachmentIds[] = (int) $id;
+            }
+        }
+        $attachmentIds = array_values(array_unique(array_filter($attachmentIds)));
+
+        if ($attachmentIds !== []) {
+            $transactionId = (int) $request->integer('transaction_id');
+            if ($transactionId <= 0) {
+                throw ValidationException::withMessages([
+                    'transaction_id' => __('Choose the expense these receipts belong to.'),
+                ]);
+            }
+
+            $transaction = Transaction::queryWithoutTeamScope()->findOrFail($transactionId);
+            $this->resolveTeamExpense($request, $transaction);
+
+            foreach ($attachmentIds as $attachmentId) {
+                $media = Media::query()->findOrFail($attachmentId);
+                $media = $this->resolveExpenseAttachment($transaction, $media);
+                $path = $media->getPath();
+                if (! is_string($path) || $path === '' || ! is_file($path)) {
+                    throw ValidationException::withMessages([
+                        'attachment_id' => __('Could not read that receipt file.'),
+                    ]);
+                }
+
+                $files[] = new UploadedFile(
+                    $path,
+                    $media->file_name ?: 'receipt',
+                    $media->mime_type ?: null,
+                    null,
+                    true,
+                );
+            }
+        }
+
+        if ($files === []) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Upload or select at least one receipt to scan.'),
+            ]);
+        }
+
+        if (count($files) > 10) {
+            throw ValidationException::withMessages([
+                'receipt' => __('You can scan at most 10 receipts at once.'),
+            ]);
+        }
+
+        return $files;
     }
 
     public function store(Request $request, PostTransactionAction $postTransactionAction): RedirectResponse

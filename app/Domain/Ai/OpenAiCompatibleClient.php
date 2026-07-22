@@ -14,10 +14,11 @@ use Throwable;
 final class OpenAiCompatibleClient
 {
     /**
+     * @param  UploadedFile|list<UploadedFile>  $files
      * @return array<string, mixed>
      */
     public function extractStructuredJson(
-        UploadedFile $file,
+        UploadedFile|array $files,
         string $apiKey,
         string $model,
         string $prompt,
@@ -26,18 +27,7 @@ final class OpenAiCompatibleClient
         bool $preferOpenAiPdfFilePart = false,
         bool $useJsonResponseFormat = true,
     ): array {
-        $mime = (string) ($file->getMimeType() ?: '');
-        $isPdf = $mime === 'application/pdf' || str_ends_with(strtolower($file->getClientOriginalName()), '.pdf');
-        $isImage = str_starts_with($mime, 'image/');
-
-        if (! $isPdf && ! $isImage) {
-            throw ValidationException::withMessages([
-                'receipt' => __('Upload an image or PDF to scan.'),
-            ]);
-        }
-
-        $base64 = base64_encode((string) file_get_contents($file->getRealPath()));
-        $dataUrl = ($isPdf ? 'data:application/pdf;base64,' : 'data:'.$mime.';base64,').$base64;
+        $fileList = $this->normalizeFiles($files);
 
         $userContent = [
             [
@@ -46,21 +36,8 @@ final class OpenAiCompatibleClient
             ],
         ];
 
-        if ($isPdf && $preferOpenAiPdfFilePart) {
-            $userContent[] = [
-                'type' => 'file',
-                'file' => [
-                    'filename' => $file->getClientOriginalName() ?: 'document.pdf',
-                    'file_data' => $dataUrl,
-                ],
-            ];
-        } else {
-            $userContent[] = [
-                'type' => 'image_url',
-                'image_url' => [
-                    'url' => $dataUrl,
-                ],
-            ];
+        foreach ($fileList as $file) {
+            $userContent[] = $this->contentPartForFile($file, $preferOpenAiPdfFilePart);
         }
 
         $endpoint = rtrim($baseUrl, '/').'/chat/completions';
@@ -121,6 +98,58 @@ final class OpenAiCompatibleClient
         }
 
         return $this->decodeJsonObject($content);
+    }
+
+    /**
+     * @param  UploadedFile|list<UploadedFile>  $files
+     * @return list<UploadedFile>
+     */
+    private function normalizeFiles(UploadedFile|array $files): array
+    {
+        $list = is_array($files) ? array_values(array_filter($files)) : [$files];
+        if ($list === []) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Upload an image or PDF to scan.'),
+            ]);
+        }
+
+        return $list;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function contentPartForFile(UploadedFile $file, bool $preferOpenAiPdfFilePart): array
+    {
+        $mime = (string) ($file->getMimeType() ?: '');
+        $isPdf = $mime === 'application/pdf' || str_ends_with(strtolower($file->getClientOriginalName()), '.pdf');
+        $isImage = str_starts_with($mime, 'image/');
+
+        if (! $isPdf && ! $isImage) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Upload an image or PDF to scan.'),
+            ]);
+        }
+
+        $base64 = base64_encode((string) file_get_contents($file->getRealPath()));
+        $dataUrl = ($isPdf ? 'data:application/pdf;base64,' : 'data:'.$mime.';base64,').$base64;
+
+        if ($isPdf && $preferOpenAiPdfFilePart) {
+            return [
+                'type' => 'file',
+                'file' => [
+                    'filename' => $file->getClientOriginalName() ?: 'document.pdf',
+                    'file_data' => $dataUrl,
+                ],
+            ];
+        }
+
+        return [
+            'type' => 'image_url',
+            'image_url' => [
+                'url' => $dataUrl,
+            ],
+        ];
     }
 
     private function http(string $apiKey, string $providerKey): PendingRequest

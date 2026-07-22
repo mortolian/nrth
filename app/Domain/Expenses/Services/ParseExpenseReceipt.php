@@ -25,9 +25,24 @@ class ParseExpenseReceipt
 
     public function parse(UploadedFile $file, Team $team): ParsedExpenseReceipt
     {
+        return $this->parseMany([$file], $team);
+    }
+
+    /**
+     * @param  list<UploadedFile>  $files
+     */
+    public function parseMany(array $files, Team $team): ParsedExpenseReceipt
+    {
         if (! $this->enabledFor($team)) {
             throw ValidationException::withMessages([
                 'receipt' => __('AI is not configured. Add an API key in Company settings → AI.'),
+            ]);
+        }
+
+        $files = array_values(array_filter($files));
+        if ($files === []) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Upload an image or PDF to scan.'),
             ]);
         }
 
@@ -43,11 +58,15 @@ class ParseExpenseReceipt
             ]);
         }
 
+        $prompt = count($files) > 1
+            ? $this->mergeExtractionPrompt()
+            : $this->extractionPrompt();
+
         $decoded = $provider->extractStructuredJson(
-            $file,
+            $files,
             $apiKey,
             $model,
-            $this->extractionPrompt(),
+            $prompt,
             $team->aiBaseUrl() !== '' ? $team->aiBaseUrl() : null,
         );
 
@@ -61,6 +80,17 @@ class ParseExpenseReceipt
             .'amount_excl_vat (number in ZAR, excl VAT), vat_amount (number in ZAR), '
             .'vat_rate (one of vat15, vat0, exempt, no_vat), reference (invoice/receipt number), '
             .'confidence (0 to 1). Use null when unknown. Prefer vat15 when 15% VAT is shown.';
+    }
+
+    private function mergeExtractionPrompt(): string
+    {
+        return 'These documents may be pages or parts of one South African tax invoice / receipt. '
+            .'Combine them into a single expense. Return JSON only with keys: date (YYYY-MM-DD or null), '
+            .'supplier_name, description, amount_excl_vat (number in ZAR, excl VAT for the whole expense), '
+            .'vat_amount (number in ZAR), vat_rate (one of vat15, vat0, exempt, no_vat), '
+            .'reference (invoice/receipt number), confidence (0 to 1). '
+            .'Do not sum duplicate totals that appear on multiple pages. Use null when unknown. '
+            .'Prefer vat15 when 15% VAT is shown.';
     }
 
     /**

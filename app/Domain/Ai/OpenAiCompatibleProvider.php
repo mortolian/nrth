@@ -25,8 +25,11 @@ final class OpenAiCompatibleProvider implements AiProvider
         return $this->providerKey;
     }
 
+    /**
+     * @param  UploadedFile|list<UploadedFile>  $files
+     */
     public function extractStructuredJson(
-        UploadedFile $file,
+        UploadedFile|array $files,
         string $apiKey,
         string $model,
         string $prompt,
@@ -46,7 +49,7 @@ final class OpenAiCompatibleProvider implements AiProvider
             || $this->providerKey === AiCatalog::PROVIDER_OPENROUTER;
 
         return $this->client->extractStructuredJson(
-            file: $file,
+            files: $files,
             apiKey: $apiKey,
             model: $model,
             prompt: $prompt,

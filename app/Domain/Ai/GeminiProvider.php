@@ -14,28 +14,30 @@ final class GeminiProvider implements AiProvider
         return AiCatalog::PROVIDER_GEMINI;
     }
 
+    /**
+     * @param  UploadedFile|list<UploadedFile>  $files
+     */
     public function extractStructuredJson(
-        UploadedFile $file,
+        UploadedFile|array $files,
         string $apiKey,
         string $model,
         string $prompt,
         ?string $baseUrl = null,
     ): array {
-        $mime = (string) ($file->getMimeType() ?: 'application/octet-stream');
-        $isPdf = $mime === 'application/pdf' || str_ends_with(strtolower($file->getClientOriginalName()), '.pdf');
-        $isImage = str_starts_with($mime, 'image/');
-
-        if (! $isPdf && ! $isImage) {
+        $fileList = is_array($files) ? array_values(array_filter($files)) : [$files];
+        if ($fileList === []) {
             throw ValidationException::withMessages([
                 'receipt' => __('Upload an image or PDF to scan.'),
             ]);
         }
 
-        if ($isImage && ! in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
-            $mime = 'image/jpeg';
+        $parts = [
+            ['text' => $prompt.' Reply with valid JSON only, no markdown.'],
+        ];
+        foreach ($fileList as $file) {
+            $parts[] = $this->inlineDataPartForFile($file);
         }
 
-        $base64 = base64_encode((string) file_get_contents($file->getRealPath()));
         $endpoint = sprintf(
             'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
             rawurlencode($model)
@@ -46,18 +48,10 @@ final class GeminiProvider implements AiProvider
                 'x-goog-api-key' => $apiKey,
             ])
                 ->acceptJson()
-                ->timeout(60)
+                ->timeout(120)
                 ->post($endpoint, [
                     'contents' => [[
-                        'parts' => [
-                            ['text' => $prompt.' Reply with valid JSON only, no markdown.'],
-                            [
-                                'inline_data' => [
-                                    'mime_type' => $isPdf ? 'application/pdf' : $mime,
-                                    'data' => $base64,
-                                ],
-                            ],
-                        ],
+                        'parts' => $parts,
                     ]],
                     'generationConfig' => [
                         'responseMimeType' => 'application/json',
@@ -86,6 +80,35 @@ final class GeminiProvider implements AiProvider
         }
 
         return $this->decodeJsonObject($text);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function inlineDataPartForFile(UploadedFile $file): array
+    {
+        $mime = (string) ($file->getMimeType() ?: 'application/octet-stream');
+        $isPdf = $mime === 'application/pdf' || str_ends_with(strtolower($file->getClientOriginalName()), '.pdf');
+        $isImage = str_starts_with($mime, 'image/');
+
+        if (! $isPdf && ! $isImage) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Upload an image or PDF to scan.'),
+            ]);
+        }
+
+        if ($isImage && ! in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+            $mime = 'image/jpeg';
+        }
+
+        $base64 = base64_encode((string) file_get_contents($file->getRealPath()));
+
+        return [
+            'inline_data' => [
+                'mime_type' => $isPdf ? 'application/pdf' : $mime,
+                'data' => $base64,
+            ],
+        ];
     }
 
     /**

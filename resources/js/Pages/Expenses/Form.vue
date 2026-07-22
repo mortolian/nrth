@@ -86,12 +86,13 @@ const defaultPaidFromAccountId = (): number => {
 
 const page = usePage();
 const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
-const scanReceiptLoading = ref(false);
+const scanningKey = ref<string | null>(null);
 const scanReceiptError = ref<string | null>(null);
 const scanReceiptApplied = ref(false);
 const saveSupplierLoading = ref(false);
 const saveSupplierError = ref<string | null>(null);
 const saveSupplierSuccess = ref(false);
+const scanReceiptLoading = computed(() => scanningKey.value !== null);
 
 const schema = z
     .object({
@@ -353,84 +354,147 @@ const clearReceipts = () => {
     scanReceiptError.value = null;
 };
 
-const scanReceipt = async () => {
-    if (!aiEnabled.value || !receiptFiles.value.length || scanReceiptLoading.value) {
-        return;
-    }
+const totalReceiptCount = computed(() => existingAttachments.value.length + receiptFiles.value.length);
 
+type ScanPayload = {
+    date?: string | null;
+    supplier_id?: number;
+    supplier?: string;
+    description?: string;
+    amount_excl_vat?: number | null;
+    vat_amount?: number | null;
+    vat_rate?: 'vat15' | 'vat0' | 'exempt' | 'no_vat' | null;
+    reference?: string;
+};
+
+const applyScanPayload = (data: ScanPayload) => {
+    if (data.date) form.date = data.date;
+    if (typeof data.supplier_id === 'number' && data.supplier_id > 0) {
+        form.supplier_id = data.supplier_id;
+        form.supplier_custom = '';
+    } else if (data.supplier?.trim()) {
+        form.supplier_id = 0;
+        form.supplier_custom = data.supplier.trim();
+    }
+    if (data.description != null) form.description = data.description;
+    if (data.amount_excl_vat != null) form.amount_excl_vat = data.amount_excl_vat;
+    if (data.vat_amount != null) form.vat_amount = data.vat_amount;
+    if (data.vat_rate) form.vat_rate = data.vat_rate;
+    if (data.reference != null) form.reference = data.reference;
+};
+
+const postScan = async (body: FormData) => {
     const token = page.props.csrf_token as string | undefined;
     if (!token) {
         scanReceiptError.value = 'Unable to scan: missing security token. Refresh the page and try again.';
         return;
     }
 
-    scanReceiptLoading.value = true;
+    const res = await fetch(route('expenses.parse-receipt'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': token,
+        },
+        body,
+    });
+
+    const payload = (await res.json().catch(() => null)) as {
+        data?: ScanPayload;
+        message?: string;
+        errors?: Record<string, string[]>;
+    } | null;
+
+    if (!res.ok) {
+        const firstError = payload?.errors
+            ? Object.values(payload.errors).flat()[0]
+            : null;
+        scanReceiptError.value = firstError || payload?.message || 'Could not scan this receipt.';
+        return;
+    }
+
+    const data = payload?.data;
+    if (!data) {
+        scanReceiptError.value = 'Could not scan this receipt.';
+        return;
+    }
+
+    applyScanPayload(data);
+    scanReceiptApplied.value = true;
+};
+
+const scanExistingAttachment = async (attachment: ExpenseAttachment) => {
+    if (!aiEnabled.value || scanningKey.value || !props.expense?.id) {
+        return;
+    }
+
+    scanningKey.value = `existing:${attachment.id}`;
     scanReceiptError.value = null;
     scanReceiptApplied.value = false;
 
     try {
         const body = new FormData();
-        body.append('receipt', receiptFiles.value[0]);
-
-        const res = await fetch(route('expenses.parse-receipt'), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': token,
-            },
-            body,
-        });
-
-        const payload = (await res.json().catch(() => null)) as {
-            data?: {
-                date?: string | null;
-                supplier_id?: number;
-                supplier?: string;
-                description?: string;
-                amount_excl_vat?: number | null;
-                vat_amount?: number | null;
-                vat_rate?: 'vat15' | 'vat0' | 'exempt' | 'no_vat' | null;
-                reference?: string;
-            };
-            message?: string;
-            errors?: Record<string, string[]>;
-        } | null;
-
-        if (!res.ok) {
-            const firstError = payload?.errors
-                ? Object.values(payload.errors).flat()[0]
-                : null;
-            scanReceiptError.value = firstError || payload?.message || 'Could not scan this receipt.';
-            return;
-        }
-
-        const data = payload?.data;
-        if (!data) {
-            scanReceiptError.value = 'Could not scan this receipt.';
-            return;
-        }
-
-        if (data.date) form.date = data.date;
-        if (typeof data.supplier_id === 'number' && data.supplier_id > 0) {
-            form.supplier_id = data.supplier_id;
-            form.supplier_custom = '';
-        } else if (data.supplier?.trim()) {
-            form.supplier_id = 0;
-            form.supplier_custom = data.supplier.trim();
-        }
-        if (data.description != null) form.description = data.description;
-        if (data.amount_excl_vat != null) form.amount_excl_vat = data.amount_excl_vat;
-        if (data.vat_amount != null) form.vat_amount = data.vat_amount;
-        if (data.vat_rate) form.vat_rate = data.vat_rate;
-        if (data.reference != null) form.reference = data.reference;
-
-        scanReceiptApplied.value = true;
+        body.append('attachment_id', String(attachment.id));
+        body.append('transaction_id', String(props.expense.id));
+        await postScan(body);
     } catch {
         scanReceiptError.value = 'Could not reach the scanning service. Try again.';
     } finally {
-        scanReceiptLoading.value = false;
+        scanningKey.value = null;
+    }
+};
+
+const scanNewReceipt = async (index: number) => {
+    if (!aiEnabled.value || scanningKey.value) {
+        return;
+    }
+    const file = receiptFiles.value[index];
+    if (!file) {
+        return;
+    }
+
+    scanningKey.value = `new:${index}`;
+    scanReceiptError.value = null;
+    scanReceiptApplied.value = false;
+
+    try {
+        const body = new FormData();
+        body.append('receipt', file);
+        await postScan(body);
+    } catch {
+        scanReceiptError.value = 'Could not reach the scanning service. Try again.';
+    } finally {
+        scanningKey.value = null;
+    }
+};
+
+const scanAllReceipts = async () => {
+    if (!aiEnabled.value || scanningKey.value || totalReceiptCount.value < 2) {
+        return;
+    }
+
+    scanningKey.value = 'all';
+    scanReceiptError.value = null;
+    scanReceiptApplied.value = false;
+
+    try {
+        const body = new FormData();
+        receiptFiles.value.forEach((file, index) => {
+            body.append(`receipts[${index}]`, file);
+        });
+        if (existingAttachments.value.length && props.expense?.id) {
+            body.append('transaction_id', String(props.expense.id));
+            existingAttachments.value.forEach((attachment, index) => {
+                body.append(`attachment_ids[${index}]`, String(attachment.id));
+            });
+        }
+        await postScan(body);
+    } catch {
+        scanReceiptError.value = 'Could not reach the scanning service. Try again.';
+    } finally {
+        scanningKey.value = null;
     }
 };
 
@@ -744,7 +808,7 @@ const submit = () => {
                 </label>
 
                 <div
-                    v-if="aiEnabled && receiptFiles.length"
+                    v-if="aiEnabled && totalReceiptCount >= 2"
                     class="mt-2 flex flex-wrap items-center gap-2"
                 >
                     <AppButton
@@ -752,12 +816,12 @@ const submit = () => {
                         variant="secondary"
                         size="sm"
                         :disabled="scanReceiptLoading"
-                        @click="scanReceipt"
+                        @click="scanAllReceipts"
                     >
                         <ScanLine class="mr-1.5 h-4 w-4" />
-                        {{ scanReceiptLoading ? 'Scanning…' : 'Scan receipt' }}
+                        {{ scanningKey === 'all' ? 'Scanning all…' : 'Scan all' }}
                     </AppButton>
-                    <p class="text-xs text-slate-500">Uses the first file to fill date, supplier, amounts, and reference.</p>
+                    <p class="text-xs text-slate-500">Combines every receipt into one form fill (overwrites fields).</p>
                 </div>
                 <p v-if="scanReceiptApplied" class="mt-2 text-xs text-emerald-700">
                     Applied from receipt — review the fields before saving.
@@ -811,6 +875,17 @@ const submit = () => {
                         </button>
                         <p class="mt-1 truncate text-[11px] text-slate-600" :title="attachment.name">{{ attachment.name }}</p>
                         <button
+                            v-if="aiEnabled"
+                            type="button"
+                            class="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            :disabled="scanReceiptLoading"
+                            :aria-label="`Scan ${attachment.name}`"
+                            @click.stop="scanExistingAttachment(attachment)"
+                        >
+                            <ScanLine class="h-3 w-3 shrink-0" />
+                            {{ scanningKey === `existing:${attachment.id}` ? 'Scanning…' : 'Scan' }}
+                        </button>
+                        <button
                             type="button"
                             class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900 disabled:opacity-50"
                             :aria-label="`Remove ${attachment.name}`"
@@ -861,6 +936,17 @@ const submit = () => {
                             </div>
                         </button>
                         <p class="mt-1 truncate text-[11px] text-slate-600" :title="file.name">{{ file.name }}</p>
+                        <button
+                            v-if="aiEnabled"
+                            type="button"
+                            class="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            :disabled="scanReceiptLoading"
+                            :aria-label="`Scan ${file.name}`"
+                            @click.stop="scanNewReceipt(index)"
+                        >
+                            <ScanLine class="h-3 w-3 shrink-0" />
+                            {{ scanningKey === `new:${index}` ? 'Scanning…' : 'Scan' }}
+                        </button>
                         <button
                             type="button"
                             class="absolute right-1 top-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-600 shadow-sm ring-1 ring-slate-200 hover:bg-white hover:text-slate-900"
