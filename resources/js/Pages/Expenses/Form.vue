@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref, toRaw, watch, withDefaults } from 'vue';
+import { computed, onUnmounted, reactive, ref, watch, withDefaults } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -51,7 +51,15 @@ const props = withDefaults(
 );
 
 const categoryList = computed(() => props.categories);
-const supplierList = computed(() => props.supplier_options);
+const createdSuppliers = ref<SupplierOption[]>([]);
+const supplierList = computed(() => {
+    const byId = new Map<number, SupplierOption>();
+    for (const supplier of [...props.supplier_options, ...createdSuppliers.value]) {
+        byId.set(supplier.id, supplier);
+    }
+
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+});
 const taxRateList = computed(() => (props.tax_rates?.length ? props.tax_rates : FALLBACK_EXPENSE_TAX_RATES));
 
 const page = usePage();
@@ -59,6 +67,9 @@ const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
 const scanReceiptLoading = ref(false);
 const scanReceiptError = ref<string | null>(null);
 const scanReceiptApplied = ref(false);
+const saveSupplierLoading = ref(false);
+const saveSupplierError = ref<string | null>(null);
+const saveSupplierSuccess = ref(false);
 
 const schema = z
     .object({
@@ -122,6 +133,14 @@ const initialFromProps = () => {
 };
 
 const form = reactive(initialFromProps());
+
+watch(
+    () => [form.supplier_id, form.supplier_custom],
+    () => {
+        saveSupplierSuccess.value = false;
+        saveSupplierError.value = null;
+    },
+);
 
 const receiptFiles = ref<File[]>([]);
 const receiptPreviewUrls = ref<string[]>([]);
@@ -335,6 +354,94 @@ const supplierSelectOptions = computed(() => [
     ...supplierList.value.map((s) => ({ label: s.name, value: String(s.id) })),
 ]);
 
+const canSaveAsSupplier = computed(
+    () => form.supplier_id === 0 && (form.supplier_custom?.trim().length ?? 0) > 0,
+);
+
+const expenseReturnPath = computed(() =>
+    props.isEditing && props.expense ? `/expenses/${props.expense.id}/edit` : '/expenses/create',
+);
+
+const openNewSupplierForm = () => {
+    const query: Record<string, string> = { return: expenseReturnPath.value };
+    const name = form.supplier_custom?.trim();
+    if (form.supplier_id === 0 && name) {
+        query.name = name;
+    }
+    router.get(route('suppliers.create'), query);
+};
+
+const saveAsSupplier = async () => {
+    const name = form.supplier_custom?.trim() ?? '';
+    if (!name || saveSupplierLoading.value) {
+        return;
+    }
+
+    const token = page.props.csrf_token as string | undefined;
+    if (!token) {
+        saveSupplierError.value = 'Unable to save supplier: missing security token. Refresh the page and try again.';
+        return;
+    }
+
+    saveSupplierLoading.value = true;
+    saveSupplierError.value = null;
+    saveSupplierSuccess.value = false;
+
+    try {
+        const res = await fetch(route('suppliers.store'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': token,
+            },
+            body: JSON.stringify({
+                name,
+                contact_name: null,
+                email: null,
+                phone: null,
+                vat_number: null,
+                registration_number: null,
+                address: null,
+                notes: null,
+                is_active: true,
+            }),
+        });
+
+        const payload = (await res.json().catch(() => null)) as {
+            data?: { id?: number; name?: string };
+            message?: string;
+            errors?: Record<string, string[]>;
+        } | null;
+
+        if (!res.ok) {
+            const firstError = payload?.errors
+                ? Object.values(payload.errors).flat()[0]
+                : null;
+            saveSupplierError.value = firstError || payload?.message || 'Could not save this supplier.';
+            return;
+        }
+
+        const id = Number(payload?.data?.id ?? 0);
+        const savedName = String(payload?.data?.name ?? name);
+        if (id <= 0) {
+            saveSupplierError.value = 'Could not save this supplier.';
+            return;
+        }
+
+        createdSuppliers.value = [...createdSuppliers.value, { id, name: savedName }];
+        form.supplier_id = id;
+        form.supplier_custom = '';
+        saveSupplierSuccess.value = true;
+    } catch {
+        saveSupplierError.value = 'Could not save this supplier. Try again.';
+    } finally {
+        saveSupplierLoading.value = false;
+    }
+};
+
 const categorySelectOptions = computed(() =>
     categoryList.value.map((category) => ({ label: category.name, value: String(category.id) })),
 );
@@ -346,44 +453,123 @@ const taxRateSelectOptions = computed(() =>
 const hasCategories = computed(() => categoryList.value.length > 0);
 
 const buildFormData = (parsed: z.infer<typeof schema>) => {
-    const form = new FormData();
-    form.set('date', parsed.date);
+    const data = new FormData();
+    data.set('date', parsed.date);
     if (parsed.supplier_id > 0) {
-        form.set('supplier_id', String(parsed.supplier_id));
+        data.set('supplier_id', String(parsed.supplier_id));
     } else {
-        form.set('supplier', parsed.supplier_custom?.trim() ?? '');
+        data.set('supplier', parsed.supplier_custom?.trim() ?? '');
     }
-    form.set('category_account_id', String(parsed.category_account_id));
-    form.set('description', parsed.description ?? '');
-    form.set('amount_excl_vat_cents', String(Math.round(parsed.amount_excl_vat * 100)));
-    form.set('vat_rate', parsed.vat_rate);
-    form.set('vat_amount_cents', String(Math.round(parsed.vat_amount * 100)));
-    form.set('payment_method', parsed.payment_method);
-    form.set('reference', parsed.reference ?? '');
-    form.set('notes', parsed.notes ?? '');
-    if (isHomeOffice.value) form.set('office_percentage', String(parsed.office_percentage ?? 0));
+    data.set('category_account_id', String(parsed.category_account_id));
+    data.set('description', parsed.description ?? '');
+    data.set('amount_excl_vat_cents', String(Math.round(parsed.amount_excl_vat * 100)));
+    data.set('vat_rate', parsed.vat_rate);
+    data.set('vat_amount_cents', String(Math.round(parsed.vat_amount * 100)));
+    data.set('payment_method', parsed.payment_method);
+    data.set('reference', parsed.reference ?? '');
+    data.set('notes', parsed.notes ?? '');
+    if (isHomeOffice.value) data.set('office_percentage', String(parsed.office_percentage ?? 0));
     if (isTravel.value) {
-        form.set('distance_km', String(parsed.distance_km ?? 0));
-        form.set('rate_per_km', String(parsed.rate_per_km ?? props.sars_rate_per_km));
+        data.set('distance_km', String(parsed.distance_km ?? 0));
+        data.set('rate_per_km', String(parsed.rate_per_km ?? props.sars_rate_per_km));
     }
     receiptFiles.value.forEach((file, index) => {
-        form.append(`receipts[${index}]`, file);
+        data.append(`receipts[${index}]`, file);
     });
-    return form;
+    return data;
 };
 
-const submit = () => {
-    if (!hasCategories.value) return;
-    const parsed = schema.safeParse(toRaw(form));
-    if (!parsed.success) return;
+const formErrors = ref<string[]>([]);
+const submitting = ref(false);
 
-    const form = buildFormData(parsed.data);
-    if (props.isEditing && props.expense) {
-        form.append('_method', 'put');
-        router.post(route('expenses.update', props.expense.id), form);
+const inertiaErrors = computed(() => {
+    const errors = page.props.errors as Record<string, string | string[]> | undefined;
+    if (!errors) {
+        return [];
+    }
+
+    return Object.values(errors).flatMap((value) => (Array.isArray(value) ? value : [value]));
+});
+
+const visibleErrors = computed(() => (formErrors.value.length ? formErrors.value : inertiaErrors.value));
+
+const snapshotForm = () => ({
+    date: String(form.date ?? ''),
+    supplier_id: Number(form.supplier_id || 0),
+    supplier_custom: String(form.supplier_custom ?? ''),
+    category_account_id: Number(form.category_account_id || 0),
+    description: String(form.description ?? ''),
+    amount_excl_vat: Number(form.amount_excl_vat || 0),
+    vat_rate: form.vat_rate,
+    vat_amount: Number(form.vat_amount || 0),
+    payment_method: form.payment_method,
+    reference: String(form.reference ?? ''),
+    notes: String(form.notes ?? ''),
+    office_percentage: Number(form.office_percentage || 0),
+    distance_km: Number(form.distance_km || 0),
+    rate_per_km: Number(form.rate_per_km || props.sars_rate_per_km),
+});
+
+const submit = () => {
+    if (submitting.value) {
         return;
     }
-    router.post(route('expenses.store'), form);
+
+    formErrors.value = [];
+    if (!hasCategories.value) {
+        formErrors.value = ['Add at least one expense category before saving.'];
+        return;
+    }
+
+    const parsed = schema.safeParse(snapshotForm());
+    if (!parsed.success) {
+        const messages = parsed.error.issues.map((issue) => {
+            const field = issue.path[0];
+            if (field === 'supplier_custom' || field === 'supplier_id') {
+                return 'Choose a saved supplier or enter a one-off supplier name.';
+            }
+            if (field === 'category_account_id') {
+                return 'Choose an expense category.';
+            }
+            if (field === 'date') {
+                return 'Enter a date.';
+            }
+            if (field === 'amount_excl_vat') {
+                return 'Enter an amount excluding VAT.';
+            }
+
+            return issue.message;
+        });
+        formErrors.value = [...new Set(messages)];
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+    }
+
+    const payload = buildFormData(parsed.data);
+    const visitOptions = {
+        forceFormData: true,
+        onStart: () => {
+            submitting.value = true;
+        },
+        onError: (errors: Record<string, string>) => {
+            formErrors.value = Object.values(errors).flat();
+            if (!formErrors.value.length) {
+                formErrors.value = ['Could not save this expense. Check the form and try again.'];
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        },
+        onFinish: () => {
+            submitting.value = false;
+        },
+    };
+
+    if (props.isEditing && props.expense) {
+        payload.append('_method', 'put');
+        router.post(route('expenses.update', props.expense.id), payload, visitOptions);
+        return;
+    }
+
+    router.post(route('expenses.store'), payload, visitOptions);
 };
 </script>
 
@@ -404,6 +590,17 @@ const submit = () => {
         </AppCard>
 
         <AppCard v-else class="mt-5">
+            <div
+                v-if="visibleErrors.length"
+                class="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+                role="alert"
+            >
+                <p class="font-medium">Could not save expense.</p>
+                <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                    <li v-for="(error, index) in visibleErrors" :key="index">{{ error }}</li>
+                </ul>
+            </div>
+
             <div class="mb-5">
                 <div class="mb-1 flex items-center justify-between gap-3">
                     <p class="text-xs font-medium text-slate-500">Receipts</p>
@@ -516,7 +713,7 @@ const submit = () => {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            @click="router.get(route('suppliers.create'), { return: props.isEditing && props.expense ? `/expenses/${props.expense.id}/edit` : '/expenses/create' })"
+                            @click="openNewSupplierForm"
                         >
                             <Plus class="mr-1 h-3.5 w-3.5" />
                             New supplier
@@ -527,12 +724,29 @@ const submit = () => {
                         :options="supplierSelectOptions"
                         @update:model-value="form.supplier_id = Number($event)"
                     />
-                    <AppInput
-                        v-if="form.supplier_id === 0"
-                        v-model="form.supplier_custom"
-                        placeholder="One-off supplier name"
-                        class="mt-2 min-h-12 text-base md:min-h-0 md:text-sm"
-                    />
+                    <div v-if="form.supplier_id === 0" class="mt-2 space-y-2">
+                        <AppInput
+                            v-model="form.supplier_custom"
+                            placeholder="One-off supplier name"
+                            class="min-h-12 text-base md:min-h-0 md:text-sm"
+                        />
+                        <div v-if="canSaveAsSupplier" class="flex flex-wrap items-center gap-2">
+                            <AppButton
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                :disabled="saveSupplierLoading"
+                                @click="saveAsSupplier"
+                            >
+                                {{ saveSupplierLoading ? 'Saving…' : 'Save as supplier' }}
+                            </AppButton>
+                            <p class="text-xs text-slate-500">
+                                Keep this vendor for future expenses (from the receipt name).
+                            </p>
+                        </div>
+                        <p v-if="saveSupplierError" class="text-xs text-rose-700">{{ saveSupplierError }}</p>
+                        <p v-if="saveSupplierSuccess" class="text-xs text-emerald-700">Supplier saved and selected.</p>
+                    </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Category</label>
@@ -632,9 +846,23 @@ const submit = () => {
             </div>
 
             <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <AppButton variant="ghost" size="touch" class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm" @click="router.visit(route('expenses.index'))">Cancel</AppButton>
-                <AppButton variant="primary" size="touch" class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm" @click="submit">
-                    {{ props.isEditing ? 'Update Expense' : 'Save Expense' }}
+                <AppButton
+                    variant="ghost"
+                    size="touch"
+                    class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
+                    :disabled="submitting"
+                    @click="router.visit(route('expenses.index'))"
+                >
+                    Cancel
+                </AppButton>
+                <AppButton
+                    variant="primary"
+                    size="touch"
+                    class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
+                    :disabled="submitting"
+                    @click="submit"
+                >
+                    {{ submitting ? 'Saving…' : props.isEditing ? 'Update Expense' : 'Save Expense' }}
                 </AppButton>
             </div>
         </AppCard>

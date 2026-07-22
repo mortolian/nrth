@@ -9,6 +9,9 @@ import AppPhoneInput from '@/Components/AppPhoneInput.vue';
 const props = defineProps<{
     isEditing: boolean;
     return_to?: string | null;
+    prefill?: {
+        name?: string | null;
+    } | null;
     supplier: null | {
         id: number;
         name: string;
@@ -31,7 +34,7 @@ const props = defineProps<{
 
 const { values, setFieldValue } = useForm({
     initialValues: {
-        name: props.supplier?.name ?? '',
+        name: props.supplier?.name ?? props.prefill?.name ?? '',
         contact_name: props.supplier?.contact_name ?? '',
         email: props.supplier?.email ?? '',
         phone: props.supplier?.phone ?? '',

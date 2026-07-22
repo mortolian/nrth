@@ -68,6 +68,46 @@ class SupplierTest extends TestCase
         $this->assertNull(Supplier::queryWithoutTeamScope()->find($supplier->id));
     }
 
+    public function test_supplier_store_returns_json_for_inline_create(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $this->postJson(route('suppliers.store'), [
+            'name' => 'Receipt Vendor',
+            'contact_name' => null,
+            'email' => null,
+            'phone' => null,
+            'vat_number' => null,
+            'registration_number' => null,
+            'address' => null,
+            'notes' => null,
+            'is_active' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Receipt Vendor');
+
+        $this->assertDatabaseHas('suppliers', [
+            'team_id' => $team->id,
+            'name' => 'Receipt Vendor',
+        ]);
+    }
+
+    public function test_supplier_create_prefills_name_from_query(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $this->get(route('suppliers.create', ['name' => 'Makro Sandton']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Suppliers/Form')
+                ->where('prefill.name', 'Makro Sandton'));
+    }
+
     public function test_supplier_cannot_be_deleted_when_linked_to_expense(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

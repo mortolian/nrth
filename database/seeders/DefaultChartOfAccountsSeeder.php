@@ -46,15 +46,18 @@ class DefaultChartOfAccountsSeeder
     }
 
     /**
-     * Idempotent: creates the full default chart when core accounts (e.g. Bank 1010) are missing.
+     * Idempotent: creates/updates the default chart when core posting accounts are missing.
      * Covers teams that never completed onboarding or install seeding.
      */
     public function ensureForTeam(Team $team): void
     {
-        if (Account::queryWithoutTeamScope()
+        $requiredCodes = ['1010', '1200', '2000', '2100'];
+        $existingCount = Account::queryWithoutTeamScope()
             ->where('team_id', $team->id)
-            ->where('code', '1010')
-            ->exists()) {
+            ->whereIn('code', $requiredCodes)
+            ->count();
+
+        if ($existingCount >= count($requiredCodes)) {
             return;
         }
 
@@ -71,7 +74,7 @@ class DefaultChartOfAccountsSeeder
                     continue;
                 }
 
-                $account = Account::queryWithoutTeamScope()->updateOrCreate(
+                $account = Account::queryWithoutTeamScope()->firstOrCreate(
                     [
                         'team_id' => $team->id,
                         'code' => $row['code'],
@@ -96,7 +99,7 @@ class DefaultChartOfAccountsSeeder
 
                 $parentId = $idByCode[$row['parent_code']] ?? null;
 
-                $account = Account::queryWithoutTeamScope()->updateOrCreate(
+                $account = Account::queryWithoutTeamScope()->firstOrCreate(
                     [
                         'team_id' => $team->id,
                         'code' => $row['code'],

@@ -45,6 +45,42 @@ class ExpenseCrudTest extends TestCase
         return [$user, $team, $category];
     }
 
+    public function test_store_ensures_missing_bank_chart_account(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $category = Account::factory()->for($team)->expense()->create(['code' => '7500', 'name' => 'General expense']);
+
+        $this->assertNull(
+            Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '1010')->first()
+        );
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 4500,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 675,
+            'payment_method' => 'business_account',
+            'reference' => null,
+            'notes' => null,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->assertNotNull(
+            Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '1010')->first()
+        );
+        $this->assertDatabaseHas('transactions', [
+            'team_id' => $team->id,
+            'type' => TransactionType::Expense->value,
+            'reference' => 'Corner Cafe',
+        ]);
+    }
+
     public function test_store_update_delete_and_receipt(): void
     {
         [, $team, $category] = $this->teamWithExpenseAccounts();

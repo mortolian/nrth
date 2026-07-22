@@ -72,15 +72,19 @@ class SupplierController extends Controller
     public function create(Request $request): Response
     {
         $returnQuery = $request->query('return');
+        $namePrefill = trim((string) $request->query('name', ''));
 
         return Inertia::render('Suppliers/Form', [
             'isEditing' => false,
             'supplier' => null,
             'return_to' => $this->safeInternalReturn(is_string($returnQuery) ? $returnQuery : null),
+            'prefill' => [
+                'name' => $namePrefill !== '' ? $namePrefill : null,
+            ],
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $payload = $this->validateSupplier($request);
         $teamId = (int) $request->user()->current_team_id;
@@ -92,6 +96,15 @@ class SupplierController extends Controller
             'team_id' => $teamId,
             ...$payload,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'data' => [
+                    'id' => $supplier->id,
+                    'name' => $supplier->name,
+                ],
+            ], 201);
+        }
 
         if ($returnTo !== null) {
             return redirect($returnTo);

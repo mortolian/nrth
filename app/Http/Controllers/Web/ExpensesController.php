@@ -17,6 +17,8 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
+use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -162,7 +164,11 @@ class ExpensesController extends Controller
 
     public function create(Request $request): Response
     {
-        $teamId = (int) $request->user()->current_team_id;
+        $team = $request->user()?->currentTeam;
+        abort_if($team === null, 403);
+        (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+
+        $teamId = (int) $team->id;
         $prefillSupplierId = (int) $request->integer('supplier_id');
         $prefillSupplierCustom = trim((string) $request->string('supplier')->toString());
 
@@ -270,7 +276,11 @@ class ExpensesController extends Controller
 
     public function store(Request $request, PostTransactionAction $postTransactionAction): RedirectResponse
     {
-        $teamId = (int) $request->user()->current_team_id;
+        $team = $request->user()?->currentTeam;
+        abort_if($team === null, 403);
+        (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+
+        $teamId = (int) $team->id;
         $userId = (int) $request->user()->id;
         $payload = $this->validatedExpensePayload($request, $teamId);
         $categoryAccount = $this->resolveCategoryAccount($teamId, $payload);
@@ -329,7 +339,11 @@ class ExpensesController extends Controller
     public function update(Request $request, Transaction $transaction, PostTransactionAction $postTransactionAction): RedirectResponse
     {
         $transaction = $this->resolveTeamExpense($request, $transaction);
-        $teamId = (int) $request->user()->current_team_id;
+        $team = $request->user()?->currentTeam;
+        abort_if($team === null, 403);
+        (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+
+        $teamId = (int) $team->id;
 
         $payload = $this->validatedExpensePayload($request, $teamId);
         $categoryAccount = $this->resolveCategoryAccount($teamId, $payload);
@@ -604,10 +618,34 @@ class ExpensesController extends Controller
             ->where('team_id', $teamId)
             ->where('code', $creditCode)
             ->first();
+
         if ($creditAccount === null) {
+            $team = Team::query()->find($teamId);
+            if ($team !== null) {
+                (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+                $creditAccount = Account::queryWithoutTeamScope()
+                    ->where('team_id', $teamId)
+                    ->where('code', $creditCode)
+                    ->first();
+            }
+        }
+
+        if ($creditAccount === null) {
+            $label = match ($paymentMethod) {
+                'business_account' => __('Bank (chart code 1010)'),
+                'personal_reimbursable', 'credit_card' => __('Accounts Payable (chart code 2000)'),
+                default => __('the payment account'),
+            };
+
             throw ValidationException::withMessages([
-                'payment_method' => __('Missing required chart account for selected payment method.'),
+                'payment_method' => __('Missing :account for this payment method. Open Chart of accounts and add it, or restore the default chart.', [
+                    'account' => $label,
+                ]),
             ]);
+        }
+
+        if (! $creditAccount->is_active) {
+            $creditAccount->forceFill(['is_active' => true])->save();
         }
 
         return $creditAccount;
