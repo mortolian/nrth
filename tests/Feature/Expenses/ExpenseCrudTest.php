@@ -262,7 +262,8 @@ class ExpenseCrudTest extends TestCase
 
         $this->post(route('expenses.receipt.store', $txn), [
             'receipt' => UploadedFile::fake()->create('rcpt.pdf', 120),
-        ])->assertRedirect();
+        ])->assertRedirect()
+            ->assertSessionHas('success', 'Receipt attached successfully.');
 
         $this->assertGreaterThanOrEqual(1, $txn->fresh()->getMedia('attachments')->count());
 

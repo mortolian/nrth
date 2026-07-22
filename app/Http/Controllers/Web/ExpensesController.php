@@ -37,6 +37,7 @@ use Inertia\Response;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class ExpensesController extends Controller
 {
@@ -575,9 +576,25 @@ class ExpensesController extends Controller
             ]);
         }
 
-        $this->attachReceiptUploads($request, $transaction);
+        try {
+            $attached = $this->attachReceiptUploads($request, $transaction);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (Throwable $e) {
+            report($e);
 
-        return back();
+            return back()->with('error', __('Could not attach that receipt. Please try again.'));
+        }
+
+        if ($attached < 1) {
+            return back()->with('error', __('Could not attach that receipt. Please try again.'));
+        }
+
+        $message = $attached === 1
+            ? __('Receipt attached successfully.')
+            : __(':count receipts attached successfully.', ['count' => $attached]);
+
+        return back()->with('success', $message);
     }
 
     public function showAttachment(Request $request, Transaction $transaction, Media $media): BinaryFileResponse
@@ -585,7 +602,10 @@ class ExpensesController extends Controller
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $media = $this->resolveExpenseAttachment($transaction, $media);
 
-        return response()->file($media->getPath(), [
+        $path = $media->getPath();
+        abort_unless(is_string($path) && $path !== '' && is_file($path), 404);
+
+        return response()->file($path, [
             'Content-Type' => $media->mime_type ?: 'application/octet-stream',
             'Content-Disposition' => 'inline; filename="'.$media->file_name.'"',
         ]);
@@ -609,7 +629,7 @@ class ExpensesController extends Controller
         return $media;
     }
 
-    private function attachReceiptUploads(Request $request, Transaction $transaction): void
+    private function attachReceiptUploads(Request $request, Transaction $transaction): int
     {
         $files = [];
 
@@ -622,12 +642,63 @@ class ExpensesController extends Controller
             $files[] = $request->file('receipt');
         }
 
+        $attached = 0;
         foreach ($files as $file) {
-            if ($file === null) {
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
                 continue;
             }
-            $transaction->addMedia($file)->toMediaCollection('attachments');
+
+            $this->assertReceiptFileIsSafe($file);
+
+            $transaction
+                ->addMedia($file)
+                ->usingFileName($this->safeReceiptFileName($file))
+                ->toMediaCollection('attachments');
+            $attached++;
         }
+
+        return $attached;
+    }
+
+    private function assertReceiptFileIsSafe(UploadedFile $file): void
+    {
+        $path = $file->getRealPath();
+        if (! is_string($path) || $path === '' || ! is_file($path)) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not read that receipt file.'),
+            ]);
+        }
+
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not read that receipt file.'),
+            ]);
+        }
+
+        $head = (string) fread($handle, 128);
+        fclose($handle);
+
+        if (preg_match('/^\s*(<!DOCTYPE|<html\b|SQLSTATE|Illuminate\\\\)/i', $head) === 1) {
+            throw ValidationException::withMessages([
+                'receipt' => __('That file does not look like a receipt image or PDF.'),
+            ]);
+        }
+    }
+
+    private function safeReceiptFileName(UploadedFile $file): string
+    {
+        $original = $file->getClientOriginalName() ?: 'receipt';
+        $basename = pathinfo($original, PATHINFO_FILENAME) ?: 'receipt';
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        $safeBase = preg_replace('/[^A-Za-z0-9._-]+/', '-', $basename) ?: 'receipt';
+        $safeBase = trim($safeBase, '.-_') ?: 'receipt';
+
+        if ($extension !== '') {
+            return $safeBase.'.'.$extension;
+        }
+
+        return $safeBase;
     }
 
     /**

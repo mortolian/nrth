@@ -30,7 +30,6 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
-const flashSuccess = computed(() => (page.props.flash as { success?: string } | undefined)?.success);
 const pageErrors = computed(() => page.props.errors as Record<string, string> | undefined);
 
 const isTrulyEmpty = computed(() => props.account_count === 0);
@@ -135,12 +134,6 @@ const typeBadgeClass: Record<string, string> = {
             subtitle="All accounts used in your double-entry bookkeeping"
         />
 
-        <div
-            v-if="flashSuccess"
-            class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
-        >
-            {{ flashSuccess }}
-        </div>
         <div
             v-if="pageErrors?.account"
             class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"

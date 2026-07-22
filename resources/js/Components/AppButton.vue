@@ -40,7 +40,7 @@ const sizeClass = {
         :as="as"
         :type="type"
         :disabled="disabled"
-        :class="cn('inline-flex items-center justify-center rounded-md font-medium transition disabled:cursor-not-allowed disabled:opacity-50', variantClass[variant], sizeClass[size])"
+        :class="cn('inline-flex items-center justify-center rounded-md font-medium transition active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100', variantClass[variant], sizeClass[size])"
         @click="emit('click', $event)"
     >
         <slot />

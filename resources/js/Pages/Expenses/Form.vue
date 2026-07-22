@@ -89,6 +89,7 @@ const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
 const scanningKey = ref<string | null>(null);
 const scanReceiptError = ref<string | null>(null);
 const scanReceiptApplied = ref(false);
+const receiptUploadSuccess = ref<string | null>(null);
 const saveSupplierLoading = ref(false);
 const saveSupplierError = ref<string | null>(null);
 const saveSupplierSuccess = ref(false);
@@ -321,7 +322,9 @@ const onReceiptChange = (event: Event) => {
     const incoming = Array.from(input.files ?? []);
     if (!incoming.length) return;
 
+    const previousCount = receiptFiles.value.length;
     const nextFiles = [...receiptFiles.value, ...incoming].slice(0, 20);
+    const added = nextFiles.length - previousCount;
     receiptPreviewUrls.value.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
     });
@@ -329,6 +332,11 @@ const onReceiptChange = (event: Event) => {
     receiptPreviewUrls.value = nextFiles.map((file) => previewUrlFor(file));
     scanReceiptError.value = null;
     scanReceiptApplied.value = false;
+    receiptUploadSuccess.value = added === 1
+        ? 'Receipt added — it will be saved with this expense.'
+        : added > 1
+            ? `${added} receipts added — they will be saved with this expense.`
+            : 'Receipt limit reached (20 files).';
     input.value = '';
 };
 
@@ -369,6 +377,7 @@ const clearReceipts = () => {
     receiptPreviewUrls.value = [];
     scanReceiptApplied.value = false;
     scanReceiptError.value = null;
+    receiptUploadSuccess.value = null;
 };
 
 const totalReceiptCount = computed(() => existingAttachments.value.length + receiptFiles.value.length);
@@ -840,6 +849,9 @@ const submit = () => {
                     </AppButton>
                     <p class="text-xs text-slate-500">Combines every receipt into one form fill (overwrites fields).</p>
                 </div>
+                <p v-if="receiptUploadSuccess" class="mt-2 text-xs text-emerald-700">
+                    {{ receiptUploadSuccess }}
+                </p>
                 <p v-if="scanReceiptApplied" class="mt-2 text-xs text-emerald-700">
                     Applied from receipt — review the fields before saving.
                 </p>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { useFlash } from '@/composables/useFlash';
 
 type OperatorRow = {
     id: number | null;
@@ -16,8 +15,6 @@ const props = defineProps<{
     backup_schedule_hint: string;
     env_break_glass_configured: boolean;
 }>();
-
-const { success: flashSuccess, error: flashError } = useFlash();
 
 const addForm = useForm({
     email: '',
@@ -63,13 +60,6 @@ const sourceLabel = (source: string) => {
             title="Instance"
             subtitle="Operators who can manage whole-server backups for this install"
         />
-
-        <p v-if="flashSuccess" class="mt-4 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
-            {{ flashSuccess }}
-        </p>
-        <p v-if="flashError" class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {{ flashError }}
-        </p>
 
         <AppCard class="mt-5">
             <h3 class="text-base font-semibold text-slate-900">Instance operators</h3>

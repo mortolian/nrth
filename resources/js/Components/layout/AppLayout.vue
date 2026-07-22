@@ -26,7 +26,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import ApplicationMark from '@/Components/ApplicationMark.vue';
-import Banner from '@/Components/Banner.vue';
+import ToastHost from '@/Components/ToastHost.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
@@ -293,7 +293,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
 <template>
     <div>
         <Head :title="title" />
-        <Banner />
+        <ToastHost />
 
         <div class="min-h-screen bg-white text-slate-900 lg:pl-0">
             <aside

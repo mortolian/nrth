@@ -109,8 +109,12 @@ const toggleSelectAllPage = (checked: boolean) => {
 
 const receiptAttachTransactionId = ref<number | null>(null);
 const receiptAttachInput = ref<HTMLInputElement | null>(null);
+const receiptAttachBusy = ref(false);
 
 const startAttachReceipt = (id: number) => {
+    if (receiptAttachBusy.value) {
+        return;
+    }
     receiptAttachTransactionId.value = id;
     receiptAttachInput.value?.click();
 };
@@ -119,16 +123,24 @@ const onReceiptFileSelected = (event: Event) => {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     const id = receiptAttachTransactionId.value;
-    if (!file || id == null) {
+    if (!file || id == null || receiptAttachBusy.value) {
         input.value = '';
         receiptAttachTransactionId.value = null;
         return;
     }
+
+    receiptAttachBusy.value = true;
     const form = new FormData();
     form.append('receipt', file);
-    router.post(route('expenses.receipt.store', id), form, { preserveScroll: true });
-    receiptAttachTransactionId.value = null;
-    input.value = '';
+    router.post(route('expenses.receipt.store', id), form, {
+        preserveScroll: true,
+        forceFormData: true,
+        onFinish: () => {
+            receiptAttachBusy.value = false;
+            receiptAttachTransactionId.value = null;
+            input.value = '';
+        },
+    });
 };
 
 const confirmDelete = (expense: ExpenseRow) => {

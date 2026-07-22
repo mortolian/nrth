@@ -4,7 +4,6 @@ namespace App\Http\Middleware;
 
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Transaction;
-use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
 use App\Domain\Banking\Support\BankingPaymentAccounts;
 use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
@@ -67,8 +66,8 @@ class HandleInertiaRequests extends Middleware
                     return [];
                 }
 
-                (new EnsureDefaultBankingAccount)->execute($team);
-
+                // Read-only: do not create banking accounts from shared props
+                // (that raced under concurrent Inertia visits and surfaced unique violations).
                 return BankingPaymentAccounts::forInvoiceDeposit((int) $team->id);
             },
             'commandPalette' => fn () => $this->commandPaletteData($request),
