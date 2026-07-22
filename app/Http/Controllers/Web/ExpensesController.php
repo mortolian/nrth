@@ -14,9 +14,13 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\TaxLine;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
+use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Support\BankingPaymentAccounts;
 use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -167,6 +171,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
         $prefillSupplierId = (int) $request->integer('supplier_id');
@@ -189,12 +194,13 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
 
         return Inertia::render('Expenses/Form', [
             'isEditing' => true,
-            'expense' => $this->serializeExpenseForForm($transaction),
+            'expense' => $this->serializeExpenseForForm($transaction, $team),
             'prefill' => null,
             ...$this->expenseFormSharedProps($teamId),
         ]);
@@ -229,6 +235,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
         $userId = (int) $request->user()->id;
@@ -242,13 +249,16 @@ class ExpensesController extends Controller
         $vatAmountCents = $normalized[1];
         $isVatClaimable = $normalized[3];
 
-        $creditAccount = $this->resolvePaidFromAccount($teamId, (int) $payload['paid_from_account_id']);
+        $bankingAccount = $this->resolvePaidFromBankingAccount($teamId, (int) $payload['paid_from_banking_account_id']);
+        $creditAccount = $bankingAccount->glAccount;
+        abort_if($creditAccount === null, 422);
+
         $vatInputAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('code', '1200')
             ->first();
 
-        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $creditAccount);
+        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $bankingAccount, $creditAccount);
 
         $transaction = DB::transaction(function () use ($payload, $teamId, $userId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): Transaction {
             $transaction = Transaction::queryWithoutTeamScope()->create([
@@ -292,6 +302,7 @@ class ExpensesController extends Controller
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+        (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
 
@@ -305,13 +316,16 @@ class ExpensesController extends Controller
         $vatAmountCents = $normalized[1];
         $isVatClaimable = $normalized[3];
 
-        $creditAccount = $this->resolvePaidFromAccount($teamId, (int) $payload['paid_from_account_id']);
+        $bankingAccount = $this->resolvePaidFromBankingAccount($teamId, (int) $payload['paid_from_banking_account_id']);
+        $creditAccount = $bankingAccount->glAccount;
+        abort_if($creditAccount === null, 422);
+
         $vatInputAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('code', '1200')
             ->first();
 
-        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $creditAccount);
+        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $bankingAccount, $creditAccount);
 
         DB::transaction(function () use ($transaction, $payload, $teamId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): void {
             $transaction->forceFill([
@@ -422,13 +436,13 @@ class ExpensesController extends Controller
             'amount_excl_vat_cents' => ['required', 'integer', 'min:0'],
             'vat_rate' => ['required', Rule::in(['vat15', 'vat0', 'exempt', 'no_vat'])],
             'vat_amount_cents' => ['required', 'integer', 'min:0'],
-            'paid_from_account_id' => [
+            'paid_from_banking_account_id' => [
                 'required',
                 'integer',
-                Rule::exists('accounts', 'id')->where(function ($query) use ($teamId): void {
+                Rule::exists('banking_accounts', 'id')->where(function ($query) use ($teamId): void {
                     $query->where('team_id', $teamId)
                         ->where('is_active', true)
-                        ->whereIn('type', [AccountType::Asset->value, AccountType::Liability->value]);
+                        ->whereNotNull('gl_account_id');
                 }),
             ],
             'reference' => ['nullable', 'string', 'max:255'],
@@ -543,12 +557,18 @@ class ExpensesController extends Controller
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>|null
      */
-    private function buildExpenseMeta(Account $categoryAccount, array $payload, Account $paidFromAccount): ?array
-    {
+    private function buildExpenseMeta(
+        Account $categoryAccount,
+        array $payload,
+        BankingAccount $bankingAccount,
+        Account $paidFromGlAccount,
+    ): ?array {
         $name = strtolower($categoryAccount->name);
         $meta = [
-            'paid_from_account_id' => $paidFromAccount->id,
-            'paid_from_account_name' => trim($paidFromAccount->code.' - '.$paidFromAccount->name),
+            'paid_from_banking_account_id' => $bankingAccount->id,
+            'paid_from_banking_account_name' => $bankingAccount->name,
+            'paid_from_account_id' => $paidFromGlAccount->id,
+            'paid_from_account_name' => trim($paidFromGlAccount->code.' - '.$paidFromGlAccount->name),
             'external_reference' => trim((string) ($payload['reference'] ?? '')),
             'notes' => trim((string) ($payload['notes'] ?? '')),
         ];
@@ -563,28 +583,41 @@ class ExpensesController extends Controller
         return $meta;
     }
 
-    private function resolvePaidFromAccount(int $teamId, int $accountId): Account
+    private function resolvePaidFromBankingAccount(int $teamId, int $bankingAccountId): BankingAccount
     {
-        $account = Account::queryWithoutTeamScope()
+        $account = BankingAccount::queryWithoutTeamScope()
+            ->with('glAccount')
             ->where('team_id', $teamId)
-            ->whereKey($accountId)
+            ->whereKey($bankingAccountId)
             ->first();
 
         if ($account === null) {
             throw ValidationException::withMessages([
-                'paid_from_account_id' => __('Select a valid paid-from account for this company.'),
+                'paid_from_banking_account_id' => __('Select a valid banking account for this company.'),
             ]);
         }
 
         if (! $account->is_active) {
             throw ValidationException::withMessages([
-                'paid_from_account_id' => __('That paid-from account is inactive.'),
+                'paid_from_banking_account_id' => __('That banking account is inactive.'),
             ]);
         }
 
-        if (! in_array($account->type, [AccountType::Asset, AccountType::Liability], true)) {
+        if ($account->gl_account_id === null || $account->glAccount === null) {
             throw ValidationException::withMessages([
-                'paid_from_account_id' => __('Paid from must be an asset or liability account.'),
+                'paid_from_banking_account_id' => __('Link that banking account to a ledger account first.'),
+            ]);
+        }
+
+        if (! $account->glAccount->is_active) {
+            throw ValidationException::withMessages([
+                'paid_from_banking_account_id' => __('The linked ledger account is inactive.'),
+            ]);
+        }
+
+        if (! in_array($account->glAccount->type, [AccountType::Asset, AccountType::Liability], true)) {
+            throw ValidationException::withMessages([
+                'paid_from_banking_account_id' => __('Paid from must link to an asset or liability ledger account.'),
             ]);
         }
 
@@ -594,7 +627,7 @@ class ExpensesController extends Controller
     /**
      * @return array{
      *   categories: list<array{id: int, name: string}>,
-     *   paid_from_options: list<array{id: int, code: string, name: string}>,
+     *   paid_from_options: list<array{id: int, name: string, gl_account_id: int, gl_label: string}>,
      *   supplier_options: list<array{id: int, name: string}>,
      *   tax_rates: list<array{value: string, label: string, rate: float, claimable: bool}>,
      *   sars_rate_per_km: float
@@ -614,7 +647,7 @@ class ExpensesController extends Controller
                     'name' => trim($account->code.' - '.$account->name),
                 ])
                 ->all(),
-            'paid_from_options' => $this->paidFromAccountOptions($teamId),
+            'paid_from_options' => BankingPaymentAccounts::forExpensePaidFrom($teamId),
             'supplier_options' => Supplier::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
@@ -633,68 +666,6 @@ class ExpensesController extends Controller
             ],
             'sars_rate_per_km' => 4.84,
         ];
-    }
-
-    /**
-     * Preferred: Bank 1010, Petty cash 1020, Accounts Payable 2000.
-     * Also include other active cash/bank/payable-style Asset/Liability accounts.
-     *
-     * @return list<array{id: int, code: string, name: string}>
-     */
-    private function paidFromAccountOptions(int $teamId): array
-    {
-        $preferredCodes = ['1010', '1020', '2000'];
-        $excludedCodes = ['1000', '1100', '1200', '2100', '2200'];
-
-        $accounts = Account::queryWithoutTeamScope()
-            ->where('team_id', $teamId)
-            ->where('is_active', true)
-            ->whereIn('type', [AccountType::Asset->value, AccountType::Liability->value])
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'type']);
-
-        $eligible = $accounts->filter(function (Account $account) use ($preferredCodes, $excludedCodes): bool {
-            if (in_array($account->code, $preferredCodes, true)) {
-                return true;
-            }
-
-            if (in_array($account->code, $excludedCodes, true)) {
-                return false;
-            }
-
-            $haystack = strtolower($account->code.' '.$account->name);
-
-            if ($account->type === AccountType::Asset) {
-                return str_contains($haystack, 'bank')
-                    || str_contains($haystack, 'cash')
-                    || str_contains($haystack, 'petty')
-                    || (bool) preg_match('/^10\d{2}$/', $account->code);
-            }
-
-            return str_contains($haystack, 'payable')
-                || str_contains($haystack, 'creditor')
-                || str_contains($haystack, 'credit card')
-                || (bool) preg_match('/^20\d{2}$/', $account->code);
-        });
-
-        $byCode = $eligible->keyBy('code');
-        $ordered = collect();
-        foreach ($preferredCodes as $code) {
-            if ($byCode->has($code)) {
-                $ordered->push($byCode->get($code));
-                $byCode->forget($code);
-            }
-        }
-        $ordered = $ordered->concat($byCode->sortBy('code')->values());
-
-        return $ordered
-            ->map(fn (Account $account) => [
-                'id' => $account->id,
-                'code' => $account->code,
-                'name' => trim($account->code.' - '.$account->name),
-            ])
-            ->values()
-            ->all();
     }
 
     /**
@@ -765,7 +736,7 @@ class ExpensesController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serializeExpenseForForm(Transaction $transaction): array
+    private function serializeExpenseForForm(Transaction $transaction, Team $team): array
     {
         $transaction->loadMissing(['journalEntries.account', 'taxLines', 'supplier']);
 
@@ -789,7 +760,7 @@ class ExpensesController extends Controller
         }
 
         $meta = $transaction->expense_meta ?? [];
-        $paidFromAccountId = $this->resolvePaidFromAccountIdForForm($transaction, $creditLine);
+        $paidFromBankingAccountId = $this->resolvePaidFromBankingAccountIdForForm($transaction, $creditLine, $team);
 
         return [
             'id' => $transaction->id,
@@ -801,7 +772,7 @@ class ExpensesController extends Controller
             'amount_excl_vat' => $amountExclCents / 100,
             'vat_rate' => $vatRate,
             'vat_amount' => $vatAmountCents / 100,
-            'paid_from_account_id' => $paidFromAccountId,
+            'paid_from_banking_account_id' => $paidFromBankingAccountId,
             'reference' => (string) ($meta['external_reference'] ?? ''),
             'notes' => (string) ($meta['notes'] ?? ''),
             'office_percentage' => (float) ($meta['office_percentage'] ?? 15),
@@ -811,32 +782,75 @@ class ExpensesController extends Controller
     }
 
     /**
-     * Prefer stored meta, then credit journal line, then legacy payment_method → 1010/2000.
+     * Prefer stored banking meta, then banking linked to credit GL / legacy payment_method codes.
      */
-    private function resolvePaidFromAccountIdForForm(Transaction $transaction, ?JournalEntry $creditLine): int
-    {
+    private function resolvePaidFromBankingAccountIdForForm(
+        Transaction $transaction,
+        ?JournalEntry $creditLine,
+        Team $team,
+    ): int {
         $meta = $transaction->expense_meta ?? [];
-        $fromMeta = (int) ($meta['paid_from_account_id'] ?? 0);
+        $fromMeta = (int) ($meta['paid_from_banking_account_id'] ?? 0);
         if ($fromMeta > 0) {
-            return $fromMeta;
+            $existing = BankingAccount::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->whereKey($fromMeta)
+                ->whereNotNull('gl_account_id')
+                ->first();
+            if ($existing !== null) {
+                return (int) $existing->id;
+            }
         }
 
-        if ($creditLine?->account_id) {
-            return (int) $creditLine->account_id;
+        $glAccountId = (int) ($meta['paid_from_account_id'] ?? 0);
+        if ($glAccountId <= 0 && $creditLine?->account_id) {
+            $glAccountId = (int) $creditLine->account_id;
         }
 
-        $legacyMethod = (string) ($meta['payment_method'] ?? 'business_account');
-        $code = match ($legacyMethod) {
-            'personal_reimbursable', 'credit_card' => '2000',
-            default => '1010',
-        };
+        if ($glAccountId <= 0) {
+            $legacyMethod = (string) ($meta['payment_method'] ?? 'business_account');
+            $code = match ($legacyMethod) {
+                'personal_reimbursable', 'credit_card' => '2000',
+                default => '1010',
+            };
+            $gl = Account::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->where('code', $code)
+                ->first();
+            $glAccountId = $gl !== null ? (int) $gl->id : 0;
+        }
 
-        $account = Account::queryWithoutTeamScope()
-            ->where('team_id', $transaction->team_id)
-            ->where('code', $code)
-            ->first();
+        if ($glAccountId > 0) {
+            $linked = BankingAccount::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->where('gl_account_id', $glAccountId)
+                ->first();
+            if ($linked !== null) {
+                return (int) $linked->id;
+            }
 
-        return $account !== null ? (int) $account->id : 0;
+            $gl = Account::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->whereKey($glAccountId)
+                ->first();
+
+            if ($gl !== null && in_array($gl->type, [AccountType::Asset, AccountType::Liability], true)) {
+                $created = BankingAccount::queryWithoutTeamScope()->create([
+                    'team_id' => $team->id,
+                    'name' => $gl->name,
+                    'bank_name' => null,
+                    'account_number_last4' => null,
+                    'currency' => 'ZAR',
+                    'type' => $gl->code === '2000' ? 'payable' : ($gl->code === '1020' ? 'cash' : 'cheque'),
+                    'is_active' => true,
+                    'gl_account_id' => $gl->id,
+                ]);
+
+                return (int) $created->id;
+            }
+        }
+
+        return (int) (new EnsureDefaultBankingAccount)->execute($team)->id;
     }
 
     private function resolveTeamExpense(Request $request, Transaction $transaction): Transaction

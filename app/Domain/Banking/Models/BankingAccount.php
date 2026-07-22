@@ -2,6 +2,7 @@
 
 namespace App\Domain\Banking\Models;
 
+use App\Domain\Accounting\Models\Account;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
 use Database\Factories\BankingAccountFactory;
@@ -27,6 +28,7 @@ class BankingAccount extends Model
         'currency',
         'type',
         'is_active',
+        'gl_account_id',
     ];
 
     /**
@@ -45,6 +47,14 @@ class BankingAccount extends Model
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /**
+     * @return BelongsTo<Account, $this>
+     */
+    public function glAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'gl_account_id');
     }
 
     /**

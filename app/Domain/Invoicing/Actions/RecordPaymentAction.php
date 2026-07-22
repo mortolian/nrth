@@ -3,12 +3,15 @@
 namespace App\Domain\Invoicing\Actions;
 
 use App\Domain\Accounting\Actions\PostTransactionAction;
+use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\EntryType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Invoicing\DTOs\RecordPaymentDTO;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
@@ -41,6 +44,7 @@ class RecordPaymentAction
 
             $team = $invoice->team ?? Team::query()->findOrFail($dto->teamId);
             (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+            (new EnsureDefaultBankingAccount)->execute($team);
 
             if ($this->shouldPostInCompanyFunctionalCurrency($invoice)) {
                 if ($dto->bankAmountCompanyCents !== null && $dto->bankAmountCompanyCents < 0) {
@@ -87,7 +91,7 @@ class RecordPaymentAction
 
     private function executeInvoiceCurrencyPayment(RecordPaymentDTO $dto, Invoice $invoice): Payment
     {
-        $bankAccount = $this->getRequiredAccount($dto->teamId, '1010', 'Bank');
+        $bankAccount = $this->resolveDepositGlAccount($dto);
         $receivableAccount = $this->getRequiredAccount($dto->teamId, '1100', 'Accounts Receivable');
         $vatOutputAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $dto->teamId)
@@ -158,7 +162,7 @@ class RecordPaymentAction
             ?? 'ZAR'
         ));
 
-        $bankAccount = $this->getRequiredAccount($dto->teamId, '1010', 'Bank');
+        $bankAccount = $this->resolveDepositGlAccount($dto);
         $receivableAccount = $this->getRequiredAccount($dto->teamId, '1100', 'Accounts Receivable');
         $vatOutputAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $dto->teamId)
@@ -276,6 +280,48 @@ class RecordPaymentAction
         return $this->finalizePayment($dto, $invoice, $transaction->id, $bankCompany);
     }
 
+    private function resolveDepositGlAccount(RecordPaymentDTO $dto): Account
+    {
+        $bankingAccount = BankingAccount::queryWithoutTeamScope()
+            ->with('glAccount')
+            ->where('team_id', $dto->teamId)
+            ->whereKey($dto->bankingAccountId)
+            ->first();
+
+        if ($bankingAccount === null) {
+            throw ValidationException::withMessages([
+                'banking_account_id' => __('Select a valid banking account for this company.'),
+            ]);
+        }
+
+        if (! $bankingAccount->is_active) {
+            throw ValidationException::withMessages([
+                'banking_account_id' => __('That banking account is inactive.'),
+            ]);
+        }
+
+        $gl = $bankingAccount->glAccount;
+        if ($gl === null || $bankingAccount->gl_account_id === null) {
+            throw ValidationException::withMessages([
+                'banking_account_id' => __('Link that banking account to a ledger account first.'),
+            ]);
+        }
+
+        if (! $gl->is_active) {
+            throw ValidationException::withMessages([
+                'banking_account_id' => __('The linked ledger account is inactive.'),
+            ]);
+        }
+
+        if ($gl->type !== AccountType::Asset) {
+            throw ValidationException::withMessages([
+                'banking_account_id' => __('Invoice payments must be paid into an asset ledger account (bank or cash).'),
+            ]);
+        }
+
+        return $gl;
+    }
+
     private function finalizePayment(RecordPaymentDTO $dto, Invoice $invoice, int $transactionId, ?int $bankCompanyCents): Payment
     {
         $payment = Payment::queryWithoutTeamScope()->create([
@@ -289,6 +335,7 @@ class RecordPaymentAction
             'reference' => $dto->reference,
             'notes' => $dto->notes,
             'transaction_id' => $transactionId,
+            'banking_account_id' => $dto->bankingAccountId,
         ]);
 
         $newPaid = (int) $invoice->getRawOriginal('amount_paid_cents') + $dto->amountCents;

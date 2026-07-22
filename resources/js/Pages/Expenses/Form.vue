@@ -8,7 +8,7 @@ import { Camera, Plus, ScanLine, Upload, X } from 'lucide-vue-next';
 import { FALLBACK_EXPENSE_TAX_RATES, type ExpenseTaxRateOption } from './fallbackTaxRates';
 
 type CategoryOption = { id: number; name: string };
-type PaidFromOption = { id: number; code: string; name: string };
+type PaidFromOption = { id: number; name: string; gl_account_id: number; gl_label: string };
 type SupplierOption = { id: number; name: string };
 type TaxRateOption = ExpenseTaxRateOption;
 
@@ -22,7 +22,7 @@ type ExpenseFormRow = {
     amount_excl_vat: number;
     vat_rate: 'vat15' | 'vat0' | 'exempt' | 'no_vat';
     vat_amount: number;
-    paid_from_account_id: number;
+    paid_from_banking_account_id: number;
     reference: string;
     notes: string;
     office_percentage: number;
@@ -67,7 +67,7 @@ const supplierList = computed(() => {
 const taxRateList = computed(() => (props.tax_rates?.length ? props.tax_rates : FALLBACK_EXPENSE_TAX_RATES));
 
 const defaultPaidFromAccountId = (): number => {
-    const bank = paidFromList.value.find((option) => option.code === '1010');
+    const bank = paidFromList.value.find((option) => option.gl_label.startsWith('1010'));
     if (bank) {
         return bank.id;
     }
@@ -94,7 +94,7 @@ const schema = z
         amount_excl_vat: z.coerce.number().min(0),
         vat_rate: z.enum(['vat15', 'vat0', 'exempt', 'no_vat']),
         vat_amount: z.coerce.number().min(0),
-        paid_from_account_id: z.coerce.number().int().positive(),
+        paid_from_banking_account_id: z.coerce.number().int().positive(),
         reference: z.string().optional(),
         notes: z.string().optional(),
         office_percentage: z.coerce.number().min(0).max(100).optional(),
@@ -118,7 +118,7 @@ const initialFromProps = () => {
             amount_excl_vat: e.amount_excl_vat,
             vat_rate: e.vat_rate,
             vat_amount: e.vat_amount,
-            paid_from_account_id: e.paid_from_account_id || defaultPaidFromAccountId(),
+            paid_from_banking_account_id: e.paid_from_banking_account_id || defaultPaidFromAccountId(),
             reference: e.reference,
             notes: e.notes,
             office_percentage: e.office_percentage,
@@ -136,7 +136,7 @@ const initialFromProps = () => {
         amount_excl_vat: 0,
         vat_rate: 'vat15' as const,
         vat_amount: 0,
-        paid_from_account_id: defaultPaidFromAccountId(),
+        paid_from_banking_account_id: defaultPaidFromAccountId(),
         reference: '',
         notes: '',
         office_percentage: 15,
@@ -478,7 +478,7 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
     data.set('amount_excl_vat_cents', String(Math.round(parsed.amount_excl_vat * 100)));
     data.set('vat_rate', parsed.vat_rate);
     data.set('vat_amount_cents', String(Math.round(parsed.vat_amount * 100)));
-    data.set('paid_from_account_id', String(parsed.paid_from_account_id));
+    data.set('paid_from_banking_account_id', String(parsed.paid_from_banking_account_id));
     data.set('reference', parsed.reference ?? '');
     data.set('notes', parsed.notes ?? '');
     if (isHomeOffice.value) data.set('office_percentage', String(parsed.office_percentage ?? 0));
@@ -515,7 +515,7 @@ const snapshotForm = () => ({
     amount_excl_vat: Number(form.amount_excl_vat || 0),
     vat_rate: form.vat_rate,
     vat_amount: Number(form.vat_amount || 0),
-    paid_from_account_id: Number(form.paid_from_account_id || 0),
+    paid_from_banking_account_id: Number(form.paid_from_banking_account_id || 0),
     reference: String(form.reference ?? ''),
     notes: String(form.notes ?? ''),
     office_percentage: Number(form.office_percentage || 0),
@@ -814,11 +814,11 @@ const submit = () => {
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Paid from</label>
                     <AppSelect
-                        :model-value="String(form.paid_from_account_id)"
-                        :options="paidFromList.map((option) => ({ label: option.name, value: String(option.id) }))"
-                        @update:model-value="form.paid_from_account_id = Number($event)"
+                        :model-value="String(form.paid_from_banking_account_id)"
+                        :options="paidFromList.map((option) => ({ label: `${option.name} (${option.gl_label})`, value: String(option.id) }))"
+                        @update:model-value="form.paid_from_banking_account_id = Number($event)"
                     />
-                    <p class="mt-1 text-xs text-slate-500">Which balance sheet account this expense is paid from or owed on.</p>
+                    <p class="mt-1 text-xs text-slate-500">Which bank, cash, or card account this expense was paid from (posts to its linked ledger account).</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Reference</label>

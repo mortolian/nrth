@@ -4,6 +4,7 @@ namespace App\Domain\Invoicing\Models;
 
 use App\Domain\Accounting\Casts\MoneyCast;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Invoicing\Enums\PaymentMethod;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
@@ -30,6 +31,7 @@ class Payment extends Model
         'reference',
         'notes',
         'transaction_id',
+        'banking_account_id',
     ];
 
     /**
@@ -66,6 +68,14 @@ class Payment extends Model
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    /**
+     * @return BelongsTo<BankingAccount, $this>
+     */
+    public function bankingAccount(): BelongsTo
+    {
+        return $this->belongsTo(BankingAccount::class);
     }
 
     protected static function newFactory(): PaymentFactory

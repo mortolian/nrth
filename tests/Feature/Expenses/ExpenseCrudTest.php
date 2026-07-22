@@ -9,6 +9,7 @@ use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Tax\Models\TaxRate;
 use App\Models\Team;
 use App\Models\User;
@@ -27,7 +28,7 @@ class ExpenseCrudTest extends TestCase
     }
 
     /**
-     * @return array{0: User, 1: Team, 2: Account, 3: Account}
+     * @return array{0: User, 1: Team, 2: Account, 3: Account, 4: BankingAccount}
      */
     private function teamWithExpenseAccounts(): array
     {
@@ -37,19 +38,24 @@ class ExpenseCrudTest extends TestCase
         $this->actingTeamContext($user, $team);
 
         Account::factory()->for($team)->expense()->create(['code' => '7500', 'name' => 'General expense']);
-        $bank = Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
+        $bankGl = Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
         Account::factory()->for($team)->asset()->create(['code' => '1020', 'name' => 'Cash on hand', 'is_system' => true]);
         Account::factory()->for($team)->liability()->create(['code' => '2000', 'name' => 'Accounts Payable', 'is_system' => true]);
 
         $category = Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '7500')->first();
         $this->assertNotNull($category);
 
-        return [$user, $team, $category, $bank];
+        $banking = BankingAccount::factory()->for($team)->create([
+            'name' => 'Operating bank',
+            'gl_account_id' => $bankGl->id,
+        ]);
+
+        return [$user, $team, $category, $bankGl, $banking];
     }
 
-    public function test_store_posts_credit_to_paid_from_account(): void
+    public function test_store_posts_credit_to_banking_linked_gl(): void
     {
-        [, $team, $category, $bank] = $this->teamWithExpenseAccounts();
+        [, $team, $category, $bankGl, $banking] = $this->teamWithExpenseAccounts();
 
         $this->post(route('expenses.store'), [
             'date' => '2026-05-01',
@@ -59,7 +65,7 @@ class ExpenseCrudTest extends TestCase
             'amount_excl_vat_cents' => 4500,
             'vat_rate' => 'no_vat',
             'vat_amount_cents' => 0,
-            'paid_from_account_id' => $bank->id,
+            'paid_from_banking_account_id' => $banking->id,
             'reference' => null,
             'notes' => null,
         ])->assertRedirect(route('expenses.index'));
@@ -70,15 +76,16 @@ class ExpenseCrudTest extends TestCase
             ->latest('id')
             ->first();
         $this->assertNotNull($txn);
-        $this->assertSame($bank->id, (int) ($txn->expense_meta['paid_from_account_id'] ?? 0));
+        $this->assertSame($banking->id, (int) ($txn->expense_meta['paid_from_banking_account_id'] ?? 0));
+        $this->assertSame($bankGl->id, (int) ($txn->expense_meta['paid_from_account_id'] ?? 0));
         $this->assertSame('1010 - Bank', $txn->expense_meta['paid_from_account_name'] ?? null);
 
         $credit = $txn->journalEntries->first(fn ($entry) => $entry->type === EntryType::Credit);
         $this->assertNotNull($credit);
-        $this->assertSame($bank->id, (int) $credit->account_id);
+        $this->assertSame($bankGl->id, (int) $credit->account_id);
     }
 
-    public function test_store_ensures_missing_chart_accounts_on_create_form(): void
+    public function test_create_form_ensures_default_banking_account_for_bank_gl(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -95,31 +102,41 @@ class ExpenseCrudTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Expenses/Form')
-                ->where('paid_from_options.0.code', '1010'));
+                ->has('paid_from_options.0.id')
+                ->where('paid_from_options.0.gl_label', fn ($label) => str_starts_with((string) $label, '1010')));
 
+        $bankGl = Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '1010')->first();
+        $this->assertNotNull($bankGl);
         $this->assertNotNull(
-            Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '1010')->first()
+            BankingAccount::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->where('gl_account_id', $bankGl->id)
+                ->first()
         );
     }
 
-    public function test_store_rejects_inactive_wrong_type_and_other_team_paid_from(): void
+    public function test_store_rejects_inactive_unlinked_and_other_team_banking(): void
     {
-        [, $team, $category] = $this->teamWithExpenseAccounts();
+        [, $team, $category, $bankGl] = $this->teamWithExpenseAccounts();
 
-        $inactive = Account::factory()->for($team)->asset()->create([
-            'code' => '1099',
-            'name' => 'Old petty',
+        $inactive = BankingAccount::factory()->for($team)->create([
+            'name' => 'Old',
             'is_active' => false,
+            'gl_account_id' => Account::factory()->for($team)->asset()->create(['code' => '1098', 'name' => 'Spare'])->id,
         ]);
-        $expenseAccount = Account::factory()->for($team)->expense()->create([
-            'code' => '7510',
-            'name' => 'Not a balance sheet',
+        $unlinked = BankingAccount::factory()->for($team)->create([
+            'name' => 'Import only',
+            'gl_account_id' => null,
         ]);
 
         $otherUser = User::factory()->withPersonalTeam()->create();
         $otherTeam = $otherUser->currentTeam;
         $this->assertNotNull($otherTeam);
-        $otherBank = Account::factory()->for($otherTeam)->asset()->create(['code' => '1010', 'name' => 'Other Bank']);
+        $otherGl = Account::factory()->for($otherTeam)->asset()->create(['code' => '1010', 'name' => 'Other Bank']);
+        $otherBanking = BankingAccount::factory()->for($otherTeam)->create([
+            'name' => 'Other',
+            'gl_account_id' => $otherGl->id,
+        ]);
 
         $base = [
             'date' => '2026-05-01',
@@ -131,17 +148,19 @@ class ExpenseCrudTest extends TestCase
             'vat_amount_cents' => 0,
         ];
 
-        $this->post(route('expenses.store'), [...$base, 'paid_from_account_id' => $inactive->id])
-            ->assertSessionHasErrors('paid_from_account_id');
+        $this->post(route('expenses.store'), [...$base, 'paid_from_banking_account_id' => $inactive->id])
+            ->assertSessionHasErrors('paid_from_banking_account_id');
 
-        $this->post(route('expenses.store'), [...$base, 'paid_from_account_id' => $expenseAccount->id])
-            ->assertSessionHasErrors('paid_from_account_id');
+        $this->post(route('expenses.store'), [...$base, 'paid_from_banking_account_id' => $unlinked->id])
+            ->assertSessionHasErrors('paid_from_banking_account_id');
 
-        $this->post(route('expenses.store'), [...$base, 'paid_from_account_id' => $otherBank->id])
-            ->assertSessionHasErrors('paid_from_account_id');
+        $this->post(route('expenses.store'), [...$base, 'paid_from_banking_account_id' => $otherBanking->id])
+            ->assertSessionHasErrors('paid_from_banking_account_id');
+
+        unset($bankGl);
     }
 
-    public function test_edit_legacy_payment_method_maps_to_paid_from_account(): void
+    public function test_edit_legacy_payment_method_maps_to_banking_account(): void
     {
         [, $team, $category] = $this->teamWithExpenseAccounts();
         $ap = Account::queryWithoutTeamScope()
@@ -180,16 +199,21 @@ class ExpenseCrudTest extends TestCase
             'description' => 'Expense payment',
         ]);
 
+        $apBanking = BankingAccount::factory()->for($team)->create([
+            'name' => 'Reimbursable',
+            'gl_account_id' => $ap->id,
+        ]);
+
         $this->get(route('expenses.edit', $txn))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Expenses/Form')
-                ->where('expense.paid_from_account_id', $ap->id));
+                ->where('expense.paid_from_banking_account_id', $apBanking->id));
     }
 
     public function test_store_update_delete_and_receipt(): void
     {
-        [, $team, $category, $bank] = $this->teamWithExpenseAccounts();
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
 
         $this->post(route('expenses.store'), [
             'date' => '2026-05-01',
@@ -199,7 +223,7 @@ class ExpenseCrudTest extends TestCase
             'amount_excl_vat_cents' => 100_00,
             'vat_rate' => 'no_vat',
             'vat_amount_cents' => 0,
-            'paid_from_account_id' => $bank->id,
+            'paid_from_banking_account_id' => $banking->id,
             'reference' => 'PO-99',
             'notes' => 'Quarterly',
         ])->assertRedirect(route('expenses.index'));
@@ -222,7 +246,7 @@ class ExpenseCrudTest extends TestCase
             'amount_excl_vat_cents' => 200_00,
             'vat_rate' => 'no_vat',
             'vat_amount_cents' => 0,
-            'paid_from_account_id' => $bank->id,
+            'paid_from_banking_account_id' => $banking->id,
             'reference' => 'PO-100',
             'notes' => 'Updated',
         ])->assertRedirect(route('expenses.index'));
@@ -245,7 +269,7 @@ class ExpenseCrudTest extends TestCase
 
     public function test_store_accepts_multiple_receipt_files(): void
     {
-        [, $team, $category, $bank] = $this->teamWithExpenseAccounts();
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
 
         $this->post(route('expenses.store'), [
             'date' => '2026-05-01',
@@ -255,7 +279,7 @@ class ExpenseCrudTest extends TestCase
             'amount_excl_vat_cents' => 50_00,
             'vat_rate' => 'no_vat',
             'vat_amount_cents' => 0,
-            'paid_from_account_id' => $bank->id,
+            'paid_from_banking_account_id' => $banking->id,
             'receipts' => [
                 UploadedFile::fake()->image('page1.jpg'),
                 UploadedFile::fake()->create('page2.pdf', 80, 'application/pdf'),
@@ -273,7 +297,7 @@ class ExpenseCrudTest extends TestCase
 
     public function test_travel_category_uses_distance_times_rate(): void
     {
-        [, $team, , $bank] = $this->teamWithExpenseAccounts();
+        [, $team, , , $banking] = $this->teamWithExpenseAccounts();
 
         $travel = Account::factory()->for($team)->expense()->create(['code' => '7600', 'name' => 'Travel — mileage']);
 
@@ -285,7 +309,7 @@ class ExpenseCrudTest extends TestCase
             'amount_excl_vat_cents' => 999_99,
             'vat_rate' => 'vat15',
             'vat_amount_cents' => 0,
-            'paid_from_account_id' => $bank->id,
+            'paid_from_banking_account_id' => $banking->id,
             'distance_km' => 10,
             'rate_per_km' => 3.50,
         ])->assertRedirect(route('expenses.index'));
@@ -302,7 +326,7 @@ class ExpenseCrudTest extends TestCase
 
     public function test_home_office_scales_amounts(): void
     {
-        [, $team, , $bank] = $this->teamWithExpenseAccounts();
+        [, $team, , , $banking] = $this->teamWithExpenseAccounts();
         TaxRate::factory()->for($team)->create();
 
         $home = Account::factory()->for($team)->expense()->create(['code' => '7700', 'name' => 'Home office']);
@@ -315,7 +339,7 @@ class ExpenseCrudTest extends TestCase
             'amount_excl_vat_cents' => 1000_00,
             'vat_rate' => 'vat15',
             'vat_amount_cents' => 150_00,
-            'paid_from_account_id' => $bank->id,
+            'paid_from_banking_account_id' => $banking->id,
             'office_percentage' => 25,
         ])->assertRedirect(route('expenses.index'));
 

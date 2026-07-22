@@ -11,6 +11,7 @@ readonly class RecordPaymentDTO
         public int $teamId,
         public int $amountCents,
         public string $paymentDate,
+        public int $bankingAccountId,
         public PaymentMethod $method = PaymentMethod::Eft,
         public string $currency = 'ZAR',
         public ?string $reference = null,

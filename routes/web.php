@@ -35,6 +35,7 @@ use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
 use App\Http\Controllers\Web\Webhooks\PayFastPaymentWebhookController;
 use App\Http\Controllers\Web\Webhooks\StripePaymentWebhookController;
+use App\Http\Middleware\EnforceSessionIdleTimeout;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -54,7 +55,7 @@ Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
-    \App\Http\Middleware\EnforceSessionIdleTimeout::class,
+    EnforceSessionIdleTimeout::class,
 ])->group(function () {
     Route::get('/onboarding/setup', [OnboardingController::class, 'show'])->name('onboarding.setup');
     Route::post('/onboarding/progress', [OnboardingController::class, 'saveProgress'])->name('onboarding.progress');
@@ -80,6 +81,7 @@ Route::middleware([
         Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [BankingAccountController::class, 'store'])->name('accounts.store');
+        Route::put('/accounts/{bankingAccount}', [BankingAccountController::class, 'update'])->name('accounts.update');
         Route::get('/import', [BankingStatementImportController::class, 'create'])->name('import.create');
         Route::post('/import', [BankingStatementImportController::class, 'store'])->name('import.store');
         Route::get('/import/{import}/map', [BankingStatementImportController::class, 'map'])->name('import.map');

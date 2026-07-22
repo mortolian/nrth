@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
+use App\Domain\Banking\Support\BankingPaymentAccounts;
 use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
@@ -59,6 +61,16 @@ class HandleInertiaRequests extends Middleware
             'invoice_payment_methods' => fn () => $request->user()?->current_team_id
                 ? PaymentMethodOptions::forInertia()
                 : [],
+            'banking_deposit_accounts' => function () use ($request) {
+                $team = $request->user()?->currentTeam;
+                if ($team === null) {
+                    return [];
+                }
+
+                (new EnsureDefaultBankingAccount)->execute($team);
+
+                return BankingPaymentAccounts::forInvoiceDeposit((int) $team->id);
+            },
             'commandPalette' => fn () => $this->commandPaletteData($request),
             'session_idle_timeout_minutes' => fn () => (int) (
                 $request->user()?->currentTeam?->mergedCompanySettings()['session_idle_timeout_minutes'] ?? 0

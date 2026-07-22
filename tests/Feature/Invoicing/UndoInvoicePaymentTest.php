@@ -8,6 +8,7 @@ use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\LedgerService;
+use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\UndoInvoicePaymentAction;
 use App\Domain\Invoicing\DTOs\RecordPaymentDTO;
@@ -61,6 +62,7 @@ class UndoInvoicePaymentTest extends TestCase
             teamId: $team->id,
             amountCents: 115_00,
             paymentDate: '2026-05-01',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
             method: PaymentMethod::Eft,
             createdBy: $user->id,
         ));
@@ -114,6 +116,7 @@ class UndoInvoicePaymentTest extends TestCase
             teamId: $team->id,
             amountCents: 50_00,
             paymentDate: '2026-05-01',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
             method: PaymentMethod::Eft,
             createdBy: $user->id,
         ));

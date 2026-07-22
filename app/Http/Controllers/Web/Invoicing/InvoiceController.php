@@ -611,6 +611,15 @@ class InvoiceController extends Controller
             'amount_cents' => ['required', 'integer', 'min:1'],
             'payment_date' => ['required', 'date'],
             'method' => ['required', Rule::in(array_map(fn (PaymentMethod $method) => $method->value, PaymentMethod::cases()))],
+            'banking_account_id' => [
+                'required',
+                'integer',
+                Rule::exists('banking_accounts', 'id')->where(function ($query) use ($request): void {
+                    $query->where('team_id', (int) $request->user()->current_team_id)
+                        ->where('is_active', true)
+                        ->whereNotNull('gl_account_id');
+                }),
+            ],
             'reference' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'bank_amount_company_cents' => ['nullable', 'integer', 'min:0'],
@@ -622,6 +631,7 @@ class InvoiceController extends Controller
             teamId: (int) $request->user()->current_team_id,
             amountCents: (int) $payload['amount_cents'],
             paymentDate: (string) $payload['payment_date'],
+            bankingAccountId: (int) $payload['banking_account_id'],
             method: PaymentMethod::from((string) $payload['method']),
             currency: Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
             reference: $payload['reference'] ?? null,

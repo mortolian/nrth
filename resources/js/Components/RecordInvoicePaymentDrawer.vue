@@ -29,14 +29,26 @@ const emit = defineEmits<{
 }>();
 
 const page = usePage<{
-    errors?: Record<string, string | string[] | undefined>;
+    errors?: Record<string, string | string[]> | undefined;
     company_currency?: string;
     invoice_payment_methods?: Array<{ value: string; label: string }>;
+    banking_deposit_accounts?: Array<{ id: number; name: string; gl_account_id: number; gl_label: string }>;
 }>();
 
 const paymentMethods = computed(
     () => page.props.invoice_payment_methods ?? [],
 );
+
+const depositAccounts = computed(() => page.props.banking_deposit_accounts ?? []);
+
+const defaultDepositAccountId = (): number => {
+    const bank = depositAccounts.value.find((option) => option.gl_label.startsWith('1010'));
+    if (bank) {
+        return bank.id;
+    }
+
+    return depositAccounts.value[0]?.id ?? 0;
+};
 
 const companyCurrencyFallback = computed(() => page.props.company_currency ?? 'ZAR');
 
@@ -67,6 +79,7 @@ const form = ref({
     amount: '',
     payment_date: '',
     method: 'eft',
+    banking_account_id: 0,
     reference: '',
     notes: '',
     bank_amount_company: '',
@@ -118,6 +131,7 @@ const errorKeys = [
     'amount_cents',
     'payment_date',
     'method',
+    'banking_account_id',
     'reference',
     'notes',
     'account',
@@ -143,6 +157,7 @@ const resetForm = () => {
         amount: inv ? ((Number(inv.amount_due_cents) || 0) / 100).toFixed(2) : '',
         payment_date: new Date().toISOString().slice(0, 10),
         method: 'eft',
+        banking_account_id: defaultDepositAccountId(),
         reference: '',
         notes: '',
         bank_amount_company: '',
@@ -240,6 +255,7 @@ const submit = () => {
         amount_cents: amountCents,
         payment_date: form.value.payment_date,
         method: form.value.method,
+        banking_account_id: Number(form.value.banking_account_id || 0),
         reference: form.value.reference || null,
         notes: form.value.notes || null,
     };
@@ -415,6 +431,16 @@ const submit = () => {
                         v-model="form.method"
                         :options="paymentMethods.map((m) => ({ label: m.label, value: m.value }))"
                     />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Paid into</label>
+                    <AppSelect
+                        :model-value="String(form.banking_account_id || '')"
+                        :options="depositAccounts.map((option) => ({ label: `${option.name} (${option.gl_label})`, value: String(option.id) }))"
+                        placeholder="Select banking account"
+                        @update:model-value="form.banking_account_id = Number($event)"
+                    />
+                    <p class="mt-1 text-xs text-slate-500">Which bank or cash account received this payment.</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Reference</label>
