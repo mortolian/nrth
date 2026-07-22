@@ -2,6 +2,12 @@
 
 namespace App\Providers;
 
+use App\Domain\Ai\AiCatalog;
+use App\Domain\Ai\AiProviderRegistry;
+use App\Domain\Ai\AnthropicProvider;
+use App\Domain\Ai\GeminiProvider;
+use App\Domain\Ai\OpenAiCompatibleClient;
+use App\Domain\Ai\OpenAiCompatibleProvider;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
@@ -33,6 +39,18 @@ class AppServiceProvider extends ServiceProvider
             $app->make(CsvBankStatementImporter::class),
             $app->make(OfxBankStatementImporter::class),
         ));
+
+        $this->app->singleton(AiProviderRegistry::class, function ($app): AiProviderRegistry {
+            $client = $app->make(OpenAiCompatibleClient::class);
+
+            return new AiProviderRegistry([
+                new OpenAiCompatibleProvider(AiCatalog::PROVIDER_OPENAI, $client),
+                $app->make(AnthropicProvider::class),
+                $app->make(GeminiProvider::class),
+                new OpenAiCompatibleProvider(AiCatalog::PROVIDER_OPENROUTER, $client),
+                new OpenAiCompatibleProvider(AiCatalog::PROVIDER_OPENAI_COMPATIBLE, $client),
+            ]);
+        });
     }
 
     /**

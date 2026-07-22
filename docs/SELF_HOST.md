@@ -63,6 +63,29 @@ Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first adm
 
 Optional break-glass: `NRTH_OPERATOR_EMAILS` in `.env`. Existing installs with no operators: `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` (also run by `./scripts/update`).
 
+### Optional AI
+
+Configure under **Company settings → AI** (provider, model, API key, and base URL where needed).
+
+Supported providers:
+
+- OpenAI, Anthropic, Google Gemini
+- OpenRouter
+- OpenAI-compatible (custom base URL — use this for Ollama and other local/OpenAI-compatible servers)
+
+Used by features such as expense receipt autofill (**Scan receipt**). Cloud providers need an API key. OpenAI-compatible can run with a base URL and an optional key (e.g. Ollama at `http://127.0.0.1:11434/v1`). Local vision models typically need images rather than PDFs.
+
+Optional server-wide fallback in `.env`:
+
+- `AI_PROVIDER=openai` (or `anthropic`, `gemini`, `openrouter`, `openai_compatible`)
+- `OPENAI_API_KEY` / `OPENAI_MODEL`
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`
+- `GEMINI_API_KEY` / `GEMINI_MODEL`
+- `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `OPENROUTER_BASE_URL`
+- `OPENAI_COMPATIBLE_API_KEY` / `OPENAI_COMPATIBLE_MODEL` / `OPENAI_COMPATIBLE_BASE_URL`
+
+Env values are used only when the company setting is empty.
+
 ---
 
 ## Update

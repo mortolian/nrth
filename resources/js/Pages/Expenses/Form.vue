@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, toRaw, watch, withDefaults } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-import { Camera, Upload } from 'lucide-vue-next';
+import { Camera, ScanLine, Upload } from 'lucide-vue-next';
 import { FALLBACK_EXPENSE_TAX_RATES, type ExpenseTaxRateOption } from './fallbackTaxRates';
 
 type CategoryOption = { id: number; name: string };
@@ -53,6 +53,12 @@ const props = withDefaults(
 const categoryList = computed(() => props.categories);
 const supplierList = computed(() => props.supplier_options);
 const taxRateList = computed(() => (props.tax_rates?.length ? props.tax_rates : FALLBACK_EXPENSE_TAX_RATES));
+
+const page = usePage();
+const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
+const scanReceiptLoading = ref(false);
+const scanReceiptError = ref<string | null>(null);
+const scanReceiptApplied = ref(false);
 
 const schema = z
     .object({
@@ -168,6 +174,8 @@ const onReceiptChange = (event: Event) => {
     });
     receiptFiles.value = nextFiles;
     receiptPreviewUrls.value = nextFiles.map((file) => previewUrlFor(file));
+    scanReceiptError.value = null;
+    scanReceiptApplied.value = false;
     input.value = '';
 };
 
@@ -184,6 +192,89 @@ const clearReceipts = () => {
     });
     receiptFiles.value = [];
     receiptPreviewUrls.value = [];
+    scanReceiptApplied.value = false;
+    scanReceiptError.value = null;
+};
+
+const scanReceipt = async () => {
+    if (!aiEnabled.value || !receiptFiles.value.length || scanReceiptLoading.value) {
+        return;
+    }
+
+    const token = page.props.csrf_token as string | undefined;
+    if (!token) {
+        scanReceiptError.value = 'Unable to scan: missing security token. Refresh the page and try again.';
+        return;
+    }
+
+    scanReceiptLoading.value = true;
+    scanReceiptError.value = null;
+    scanReceiptApplied.value = false;
+
+    try {
+        const body = new FormData();
+        body.append('receipt', receiptFiles.value[0]);
+
+        const res = await fetch(route('expenses.parse-receipt'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': token,
+            },
+            body,
+        });
+
+        const payload = (await res.json().catch(() => null)) as {
+            data?: {
+                date?: string | null;
+                supplier_id?: number;
+                supplier?: string;
+                description?: string;
+                amount_excl_vat?: number | null;
+                vat_amount?: number | null;
+                vat_rate?: 'vat15' | 'vat0' | 'exempt' | 'no_vat' | null;
+                reference?: string;
+            };
+            message?: string;
+            errors?: Record<string, string[]>;
+        } | null;
+
+        if (!res.ok) {
+            const firstError = payload?.errors
+                ? Object.values(payload.errors).flat()[0]
+                : null;
+            scanReceiptError.value = firstError || payload?.message || 'Could not scan this receipt.';
+            return;
+        }
+
+        const data = payload?.data;
+        if (!data) {
+            scanReceiptError.value = 'Could not scan this receipt.';
+            return;
+        }
+
+        if (data.date) form.date = data.date;
+        if (typeof data.supplier_id === 'number' && data.supplier_id > 0) {
+            form.supplier_id = data.supplier_id;
+            form.supplier_custom = '';
+        } else if (data.supplier?.trim()) {
+            form.supplier_id = 0;
+            form.supplier_custom = data.supplier.trim();
+        }
+        if (data.description != null) form.description = data.description;
+        if (data.amount_excl_vat != null) form.amount_excl_vat = data.amount_excl_vat;
+        if (data.vat_amount != null) form.vat_amount = data.vat_amount;
+        if (data.vat_rate) form.vat_rate = data.vat_rate;
+        if (data.reference != null) form.reference = data.reference;
+
+        scanReceiptApplied.value = true;
+    } catch {
+        scanReceiptError.value = 'Could not reach the scanning service. Try again.';
+    } finally {
+        scanReceiptLoading.value = false;
+    }
 };
 
 const supplierSelectOptions = computed(() => [
@@ -282,6 +373,29 @@ const submit = () => {
                     <span class="hidden text-xs text-slate-500 sm:inline">Photos or PDFs</span>
                     <input type="file" accept="image/*,.pdf" multiple class="hidden" @change="onReceiptChange">
                 </label>
+
+                <div
+                    v-if="aiEnabled && receiptFiles.length"
+                    class="mt-2 flex flex-wrap items-center gap-2"
+                >
+                    <AppButton
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        :disabled="scanReceiptLoading"
+                        @click="scanReceipt"
+                    >
+                        <ScanLine class="mr-1.5 h-4 w-4" />
+                        {{ scanReceiptLoading ? 'Scanning…' : 'Scan receipt' }}
+                    </AppButton>
+                    <p class="text-xs text-slate-500">Uses the first file to fill date, supplier, amounts, and reference.</p>
+                </div>
+                <p v-if="scanReceiptApplied" class="mt-2 text-xs text-emerald-700">
+                    Applied from receipt — review the fields before saving.
+                </p>
+                <p v-if="scanReceiptError" class="mt-2 text-xs text-rose-700">
+                    {{ scanReceiptError }}
+                </p>
 
                 <ul v-if="receiptFiles.length" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                     <li

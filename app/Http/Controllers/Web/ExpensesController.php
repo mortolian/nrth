@@ -14,8 +14,10 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\TaxLine;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -239,6 +241,30 @@ class ExpensesController extends Controller
                 ['value' => 'no_vat', 'label' => 'No VAT', 'rate' => 0.0, 'claimable' => false],
             ],
             'sars_rate_per_km' => 4.84,
+        ]);
+    }
+
+    public function parseReceipt(Request $request, ParseExpenseReceipt $parser): JsonResponse
+    {
+        $team = $request->user()?->currentTeam;
+        abort_if($team === null, 403);
+
+        if (! $parser->enabledFor($team)) {
+            throw ValidationException::withMessages([
+                'receipt' => __('AI is not configured. Add an API key in Company settings → AI.'),
+            ]);
+        }
+
+        $validated = $request->validate([
+            'receipt' => ['required', 'file', 'max:10240'],
+        ]);
+
+        /** @var \Illuminate\Http\UploadedFile $file */
+        $file = $validated['receipt'];
+        $parsed = $parser->parse($file, $team);
+
+        return response()->json([
+            'data' => $parsed->toFormPayload(),
         ]);
     }
 

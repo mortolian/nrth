@@ -63,6 +63,7 @@ class SessionIdleTimeoutTest extends TestCase
             'default_tax_rate_id' => $settings['default_tax_rate_id'],
             'payment_pages_enabled' => $settings['payment_pages_enabled'],
             'session_idle_timeout_minutes' => $settings['session_idle_timeout_minutes'],
+            'ai' => $settings['ai'],
             'payment_gateways' => $settings['payment_gateways'],
             'bank_accounts' => [
                 [

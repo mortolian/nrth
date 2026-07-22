@@ -58,15 +58,17 @@ const props = defineProps<{
     vat_period_types: Array<{ value: string; label: string }>;
     bank_account_types: Array<{ value: string; label: string }>;
     session_lifetime_minutes: number;
+    ai_providers: Array<{ value: string; label: string }>;
+    ai_models_by_provider: Record<string, Array<{ value: string; label: string }>>;
 }>();
 
-type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages' | 'security';
+type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages' | 'security' | 'ai';
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security'];
+const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security', 'ai'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
 
@@ -120,6 +122,12 @@ const form = useForm({
     default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
     payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? true),
     session_idle_timeout_minutes: String(Number(props.settings.session_idle_timeout_minutes ?? 0)),
+    ai: {
+        provider: String((props.settings.ai as any)?.provider ?? 'openai'),
+        api_key: String((props.settings.ai as any)?.api_key ?? ''),
+        model: String((props.settings.ai as any)?.model ?? 'gpt-4o-mini'),
+        base_url: String((props.settings.ai as any)?.base_url ?? ''),
+    },
     payment_gateways: {
         payfast: {
             enabled: Boolean((props.settings.payment_gateways as any)?.payfast?.enabled ?? false),
@@ -275,6 +283,7 @@ const tabs = [
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
     { id: 'payment_pages' as const, label: 'Online payments' },
+    { id: 'ai' as const, label: 'AI' },
     { id: 'security' as const, label: 'Security' },
 ];
 
@@ -290,6 +299,41 @@ const idleTimeoutOptions = computed(() => {
 
     return presets.filter((option) => Number(option.value) <= max);
 });
+
+const aiModelOptions = computed(
+    () => props.ai_models_by_provider[form.ai.provider] ?? [],
+);
+
+const aiShowsBaseUrl = computed(() =>
+    ['openai_compatible', 'openrouter'].includes(form.ai.provider),
+);
+
+const aiApiKeyOptional = computed(() => form.ai.provider === 'openai_compatible');
+
+const aiAllowsCustomModel = computed(() =>
+    ['openrouter', 'openai_compatible'].includes(form.ai.provider),
+);
+
+const aiDefaultBaseUrls: Record<string, string> = {
+    openrouter: 'https://openrouter.ai/api/v1',
+    openai_compatible: 'http://127.0.0.1:11434/v1',
+};
+
+watch(
+    () => form.ai.provider,
+    (provider) => {
+        const models = props.ai_models_by_provider[provider] ?? [];
+        if (!models.some((option) => option.value === form.ai.model)) {
+            form.ai.model = models[0]?.value ?? '';
+        }
+        if (aiDefaultBaseUrls[provider] && !form.ai.base_url) {
+            form.ai.base_url = aiDefaultBaseUrls[provider];
+        }
+        if (!['openai_compatible', 'openrouter'].includes(provider)) {
+            form.ai.base_url = '';
+        }
+    },
+);
 
 const activeTaxRates = computed(() => props.tax_rates.filter((rate) => rate.is_active));
 const validTaxRateIds = computed(() => new Set(activeTaxRates.value.map((rate) => String(rate.id))));
@@ -340,6 +384,12 @@ const submit = () => {
         default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
         payment_pages_enabled: form.payment_pages_enabled,
         session_idle_timeout_minutes: Number(form.session_idle_timeout_minutes),
+        ai: {
+            provider: form.ai.provider,
+            api_key: form.ai.api_key,
+            model: form.ai.model,
+            base_url: form.ai.base_url,
+        },
         payment_gateways: {
             payfast: {
                 enabled: form.payment_gateways.payfast.enabled,
@@ -1085,6 +1135,76 @@ const removeBankAccount = (index: number) => {
                             <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.zapper.merchant_id" /></div>
                             <div><label class="mb-1 block text-xs text-slate-500">API key</label><AppInput v-model="form.payment_gateways.zapper.api_key" /></div>
                         </div>
+                    </div>
+                </div>
+            </AppCard>
+
+            <AppCard v-show="tab === 'ai'">
+                <h3 class="text-base font-semibold text-slate-900">AI</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Shared AI provider for features like expense receipt autofill. When those features run, files or text may be sent to the selected provider. For local tools like Ollama, choose OpenAI-compatible and set the base URL (e.g. http://127.0.0.1:11434/v1). Local vision models usually need images, not PDFs.
+                </p>
+                <div class="mt-4 grid max-w-2xl gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Provider</label>
+                        <AppSelect
+                            v-model="form.ai.provider"
+                            :options="ai_providers"
+                        />
+                        <p v-if="form.errors['ai.provider']" class="mt-1 text-xs text-rose-600">
+                            {{ form.errors['ai.provider'] }}
+                        </p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Model</label>
+                        <AppSelect
+                            v-if="!aiAllowsCustomModel"
+                            v-model="form.ai.model"
+                            :options="aiModelOptions"
+                        />
+                        <AppInput
+                            v-else
+                            v-model="form.ai.model"
+                            :list="'ai-model-suggestions-' + form.ai.provider"
+                            placeholder="Model id"
+                        />
+                        <datalist v-if="aiAllowsCustomModel" :id="'ai-model-suggestions-' + form.ai.provider">
+                            <option v-for="option in aiModelOptions" :key="option.value" :value="option.value" />
+                        </datalist>
+                        <p class="mt-2 text-xs text-slate-500">
+                            Vision-capable models are required for document and receipt features.
+                        </p>
+                        <p v-if="form.errors['ai.model']" class="mt-1 text-xs text-rose-600">
+                            {{ form.errors['ai.model'] }}
+                        </p>
+                    </div>
+                    <div v-if="aiShowsBaseUrl" class="md:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Base URL</label>
+                        <AppInput
+                            v-model="form.ai.base_url"
+                            placeholder="https://…"
+                            autocomplete="off"
+                        />
+                        <p class="mt-2 text-xs text-slate-500">
+                            Chat completions root ending in /v1. Example for Ollama: http://127.0.0.1:11434/v1.
+                        </p>
+                        <p v-if="form.errors['ai.base_url']" class="mt-1 text-xs text-rose-600">
+                            {{ form.errors['ai.base_url'] }}
+                        </p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-500">
+                            API key{{ aiApiKeyOptional ? ' (optional)' : '' }}
+                        </label>
+                        <AppInput
+                            v-model="form.ai.api_key"
+                            type="password"
+                            autocomplete="off"
+                            :placeholder="form.ai.provider === 'anthropic' ? 'sk-ant-…' : form.ai.provider === 'gemini' ? 'AIza…' : 'sk-…'"
+                        />
+                        <p v-if="form.errors['ai.api_key']" class="mt-1 text-xs text-rose-600">
+                            {{ form.errors['ai.api_key'] }}
+                        </p>
                     </div>
                 </div>
             </AppCard>

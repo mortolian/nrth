@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Settings;
 
+use App\Domain\Ai\AiCatalog;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
@@ -80,6 +81,13 @@ class CompanySettingsController extends Controller
                 ['value' => 'savings', 'label' => 'Savings'],
             ],
             'session_lifetime_minutes' => (int) config('session.lifetime'),
+            'ai_providers' => AiCatalog::providerOptions(),
+            'ai_models_by_provider' => collect(AiCatalog::modelsByProvider())
+                ->map(fn (array $models): array => collect($models)->map(fn (string $model): array => [
+                    'value' => $model,
+                    'label' => $model,
+                ])->all())
+                ->all(),
         ]);
     }
 
@@ -160,6 +168,21 @@ class CompanySettingsController extends Controller
                 'min:0',
                 'max:'.(int) config('session.lifetime'),
             ],
+            'ai' => ['required', 'array'],
+            'ai.provider' => ['required', 'string', Rule::in(AiCatalog::providers())],
+            'ai.api_key' => ['nullable', 'string', 'max:255'],
+            'ai.base_url' => ['nullable', 'string', 'max:255'],
+            'ai.model' => [
+                'required',
+                'string',
+                'max:128',
+                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+                    $provider = (string) $request->input('ai.provider', '');
+                    if (! is_string($value) || ! AiCatalog::isValidModel($provider, $value)) {
+                        $fail('The selected AI model is invalid for the chosen provider.');
+                    }
+                },
+            ],
             'payment_gateways' => ['required', 'array'],
             'payment_gateways.payfast' => ['required', 'array'],
             'payment_gateways.payfast.enabled' => ['required', 'boolean'],
@@ -230,6 +253,7 @@ class CompanySettingsController extends Controller
             'vat_registered', 'vat_period_type', 'default_tax_rate_id',
             'payment_pages_enabled',
             'session_idle_timeout_minutes',
+            'ai',
             'payment_gateways',
         ];
 
@@ -239,6 +263,26 @@ class CompanySettingsController extends Controller
                 $newSettings[$key] = $validated[$key];
             }
         }
+
+        if (isset($newSettings['ai']['api_key'])) {
+            $key = trim((string) $newSettings['ai']['api_key']);
+            $newSettings['ai']['api_key'] = $key !== '' ? $key : null;
+        }
+
+        $aiProvider = (string) ($newSettings['ai']['provider'] ?? '');
+        $baseUrl = trim((string) ($newSettings['ai']['base_url'] ?? ''));
+        if ($baseUrl === '' && AiCatalog::defaultBaseUrl($aiProvider)) {
+            $baseUrl = (string) AiCatalog::defaultBaseUrl($aiProvider);
+        }
+        if ($aiProvider === AiCatalog::PROVIDER_OPENAI_COMPATIBLE && $baseUrl === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'ai.base_url' => 'A base URL is required for OpenAI-compatible providers.',
+            ]);
+        }
+        if (! AiCatalog::showsBaseUrl($aiProvider)) {
+            $baseUrl = '';
+        }
+        $newSettings['ai']['base_url'] = $baseUrl !== '' ? rtrim($baseUrl, '/') : null;
 
         $newSettings = array_merge($newSettings, [
             'bank_name' => null,
@@ -255,7 +299,7 @@ class CompanySettingsController extends Controller
             $team->mergedCompanySettings(),
             $newSettings
         );
-        foreach (['quote_prefix', 'quote_number_include_month', 'quote_number_use_random_suffix'] as $legacyKey) {
+        foreach (['quote_prefix', 'quote_number_include_month', 'quote_number_use_random_suffix', 'receipt_scan'] as $legacyKey) {
             unset($mergedSettings[$legacyKey]);
         }
         $team->company_settings = $mergedSettings;
@@ -283,7 +327,7 @@ class CompanySettingsController extends Controller
         }
 
         $tab = (string) $request->input('tab', 'profile');
-        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security'], true)) {
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security', 'ai'], true)) {
             $tab = 'profile';
         }
 

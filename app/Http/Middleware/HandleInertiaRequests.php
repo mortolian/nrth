@@ -63,6 +63,7 @@ class HandleInertiaRequests extends Middleware
             'session_idle_timeout_minutes' => fn () => (int) (
                 $request->user()?->currentTeam?->mergedCompanySettings()['session_idle_timeout_minutes'] ?? 0
             ),
+            'ai_enabled' => fn () => (bool) $request->user()?->currentTeam?->aiEnabled(),
             'can_manage_backups' => fn () => $request->user() !== null
                 && Gate::forUser($request->user())->allows('manageInstanceBackups'),
             'can_access_backups_exports' => function () use ($request) {

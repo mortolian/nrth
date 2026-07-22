@@ -89,6 +89,7 @@ Route::middleware([
     });
     Route::get('/expenses', [ExpensesController::class, 'index'])->name('expenses.index');
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
+    Route::post('/expenses/parse-receipt', [ExpensesController::class, 'parseReceipt'])->name('expenses.parse-receipt');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
     Route::get('/expenses/{transaction}/edit', [ExpensesController::class, 'edit'])->name('expenses.edit');
     Route::put('/expenses/{transaction}', [ExpensesController::class, 'update'])->name('expenses.update');

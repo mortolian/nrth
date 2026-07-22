@@ -39,4 +39,35 @@ return [
         'sandbox' => env('PAYFAST_SANDBOX', true),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', env('OPENAI_RECEIPT_MODEL', 'gpt-4o-mini')),
+    ],
+
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', env('ANTHROPIC_RECEIPT_MODEL', 'claude-haiku-4-5')),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
+    'openrouter' => [
+        'api_key' => env('OPENROUTER_API_KEY'),
+        'model' => env('OPENROUTER_MODEL', 'openai/gpt-4o-mini'),
+        'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+    ],
+
+    'openai_compatible' => [
+        'api_key' => env('OPENAI_COMPATIBLE_API_KEY'),
+        'model' => env('OPENAI_COMPATIBLE_MODEL'),
+        'base_url' => env('OPENAI_COMPATIBLE_BASE_URL'),
+    ],
+
+    'ai' => [
+        'provider' => env('AI_PROVIDER', env('RECEIPT_SCAN_PROVIDER', 'openai')),
+    ],
+
 ];
