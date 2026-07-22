@@ -8,6 +8,7 @@ import { Camera, Plus, ScanLine, Upload, X } from 'lucide-vue-next';
 import { FALLBACK_EXPENSE_TAX_RATES, type ExpenseTaxRateOption } from './fallbackTaxRates';
 
 type CategoryOption = { id: number; name: string };
+type PaidFromOption = { id: number; code: string; name: string };
 type SupplierOption = { id: number; name: string };
 type TaxRateOption = ExpenseTaxRateOption;
 
@@ -21,7 +22,7 @@ type ExpenseFormRow = {
     amount_excl_vat: number;
     vat_rate: 'vat15' | 'vat0' | 'exempt' | 'no_vat';
     vat_amount: number;
-    payment_method: 'business_account' | 'personal_reimbursable' | 'credit_card';
+    paid_from_account_id: number;
     reference: string;
     notes: string;
     office_percentage: number;
@@ -32,9 +33,10 @@ type ExpenseFormRow = {
 const props = withDefaults(
     defineProps<{
         isEditing: boolean;
-        expense: ExpenseFormRow | null;
+        expense: ExpenseFormProps | null;
         prefill: { supplier_id: number; supplier_custom: string } | null;
         categories: CategoryOption[];
+        paid_from_options: PaidFromOption[];
         supplier_options: SupplierOption[];
         tax_rates: TaxRateOption[];
         sars_rate_per_km: number;
@@ -44,6 +46,7 @@ const props = withDefaults(
         expense: null,
         prefill: null,
         categories: () => [],
+        paid_from_options: () => [],
         supplier_options: () => [],
         tax_rates: () => FALLBACK_EXPENSE_TAX_RATES,
         sars_rate_per_km: 4.84,
@@ -51,6 +54,7 @@ const props = withDefaults(
 );
 
 const categoryList = computed(() => props.categories);
+const paidFromList = computed(() => props.paid_from_options);
 const createdSuppliers = ref<SupplierOption[]>([]);
 const supplierList = computed(() => {
     const byId = new Map<number, SupplierOption>();
@@ -61,6 +65,15 @@ const supplierList = computed(() => {
     return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 });
 const taxRateList = computed(() => (props.tax_rates?.length ? props.tax_rates : FALLBACK_EXPENSE_TAX_RATES));
+
+const defaultPaidFromAccountId = (): number => {
+    const bank = paidFromList.value.find((option) => option.code === '1010');
+    if (bank) {
+        return bank.id;
+    }
+
+    return paidFromList.value[0]?.id ?? 0;
+};
 
 const page = usePage();
 const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
@@ -81,7 +94,7 @@ const schema = z
         amount_excl_vat: z.coerce.number().min(0),
         vat_rate: z.enum(['vat15', 'vat0', 'exempt', 'no_vat']),
         vat_amount: z.coerce.number().min(0),
-        payment_method: z.enum(['business_account', 'personal_reimbursable', 'credit_card']),
+        paid_from_account_id: z.coerce.number().int().positive(),
         reference: z.string().optional(),
         notes: z.string().optional(),
         office_percentage: z.coerce.number().min(0).max(100).optional(),
@@ -105,7 +118,7 @@ const initialFromProps = () => {
             amount_excl_vat: e.amount_excl_vat,
             vat_rate: e.vat_rate,
             vat_amount: e.vat_amount,
-            payment_method: e.payment_method,
+            paid_from_account_id: e.paid_from_account_id || defaultPaidFromAccountId(),
             reference: e.reference,
             notes: e.notes,
             office_percentage: e.office_percentage,
@@ -123,7 +136,7 @@ const initialFromProps = () => {
         amount_excl_vat: 0,
         vat_rate: 'vat15' as const,
         vat_amount: 0,
-        payment_method: 'business_account' as const,
+        paid_from_account_id: defaultPaidFromAccountId(),
         reference: '',
         notes: '',
         office_percentage: 15,
@@ -465,7 +478,7 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
     data.set('amount_excl_vat_cents', String(Math.round(parsed.amount_excl_vat * 100)));
     data.set('vat_rate', parsed.vat_rate);
     data.set('vat_amount_cents', String(Math.round(parsed.vat_amount * 100)));
-    data.set('payment_method', parsed.payment_method);
+    data.set('paid_from_account_id', String(parsed.paid_from_account_id));
     data.set('reference', parsed.reference ?? '');
     data.set('notes', parsed.notes ?? '');
     if (isHomeOffice.value) data.set('office_percentage', String(parsed.office_percentage ?? 0));
@@ -502,7 +515,7 @@ const snapshotForm = () => ({
     amount_excl_vat: Number(form.amount_excl_vat || 0),
     vat_rate: form.vat_rate,
     vat_amount: Number(form.vat_amount || 0),
-    payment_method: form.payment_method,
+    paid_from_account_id: Number(form.paid_from_account_id || 0),
     reference: String(form.reference ?? ''),
     notes: String(form.notes ?? ''),
     office_percentage: Number(form.office_percentage || 0),
@@ -778,7 +791,7 @@ const submit = () => {
                 @click="showAdvanced = !showAdvanced"
             >
                 {{ showAdvanced ? 'Hide' : 'More options' }}
-                <span class="text-xs text-slate-500">(VAT, payment, notes)</span>
+                <span class="text-xs text-slate-500">(VAT, paid from, notes)</span>
             </button>
 
             <div :class="['mt-4 grid gap-4 md:grid-cols-2', !showAdvanced && 'max-md:hidden']">
@@ -799,16 +812,13 @@ const submit = () => {
                     <AppInput :model-value="formatCents(totalCents)" disabled />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Payment method</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Paid from</label>
                     <AppSelect
-                        :model-value="form.payment_method"
-                        :options="[
-                            { label: 'Business account', value: 'business_account' },
-                            { label: 'Personal reimbursable', value: 'personal_reimbursable' },
-                            { label: 'Credit card', value: 'credit_card' },
-                        ]"
-                        @update:model-value="form.payment_method = $event as 'business_account' | 'personal_reimbursable' | 'credit_card'"
+                        :model-value="String(form.paid_from_account_id)"
+                        :options="paidFromList.map((option) => ({ label: option.name, value: String(option.id) }))"
+                        @update:model-value="form.paid_from_account_id = Number($event)"
                     />
+                    <p class="mt-1 text-xs text-slate-500">Which balance sheet account this expense is paid from or owed on.</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Reference</label>

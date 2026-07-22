@@ -17,11 +17,11 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
-use App\Models\Team;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -179,74 +179,24 @@ class ExpensesController extends Controller
                 'supplier_id' => $prefillSupplierId > 0 ? $prefillSupplierId : 0,
                 'supplier_custom' => $prefillSupplierId > 0 ? '' : $prefillSupplierCustom,
             ],
-            'categories' => Account::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('type', AccountType::Expense->value)
-                ->where('is_active', true)
-                ->orderBy('code')
-                ->get(['id', 'code', 'name'])
-                ->map(fn (Account $account) => [
-                    'id' => $account->id,
-                    'name' => trim($account->code.' - '.$account->name),
-                ])
-                ->all(),
-            'supplier_options' => Supplier::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Supplier $supplier) => [
-                    'id' => $supplier->id,
-                    'name' => $supplier->name,
-                ])
-                ->all(),
-            'tax_rates' => [
-                ['value' => 'vat15', 'label' => 'VAT 15%', 'rate' => 0.15, 'claimable' => true],
-                ['value' => 'vat0', 'label' => 'VAT 0%', 'rate' => 0.0, 'claimable' => true],
-                ['value' => 'exempt', 'label' => 'Exempt', 'rate' => 0.0, 'claimable' => false],
-                ['value' => 'no_vat', 'label' => 'No VAT', 'rate' => 0.0, 'claimable' => false],
-            ],
-            'sars_rate_per_km' => 4.84,
+            ...$this->expenseFormSharedProps($teamId),
         ]);
     }
 
     public function edit(Request $request, Transaction $transaction): Response
     {
         $transaction = $this->resolveTeamExpense($request, $transaction);
-        $teamId = (int) $request->user()->current_team_id;
+        $team = $request->user()?->currentTeam;
+        abort_if($team === null, 403);
+        (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+
+        $teamId = (int) $team->id;
 
         return Inertia::render('Expenses/Form', [
             'isEditing' => true,
             'expense' => $this->serializeExpenseForForm($transaction),
             'prefill' => null,
-            'categories' => Account::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('type', AccountType::Expense->value)
-                ->where('is_active', true)
-                ->orderBy('code')
-                ->get(['id', 'code', 'name'])
-                ->map(fn (Account $account) => [
-                    'id' => $account->id,
-                    'name' => trim($account->code.' - '.$account->name),
-                ])
-                ->all(),
-            'supplier_options' => Supplier::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Supplier $supplier) => [
-                    'id' => $supplier->id,
-                    'name' => $supplier->name,
-                ])
-                ->all(),
-            'tax_rates' => [
-                ['value' => 'vat15', 'label' => 'VAT 15%', 'rate' => 0.15, 'claimable' => true],
-                ['value' => 'vat0', 'label' => 'VAT 0%', 'rate' => 0.0, 'claimable' => true],
-                ['value' => 'exempt', 'label' => 'Exempt', 'rate' => 0.0, 'claimable' => false],
-                ['value' => 'no_vat', 'label' => 'No VAT', 'rate' => 0.0, 'claimable' => false],
-            ],
-            'sars_rate_per_km' => 4.84,
+            ...$this->expenseFormSharedProps($teamId),
         ]);
     }
 
@@ -265,7 +215,7 @@ class ExpensesController extends Controller
             'receipt' => ['required', 'file', 'max:10240'],
         ]);
 
-        /** @var \Illuminate\Http\UploadedFile $file */
+        /** @var UploadedFile $file */
         $file = $validated['receipt'];
         $parsed = $parser->parse($file, $team);
 
@@ -292,13 +242,13 @@ class ExpensesController extends Controller
         $vatAmountCents = $normalized[1];
         $isVatClaimable = $normalized[3];
 
-        $creditAccount = $this->resolveCreditAccount($teamId, $payload['payment_method']);
+        $creditAccount = $this->resolvePaidFromAccount($teamId, (int) $payload['paid_from_account_id']);
         $vatInputAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('code', '1200')
             ->first();
 
-        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload);
+        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $creditAccount);
 
         $transaction = DB::transaction(function () use ($payload, $teamId, $userId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): Transaction {
             $transaction = Transaction::queryWithoutTeamScope()->create([
@@ -355,13 +305,13 @@ class ExpensesController extends Controller
         $vatAmountCents = $normalized[1];
         $isVatClaimable = $normalized[3];
 
-        $creditAccount = $this->resolveCreditAccount($teamId, $payload['payment_method']);
+        $creditAccount = $this->resolvePaidFromAccount($teamId, (int) $payload['paid_from_account_id']);
         $vatInputAccount = Account::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('code', '1200')
             ->first();
 
-        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload);
+        $expenseMeta = $this->buildExpenseMeta($categoryAccount, $payload, $creditAccount);
 
         DB::transaction(function () use ($transaction, $payload, $teamId, $categoryAccount, $creditAccount, $vatInputAccount, $isVatClaimable, $amountExclCents, $vatAmountCents, $postTransactionAction, $supplierIdToSave, $reference, $expenseMeta): void {
             $transaction->forceFill([
@@ -472,7 +422,15 @@ class ExpensesController extends Controller
             'amount_excl_vat_cents' => ['required', 'integer', 'min:0'],
             'vat_rate' => ['required', Rule::in(['vat15', 'vat0', 'exempt', 'no_vat'])],
             'vat_amount_cents' => ['required', 'integer', 'min:0'],
-            'payment_method' => ['required', Rule::in(['business_account', 'personal_reimbursable', 'credit_card'])],
+            'paid_from_account_id' => [
+                'required',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($query) use ($teamId): void {
+                    $query->where('team_id', $teamId)
+                        ->where('is_active', true)
+                        ->whereIn('type', [AccountType::Asset->value, AccountType::Liability->value]);
+                }),
+            ],
             'reference' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'office_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -585,11 +543,12 @@ class ExpensesController extends Controller
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>|null
      */
-    private function buildExpenseMeta(Account $categoryAccount, array $payload): ?array
+    private function buildExpenseMeta(Account $categoryAccount, array $payload, Account $paidFromAccount): ?array
     {
         $name = strtolower($categoryAccount->name);
         $meta = [
-            'payment_method' => $payload['payment_method'],
+            'paid_from_account_id' => $paidFromAccount->id,
+            'paid_from_account_name' => trim($paidFromAccount->code.' - '.$paidFromAccount->name),
             'external_reference' => trim((string) ($payload['reference'] ?? '')),
             'notes' => trim((string) ($payload['notes'] ?? '')),
         ];
@@ -604,51 +563,138 @@ class ExpensesController extends Controller
         return $meta;
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function resolveCreditAccount(int $teamId, string $paymentMethod): Account
+    private function resolvePaidFromAccount(int $teamId, int $accountId): Account
     {
-        $creditCode = match ($paymentMethod) {
-            'business_account' => '1010',
-            'personal_reimbursable', 'credit_card' => '2000',
-            default => '1010',
-        };
-        $creditAccount = Account::queryWithoutTeamScope()
+        $account = Account::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->where('code', $creditCode)
+            ->whereKey($accountId)
             ->first();
 
-        if ($creditAccount === null) {
-            $team = Team::query()->find($teamId);
-            if ($team !== null) {
-                (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
-                $creditAccount = Account::queryWithoutTeamScope()
-                    ->where('team_id', $teamId)
-                    ->where('code', $creditCode)
-                    ->first();
-            }
-        }
-
-        if ($creditAccount === null) {
-            $label = match ($paymentMethod) {
-                'business_account' => __('Bank (chart code 1010)'),
-                'personal_reimbursable', 'credit_card' => __('Accounts Payable (chart code 2000)'),
-                default => __('the payment account'),
-            };
-
+        if ($account === null) {
             throw ValidationException::withMessages([
-                'payment_method' => __('Missing :account for this payment method. Open Chart of accounts and add it, or restore the default chart.', [
-                    'account' => $label,
-                ]),
+                'paid_from_account_id' => __('Select a valid paid-from account for this company.'),
             ]);
         }
 
-        if (! $creditAccount->is_active) {
-            $creditAccount->forceFill(['is_active' => true])->save();
+        if (! $account->is_active) {
+            throw ValidationException::withMessages([
+                'paid_from_account_id' => __('That paid-from account is inactive.'),
+            ]);
         }
 
-        return $creditAccount;
+        if (! in_array($account->type, [AccountType::Asset, AccountType::Liability], true)) {
+            throw ValidationException::withMessages([
+                'paid_from_account_id' => __('Paid from must be an asset or liability account.'),
+            ]);
+        }
+
+        return $account;
+    }
+
+    /**
+     * @return array{
+     *   categories: list<array{id: int, name: string}>,
+     *   paid_from_options: list<array{id: int, code: string, name: string}>,
+     *   supplier_options: list<array{id: int, name: string}>,
+     *   tax_rates: list<array{value: string, label: string, rate: float, claimable: bool}>,
+     *   sars_rate_per_km: float
+     * }
+     */
+    private function expenseFormSharedProps(int $teamId): array
+    {
+        return [
+            'categories' => Account::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('type', AccountType::Expense->value)
+                ->where('is_active', true)
+                ->orderBy('code')
+                ->get(['id', 'code', 'name'])
+                ->map(fn (Account $account) => [
+                    'id' => $account->id,
+                    'name' => trim($account->code.' - '.$account->name),
+                ])
+                ->all(),
+            'paid_from_options' => $this->paidFromAccountOptions($teamId),
+            'supplier_options' => Supplier::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Supplier $supplier) => [
+                    'id' => $supplier->id,
+                    'name' => $supplier->name,
+                ])
+                ->all(),
+            'tax_rates' => [
+                ['value' => 'vat15', 'label' => 'VAT 15%', 'rate' => 0.15, 'claimable' => true],
+                ['value' => 'vat0', 'label' => 'VAT 0%', 'rate' => 0.0, 'claimable' => true],
+                ['value' => 'exempt', 'label' => 'Exempt', 'rate' => 0.0, 'claimable' => false],
+                ['value' => 'no_vat', 'label' => 'No VAT', 'rate' => 0.0, 'claimable' => false],
+            ],
+            'sars_rate_per_km' => 4.84,
+        ];
+    }
+
+    /**
+     * Preferred: Bank 1010, Petty cash 1020, Accounts Payable 2000.
+     * Also include other active cash/bank/payable-style Asset/Liability accounts.
+     *
+     * @return list<array{id: int, code: string, name: string}>
+     */
+    private function paidFromAccountOptions(int $teamId): array
+    {
+        $preferredCodes = ['1010', '1020', '2000'];
+        $excludedCodes = ['1000', '1100', '1200', '2100', '2200'];
+
+        $accounts = Account::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('is_active', true)
+            ->whereIn('type', [AccountType::Asset->value, AccountType::Liability->value])
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'type']);
+
+        $eligible = $accounts->filter(function (Account $account) use ($preferredCodes, $excludedCodes): bool {
+            if (in_array($account->code, $preferredCodes, true)) {
+                return true;
+            }
+
+            if (in_array($account->code, $excludedCodes, true)) {
+                return false;
+            }
+
+            $haystack = strtolower($account->code.' '.$account->name);
+
+            if ($account->type === AccountType::Asset) {
+                return str_contains($haystack, 'bank')
+                    || str_contains($haystack, 'cash')
+                    || str_contains($haystack, 'petty')
+                    || (bool) preg_match('/^10\d{2}$/', $account->code);
+            }
+
+            return str_contains($haystack, 'payable')
+                || str_contains($haystack, 'creditor')
+                || str_contains($haystack, 'credit card')
+                || (bool) preg_match('/^20\d{2}$/', $account->code);
+        });
+
+        $byCode = $eligible->keyBy('code');
+        $ordered = collect();
+        foreach ($preferredCodes as $code) {
+            if ($byCode->has($code)) {
+                $ordered->push($byCode->get($code));
+                $byCode->forget($code);
+            }
+        }
+        $ordered = $ordered->concat($byCode->sortBy('code')->values());
+
+        return $ordered
+            ->map(fn (Account $account) => [
+                'id' => $account->id,
+                'code' => $account->code,
+                'name' => trim($account->code.' - '.$account->name),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -742,17 +788,8 @@ class ExpensesController extends Controller
             $vatRate = 'vat0';
         }
 
-        $paymentMethod = 'business_account';
-        if ($creditLine?->account?->code === '2000') {
-            $paymentMethod = (string) ($transaction->expense_meta['payment_method'] ?? 'personal_reimbursable');
-            if (! in_array($paymentMethod, ['personal_reimbursable', 'credit_card'], true)) {
-                $paymentMethod = 'personal_reimbursable';
-            }
-        } elseif ($creditLine?->account?->code === '1010') {
-            $paymentMethod = 'business_account';
-        }
-
         $meta = $transaction->expense_meta ?? [];
+        $paidFromAccountId = $this->resolvePaidFromAccountIdForForm($transaction, $creditLine);
 
         return [
             'id' => $transaction->id,
@@ -764,13 +801,42 @@ class ExpensesController extends Controller
             'amount_excl_vat' => $amountExclCents / 100,
             'vat_rate' => $vatRate,
             'vat_amount' => $vatAmountCents / 100,
-            'payment_method' => $paymentMethod,
+            'paid_from_account_id' => $paidFromAccountId,
             'reference' => (string) ($meta['external_reference'] ?? ''),
             'notes' => (string) ($meta['notes'] ?? ''),
             'office_percentage' => (float) ($meta['office_percentage'] ?? 15),
             'distance_km' => (float) ($meta['distance_km'] ?? 0),
             'rate_per_km' => (float) ($meta['rate_per_km'] ?? 4.84),
         ];
+    }
+
+    /**
+     * Prefer stored meta, then credit journal line, then legacy payment_method → 1010/2000.
+     */
+    private function resolvePaidFromAccountIdForForm(Transaction $transaction, ?JournalEntry $creditLine): int
+    {
+        $meta = $transaction->expense_meta ?? [];
+        $fromMeta = (int) ($meta['paid_from_account_id'] ?? 0);
+        if ($fromMeta > 0) {
+            return $fromMeta;
+        }
+
+        if ($creditLine?->account_id) {
+            return (int) $creditLine->account_id;
+        }
+
+        $legacyMethod = (string) ($meta['payment_method'] ?? 'business_account');
+        $code = match ($legacyMethod) {
+            'personal_reimbursable', 'credit_card' => '2000',
+            default => '1010',
+        };
+
+        $account = Account::queryWithoutTeamScope()
+            ->where('team_id', $transaction->team_id)
+            ->where('code', $code)
+            ->first();
+
+        return $account !== null ? (int) $account->id : 0;
     }
 
     private function resolveTeamExpense(Request $request, Transaction $transaction): Transaction

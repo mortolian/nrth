@@ -142,7 +142,7 @@ class SupplierTest extends TestCase
         $this->actingTeamContext($user, $team);
 
         Account::factory()->for($team)->expense()->create(['code' => '7500', 'name' => 'General expense']);
-        Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
+        $bank = Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
 
         $supplier = Supplier::factory()->for($team)->create(['name' => 'Ledger Supplier']);
 
@@ -162,7 +162,7 @@ class SupplierTest extends TestCase
             'amount_excl_vat_cents' => 100_00,
             'vat_rate' => 'no_vat',
             'vat_amount_cents' => 0,
-            'payment_method' => 'business_account',
+            'paid_from_account_id' => $bank->id,
         ])->assertRedirect(route('expenses.index'));
 
         $txn = Transaction::queryWithoutTeamScope()
