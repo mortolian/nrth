@@ -19,7 +19,8 @@ final class CreateBankingAccountAction
      *     account_number_last4?: string|null,
      *     currency?: string,
      *     type?: string|null,
-     *     gl_account_id: int
+     *     gl_account_id: int,
+     *     is_active?: bool
      * }  $data
      */
     public function execute(array $data): BankingAccount
@@ -36,7 +37,7 @@ final class CreateBankingAccountAction
             'account_number_last4' => $data['account_number_last4'] ?? null,
             'currency' => $data['currency'] ?? 'ZAR',
             'type' => $data['type'] ?? null,
-            'is_active' => true,
+            'is_active' => (bool) ($data['is_active'] ?? true),
             'gl_account_id' => $gl->id,
         ]));
     }

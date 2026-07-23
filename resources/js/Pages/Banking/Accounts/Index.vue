@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -17,6 +17,21 @@ type AccountRow = {
     gl_label: string | null;
 };
 
+const ACCOUNT_TYPE_OPTIONS = [
+    { value: 'cheque', label: 'Cheque / current' },
+    { value: 'savings', label: 'Savings' },
+    { value: 'credit_card', label: 'Credit card' },
+    { value: 'cash', label: 'Cash' },
+    { value: 'money_market', label: 'Money market' },
+    { value: 'loan', label: 'Loan' },
+    { value: 'investment', label: 'Investment' },
+    { value: 'other', label: 'Other' },
+] as const;
+
+const KNOWN_TYPE_VALUES = new Set(
+    ACCOUNT_TYPE_OPTIONS.map((option) => option.value).filter((value) => value !== 'other'),
+);
+
 const props = defineProps<{
     accounts: AccountRow[];
     gl_options: GlOption[];
@@ -24,19 +39,28 @@ const props = defineProps<{
 
 const showForm = ref(false);
 const editingId = ref<number | null>(null);
+const typeChoice = ref('cheque');
+const customType = ref('');
 
 const form = useForm({
     name: '',
     bank_name: '',
     account_number_last4: '',
     currency: 'ZAR',
-    type: '',
+    type: 'cheque',
     gl_account_id: '' as string | number,
     is_active: true,
 });
 
 const editingAccount = computed(() =>
     editingId.value === null ? null : props.accounts.find((row) => row.id === editingId.value) ?? null,
+);
+
+const typeSelectOptions = computed(() =>
+    ACCOUNT_TYPE_OPTIONS.map((option) => ({
+        label: option.label,
+        value: option.value,
+    })),
 );
 
 const glSelectOptions = computed(() => {
@@ -58,12 +82,65 @@ const glSelectOptions = computed(() => {
     return options;
 });
 
+const typeLabel = (type: string | null): string => {
+    if (!type) {
+        return '—';
+    }
+    const known = ACCOUNT_TYPE_OPTIONS.find((option) => option.value === type);
+    if (known && known.value !== 'other') {
+        return known.label;
+    }
+
+    return type;
+};
+
+const syncTypeFromChoice = () => {
+    if (typeChoice.value === 'other') {
+        form.type = customType.value.trim();
+        return;
+    }
+    form.type = typeChoice.value;
+};
+
+watch(typeChoice, () => {
+    if (typeChoice.value !== 'other') {
+        customType.value = '';
+    }
+    syncTypeFromChoice();
+});
+
+watch(customType, () => {
+    if (typeChoice.value === 'other') {
+        syncTypeFromChoice();
+    }
+});
+
+const applyStoredType = (type: string | null) => {
+    const value = (type ?? '').trim();
+    if (value !== '' && KNOWN_TYPE_VALUES.has(value)) {
+        typeChoice.value = value;
+        customType.value = '';
+        form.type = value;
+        return;
+    }
+    if (value === '') {
+        typeChoice.value = 'cheque';
+        customType.value = '';
+        form.type = 'cheque';
+        return;
+    }
+    typeChoice.value = 'other';
+    customType.value = value;
+    form.type = value;
+};
+
 const resetForm = () => {
     form.reset();
     form.clearErrors();
     form.currency = 'ZAR';
     form.is_active = true;
     form.gl_account_id = '';
+    applyStoredType('cheque');
     editingId.value = null;
 };
 
@@ -79,7 +156,7 @@ const openEdit = (account: AccountRow) => {
     form.bank_name = account.bank_name ?? '';
     form.account_number_last4 = account.account_number_last4 ?? '';
     form.currency = account.currency;
-    form.type = account.type ?? '';
+    applyStoredType(account.type);
     form.gl_account_id = account.gl_account_id ? String(account.gl_account_id) : '';
     form.is_active = account.is_active;
     form.clearErrors();
@@ -91,12 +168,15 @@ const cancelForm = () => {
 };
 
 const submit = () => {
+    syncTypeFromChoice();
+    const resolvedType = form.type.trim() === '' ? null : form.type.trim();
+
     const payload = {
         name: form.name,
         bank_name: form.bank_name || null,
         account_number_last4: form.account_number_last4 || null,
         currency: form.currency || 'ZAR',
-        type: form.type || null,
+        type: resolvedType,
         gl_account_id: Number(form.gl_account_id),
         is_active: form.is_active,
     };
@@ -118,6 +198,7 @@ const submit = () => {
         currency: payload.currency,
         type: payload.type,
         gl_account_id: payload.gl_account_id,
+        is_active: payload.is_active,
     })).post(route('banking.accounts.store'), {
         preserveScroll: true,
         onSuccess: () => {
@@ -129,80 +210,92 @@ const submit = () => {
 
 <template>
     <AppLayout
-        title="Banking accounts"
+        :title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
         :breadcrumbs="[
             { label: 'Banking' },
-            { label: 'Accounts' },
+            { label: 'Accounts', href: showForm ? route('banking.accounts.index') : undefined },
+            ...(showForm ? [{ label: editingId ? 'Edit' : 'Create' }] : []),
         ]"
     >
-        <PageHeader title="Banking accounts">
-            <template #actions>
+        <PageHeader
+            :title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
+            :subtitle="showForm ? undefined : 'Used for statement import and for posting expenses and invoice payments once linked to a ledger account.'"
+        >
+            <template v-if="!showForm" #actions>
                 <AppButton variant="secondary" @click="router.visit(route('banking.transactions.index'))">
                     View transactions
                 </AppButton>
                 <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
                     Import statement
                 </AppButton>
-                <AppButton variant="primary" @click="showForm ? cancelForm() : openCreate()">
-                    {{ showForm ? 'Cancel' : 'New account' }}
+                <AppButton variant="primary" @click="openCreate()">
+                    New account
                 </AppButton>
             </template>
         </PageHeader>
 
-        <p class="mt-3 max-w-3xl text-sm text-slate-600">
-            Banking accounts are used for statement import and for posting expenses and invoice payments once linked to a ledger account.
-        </p>
-
         <AppCard v-if="showForm" class="mt-5">
-            <h2 class="text-sm font-semibold text-slate-900">
-                {{ editingId ? 'Edit banking account' : 'Create banking account' }}
-            </h2>
-            <form class="mt-4 grid gap-4 md:grid-cols-2" @submit.prevent="submit">
+            <form class="grid max-w-xl gap-5" @submit.prevent="submit">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Name</label>
                     <AppInput v-model="form.name" required />
-                    <p v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</p>
+                    <p v-if="form.errors.name" class="mt-1.5 text-xs text-red-600">{{ form.errors.name }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Bank name</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Bank name</label>
                     <AppInput v-model="form.bank_name" />
                 </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Last 4 digits</label>
-                    <AppInput v-model="form.account_number_last4" maxlength="4" />
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-500">Last 4 digits</label>
+                        <AppInput v-model="form.account_number_last4" maxlength="4" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-500">Currency</label>
+                        <AppInput v-model="form.currency" maxlength="3" />
+                    </div>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
-                    <AppInput v-model="form.currency" maxlength="3" />
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Type</label>
+                    <AppSelect v-model="typeChoice" :options="typeSelectOptions" />
+                    <div class="mt-2 min-h-10">
+                        <AppInput
+                            v-if="typeChoice === 'other'"
+                            v-model="customType"
+                            placeholder="Describe the account type"
+                            maxlength="50"
+                        />
+                    </div>
+                    <p v-if="form.errors.type" class="mt-1.5 text-xs text-red-600">{{ form.errors.type }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
-                    <AppInput v-model="form.type" placeholder="cheque, savings, credit_card, cash..." />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Ledger account</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Ledger account</label>
                     <AppSelect
                         :model-value="String(form.gl_account_id || '')"
                         :options="glSelectOptions"
                         placeholder="Select GL account"
                         @update:model-value="form.gl_account_id = $event"
                     />
-                    <p class="mt-1 text-xs text-slate-500">Required for expense Paid from and invoice Paid into.</p>
-                    <p v-if="form.errors.gl_account_id" class="mt-1 text-xs text-red-600">{{ form.errors.gl_account_id }}</p>
+                    <p class="mt-1.5 text-xs text-slate-500">Required for expense Paid from and invoice Paid into.</p>
+                    <p v-if="form.errors.gl_account_id" class="mt-1.5 text-xs text-red-600">{{ form.errors.gl_account_id }}</p>
                 </div>
-                <div v-if="editingId" class="md:col-span-2 flex items-center gap-2">
+                <div class="flex min-h-10 items-center gap-2">
                     <input id="banking-active" v-model="form.is_active" type="checkbox" class="rounded border-slate-300">
-                    <label for="banking-active" class="text-sm text-slate-700">Active</label>
+                    <label for="banking-active" class="text-sm text-slate-700">Account is active</label>
                 </div>
-                <div class="md:col-span-2">
+
+                <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
                     <AppButton type="submit" variant="primary" :disabled="form.processing">
                         {{ editingId ? 'Save changes' : 'Save account' }}
+                    </AppButton>
+                    <AppButton type="button" variant="ghost" :disabled="form.processing" @click="cancelForm">
+                        Cancel
                     </AppButton>
                 </div>
             </form>
         </AppCard>
 
-        <AppCard class="mt-5">
+        <AppCard v-else class="mt-5">
             <AppTable
                 v-if="accounts.length"
                 :columns="[
@@ -221,7 +314,7 @@ const submit = () => {
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.bank_name || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.account_number_last4 || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.currency }}</td>
-                    <td class="px-4 py-3 text-sm text-slate-600">{{ account.type || '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-600">{{ typeLabel(account.type) }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.gl_label || 'Not linked' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.is_active ? 'Active' : 'Inactive' }}</td>
                     <td class="px-4 py-3 text-right">

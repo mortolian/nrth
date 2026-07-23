@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
 type AccountOption = {
@@ -9,7 +10,7 @@ type AccountOption = {
     currency: string;
 };
 
-defineProps<{
+const props = defineProps<{
     accounts: AccountOption[];
 }>();
 
@@ -20,6 +21,13 @@ const form = useForm<{
     account_id: '',
     file: null,
 });
+
+const accountSelectOptions = computed(() =>
+    props.accounts.map((account) => ({
+        label: account.bank_name ? `${account.name} (${account.bank_name})` : account.name,
+        value: String(account.id),
+    })),
+);
 
 const onFileChange = (event: Event) => {
     const input = event.target as HTMLInputElement;
@@ -38,52 +46,57 @@ const submit = () => {
         title="Import bank statement"
         :breadcrumbs="[
             { label: 'Banking' },
-            { label: 'Import statement', href: route('banking.import.create') },
+            { label: 'Accounts', href: route('banking.accounts.index') },
+            { label: 'Import statement' },
         ]"
     >
-        <PageHeader title="Import bank statement">
-            <template #actions>
-                <AppButton variant="secondary" @click="$inertia.visit(route('banking.accounts.index'))">
-                    Manage accounts
-                </AppButton>
-            </template>
-        </PageHeader>
+        <PageHeader
+            title="Import bank statement"
+            subtitle="Upload a CSV, TXT, or OFX statement for a banking account."
+        />
 
-        <AppCard class="mt-5 max-w-2xl">
-            <form class="space-y-4" @submit.prevent="submit">
+        <AppCard class="mt-5">
+            <form class="grid max-w-xl gap-5" @submit.prevent="submit">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Account</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Account</label>
                     <AppSelect
                         :model-value="form.account_id === '' ? '' : String(form.account_id)"
-                        :options="[
-                            { label: 'Select account…', value: '' },
-                            ...accounts.map((a) => ({
-                                label: a.bank_name ? `${a.name} (${a.bank_name})` : a.name,
-                                value: String(a.id),
-                            })),
-                        ]"
+                        :options="accountSelectOptions"
+                        placeholder="Select account"
+                        :disabled="!accounts.length"
                         @update:model-value="form.account_id = $event === '' ? '' : Number($event)"
                     />
-                    <p v-if="form.errors.account_id" class="mt-1 text-xs text-red-600">{{ form.errors.account_id }}</p>
-                    <p v-if="!accounts.length" class="mt-2 text-xs text-amber-700">
-                        Create an import account before uploading a statement.
+                    <p v-if="form.errors.account_id" class="mt-1.5 text-xs text-red-600">{{ form.errors.account_id }}</p>
+                    <p v-if="!accounts.length" class="mt-1.5 text-xs text-amber-700">
+                        Create a banking account before uploading a statement.
                     </p>
                 </div>
 
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Statement file (CSV, TXT, OFX — max 10MB)</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Statement file</label>
                     <input
                         type="file"
                         accept=".csv,.txt,.ofx,text/csv,text/plain,application/x-ofx"
-                        class="block w-full text-sm text-slate-600 file:mr-4 file:rounded-md file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700"
+                        class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
                         @change="onFileChange"
-                    />
-                    <p v-if="form.errors.file" class="mt-1 text-xs text-red-600">{{ form.errors.file }}</p>
+                    >
+                    <p class="mt-1.5 text-xs text-slate-500">CSV, TXT, or OFX — max 10MB.</p>
+                    <p v-if="form.errors.file" class="mt-1.5 text-xs text-red-600">{{ form.errors.file }}</p>
                 </div>
 
-                <AppButton type="submit" variant="primary" :disabled="form.processing || !accounts.length">
-                    Continue
-                </AppButton>
+                <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+                    <AppButton type="submit" variant="primary" :disabled="form.processing || !accounts.length">
+                        Continue
+                    </AppButton>
+                    <AppButton
+                        type="button"
+                        variant="ghost"
+                        :disabled="form.processing"
+                        @click="router.visit(route('banking.accounts.index'))"
+                    >
+                        Cancel
+                    </AppButton>
+                </div>
             </form>
         </AppCard>
     </AppLayout>
