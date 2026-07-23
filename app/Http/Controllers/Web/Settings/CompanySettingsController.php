@@ -53,7 +53,7 @@ class CompanySettingsController extends Controller
                 'bank_account_type' => (string) ($b->bank_account_type ?? 'current'),
                 'show_on_invoice' => (bool) $b->show_on_invoice,
             ])->values()->all(),
-            'logo_url' => $team->getFirstMediaUrl('logo') ?: null,
+            'logo_url' => $team->getFirstMedia('logo')?->getUrl() ?: null,
             'invoice_next_sequence' => $nextSeq,
             'tax_rates' => $this->taxRatesPayload($teamId),
             'industries' => [

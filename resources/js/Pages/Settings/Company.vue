@@ -184,6 +184,7 @@ const form = useForm({
 const logoFile = ref<File | null>(null);
 const logoPreview = ref<string | null>(null);
 const removeLogo = ref(false);
+const logoLoadFailed = ref(false);
 
 const liveInvoicePreview = computed(() => {
     const now = new Date();
@@ -212,14 +213,25 @@ const liveEstimatePreview = computed(() => {
 });
 
 const displayLogo = computed(() => {
+    if (logoLoadFailed.value) {
+        return null;
+    }
     if (logoPreview.value) {
         return logoPreview.value;
     }
     if (removeLogo.value) {
         return null;
     }
-    return props.logo_url;
+    const url = typeof props.logo_url === 'string' ? props.logo_url.trim() : '';
+    return url !== '' ? url : null;
 });
+
+watch(
+    () => [logoPreview.value, props.logo_url, removeLogo.value] as const,
+    () => {
+        logoLoadFailed.value = false;
+    },
+);
 
 watch(
     () => form.postal_same_as_physical,
@@ -585,7 +597,13 @@ const removeBankAccount = (index: number) => {
                             <div
                                 class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                             >
-                                <img v-if="displayLogo" :src="displayLogo" alt="Logo preview" class="max-h-full max-w-full object-contain">
+                                <img
+                                    v-if="displayLogo"
+                                    :src="displayLogo"
+                                    alt="Logo preview"
+                                    class="max-h-full max-w-full object-contain"
+                                    @error="logoLoadFailed = true"
+                                >
                                 <Building2 v-else class="h-9 w-9 text-slate-300" />
                             </div>
                             <div class="flex flex-wrap gap-2">
