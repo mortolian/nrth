@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -17,6 +17,21 @@ type AccountRow = {
     gl_label: string | null;
 };
 
+const ACCOUNT_TYPE_OPTIONS = [
+    { value: 'cheque', label: 'Cheque / current' },
+    { value: 'savings', label: 'Savings' },
+    { value: 'credit_card', label: 'Credit card' },
+    { value: 'cash', label: 'Cash' },
+    { value: 'money_market', label: 'Money market' },
+    { value: 'loan', label: 'Loan' },
+    { value: 'investment', label: 'Investment' },
+    { value: 'other', label: 'Other' },
+] as const;
+
+const KNOWN_TYPE_VALUES = new Set(
+    ACCOUNT_TYPE_OPTIONS.map((option) => option.value).filter((value) => value !== 'other'),
+);
+
 const props = defineProps<{
     accounts: AccountRow[];
     gl_options: GlOption[];
@@ -24,19 +39,28 @@ const props = defineProps<{
 
 const showForm = ref(false);
 const editingId = ref<number | null>(null);
+const typeChoice = ref('cheque');
+const customType = ref('');
 
 const form = useForm({
     name: '',
     bank_name: '',
     account_number_last4: '',
     currency: 'ZAR',
-    type: '',
+    type: 'cheque',
     gl_account_id: '' as string | number,
     is_active: true,
 });
 
 const editingAccount = computed(() =>
     editingId.value === null ? null : props.accounts.find((row) => row.id === editingId.value) ?? null,
+);
+
+const typeSelectOptions = computed(() =>
+    ACCOUNT_TYPE_OPTIONS.map((option) => ({
+        label: option.label,
+        value: option.value,
+    })),
 );
 
 const glSelectOptions = computed(() => {
@@ -58,12 +82,65 @@ const glSelectOptions = computed(() => {
     return options;
 });
 
+const typeLabel = (type: string | null): string => {
+    if (!type) {
+        return '—';
+    }
+    const known = ACCOUNT_TYPE_OPTIONS.find((option) => option.value === type);
+    if (known && known.value !== 'other') {
+        return known.label;
+    }
+
+    return type;
+};
+
+const syncTypeFromChoice = () => {
+    if (typeChoice.value === 'other') {
+        form.type = customType.value.trim();
+        return;
+    }
+    form.type = typeChoice.value;
+};
+
+watch(typeChoice, () => {
+    if (typeChoice.value !== 'other') {
+        customType.value = '';
+    }
+    syncTypeFromChoice();
+});
+
+watch(customType, () => {
+    if (typeChoice.value === 'other') {
+        syncTypeFromChoice();
+    }
+});
+
+const applyStoredType = (type: string | null) => {
+    const value = (type ?? '').trim();
+    if (value !== '' && KNOWN_TYPE_VALUES.has(value)) {
+        typeChoice.value = value;
+        customType.value = '';
+        form.type = value;
+        return;
+    }
+    if (value === '') {
+        typeChoice.value = 'cheque';
+        customType.value = '';
+        form.type = 'cheque';
+        return;
+    }
+    typeChoice.value = 'other';
+    customType.value = value;
+    form.type = value;
+};
+
 const resetForm = () => {
     form.reset();
     form.clearErrors();
     form.currency = 'ZAR';
     form.is_active = true;
     form.gl_account_id = '';
+    applyStoredType('cheque');
     editingId.value = null;
 };
 
@@ -79,7 +156,7 @@ const openEdit = (account: AccountRow) => {
     form.bank_name = account.bank_name ?? '';
     form.account_number_last4 = account.account_number_last4 ?? '';
     form.currency = account.currency;
-    form.type = account.type ?? '';
+    applyStoredType(account.type);
     form.gl_account_id = account.gl_account_id ? String(account.gl_account_id) : '';
     form.is_active = account.is_active;
     form.clearErrors();
@@ -91,12 +168,15 @@ const cancelForm = () => {
 };
 
 const submit = () => {
+    syncTypeFromChoice();
+    const resolvedType = form.type.trim() === '' ? null : form.type.trim();
+
     const payload = {
         name: form.name,
         bank_name: form.bank_name || null,
         account_number_last4: form.account_number_last4 || null,
         currency: form.currency || 'ZAR',
-        type: form.type || null,
+        type: resolvedType,
         gl_account_id: Number(form.gl_account_id),
         is_active: form.is_active,
     };
@@ -177,7 +257,15 @@ const submit = () => {
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
-                    <AppInput v-model="form.type" placeholder="cheque, savings, credit_card, cash..." />
+                    <AppSelect v-model="typeChoice" :options="typeSelectOptions" />
+                    <div v-if="typeChoice === 'other'" class="mt-2">
+                        <AppInput
+                            v-model="customType"
+                            placeholder="Describe the account type"
+                            maxlength="50"
+                        />
+                    </div>
+                    <p v-if="form.errors.type" class="mt-1 text-xs text-red-600">{{ form.errors.type }}</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Ledger account</label>
@@ -221,7 +309,7 @@ const submit = () => {
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.bank_name || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.account_number_last4 || '—' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.currency }}</td>
-                    <td class="px-4 py-3 text-sm text-slate-600">{{ account.type || '—' }}</td>
+                    <td class="px-4 py-3 text-sm text-slate-600">{{ typeLabel(account.type) }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.gl_label || 'Not linked' }}</td>
                     <td class="px-4 py-3 text-sm text-slate-600">{{ account.is_active ? 'Active' : 'Inactive' }}</td>
                     <td class="px-4 py-3 text-right">
