@@ -13,10 +13,16 @@ const sectionClass = computed(() =>
         attrs.class as ClassValue,
     ),
 );
+
+const forwardedAttrs = computed(() => {
+    const { class: _class, ...rest } = attrs;
+
+    return rest;
+});
 </script>
 
 <template>
-    <section :class="sectionClass">
+    <section :class="sectionClass" v-bind="forwardedAttrs">
         <slot />
     </section>
 </template>

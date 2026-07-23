@@ -35,6 +35,7 @@ use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
 use App\Http\Controllers\Web\Webhooks\PayFastPaymentWebhookController;
 use App\Http\Controllers\Web\Webhooks\StripePaymentWebhookController;
+use App\Http\Middleware\EnforceSessionIdleTimeout;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -54,6 +55,7 @@ Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
+    EnforceSessionIdleTimeout::class,
 ])->group(function () {
     Route::get('/onboarding/setup', [OnboardingController::class, 'show'])->name('onboarding.setup');
     Route::post('/onboarding/progress', [OnboardingController::class, 'saveProgress'])->name('onboarding.progress');
@@ -79,6 +81,7 @@ Route::middleware([
         Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [BankingAccountController::class, 'store'])->name('accounts.store');
+        Route::put('/accounts/{bankingAccount}', [BankingAccountController::class, 'update'])->name('accounts.update');
         Route::get('/import', [BankingStatementImportController::class, 'create'])->name('import.create');
         Route::post('/import', [BankingStatementImportController::class, 'store'])->name('import.store');
         Route::get('/import/{import}/map', [BankingStatementImportController::class, 'map'])->name('import.map');
@@ -87,12 +90,16 @@ Route::middleware([
         Route::post('/import/{import}/confirm', [BankingStatementImportController::class, 'confirm'])->name('import.confirm');
     });
     Route::get('/expenses', [ExpensesController::class, 'index'])->name('expenses.index');
+    Route::get('/expenses/export', [ExpensesController::class, 'exportCsv'])->name('expenses.export');
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
+    Route::post('/expenses/parse-receipt', [ExpensesController::class, 'parseReceipt'])->name('expenses.parse-receipt');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
     Route::get('/expenses/{transaction}/edit', [ExpensesController::class, 'edit'])->name('expenses.edit');
     Route::put('/expenses/{transaction}', [ExpensesController::class, 'update'])->name('expenses.update');
     Route::delete('/expenses/{transaction}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');
     Route::post('/expenses/{transaction}/receipt', [ExpensesController::class, 'storeReceipt'])->name('expenses.receipt.store');
+    Route::get('/expenses/{transaction}/attachments/{media}', [ExpensesController::class, 'showAttachment'])->name('expenses.attachments.show');
+    Route::delete('/expenses/{transaction}/attachments/{media}', [ExpensesController::class, 'destroyAttachment'])->name('expenses.attachments.destroy');
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::get('/suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');

@@ -2,11 +2,13 @@
 
 namespace App\Domain\Invoicing\Actions;
 
+use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
 use App\Domain\Invoicing\DTOs\RecordPaymentDTO;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Enums\OnlinePaymentSessionStatus;
 use App\Domain\Invoicing\Enums\PaymentMethod;
 use App\Domain\Invoicing\Models\InvoiceOnlinePaymentSession;
+use App\Models\Team;
 use App\Support\Iso4217Currencies;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -82,11 +84,15 @@ class CompleteInvoiceOnlinePaymentSessionAction
                 ]);
             }
 
+            $team = $invoice->team ?? Team::query()->findOrFail($locked->team_id);
+            $defaultBank = (new EnsureDefaultBankingAccount)->execute($team);
+
             $payment = $this->recordPaymentAction->execute(new RecordPaymentDTO(
                 invoiceId: $invoice->id,
                 teamId: $locked->team_id,
                 amountCents: $paidAmountCents,
                 paymentDate: now()->toDateString(),
+                bankingAccountId: (int) $defaultBank->id,
                 method: PaymentMethod::Card,
                 currency: $currency,
                 reference: $gatewayReference,

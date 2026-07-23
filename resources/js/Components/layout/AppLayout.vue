@@ -26,10 +26,11 @@ import {
     X,
 } from 'lucide-vue-next';
 import ApplicationMark from '@/Components/ApplicationMark.vue';
-import Banner from '@/Components/Banner.vue';
+import ToastHost from '@/Components/ToastHost.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
+import SessionIdleWatcher from '@/Components/layout/SessionIdleWatcher.vue';
 import { useAppDisplayName } from '@/lib/appName';
 
 const NAV_SECTIONS_EXPANDED_KEY = 'nrth:nav-sections-expanded:v1';
@@ -253,13 +254,22 @@ function onSettingsRowClick(): void {
 
 const commandPaletteData = computed<PaletteData>(() => ({
     quickActions: page.props.commandPalette?.quickActions ?? [
-        { id: 'new-invoice', label: 'New Invoice', href: '#', icon: 'invoice' },
-        { id: 'new-expense', label: 'New Expense', href: '#', icon: 'expense' },
-        { id: 'record-payment', label: 'Record Payment', href: '#', icon: 'payment' },
-        { id: 'new-client', label: 'New Client', href: '#', icon: 'client' },
+        { id: 'new-invoice', label: 'New Invoice', href: route('invoicing.invoices.create'), icon: 'invoice' },
+        { id: 'new-expense', label: 'New Expense', href: route('expenses.create'), icon: 'expense' },
+        { id: 'record-payment', label: 'Record Payment', href: `${route('dashboard')}#outstanding-invoices`, icon: 'payment' },
+        { id: 'new-client', label: 'New Client', href: route('invoicing.clients.create'), icon: 'client' },
     ],
     navigation: page.props.commandPalette?.navigation ?? [
         { id: 'dashboard', label: 'Dashboard', href: route('dashboard') },
+        { id: 'invoices', label: 'Invoices', href: route('invoicing.invoices.index') },
+        { id: 'estimates', label: 'Estimates', href: route('invoicing.estimates.index') },
+        { id: 'clients', label: 'Clients', href: route('invoicing.clients.index') },
+        { id: 'expenses', label: 'Expenses', href: route('expenses.index') },
+        { id: 'suppliers', label: 'Suppliers', href: route('suppliers.index') },
+        { id: 'banking-transactions', label: 'Banking Transactions', href: route('banking.transactions.index') },
+        { id: 'accounting-transactions', label: 'Accounting Transactions', href: route('accounting.transactions.index') },
+        { id: 'budgets', label: 'Budgets', href: route('budgeting.index') },
+        { id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') },
         { id: 'profile', label: 'Profile Settings', href: route('profile.show') },
     ],
     recent: page.props.commandPalette?.recent ?? {},
@@ -283,7 +293,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
 <template>
     <div>
         <Head :title="title" />
-        <Banner />
+        <ToastHost />
 
         <div class="min-h-screen bg-white text-slate-900 lg:pl-0">
             <aside
@@ -777,5 +787,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
         </Teleport>
 
         <CommandPalette v-model:open="commandPaletteOpen" :data="commandPaletteData" />
+        <SessionIdleWatcher />
     </div>
 </template>

@@ -9,6 +9,9 @@ import AppPhoneInput from '@/Components/AppPhoneInput.vue';
 const props = defineProps<{
     isEditing: boolean;
     return_to?: string | null;
+    prefill?: {
+        name?: string | null;
+    } | null;
     supplier: null | {
         id: number;
         name: string;
@@ -31,7 +34,7 @@ const props = defineProps<{
 
 const { values, setFieldValue } = useForm({
     initialValues: {
-        name: props.supplier?.name ?? '',
+        name: props.supplier?.name ?? props.prefill?.name ?? '',
         contact_name: props.supplier?.contact_name ?? '',
         email: props.supplier?.email ?? '',
         phone: props.supplier?.phone ?? '',
@@ -91,7 +94,7 @@ const submit = () => {
             { label: isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <PageHeader :title="isEditing ? 'Edit Supplier' : 'Create Supplier'" subtitle="Vendors you pay on expenses" />
+        <PageHeader :title="isEditing ? 'Edit Supplier' : 'Create Supplier'" />
 
         <AppCard class="mt-5">
             <div class="grid gap-4 md:grid-cols-2">

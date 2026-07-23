@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\DB;
 
 final class CreateBankingAccountAction
 {
+    public function __construct(
+        private readonly ResolveLinkedGlAccount $resolveLinkedGlAccount,
+    ) {}
+
     /**
      * @param  array{
      *     team_id: int,
@@ -14,11 +18,17 @@ final class CreateBankingAccountAction
      *     bank_name?: string|null,
      *     account_number_last4?: string|null,
      *     currency?: string,
-     *     type?: string|null
+     *     type?: string|null,
+     *     gl_account_id: int
      * }  $data
      */
     public function execute(array $data): BankingAccount
     {
+        $gl = $this->resolveLinkedGlAccount->execute(
+            (int) $data['team_id'],
+            (int) $data['gl_account_id'],
+        );
+
         return DB::transaction(fn () => BankingAccount::queryWithoutTeamScope()->create([
             'team_id' => $data['team_id'],
             'name' => $data['name'],
@@ -27,6 +37,7 @@ final class CreateBankingAccountAction
             'currency' => $data['currency'] ?? 'ZAR',
             'type' => $data['type'] ?? null,
             'is_active' => true,
+            'gl_account_id' => $gl->id,
         ]));
     }
 }

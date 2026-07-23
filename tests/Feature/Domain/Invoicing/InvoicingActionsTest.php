@@ -12,6 +12,7 @@ use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\LedgerService;
+use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
 use App\Domain\Invoicing\Actions\CreateInvoiceAction;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\SendInvoiceAction;
@@ -178,6 +179,7 @@ class InvoicingActionsTest extends TestCase
             teamId: $team->id,
             amountCents: 115_00,
             paymentDate: '2026-04-25',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
             method: PaymentMethod::Eft,
             createdBy: $user->id,
         ));
@@ -216,6 +218,7 @@ class InvoicingActionsTest extends TestCase
             teamId: $team->id,
             amountCents: 115_00,
             paymentDate: '2026-04-25',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
             method: PaymentMethod::Eft,
             createdBy: $user->id,
         ));
@@ -261,6 +264,7 @@ class InvoicingActionsTest extends TestCase
             teamId: $team->id,
             amountCents: 100_00,
             paymentDate: '2026-04-26',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
             method: PaymentMethod::Eft,
             currency: 'USD',
             createdBy: $user->id,

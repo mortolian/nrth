@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { useFlash } from '@/composables/useFlash';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 
 type TakeoutRunRow = {
@@ -57,7 +56,6 @@ const props = defineProps<{
     latest_backup_at: string | null;
 }>();
 
-const { success: flashSuccess, error: flashError } = useFlash();
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
 const state = ref({
@@ -257,13 +255,6 @@ onBeforeUnmount(() => {
             title="Backups & exports"
             subtitle="Tax data takeouts for your team, and whole-server backups for operators"
         />
-
-        <p v-if="flashSuccess" class="mt-4 rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-800">
-            {{ flashSuccess }}
-        </p>
-        <p v-if="flashError" class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            {{ flashError }}
-        </p>
 
         <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
             <button

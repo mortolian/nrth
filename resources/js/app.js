@@ -21,6 +21,7 @@ import PageHeader from '@/Components/PageHeader.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import ConfirmDialog from '@/Components/ConfirmDialog.vue';
 import { readAppNameFromMeta } from '@/lib/appNameCore';
+import { bindFlashToastBridge } from '@/lib/flashToasts';
 
 const appName = (import.meta.env.VITE_APP_NAME || readAppNameFromMeta() || 'Laravel').trim();
 
@@ -55,6 +56,8 @@ createInertiaApp({
             plan: props.initialPage.props?.auth?.user?.current_team?.plan ?? null,
             features: props.initialPage.props?.auth?.user?.current_team?.features ?? {},
         });
+
+        bindFlashToastBridge(props.initialPage);
 
         return app.mount(el);
     },

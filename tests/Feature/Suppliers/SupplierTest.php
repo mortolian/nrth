@@ -7,6 +7,7 @@ use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,6 +69,46 @@ class SupplierTest extends TestCase
         $this->assertNull(Supplier::queryWithoutTeamScope()->find($supplier->id));
     }
 
+    public function test_supplier_store_returns_json_for_inline_create(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $this->postJson(route('suppliers.store'), [
+            'name' => 'Receipt Vendor',
+            'contact_name' => null,
+            'email' => null,
+            'phone' => null,
+            'vat_number' => null,
+            'registration_number' => null,
+            'address' => null,
+            'notes' => null,
+            'is_active' => true,
+        ])->assertCreated()
+            ->assertJsonPath('data.name', 'Receipt Vendor');
+
+        $this->assertDatabaseHas('suppliers', [
+            'team_id' => $team->id,
+            'name' => 'Receipt Vendor',
+        ]);
+    }
+
+    public function test_supplier_create_prefills_name_from_query(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $this->get(route('suppliers.create', ['name' => 'Makro Sandton']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Suppliers/Form')
+                ->where('prefill.name', 'Makro Sandton'));
+    }
+
     public function test_supplier_cannot_be_deleted_when_linked_to_expense(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
@@ -102,7 +143,11 @@ class SupplierTest extends TestCase
         $this->actingTeamContext($user, $team);
 
         Account::factory()->for($team)->expense()->create(['code' => '7500', 'name' => 'General expense']);
-        Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
+        $bankGl = Account::factory()->for($team)->asset()->create(['code' => '1010', 'name' => 'Bank', 'is_system' => true]);
+        $banking = BankingAccount::factory()->for($team)->create([
+            'name' => 'Bank',
+            'gl_account_id' => $bankGl->id,
+        ]);
 
         $supplier = Supplier::factory()->for($team)->create(['name' => 'Ledger Supplier']);
 
@@ -122,7 +167,7 @@ class SupplierTest extends TestCase
             'amount_excl_vat_cents' => 100_00,
             'vat_rate' => 'no_vat',
             'vat_amount_cents' => 0,
-            'payment_method' => 'business_account',
+            'paid_from_banking_account_id' => $banking->id,
         ])->assertRedirect(route('expenses.index'));
 
         $txn = Transaction::queryWithoutTeamScope()

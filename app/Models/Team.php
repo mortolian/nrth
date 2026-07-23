@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Ai\AiCatalog;
 use App\Domain\Tax\Models\TaxRate;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -212,6 +213,15 @@ class Team extends JetstreamTeam implements HasMedia
             'default_tax_rate_id' => null,
             /** Master switch: hosted checkout on invoice + public pay page (Stripe, PayFast, …). */
             'payment_pages_enabled' => true,
+            /** 0 = off (Laravel SESSION_LIFETIME only). Cap at config('session.lifetime'). */
+            'session_idle_timeout_minutes' => 0,
+            /** Optional AI provider (expenses, documents, …). Env keys are per-provider fallback. */
+            'ai' => [
+                'provider' => 'openai',
+                'api_key' => null,
+                'model' => 'gpt-4o-mini',
+                'base_url' => null,
+            ],
             'bank_name' => null,
             'bank_account_holder' => null,
             'bank_account_number' => null,
@@ -275,6 +285,20 @@ class Team extends JetstreamTeam implements HasMedia
 
         if (! array_key_exists('estimate_show_street_address', $normalized) && array_key_exists('invoice_show_street_address', $normalized)) {
             $normalized['estimate_show_street_address'] = $normalized['invoice_show_street_address'];
+        }
+
+        // Legacy key from early receipt-scan settings.
+        if (array_key_exists('receipt_scan', $normalized) && ! array_key_exists('ai', $normalized)) {
+            $normalized['ai'] = $normalized['receipt_scan'];
+        }
+        unset($normalized['receipt_scan']);
+
+        // Legacy standalone Ollama provider → OpenAI-compatible.
+        if (is_array($normalized['ai'] ?? null) && ($normalized['ai']['provider'] ?? null) === 'ollama') {
+            $normalized['ai']['provider'] = 'openai_compatible';
+            if (trim((string) ($normalized['ai']['base_url'] ?? '')) === '') {
+                $normalized['ai']['base_url'] = 'http://127.0.0.1:11434/v1';
+            }
         }
 
         return array_replace_recursive(
@@ -379,5 +403,96 @@ class Team extends JetstreamTeam implements HasMedia
             ->value('rate');
 
         return $rate !== null ? (float) $rate : 0.0;
+    }
+
+    public function aiEnabled(): bool
+    {
+        $provider = $this->aiProvider();
+
+        if (AiCatalog::apiKeyOptional($provider)) {
+            return $this->aiBaseUrl() !== '';
+        }
+
+        return $this->aiApiKey() !== '';
+    }
+
+    public function aiProvider(): string
+    {
+        $settings = $this->mergedCompanySettings();
+        $fromTeam = trim((string) ($settings['ai']['provider'] ?? ''));
+        if ($fromTeam !== '' && AiCatalog::isValidProvider($fromTeam)) {
+            return $fromTeam;
+        }
+
+        $fromEnv = trim((string) config('services.ai.provider', AiCatalog::PROVIDER_OPENAI));
+
+        return AiCatalog::isValidProvider($fromEnv)
+            ? $fromEnv
+            : AiCatalog::PROVIDER_OPENAI;
+    }
+
+    public function aiApiKey(): string
+    {
+        $settings = $this->mergedCompanySettings();
+        $fromTeam = trim((string) ($settings['ai']['api_key'] ?? ''));
+        if ($fromTeam !== '') {
+            return $fromTeam;
+        }
+
+        return match ($this->aiProvider()) {
+            AiCatalog::PROVIDER_ANTHROPIC => trim((string) config('services.anthropic.api_key', '')),
+            AiCatalog::PROVIDER_GEMINI => trim((string) config('services.gemini.api_key', '')),
+            AiCatalog::PROVIDER_OPENROUTER => trim((string) config('services.openrouter.api_key', '')),
+            AiCatalog::PROVIDER_OPENAI_COMPATIBLE => trim((string) config('services.openai_compatible.api_key', '')),
+            default => trim((string) config('services.openai.api_key', '')),
+        };
+    }
+
+    public function aiModel(): string
+    {
+        $provider = $this->aiProvider();
+        $settings = $this->mergedCompanySettings();
+        $fromTeam = trim((string) ($settings['ai']['model'] ?? ''));
+        if ($fromTeam !== '' && AiCatalog::isValidModel($provider, $fromTeam)) {
+            return $fromTeam;
+        }
+
+        $fromEnv = match ($provider) {
+            AiCatalog::PROVIDER_ANTHROPIC => trim((string) config('services.anthropic.model', '')),
+            AiCatalog::PROVIDER_GEMINI => trim((string) config('services.gemini.model', '')),
+            AiCatalog::PROVIDER_OPENROUTER => trim((string) config('services.openrouter.model', '')),
+            AiCatalog::PROVIDER_OPENAI_COMPATIBLE => trim((string) config('services.openai_compatible.model', '')),
+            default => trim((string) config('services.openai.model', '')),
+        };
+
+        if ($fromEnv !== '' && AiCatalog::isValidModel($provider, $fromEnv)) {
+            return $fromEnv;
+        }
+
+        return AiCatalog::defaultModel($provider);
+    }
+
+    public function aiBaseUrl(): string
+    {
+        $provider = $this->aiProvider();
+        $settings = $this->mergedCompanySettings();
+        $fromTeam = trim((string) ($settings['ai']['base_url'] ?? ''));
+        if ($fromTeam !== '') {
+            return rtrim($fromTeam, '/');
+        }
+
+        $fromEnv = match ($provider) {
+            AiCatalog::PROVIDER_OPENROUTER => trim((string) config('services.openrouter.base_url', '')),
+            AiCatalog::PROVIDER_OPENAI_COMPATIBLE => trim((string) config('services.openai_compatible.base_url', '')),
+            default => '',
+        };
+
+        if ($fromEnv !== '') {
+            return rtrim($fromEnv, '/');
+        }
+
+        $default = AiCatalog::defaultBaseUrl($provider);
+
+        return $default !== null ? rtrim($default, '/') : '';
     }
 }
