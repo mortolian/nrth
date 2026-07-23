@@ -59,6 +59,7 @@ class BankingAccountController extends Controller
             'currency' => $validated['currency'] ?? 'ZAR',
             'type' => $validated['type'] ?? null,
             'gl_account_id' => (int) $validated['gl_account_id'],
+            'is_active' => (bool) ($validated['is_active'] ?? true),
         ]);
 
         return redirect()
@@ -74,7 +75,7 @@ class BankingAccountController extends Controller
         abort_unless($bankingAccount->team_id === (int) $request->user()->current_team_id, 403);
 
         $teamId = (int) $request->user()->current_team_id;
-        $validated = $this->validatedPayload($request, $teamId, forUpdate: true);
+        $validated = $this->validatedPayload($request, $teamId);
 
         $action->execute($bankingAccount, [
             'name' => $validated['name'],
@@ -94,7 +95,7 @@ class BankingAccountController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatedPayload(Request $request, int $teamId, bool $forUpdate = false): array
+    private function validatedPayload(Request $request, int $teamId): array
     {
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -107,11 +108,8 @@ class BankingAccountController extends Controller
                 'integer',
                 Rule::exists('accounts', 'id')->where(fn ($q) => $q->where('team_id', $teamId)->where('is_active', true)),
             ],
+            'is_active' => ['sometimes', 'boolean'],
         ];
-
-        if ($forUpdate) {
-            $rules['is_active'] = ['sometimes', 'boolean'];
-        }
 
         return $request->validate($rules);
     }

@@ -198,6 +198,7 @@ const submit = () => {
         currency: payload.currency,
         type: payload.type,
         gl_account_id: payload.gl_account_id,
+        is_active: payload.is_active,
     })).post(route('banking.accounts.store'), {
         preserveScroll: true,
         onSuccess: () => {
@@ -209,88 +210,92 @@ const submit = () => {
 
 <template>
     <AppLayout
-        title="Banking accounts"
+        :title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
         :breadcrumbs="[
             { label: 'Banking' },
-            { label: 'Accounts' },
+            { label: 'Accounts', href: showForm ? route('banking.accounts.index') : undefined },
+            ...(showForm ? [{ label: editingId ? 'Edit' : 'Create' }] : []),
         ]"
     >
-        <PageHeader title="Banking accounts">
-            <template #actions>
+        <PageHeader
+            :title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
+            :subtitle="showForm ? undefined : 'Used for statement import and for posting expenses and invoice payments once linked to a ledger account.'"
+        >
+            <template v-if="!showForm" #actions>
                 <AppButton variant="secondary" @click="router.visit(route('banking.transactions.index'))">
                     View transactions
                 </AppButton>
                 <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
                     Import statement
                 </AppButton>
-                <AppButton variant="primary" @click="showForm ? cancelForm() : openCreate()">
-                    {{ showForm ? 'Cancel' : 'New account' }}
+                <AppButton variant="primary" @click="openCreate()">
+                    New account
                 </AppButton>
             </template>
         </PageHeader>
 
-        <p class="mt-3 max-w-3xl text-sm text-slate-600">
-            Banking accounts are used for statement import and for posting expenses and invoice payments once linked to a ledger account.
-        </p>
-
         <AppCard v-if="showForm" class="mt-5">
-            <h2 class="text-sm font-semibold text-slate-900">
-                {{ editingId ? 'Edit banking account' : 'Create banking account' }}
-            </h2>
-            <form class="mt-4 grid gap-4 md:grid-cols-2" @submit.prevent="submit">
+            <form class="grid max-w-xl gap-5" @submit.prevent="submit">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Name</label>
                     <AppInput v-model="form.name" required />
-                    <p v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</p>
+                    <p v-if="form.errors.name" class="mt-1.5 text-xs text-red-600">{{ form.errors.name }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Bank name</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Bank name</label>
                     <AppInput v-model="form.bank_name" />
                 </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Last 4 digits</label>
-                    <AppInput v-model="form.account_number_last4" maxlength="4" />
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-500">Last 4 digits</label>
+                        <AppInput v-model="form.account_number_last4" maxlength="4" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-500">Currency</label>
+                        <AppInput v-model="form.currency" maxlength="3" />
+                    </div>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
-                    <AppInput v-model="form.currency" maxlength="3" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Type</label>
                     <AppSelect v-model="typeChoice" :options="typeSelectOptions" />
-                    <div v-if="typeChoice === 'other'" class="mt-2">
+                    <div class="mt-2 min-h-10">
                         <AppInput
+                            v-if="typeChoice === 'other'"
                             v-model="customType"
                             placeholder="Describe the account type"
                             maxlength="50"
                         />
                     </div>
-                    <p v-if="form.errors.type" class="mt-1 text-xs text-red-600">{{ form.errors.type }}</p>
+                    <p v-if="form.errors.type" class="mt-1.5 text-xs text-red-600">{{ form.errors.type }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Ledger account</label>
+                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Ledger account</label>
                     <AppSelect
                         :model-value="String(form.gl_account_id || '')"
                         :options="glSelectOptions"
                         placeholder="Select GL account"
                         @update:model-value="form.gl_account_id = $event"
                     />
-                    <p class="mt-1 text-xs text-slate-500">Required for expense Paid from and invoice Paid into.</p>
-                    <p v-if="form.errors.gl_account_id" class="mt-1 text-xs text-red-600">{{ form.errors.gl_account_id }}</p>
+                    <p class="mt-1.5 text-xs text-slate-500">Required for expense Paid from and invoice Paid into.</p>
+                    <p v-if="form.errors.gl_account_id" class="mt-1.5 text-xs text-red-600">{{ form.errors.gl_account_id }}</p>
                 </div>
-                <div v-if="editingId" class="md:col-span-2 flex items-center gap-2">
+                <div class="flex min-h-10 items-center gap-2">
                     <input id="banking-active" v-model="form.is_active" type="checkbox" class="rounded border-slate-300">
-                    <label for="banking-active" class="text-sm text-slate-700">Active</label>
+                    <label for="banking-active" class="text-sm text-slate-700">Account is active</label>
                 </div>
-                <div class="md:col-span-2">
+
+                <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
                     <AppButton type="submit" variant="primary" :disabled="form.processing">
                         {{ editingId ? 'Save changes' : 'Save account' }}
+                    </AppButton>
+                    <AppButton type="button" variant="ghost" :disabled="form.processing" @click="cancelForm">
+                        Cancel
                     </AppButton>
                 </div>
             </form>
         </AppCard>
 
-        <AppCard class="mt-5">
+        <AppCard v-else class="mt-5">
             <AppTable
                 v-if="accounts.length"
                 :columns="[
