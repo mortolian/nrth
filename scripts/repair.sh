@@ -248,7 +248,8 @@ rebuild_assets_if_needed() {
         log "Building frontend assets (Vite manifest missing or --rebuild-assets)"
         $COMPOSE exec -T app npm ci --no-audit --no-fund
         $COMPOSE exec -T app npm run build
-        rm -f "$ROOT_DIR/storage/framework/.deploy-npm-hash" 2>/dev/null || true
+        rm -f "$ROOT_DIR/storage/framework/.deploy-npm-hash" \
+            "$ROOT_DIR/storage/framework/.deploy-assets-hash" 2>/dev/null || true
     else
         log "Vite manifest present — skipping asset rebuild"
     fi

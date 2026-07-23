@@ -38,7 +38,7 @@ cd /opt/nrth
 
 **Automatic:** push to `master` → Actions job on the self-hosted runner runs `./scripts/update`.
 
-No image rebuild for normal PHP/Vue changes (bind-mounted source + Octane watch). Lockfile changes trigger composer/npm inside `update`.
+No image rebuild for normal PHP/Vue changes (bind-mounted source + Octane watch). `./scripts/update` rebuilds Vite assets when `resources/js`, `resources/css`, or related frontend inputs change (not only when `package-lock.json` changes). Lockfile changes still trigger `composer install` / `npm ci`.
 
 ---
 

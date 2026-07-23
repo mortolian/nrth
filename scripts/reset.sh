@@ -175,7 +175,9 @@ main() {
     NRTH_FORCE=1 $COMPOSE down -v --force 2>/dev/null || NRTH_FORCE=1 $COMPOSE down -v
 
     log "Removing local deploy state (safe to delete)"
-    rm -f storage/framework/.deploy-composer-hash storage/framework/.deploy-npm-hash 2>/dev/null || true
+    rm -f storage/framework/.deploy-composer-hash \
+        storage/framework/.deploy-npm-hash \
+        storage/framework/.deploy-assets-hash 2>/dev/null || true
     rm -f storage/app/.docker_bootstrapped 2>/dev/null || true
 
     log "Re-running install (fresh volumes)"
