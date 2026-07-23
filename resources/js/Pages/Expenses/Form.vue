@@ -417,20 +417,31 @@ const applyScanPayload = (data: ScanPayload) => {
 const postScan = async (body: FormData) => {
     const token = page.props.csrf_token as string | undefined;
     if (!token) {
-        scanReceiptError.value = 'Unable to scan: missing security token. Refresh the page and try again.';
-        return;
+        throw new Error('Unable to scan: missing security token. Refresh the page and try again.');
     }
 
-    const res = await fetch(route('expenses.parse-receipt'), {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': token,
-        },
-        body,
-    });
+    let url: string;
+    try {
+        url = route('expenses.parse-receipt');
+    } catch {
+        throw new Error('Scan route is missing. Run ./scripts/update on the server and hard-refresh.');
+    }
+
+    let res: Response;
+    try {
+        res = await fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': token,
+            },
+            body,
+        });
+    } catch {
+        throw new Error('Could not reach the scanning service (network). Check the server can reach the AI provider.');
+    }
 
     const payload = (await res.json().catch(() => null)) as {
         data?: ScanPayload;
@@ -442,18 +453,29 @@ const postScan = async (body: FormData) => {
         const firstError = payload?.errors
             ? Object.values(payload.errors).flat()[0]
             : null;
-        scanReceiptError.value = firstError || payload?.message || 'Could not scan this receipt.';
-        return;
+        throw new Error(firstError || payload?.message || `Scan failed (HTTP ${res.status}).`);
     }
 
     const data = payload?.data;
     if (!data) {
-        scanReceiptError.value = 'Could not scan this receipt.';
-        return;
+        throw new Error('Could not scan this receipt.');
     }
 
     applyScanPayload(data);
     scanReceiptApplied.value = true;
+};
+
+const runScan = async (work: () => Promise<void>) => {
+    scanReceiptError.value = null;
+    scanReceiptApplied.value = false;
+    try {
+        await work();
+    } catch (error) {
+        scanReceiptError.value =
+            error instanceof Error && error.message
+                ? error.message
+                : 'Could not reach the scanning service. Try again.';
+    }
 };
 
 const scanExistingAttachment = async (attachment: ExpenseAttachment) => {
@@ -462,19 +484,13 @@ const scanExistingAttachment = async (attachment: ExpenseAttachment) => {
     }
 
     scanningKey.value = `existing:${attachment.id}`;
-    scanReceiptError.value = null;
-    scanReceiptApplied.value = false;
-
-    try {
+    await runScan(async () => {
         const body = new FormData();
         body.append('attachment_id', String(attachment.id));
-        body.append('transaction_id', String(props.expense.id));
+        body.append('transaction_id', String(props.expense!.id));
         await postScan(body);
-    } catch {
-        scanReceiptError.value = 'Could not reach the scanning service. Try again.';
-    } finally {
-        scanningKey.value = null;
-    }
+    });
+    scanningKey.value = null;
 };
 
 const scanNewReceipt = async (index: number) => {
@@ -487,18 +503,12 @@ const scanNewReceipt = async (index: number) => {
     }
 
     scanningKey.value = `new:${index}`;
-    scanReceiptError.value = null;
-    scanReceiptApplied.value = false;
-
-    try {
+    await runScan(async () => {
         const body = new FormData();
         body.append('receipt', file);
         await postScan(body);
-    } catch {
-        scanReceiptError.value = 'Could not reach the scanning service. Try again.';
-    } finally {
-        scanningKey.value = null;
-    }
+    });
+    scanningKey.value = null;
 };
 
 const scanAllReceipts = async () => {
@@ -507,10 +517,7 @@ const scanAllReceipts = async () => {
     }
 
     scanningKey.value = 'all';
-    scanReceiptError.value = null;
-    scanReceiptApplied.value = false;
-
-    try {
+    await runScan(async () => {
         const body = new FormData();
         receiptFiles.value.forEach((file, index) => {
             body.append(`receipts[${index}]`, file);
@@ -522,11 +529,8 @@ const scanAllReceipts = async () => {
             });
         }
         await postScan(body);
-    } catch {
-        scanReceiptError.value = 'Could not reach the scanning service. Try again.';
-    } finally {
-        scanningKey.value = null;
-    }
+    });
+    scanningKey.value = null;
 };
 
 const supplierSelectOptions = computed(() => [
