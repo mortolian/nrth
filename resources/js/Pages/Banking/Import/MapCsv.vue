@@ -18,6 +18,7 @@ const props = defineProps<{
     headers: string[];
     rows: string[][];
     delimiter: string;
+    initialMapping?: Record<string, string>;
     mappingFields: MappingField[];
 }>();
 
@@ -26,15 +27,15 @@ const headerOptions = computed(() =>
 );
 
 const mapping = ref<Record<string, string>>({
-    transaction_date: '',
-    description: '',
-    amount: '',
-    debit: '',
-    credit: '',
-    reference: '',
-    value_date: '',
-    running_balance: '',
-    date_format: '',
+    transaction_date: props.initialMapping?.transaction_date ?? '',
+    description: props.initialMapping?.description ?? '',
+    amount: props.initialMapping?.amount ?? '',
+    debit: props.initialMapping?.debit ?? '',
+    credit: props.initialMapping?.credit ?? '',
+    reference: props.initialMapping?.reference ?? '',
+    value_date: props.initialMapping?.value_date ?? '',
+    running_balance: props.initialMapping?.running_balance ?? '',
+    date_format: props.initialMapping?.date_format ?? '',
 });
 
 const form = useForm({

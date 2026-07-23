@@ -5,6 +5,7 @@ namespace App\Domain\Banking\Services;
 use App\Domain\Banking\DTOs\ParsedBankStatementDTO;
 use App\Domain\Banking\DTOs\ParsedTransactionDTO;
 use App\Domain\Banking\Enums\ImportStatus;
+use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Models\BankingTransaction;
@@ -18,6 +19,7 @@ final class BankingStatementImportService
     public function __construct(
         private readonly BankingStatementImporterRegistry $registry,
         private readonly BankingDuplicateDetector $duplicateDetector,
+        private readonly CsvBankStatementImporter $csvImporter,
     ) {}
 
     public function storeUpload(
@@ -222,6 +224,291 @@ final class BankingStatementImportService
     public function absolutePath(BankingStatementImport $import): string
     {
         return Storage::disk('local')->path($import->stored_path);
+    }
+
+    /**
+     * @param  list<string>  $headers
+     */
+    public function profileMatches(BankingAccount $account, array $headers, string $delimiter): bool
+    {
+        $profile = $account->csv_mapping_profile;
+        if (! is_array($profile)) {
+            return false;
+        }
+
+        $profileHeaders = $profile['headers'] ?? null;
+        $profileDelimiter = $profile['delimiter'] ?? null;
+        $mapping = $profile['mapping'] ?? null;
+
+        if (! is_array($profileHeaders) || ! is_array($mapping) || ! is_string($profileDelimiter)) {
+            return false;
+        }
+
+        if ($profileDelimiter !== $delimiter) {
+            return false;
+        }
+
+        $normalizedHeaders = array_map(
+            static fn (mixed $h): string => trim((string) $h),
+            $headers
+        );
+        $normalizedProfileHeaders = array_map(
+            static fn (mixed $h): string => trim((string) $h),
+            $profileHeaders
+        );
+
+        if ($normalizedHeaders !== $normalizedProfileHeaders) {
+            return false;
+        }
+
+        foreach ($mapping as $column) {
+            if ($column === null || $column === '') {
+                continue;
+            }
+            if (! in_array(trim((string) $column), $normalizedHeaders, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @param  array<string, mixed>  $mapping
+     */
+    public function saveCsvMappingProfile(
+        BankingAccount $account,
+        array $headers,
+        string $delimiter,
+        array $mapping,
+    ): void {
+        $account->forceFill([
+            'csv_mapping_profile' => [
+                'headers' => array_values(array_map(
+                    static fn (mixed $h): string => trim((string) $h),
+                    $headers
+                )),
+                'delimiter' => $delimiter,
+                'mapping' => $mapping,
+            ],
+        ])->save();
+    }
+
+    public function undoImport(BankingStatementImport $import): BankingStatementImport
+    {
+        if ($import->status !== ImportStatus::Imported) {
+            throw ValidationException::withMessages([
+                'import' => __('Only a completed import can be undone.'),
+            ]);
+        }
+
+        return DB::transaction(function () use ($import): BankingStatementImport {
+            BankingTransaction::queryWithoutTeamScope()
+                ->where('banking_statement_import_id', $import->id)
+                ->delete();
+
+            $activePath = $import->stored_path;
+            $softDeletedPath = $this->softDeleteStoredFile($import);
+
+            $import->update([
+                'status' => ImportStatus::Undone,
+                'stored_path' => $softDeletedPath,
+                'imported_rows' => 0,
+                'duplicate_rows' => 0,
+                'failed_rows' => 0,
+                'metadata' => array_merge($import->metadata ?? [], [
+                    'undone_at' => now()->toIso8601String(),
+                    'active_stored_path' => $activePath,
+                    'file_soft_deleted_at' => now()->toIso8601String(),
+                ]),
+            ]);
+
+            return $import->fresh();
+        });
+    }
+
+    public function hasStoredFile(BankingStatementImport $import): bool
+    {
+        $path = $import->stored_path;
+
+        return is_string($path) && $path !== '' && Storage::disk('local')->exists($path);
+    }
+
+    /**
+     * Restore a soft-deleted statement file and prepare it for confirm (or map if needed).
+     *
+     * @return array{import: BankingStatementImport, parsed: ParsedBankStatementDTO|null, mapping_from_profile: bool}
+     */
+    public function reimport(BankingStatementImport $import): array
+    {
+        if ($import->status !== ImportStatus::Undone) {
+            throw ValidationException::withMessages([
+                'import' => __('Only an undone import can be re-imported from history.'),
+            ]);
+        }
+
+        if (! $this->hasStoredFile($import)) {
+            throw ValidationException::withMessages([
+                'import' => __('The statement file is no longer available for re-import.'),
+            ]);
+        }
+
+        $restoredPath = $this->restoreStoredFile($import);
+
+        $import->update([
+            'stored_path' => $restoredPath,
+            'status' => ImportStatus::Pending,
+            'metadata' => array_merge($import->metadata ?? [], [
+                'reimported_at' => now()->toIso8601String(),
+                'file_soft_deleted_at' => null,
+            ]),
+        ]);
+        $import->refresh();
+
+        $options = $this->parseOptionsFromMetadata($import);
+        $mappingFromProfile = false;
+        $account = BankingAccount::queryWithoutTeamScope()->find($import->account_id);
+
+        if (
+            empty($options['mapping'])
+            && $account !== null
+            && in_array($import->file_type, ['csv', 'txt'], true)
+        ) {
+            $preview = $this->csvImporter->preview($this->absolutePath($import));
+            if ($this->profileMatches($account, $preview['headers'], $preview['delimiter'])) {
+                $profile = $account->csv_mapping_profile ?? [];
+                $options = [
+                    'mapping' => $profile['mapping'] ?? [],
+                    'delimiter' => $preview['delimiter'],
+                    'headers' => $preview['headers'],
+                ];
+                $mappingFromProfile = true;
+            }
+        }
+
+        if (in_array($import->file_type, ['csv', 'txt'], true) && empty($options['mapping'])) {
+            return [
+                'import' => $import->fresh(),
+                'parsed' => null,
+                'mapping_from_profile' => false,
+            ];
+        }
+
+        $parsed = $this->parseImport($import, $options);
+
+        return [
+            'import' => $import->fresh(),
+            'parsed' => $parsed,
+            'mapping_from_profile' => $mappingFromProfile,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function parseOptionsFromMetadata(BankingStatementImport $import): array
+    {
+        $metadata = $import->metadata ?? [];
+        $options = [];
+
+        if (isset($metadata['parsed']['mapping'])) {
+            $options['mapping'] = $metadata['parsed']['mapping'];
+        } elseif (isset($metadata['mapping'])) {
+            $options['mapping'] = $metadata['mapping'];
+        }
+        if (isset($metadata['parsed']['delimiter'])) {
+            $options['delimiter'] = $metadata['parsed']['delimiter'];
+        }
+        if (isset($metadata['parsed']['headers'])) {
+            $options['headers'] = $metadata['parsed']['headers'];
+        }
+
+        return $options;
+    }
+
+    private function softDeleteStoredFile(BankingStatementImport $import): string
+    {
+        $disk = Storage::disk('local');
+        $current = (string) $import->stored_path;
+
+        if ($current === '' || ! $disk->exists($current)) {
+            return $current;
+        }
+
+        if (str_contains($current, '/deleted/')) {
+            return $current;
+        }
+
+        $now = now();
+        $basename = basename($current);
+        $deletedPath = sprintf(
+            'banking/%d/deleted/%d/%02d/%s',
+            $import->account_id,
+            $now->year,
+            $now->month,
+            $basename
+        );
+
+        if ($disk->exists($deletedPath)) {
+            $deletedPath = sprintf(
+                'banking/%d/deleted/%d/%02d/%s_%s',
+                $import->account_id,
+                $now->year,
+                $now->month,
+                $import->id,
+                $basename
+            );
+        }
+
+        $disk->move($current, $deletedPath);
+
+        return $deletedPath;
+    }
+
+    private function restoreStoredFile(BankingStatementImport $import): string
+    {
+        $disk = Storage::disk('local');
+        $current = (string) $import->stored_path;
+
+        if ($current === '' || ! $disk->exists($current)) {
+            throw ValidationException::withMessages([
+                'import' => __('The statement file is no longer available for re-import.'),
+            ]);
+        }
+
+        if (! str_contains($current, '/deleted/')) {
+            return $current;
+        }
+
+        $metadata = $import->metadata ?? [];
+        $target = $metadata['active_stored_path'] ?? null;
+
+        if (! is_string($target) || $target === '' || str_contains($target, '/deleted/')) {
+            $now = now();
+            $target = sprintf(
+                'banking/%d/%d/%02d/%s',
+                $import->account_id,
+                $now->year,
+                $now->month,
+                basename($current)
+            );
+        }
+
+        if ($disk->exists($target) && $target !== $current) {
+            $target = sprintf(
+                'banking/%d/%d/%02d/%s_%s',
+                $import->account_id,
+                now()->year,
+                now()->month,
+                $import->id,
+                basename($current)
+            );
+        }
+
+        $disk->move($current, $target);
+
+        return $target;
     }
 
     /**

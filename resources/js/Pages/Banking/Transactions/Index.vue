@@ -97,6 +97,9 @@ const clearFilters = () => {
                 <AppButton variant="secondary" @click="router.visit(route('banking.accounts.index'))">
                     Accounts
                 </AppButton>
+                <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
+                    Import history
+                </AppButton>
                 <AppButton variant="primary" @click="router.visit(route('banking.import.create'))">
                     Import statement
                 </AppButton>

@@ -225,6 +225,9 @@ const submit = () => {
                 <AppButton variant="secondary" @click="router.visit(route('banking.transactions.index'))">
                     View transactions
                 </AppButton>
+                <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
+                    Import history
+                </AppButton>
                 <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
                     Import statement
                 </AppButton>

@@ -29,6 +29,7 @@ class BankingAccount extends Model
         'type',
         'is_active',
         'gl_account_id',
+        'csv_mapping_profile',
     ];
 
     /**
@@ -38,6 +39,7 @@ class BankingAccount extends Model
     {
         return [
             'is_active' => 'boolean',
+            'csv_mapping_profile' => 'array',
         ];
     }
 

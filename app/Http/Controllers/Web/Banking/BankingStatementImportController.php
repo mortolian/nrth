@@ -64,6 +64,22 @@ class BankingStatementImportController extends Controller
 
         $extension = strtolower((string) $import->file_type);
         if (in_array($extension, ['csv', 'txt'], true)) {
+            $preview = $this->csvImporter->preview($this->importService->absolutePath($import));
+            $account->refresh();
+
+            if ($this->importService->profileMatches($account, $preview['headers'], $preview['delimiter'])) {
+                $profile = $account->csv_mapping_profile ?? [];
+                $parsed = $this->importService->parseImport($import, [
+                    'mapping' => $profile['mapping'] ?? [],
+                    'delimiter' => $preview['delimiter'],
+                    'headers' => $preview['headers'],
+                ]);
+
+                return redirect()->route('banking.import.preview', $import)
+                    ->with('summary', $this->importService->summarize($import, $parsed))
+                    ->with('mapping_from_profile', true);
+            }
+
             return redirect()->route('banking.import.map', $import);
         }
 
@@ -73,17 +89,29 @@ class BankingStatementImportController extends Controller
             ->with('summary', $this->importService->summarize($import, $parsed));
     }
 
-    public function map(BankingStatementImport $import): Response
+    public function map(BankingStatementImport $import): Response|RedirectResponse
     {
         $this->authorizeImport($import);
 
+        if (! in_array($import->file_type, ['csv', 'txt'], true)) {
+            return redirect()->route('banking.import.preview', $import);
+        }
+
+        if (! in_array($import->status, [ImportStatus::Pending, ImportStatus::Parsed], true)) {
+            return redirect()
+                ->route('banking.imports.index')
+                ->with('error', __('This import can no longer be remapped.'));
+        }
+
         $preview = $this->csvImporter->preview($this->importService->absolutePath($import));
+        $import->load('account');
 
         return Inertia::render('Banking/Import/MapCsv', [
             'bankImport' => $this->importPayload($import),
             'headers' => $preview['headers'],
             'rows' => $preview['rows'],
             'delimiter' => $preview['delimiter'],
+            'initialMapping' => $this->resolveInitialMapping($import, $preview['headers'], $preview['delimiter']),
             'mappingFields' => [
                 ['key' => 'transaction_date', 'label' => 'Transaction date', 'required' => true],
                 ['key' => 'description', 'label' => 'Description', 'required' => true],
@@ -100,6 +128,12 @@ class BankingStatementImportController extends Controller
     public function parseMapping(Request $request, BankingStatementImport $import): RedirectResponse
     {
         $this->authorizeImport($import);
+
+        if (! in_array($import->status, [ImportStatus::Pending, ImportStatus::Parsed], true)) {
+            return redirect()
+                ->route('banking.imports.index')
+                ->with('error', __('This import can no longer be remapped.'));
+        }
 
         $validated = $request->validate([
             'mapping' => ['required', 'array'],
@@ -126,11 +160,19 @@ class BankingStatementImportController extends Controller
         }
 
         $preview = $this->csvImporter->preview($this->importService->absolutePath($import));
+        $delimiter = $validated['delimiter'] ?? $preview['delimiter'];
         $parsed = $this->importService->parseImport($import, [
             'mapping' => $validated['mapping'],
-            'delimiter' => $validated['delimiter'] ?? $preview['delimiter'],
+            'delimiter' => $delimiter,
             'headers' => $preview['headers'],
         ]);
+
+        $this->importService->saveCsvMappingProfile(
+            $import->account,
+            $preview['headers'],
+            $delimiter,
+            $validated['mapping']
+        );
 
         return redirect()->route('banking.import.preview', $import)
             ->with('summary', $this->importService->summarize($import, $parsed));
@@ -172,6 +214,9 @@ class BankingStatementImportController extends Controller
             'bankImport' => $this->importPayload($import),
             'summary' => $summary,
             'canConfirm' => $import->status === ImportStatus::Parsed,
+            'canChangeMapping' => $import->status === ImportStatus::Parsed
+                && in_array($import->file_type, ['csv', 'txt'], true),
+            'mappingFromProfile' => (bool) $request->session()->get('mapping_from_profile', false),
         ]);
     }
 
@@ -185,22 +230,22 @@ class BankingStatementImportController extends Controller
                 ->with('error', __('Import is not ready to confirm.'));
         }
 
-        $options = [];
-        $metadata = $import->metadata ?? [];
-        if (isset($metadata['parsed']['mapping'])) {
-            $options['mapping'] = $metadata['parsed']['mapping'];
-        } elseif (isset($metadata['mapping'])) {
-            $options['mapping'] = $metadata['mapping'];
-        }
-        if (isset($metadata['parsed']['delimiter'])) {
-            $options['delimiter'] = $metadata['parsed']['delimiter'];
-        }
-        if (isset($metadata['parsed']['headers'])) {
-            $options['headers'] = $metadata['parsed']['headers'];
-        }
+        $options = $this->importService->parseOptionsFromMetadata($import);
 
         $parsed = $this->importService->parseImport($import, $options);
         $this->importService->confirmImport($import, $parsed);
+
+        if (
+            in_array($import->file_type, ['csv', 'txt'], true)
+            && isset($options['mapping'], $options['headers'], $options['delimiter'])
+        ) {
+            $this->importService->saveCsvMappingProfile(
+                $import->account,
+                $options['headers'],
+                (string) $options['delimiter'],
+                $options['mapping']
+            );
+        }
 
         return redirect()
             ->route('banking.transactions.index', [
@@ -209,14 +254,101 @@ class BankingStatementImportController extends Controller
             ->with('success', __('Bank statement imported successfully.'));
     }
 
+    public function index(Request $request): Response
+    {
+        $teamId = (int) $request->user()->current_team_id;
+        $accountId = (int) $request->integer('account_id');
+
+        $query = BankingStatementImport::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->with(['account:id,name,bank_name,currency']);
+
+        if ($accountId > 0) {
+            $query->where('account_id', $accountId);
+        }
+
+        $imports = $query
+            ->orderByDesc('id')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (BankingStatementImport $import): array => [
+                'id' => $import->id,
+                'original_filename' => $import->original_filename,
+                'file_type' => $import->file_type,
+                'status' => $import->status->value,
+                'total_rows' => $import->total_rows,
+                'imported_rows' => $import->imported_rows,
+                'duplicate_rows' => $import->duplicate_rows,
+                'failed_rows' => $import->failed_rows,
+                'can_undo' => $import->status === ImportStatus::Imported,
+                'can_reimport' => $import->status === ImportStatus::Undone
+                    && $this->importService->hasStoredFile($import),
+                'created_at' => $import->created_at?->toIso8601String(),
+                'updated_at' => $import->updated_at?->toIso8601String(),
+                'account' => [
+                    'id' => $import->account->id,
+                    'name' => $import->account->name,
+                    'bank_name' => $import->account->bank_name,
+                    'currency' => $import->account->currency,
+                ],
+            ]);
+
+        return Inertia::render('Banking/Import/History', [
+            'imports' => $imports,
+            'accounts' => $this->accountOptions(includeInactive: true),
+            'filters' => [
+                'account_id' => $accountId > 0 ? $accountId : null,
+            ],
+        ]);
+    }
+
+    public function undo(BankingStatementImport $import): RedirectResponse
+    {
+        $this->authorizeImport($import);
+
+        $this->importService->undoImport($import);
+
+        return redirect()
+            ->back()
+            ->with('success', __('Import undone. Transactions were removed; the statement file was kept for re-import.'));
+    }
+
+    public function reimport(BankingStatementImport $import): RedirectResponse
+    {
+        $this->authorizeImport($import);
+
+        $result = $this->importService->reimport($import);
+        $fresh = $result['import'];
+        $parsed = $result['parsed'];
+
+        if ($parsed === null) {
+            return redirect()
+                ->route('banking.import.map', $fresh)
+                ->with('info', __('Map columns to continue re-importing this statement.'));
+        }
+
+        $redirect = redirect()->route('banking.import.preview', $fresh)
+            ->with('summary', $this->importService->summarize($fresh, $parsed));
+
+        if ($result['mapping_from_profile']) {
+            $redirect->with('mapping_from_profile', true);
+        }
+
+        return $redirect->with('success', __('Statement restored. Review and confirm to import again.'));
+    }
+
     /**
      * @return list<array{id: int, name: string, bank_name: string|null, currency: string}>
      */
-    private function accountOptions(): array
+    private function accountOptions(bool $includeInactive = false): array
     {
-        return BankingAccount::query()
-            ->where('is_active', true)
-            ->orderBy('name')
+        $query = BankingAccount::query()->orderBy('name');
+
+        if (! $includeInactive) {
+            $query->where('is_active', true);
+        }
+
+        return $query
             ->get(['id', 'name', 'bank_name', 'currency'])
             ->map(fn (BankingAccount $account) => [
                 'id' => $account->id,
@@ -245,6 +377,44 @@ class BankingStatementImportController extends Controller
                 'currency' => $import->account->currency,
             ],
         ];
+    }
+
+    /**
+     * @param  list<string>  $headers
+     * @return array<string, string>
+     */
+    private function resolveInitialMapping(BankingStatementImport $import, array $headers, string $delimiter): array
+    {
+        $empty = [
+            'transaction_date' => '',
+            'description' => '',
+            'amount' => '',
+            'debit' => '',
+            'credit' => '',
+            'reference' => '',
+            'value_date' => '',
+            'running_balance' => '',
+            'date_format' => '',
+        ];
+
+        $metadata = $import->metadata ?? [];
+        $fromImport = $metadata['parsed']['mapping'] ?? ($metadata['mapping'] ?? null);
+        if (is_array($fromImport)) {
+            return array_merge($empty, array_intersect_key($fromImport, $empty));
+        }
+
+        $account = $import->account;
+        $profile = $account?->csv_mapping_profile;
+        if (
+            $account !== null
+            && is_array($profile)
+            && is_array($profile['mapping'] ?? null)
+            && $this->importService->profileMatches($account, $headers, $delimiter)
+        ) {
+            return array_merge($empty, array_intersect_key($profile['mapping'], $empty));
+        }
+
+        return $empty;
     }
 
     private function authorizeImport(BankingStatementImport $import): void

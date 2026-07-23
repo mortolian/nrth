@@ -23,11 +23,14 @@ const props = defineProps<{
     bankImport: {
         id: number;
         original_filename: string;
+        file_type: string;
         status: string;
         account: { id: number; name: string; currency: string };
     };
     summary: Summary;
     canConfirm: boolean;
+    canChangeMapping?: boolean;
+    mappingFromProfile?: boolean;
 }>();
 
 const pageTitle = computed(() => `Import preview — ${props.bankImport.original_filename}`);
@@ -49,6 +52,9 @@ const confirmImport = (importId: number) => {
         <PageHeader :title="pageTitle">
             <template #subtitle>
                 <p class="text-sm text-slate-500">{{ bankImport.account.name }} · {{ bankImport.account.currency }}</p>
+                <p v-if="mappingFromProfile" class="mt-1 text-sm text-slate-500">
+                    Columns were mapped using this account’s saved CSV profile.
+                </p>
             </template>
         </PageHeader>
 
@@ -96,13 +102,20 @@ const confirmImport = (importId: number) => {
             <p v-if="!summary.preview.length" class="mt-4 text-sm text-slate-500">No transactions to preview.</p>
         </AppCard>
 
-        <div class="mt-5 flex gap-3">
+        <div class="mt-5 flex flex-wrap gap-3">
             <AppButton
                 v-if="canConfirm"
                 variant="primary"
                 @click="confirmImport(bankImport.id)"
             >
                 Confirm import
+            </AppButton>
+            <AppButton
+                v-if="canChangeMapping"
+                variant="secondary"
+                @click="router.visit(route('banking.import.map', bankImport.id))"
+            >
+                Change mapping
             </AppButton>
             <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
                 Cancel

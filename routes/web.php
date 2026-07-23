@@ -82,6 +82,9 @@ Route::middleware([
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [BankingAccountController::class, 'store'])->name('accounts.store');
         Route::put('/accounts/{bankingAccount}', [BankingAccountController::class, 'update'])->name('accounts.update');
+        Route::get('/imports', [BankingStatementImportController::class, 'index'])->name('imports.index');
+        Route::post('/imports/{import}/undo', [BankingStatementImportController::class, 'undo'])->name('imports.undo');
+        Route::post('/imports/{import}/reimport', [BankingStatementImportController::class, 'reimport'])->name('imports.reimport');
         Route::get('/import', [BankingStatementImportController::class, 'create'])->name('import.create');
         Route::post('/import', [BankingStatementImportController::class, 'store'])->name('import.store');
         Route::get('/import/{import}/map', [BankingStatementImportController::class, 'map'])->name('import.map');
