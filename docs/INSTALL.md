@@ -46,7 +46,7 @@ cd /opt/nrth
 ./scripts/update
 ```
 
-Mode is chosen from `APP_ENV` in `.env` (`production` → full `app:update`; otherwise fast migrate). Optional override: `./scripts/update production`.
+Mode defaults to a **full** update (migrate, caches, asset build, verify). With `APP_ENV=production`, it also runs `app:update` (maintenance mode). Optional: `./scripts/update production` or `./scripts/update dev`.
 
 `./scripts/deploy.sh` still works as an alias.
 

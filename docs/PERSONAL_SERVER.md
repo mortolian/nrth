@@ -38,7 +38,15 @@ cd /opt/nrth
 
 **Automatic:** push to `master` → Actions job on the self-hosted runner runs `./scripts/update`.
 
-No image rebuild for normal PHP/Vue changes (bind-mounted source + Octane watch). `./scripts/update` rebuilds Vite assets when `resources/js`, `resources/css`, or related frontend inputs change (not only when `package-lock.json` changes). Lockfile changes still trigger `composer install` / `npm ci`.
+`./scripts/update` always:
+
+1. Resets the tree to `origin/master` and prints the commit
+2. Rebuilds Vite assets (`npm run build`)
+3. Refreshes Laravel config/route/view caches (even when `APP_ENV=local` from a `--lan` install)
+4. Restarts the app container
+5. Verifies `expenses.parse-receipt` exists and the Vite manifest is present
+
+If verification fails, the script exits non-zero. Use `SKIP_ASSETS=1` only when you intentionally skip the frontend build.
 
 ---
 
