@@ -424,7 +424,8 @@ const postScan = async (body: FormData) => {
     try {
         url = route('expenses.parse-receipt');
     } catch {
-        throw new Error('Scan route is missing. Run ./scripts/update on the server and hard-refresh.');
+        // Ziggy can lag behind after deploys / route:cache; path is stable.
+        url = '/expenses/parse-receipt';
     }
 
     let res: Response;
