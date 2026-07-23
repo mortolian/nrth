@@ -208,11 +208,11 @@ class Team extends JetstreamTeam implements HasMedia
             'invoice_show_street_address' => true,
             'invoice_email_subject_template' => 'Invoice {{number}} from {{company}}',
             'invoice_email_body_template' => "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{company}}",
-            'vat_registered' => true,
+            'vat_registered' => false,
             'vat_period_type' => 'bi_monthly',
             'default_tax_rate_id' => null,
             /** Master switch: hosted checkout on invoice + public pay page (Stripe, PayFast, …). */
-            'payment_pages_enabled' => true,
+            'payment_pages_enabled' => false,
             /** 0 = off (Laravel SESSION_LIFETIME only). Cap at config('session.lifetime'). */
             'session_idle_timeout_minutes' => 0,
             /** Optional AI provider (expenses, documents, …). Env keys are per-provider fallback. */

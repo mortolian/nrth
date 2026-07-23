@@ -72,7 +72,7 @@ class OnboardingController extends Controller
             ],
             'initial' => [
                 'team_name' => $team->name,
-                'vat_registered' => (bool) ($settings['vat_registered'] ?? true),
+                'vat_registered' => (bool) ($settings['vat_registered'] ?? false),
                 'vat_number' => (string) ($settings['vat_number'] ?? ''),
                 'financial_year_end_month' => (int) ($settings['financial_year_end_month'] ?? 2),
                 'industry' => (string) ($settings['industry'] ?? ''),

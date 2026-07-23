@@ -43,7 +43,7 @@ class PaymentPagesEnabledTest extends TestCase
         $this->assertSame([], InvoiceOnlinePaymentProviders::enabledForInvoice($invoice->fresh()));
     }
 
-    public function test_payment_pages_enabled_default_allows_configured_stripe(): void
+    public function test_payment_pages_enabled_default_blocks_configured_stripe(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -53,6 +53,36 @@ class PaymentPagesEnabledTest extends TestCase
             'company_settings' => array_replace_recursive(
                 is_array($team->company_settings) ? $team->company_settings : [],
                 [
+                    'payment_gateways' => [
+                        'stripe' => [
+                            'enabled' => true,
+                            'secret_key' => 'sk_test_fake',
+                            'publishable_key' => 'pk_test_fake',
+                        ],
+                    ],
+                ]
+            ),
+        ])->save();
+
+        $invoice = Invoice::factory()->for($team)->create([
+            'status' => InvoiceStatus::Sent,
+            'currency' => 'ZAR',
+        ]);
+
+        $this->assertSame([], InvoiceOnlinePaymentProviders::enabledForInvoice($invoice->fresh()));
+    }
+
+    public function test_payment_pages_enabled_allows_configured_stripe(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        $team->forceFill([
+            'company_settings' => array_replace_recursive(
+                is_array($team->company_settings) ? $team->company_settings : [],
+                [
+                    'payment_pages_enabled' => true,
                     'payment_gateways' => [
                         'stripe' => [
                             'enabled' => true,

@@ -117,10 +117,10 @@ const form = useForm({
     invoice_default_footer: String(props.settings.invoice_default_footer ?? ''),
     invoice_email_subject_template: String(props.settings.invoice_email_subject_template ?? ''),
     invoice_email_body_template: String(props.settings.invoice_email_body_template ?? ''),
-    vat_registered: Boolean(props.settings.vat_registered ?? true),
+    vat_registered: Boolean(props.settings.vat_registered ?? false),
     vat_period_type: String(props.settings.vat_period_type ?? 'bi_monthly'),
     default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
-    payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? true),
+    payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? false),
     session_idle_timeout_minutes: String(Number(props.settings.session_idle_timeout_minutes ?? 0)),
     ai: {
         provider: String((props.settings.ai as any)?.provider ?? 'openai'),

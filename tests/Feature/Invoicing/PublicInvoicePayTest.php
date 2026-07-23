@@ -23,6 +23,12 @@ class PublicInvoicePayTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
         $this->assertNotNull($team);
+        $team->forceFill([
+            'company_settings' => array_replace_recursive(
+                is_array($team->company_settings) ? $team->company_settings : [],
+                ['payment_pages_enabled' => true],
+            ),
+        ])->save();
 
         $invoice = Invoice::factory()
             ->for($team)
@@ -62,6 +68,12 @@ class PublicInvoicePayTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
         $this->assertNotNull($team);
+        $team->forceFill([
+            'company_settings' => array_replace_recursive(
+                is_array($team->company_settings) ? $team->company_settings : [],
+                ['payment_pages_enabled' => true],
+            ),
+        ])->save();
         $user->forceFill(['current_team_id' => $team->id])->save();
         $this->actingAs($user);
 
@@ -83,6 +95,12 @@ class PublicInvoicePayTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
         $this->assertNotNull($team);
+        $team->forceFill([
+            'company_settings' => array_replace_recursive(
+                is_array($team->company_settings) ? $team->company_settings : [],
+                ['payment_pages_enabled' => true],
+            ),
+        ])->save();
         $user->forceFill(['current_team_id' => $team->id])->save();
         $this->actingAs($user);
 

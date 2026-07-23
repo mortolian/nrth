@@ -74,7 +74,7 @@ const recordPaymentInvoice = computed(() => {
     };
 });
 
-const chargesVatForPayment = computed(() => page.props.vat_enabled !== false);
+const chargesVatForPayment = computed(() => Boolean(page.props.vat_enabled));
 
 const localFilters = ref({
     status: props.filters.status ?? 'all',

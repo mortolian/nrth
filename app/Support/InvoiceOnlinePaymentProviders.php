@@ -12,7 +12,7 @@ final class InvoiceOnlinePaymentProviders
      */
     public static function paymentPagesEnabledForSettings(array $mergedCompanySettings): bool
     {
-        return filter_var($mergedCompanySettings['payment_pages_enabled'] ?? true, FILTER_VALIDATE_BOOLEAN);
+        return filter_var($mergedCompanySettings['payment_pages_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     public static function paymentPagesEnabledForTeam(?Team $team): bool

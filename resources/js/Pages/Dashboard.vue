@@ -23,7 +23,7 @@ const props = defineProps({
     budget_progress: { type: Array, default: () => [] },
     budget_progress_currency: { type: String, default: 'ZAR' },
     vat_summary: { type: Object, default: () => ({}) },
-    vat_enabled: { type: Boolean, default: true },
+    vat_enabled: { type: Boolean, default: false },
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -406,7 +406,7 @@ const onInvoiceAction = (invoice, actionId) => {
         <RecordInvoicePaymentDrawer
             :open="paymentDrawerOpen"
             :invoice="paymentDrawerOpen ? recordPaymentInvoice : null"
-            :charges-vat="props.vat_enabled !== false"
+            :charges-vat="props.vat_enabled"
             @update:open="paymentDrawerOpen = $event"
         />
     </AppLayout>
