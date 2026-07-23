@@ -258,14 +258,13 @@ const submit = () => {
                 <div>
                     <label class="mb-1.5 block text-xs font-medium text-slate-500">Type</label>
                     <AppSelect v-model="typeChoice" :options="typeSelectOptions" />
-                    <div class="mt-2 min-h-10">
-                        <AppInput
-                            v-if="typeChoice === 'other'"
-                            v-model="customType"
-                            placeholder="Describe the account type"
-                            maxlength="50"
-                        />
-                    </div>
+                    <AppInput
+                        v-if="typeChoice === 'other'"
+                        v-model="customType"
+                        class="mt-2"
+                        placeholder="Describe the account type"
+                        maxlength="50"
+                    />
                     <p v-if="form.errors.type" class="mt-1.5 text-xs text-red-600">{{ form.errors.type }}</p>
                 </div>
                 <div>
