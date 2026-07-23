@@ -2,21 +2,21 @@
 #
 # Pull latest code and apply updates inside the Docker Compose stack.
 #
+# Reliability over speed: every update refreshes Laravel caches, rebuilds Vite
+# assets, restarts Octane, then verifies git HEAD and a critical route.
+#
 # Data safety: does NOT remove Docker volumes, run migrate:fresh, or rotate
 # database passwords. Migrations are incremental. `git reset --hard` only
 # affects tracked files in this clone (not Postgres, Redis, or storage volumes).
 #
-# Frontend: rebuilds Vite assets when JS/CSS/Vite inputs change (tracked via
-# git), not only when package-lock.json changes. `npm ci` still runs only when
-# the lockfile changes.
-#
 # Usage:
-#   ./scripts/update                 # mode from APP_ENV in .env (recommended)
-#   ./scripts/update production      # force production path (app:update)
-#   ./scripts/update dev             # force fast path (migrate + queue restart)
+#   ./scripts/update                 # full update (recommended)
+#   ./scripts/update production      # same + app:update maintenance path
+#   ./scripts/update dev             # migrate/queues only; still rebuilds assets + route cache
 #
 # Environment:
 #   SKIP_GIT=1          Skip git pull (CI already updated the tree)
+#   SKIP_ASSETS=1       Skip npm ci / npm run build (not recommended on servers)
 #   GIT_BRANCH=master   Branch to pull (default: master)
 #   COMPOSE=...         Override compose command (default: scripts/compose.sh)
 
@@ -27,6 +27,7 @@ cd "$ROOT_DIR"
 
 GIT_BRANCH="${GIT_BRANCH:-master}"
 COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
+SKIP_ASSETS="${SKIP_ASSETS:-0}"
 
 hash_file() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -58,17 +59,21 @@ resolve_mode() {
         "")
             ;;
         *)
-            echo "error: unknown mode '${arg}' (use production, dev, or omit to auto-detect)" >&2
+            echo "error: unknown mode '${arg}' (use production, dev, or omit for full update)" >&2
             exit 1
             ;;
     esac
 
+    # Default: full production-style update. --lan installs use APP_ENV=local but
+    # still need route/config cache + asset rebuild on every deploy.
     local app_env
     app_env="$(read_app_env)"
-    if [[ "$app_env" == "production" ]]; then
+    if [[ "$app_env" == "local" || "$app_env" == "development" ]]; then
+        echo full
+    elif [[ "$app_env" == "production" ]]; then
         echo production
     else
-        echo dev
+        echo full
     fi
 }
 
@@ -89,6 +94,11 @@ if [[ "${SKIP_GIT:-0}" != "1" ]] && [[ -d .git ]] && [[ "$(id -u)" -ne 0 ]]; the
     fi
 fi
 
+BEFORE_COMMIT=""
+if [[ -d .git ]]; then
+    BEFORE_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || true)"
+fi
+
 if [[ "${SKIP_GIT:-0}" != "1" ]]; then
     if [[ -d .git ]] && { ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; }; then
         echo "warning: uncommitted changes in ${ROOT_DIR} will be discarded by git reset --hard"
@@ -97,6 +107,21 @@ if [[ "${SKIP_GIT:-0}" != "1" ]]; then
     echo "==> Pulling latest from origin/${GIT_BRANCH} (git reset --hard — code tree only)"
     git fetch origin "${GIT_BRANCH}"
     git reset --hard "origin/${GIT_BRANCH}"
+fi
+
+AFTER_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+AFTER_SHORT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+AFTER_SUBJECT="$(git log -1 --pretty=%s 2>/dev/null || echo '')"
+REMOTE_COMMIT="$(git rev-parse "origin/${GIT_BRANCH}" 2>/dev/null || echo '')"
+
+if [[ -n "$REMOTE_COMMIT" && "$AFTER_COMMIT" != "$REMOTE_COMMIT" ]]; then
+    echo "error: HEAD (${AFTER_SHORT}) does not match origin/${GIT_BRANCH} ($(git rev-parse --short "$REMOTE_COMMIT"))." >&2
+    exit 1
+fi
+
+echo "==> Code: ${AFTER_SHORT} — ${AFTER_SUBJECT}"
+if [[ -n "$BEFORE_COMMIT" && "$BEFORE_COMMIT" != "$AFTER_SHORT" ]]; then
+    echo "    (was ${BEFORE_COMMIT})"
 fi
 
 echo "==> Ensuring stack is up (applies compose/.env changes; volumes preserved)"
@@ -110,28 +135,6 @@ STATE_DIR="$ROOT_DIR/storage/framework"
 mkdir -p "$STATE_DIR"
 COMPOSER_HASH_FILE="$STATE_DIR/.deploy-composer-hash"
 NPM_LOCK_HASH_FILE="$STATE_DIR/.deploy-npm-hash"
-ASSETS_HASH_FILE="$STATE_DIR/.deploy-assets-hash"
-
-# Prefer git history for "did frontend change?" — covers Vue/CSS without touching package-lock.
-frontend_inputs_hash() {
-    if [[ -d .git ]]; then
-        git log -1 --format=%H -- \
-            package.json \
-            package-lock.json \
-            vite.config.js \
-            vite.config.ts \
-            vite.config.mjs \
-            tsconfig.json \
-            resources/js \
-            resources/css \
-            resources/views \
-            2>/dev/null || echo "unknown"
-        return
-    fi
-
-    # Non-git fallback: lockfile only (same as historical behaviour).
-    hash_file package-lock.json
-}
 
 CURRENT_COMPOSER="$(hash_file composer.lock)"
 if [[ ! -f "$COMPOSER_HASH_FILE" ]] || [[ "$(cat "$COMPOSER_HASH_FILE")" != "$CURRENT_COMPOSER" ]]; then
@@ -142,60 +145,89 @@ else
     echo "==> composer.lock unchanged — skipping composer install"
 fi
 
-CURRENT_NPM_LOCK="$(hash_file package-lock.json)"
-CURRENT_ASSETS="$(frontend_inputs_hash)"
-NEED_NPM_CI=0
-NEED_BUILD=0
+BUILT_ASSETS=0
+if [[ "$SKIP_ASSETS" == "1" ]]; then
+    echo "==> SKIP_ASSETS=1 — skipping npm install/build"
+else
+    CURRENT_NPM_LOCK="$(hash_file package-lock.json)"
+    if [[ ! -f "$NPM_LOCK_HASH_FILE" ]] || [[ "$(cat "$NPM_LOCK_HASH_FILE")" != "$CURRENT_NPM_LOCK" ]]; then
+        echo "==> package-lock.json changed — installing npm dependencies"
+        run_app npm ci --no-audit --no-fund
+        echo "$CURRENT_NPM_LOCK" > "$NPM_LOCK_HASH_FILE"
+    else
+        echo "==> package-lock.json unchanged — skipping npm ci"
+    fi
 
-if [[ ! -f "$NPM_LOCK_HASH_FILE" ]] || [[ "$(cat "$NPM_LOCK_HASH_FILE")" != "$CURRENT_NPM_LOCK" ]]; then
-    NEED_NPM_CI=1
-    NEED_BUILD=1
-fi
-
-if [[ ! -f "$ASSETS_HASH_FILE" ]] || [[ "$(cat "$ASSETS_HASH_FILE")" != "$CURRENT_ASSETS" ]]; then
-    NEED_BUILD=1
+    echo "==> Building frontend assets (npm run build)"
+    run_app npm run build
+    BUILT_ASSETS=1
+    rm -f "$STATE_DIR/.deploy-assets-hash" 2>/dev/null || true
 fi
 
 if ! run_app test -f public/build/manifest.json 2>/dev/null; then
-    echo "==> Vite manifest missing — frontend build required"
-    NEED_BUILD=1
+    echo "error: public/build/manifest.json missing after update. Frontend assets were not built." >&2
+    exit 1
 fi
 
-if [[ "$NEED_NPM_CI" -eq 1 ]]; then
-    echo "==> package-lock.json changed — installing npm dependencies"
-    run_app npm ci --no-audit --no-fund
-    echo "$CURRENT_NPM_LOCK" > "$NPM_LOCK_HASH_FILE"
-else
-    echo "==> package-lock.json unchanged — skipping npm ci"
-fi
-
-if [[ "$NEED_BUILD" -eq 1 ]]; then
-    echo "==> Frontend inputs changed — building assets (npm run build)"
-    run_app npm run build
-    echo "$CURRENT_ASSETS" > "$ASSETS_HASH_FILE"
-    # Keep lock hash in sync even when only sources changed (ci already skipped).
-    echo "$CURRENT_NPM_LOCK" > "$NPM_LOCK_HASH_FILE"
-else
-    echo "==> Frontend inputs unchanged — skipping npm build"
-fi
+refresh_caches() {
+    echo "==> Refreshing Laravel config / route / view caches"
+    run_app php artisan config:clear --no-interaction
+    run_app php artisan route:clear --no-interaction
+    run_app php artisan view:clear --no-interaction
+    run_app php artisan config:cache --no-interaction
+    run_app php artisan route:cache --no-interaction
+    run_app php artisan view:cache --no-interaction
+}
 
 if [[ "$MODE" == "production" ]]; then
     echo "==> Running production update (maintenance mode, migrate, caches, workers)"
     run_app php artisan app:update
 else
-    echo "==> Running development update (migrate + queue restart)"
+    echo "==> Running update (migrate + queue restart + caches) [mode=${MODE}]"
     run_app php artisan migrate --force --no-interaction
     run_app php artisan nrth:promote-first-operator
     run_app php artisan queue:restart
     run_app php artisan horizon:terminate 2>/dev/null || true
     $COMPOSE restart worker 2>/dev/null || true
+    refresh_caches
 fi
 
 echo "==> Restarting app (Octane picks up code and environment changes)"
 $COMPOSE restart app
 
+echo "==> Verifying deploy"
+VERIFY_OK=1
+if ! run_app php artisan route:list --name=expenses.parse-receipt --json 2>/dev/null | grep -q parse-receipt; then
+    # Fallback without --json for older artisan output
+    if ! run_app php artisan route:list --name=expenses.parse-receipt 2>/dev/null | grep -q parse-receipt; then
+        echo "    FAIL: route expenses.parse-receipt is missing"
+        VERIFY_OK=0
+    else
+        echo "    OK: route expenses.parse-receipt"
+    fi
+else
+    echo "    OK: route expenses.parse-receipt"
+fi
+
+if run_app test -f public/build/manifest.json 2>/dev/null; then
+    echo "    OK: Vite manifest present"
+else
+    echo "    FAIL: Vite manifest missing"
+    VERIFY_OK=0
+fi
+
 echo ""
 echo "Update finished ($(date -u +"%Y-%m-%d %H:%M:%S UTC"))."
-echo "  Mode: ${MODE} (from APP_ENV / CLI)"
-echo "  Commit: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+echo "  Mode: ${MODE} (APP_ENV=$(read_app_env))"
+echo "  Commit: ${AFTER_SHORT} — ${AFTER_SUBJECT}"
+echo "  Matches origin/${GIT_BRANCH}: yes"
+echo "  Assets rebuilt: $([[ "$BUILT_ASSETS" -eq 1 ]] && echo yes || echo no)"
 echo "  Data: volumes and database preserved; pending migrations applied only"
+
+if [[ "$VERIFY_OK" -ne 1 ]]; then
+    echo "" >&2
+    echo "error: deploy verification failed — see FAIL lines above." >&2
+    exit 1
+fi
+
+echo "  Verification: passed"
