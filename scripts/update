@@ -6,6 +6,10 @@
 # database passwords. Migrations are incremental. `git reset --hard` only
 # affects tracked files in this clone (not Postgres, Redis, or storage volumes).
 #
+# Frontend: rebuilds Vite assets when JS/CSS/Vite inputs change (tracked via
+# git), not only when package-lock.json changes. `npm ci` still runs only when
+# the lockfile changes.
+#
 # Usage:
 #   ./scripts/update                 # mode from APP_ENV in .env (recommended)
 #   ./scripts/update production      # force production path (app:update)
@@ -105,7 +109,29 @@ run_app() {
 STATE_DIR="$ROOT_DIR/storage/framework"
 mkdir -p "$STATE_DIR"
 COMPOSER_HASH_FILE="$STATE_DIR/.deploy-composer-hash"
-NPM_HASH_FILE="$STATE_DIR/.deploy-npm-hash"
+NPM_LOCK_HASH_FILE="$STATE_DIR/.deploy-npm-hash"
+ASSETS_HASH_FILE="$STATE_DIR/.deploy-assets-hash"
+
+# Prefer git history for "did frontend change?" — covers Vue/CSS without touching package-lock.
+frontend_inputs_hash() {
+    if [[ -d .git ]]; then
+        git log -1 --format=%H -- \
+            package.json \
+            package-lock.json \
+            vite.config.js \
+            vite.config.ts \
+            vite.config.mjs \
+            tsconfig.json \
+            resources/js \
+            resources/css \
+            resources/views \
+            2>/dev/null || echo "unknown"
+        return
+    fi
+
+    # Non-git fallback: lockfile only (same as historical behaviour).
+    hash_file package-lock.json
+}
 
 CURRENT_COMPOSER="$(hash_file composer.lock)"
 if [[ ! -f "$COMPOSER_HASH_FILE" ]] || [[ "$(cat "$COMPOSER_HASH_FILE")" != "$CURRENT_COMPOSER" ]]; then
@@ -116,14 +142,41 @@ else
     echo "==> composer.lock unchanged — skipping composer install"
 fi
 
-CURRENT_NPM="$(hash_file package-lock.json)"
-if [[ ! -f "$NPM_HASH_FILE" ]] || [[ "$(cat "$NPM_HASH_FILE")" != "$CURRENT_NPM" ]]; then
-    echo "==> package-lock.json changed — installing npm deps and building assets"
+CURRENT_NPM_LOCK="$(hash_file package-lock.json)"
+CURRENT_ASSETS="$(frontend_inputs_hash)"
+NEED_NPM_CI=0
+NEED_BUILD=0
+
+if [[ ! -f "$NPM_LOCK_HASH_FILE" ]] || [[ "$(cat "$NPM_LOCK_HASH_FILE")" != "$CURRENT_NPM_LOCK" ]]; then
+    NEED_NPM_CI=1
+    NEED_BUILD=1
+fi
+
+if [[ ! -f "$ASSETS_HASH_FILE" ]] || [[ "$(cat "$ASSETS_HASH_FILE")" != "$CURRENT_ASSETS" ]]; then
+    NEED_BUILD=1
+fi
+
+if ! run_app test -f public/build/manifest.json 2>/dev/null; then
+    echo "==> Vite manifest missing — frontend build required"
+    NEED_BUILD=1
+fi
+
+if [[ "$NEED_NPM_CI" -eq 1 ]]; then
+    echo "==> package-lock.json changed — installing npm dependencies"
     run_app npm ci --no-audit --no-fund
-    run_app npm run build
-    echo "$CURRENT_NPM" > "$NPM_HASH_FILE"
+    echo "$CURRENT_NPM_LOCK" > "$NPM_LOCK_HASH_FILE"
 else
-    echo "==> package-lock.json unchanged — skipping npm build"
+    echo "==> package-lock.json unchanged — skipping npm ci"
+fi
+
+if [[ "$NEED_BUILD" -eq 1 ]]; then
+    echo "==> Frontend inputs changed — building assets (npm run build)"
+    run_app npm run build
+    echo "$CURRENT_ASSETS" > "$ASSETS_HASH_FILE"
+    # Keep lock hash in sync even when only sources changed (ci already skipped).
+    echo "$CURRENT_NPM_LOCK" > "$NPM_LOCK_HASH_FILE"
+else
+    echo "==> Frontend inputs unchanged — skipping npm build"
 fi
 
 if [[ "$MODE" == "production" ]]; then
