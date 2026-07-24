@@ -258,28 +258,49 @@ onBeforeUnmount(() => {
             subtitle="Tax data takeouts for your team, and whole-server backups for operators"
         />
 
-        <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-2">
-            <button
-                v-if="can_generate_takeout"
-                type="button"
-                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-                :class="section === 'takeout' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-                @click="setSection('takeout')"
-            >
-                Data takeout
-            </button>
-            <button
-                v-if="can_manage_backups"
-                type="button"
-                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-                :class="section === 'backup' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-                @click="setSection('backup')"
-            >
-                Instance backup
-            </button>
-        </div>
+        <nav
+            v-if="can_generate_takeout && can_manage_backups"
+            class="mt-5 border-b border-slate-200"
+            aria-label="Backups and exports sections"
+        >
+            <div class="-mb-px flex gap-6" role="tablist">
+                <button
+                    type="button"
+                    role="tab"
+                    id="backups-tab-takeout"
+                    :aria-selected="section === 'takeout'"
+                    aria-controls="backups-panel-takeout"
+                    class="border-b-2 px-0.5 pb-3 text-sm font-medium transition"
+                    :class="section === 'takeout'
+                        ? 'border-brand-600 text-brand-800'
+                        : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'"
+                    @click="setSection('takeout')"
+                >
+                    Data takeout
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    id="backups-tab-backup"
+                    :aria-selected="section === 'backup'"
+                    aria-controls="backups-panel-backup"
+                    class="border-b-2 px-0.5 pb-3 text-sm font-medium transition"
+                    :class="section === 'backup'
+                        ? 'border-brand-600 text-brand-800'
+                        : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800'"
+                    @click="setSection('backup')"
+                >
+                    Instance backup
+                </button>
+            </div>
+        </nav>
 
-        <template v-if="section === 'takeout' && can_generate_takeout && period && preview">
+        <section
+            v-if="section === 'takeout' && can_generate_takeout && period && preview"
+            id="backups-panel-takeout"
+            :role="can_manage_backups ? 'tabpanel' : undefined"
+            :aria-labelledby="can_manage_backups ? 'backups-tab-takeout' : undefined"
+        >
             <div class="mt-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-900">Data takeout</h2>
@@ -411,9 +432,14 @@ onBeforeUnmount(() => {
                     </table>
                 </div>
             </AppCard>
-        </template>
+        </section>
 
-        <template v-else-if="section === 'backup' && can_manage_backups">
+        <section
+            v-else-if="section === 'backup' && can_manage_backups"
+            id="backups-panel-backup"
+            :role="can_generate_takeout ? 'tabpanel' : undefined"
+            :aria-labelledby="can_generate_takeout ? 'backups-tab-backup' : undefined"
+        >
             <div class="mt-5 flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-900">Instance backup</h2>
@@ -485,6 +511,6 @@ onBeforeUnmount(() => {
                     </table>
                 </div>
             </AppCard>
-        </template>
+        </section>
     </AppLayout>
 </template>
