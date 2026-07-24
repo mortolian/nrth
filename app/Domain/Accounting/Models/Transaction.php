@@ -113,4 +113,41 @@ class Transaction extends Model implements HasMedia
     {
         return $this->getMedia('attachments');
     }
+
+    /**
+     * User-facing reference for lists and statements.
+     * Expenses store the receipt/invoice number in expense_meta; other types use the column.
+     */
+    public function displayReference(): ?string
+    {
+        if ($this->type === TransactionType::Expense) {
+            $external = trim((string) (($this->expense_meta ?? [])['external_reference'] ?? ''));
+
+            return $external !== '' ? $external : null;
+        }
+
+        $reference = trim((string) ($this->reference ?? ''));
+
+        return $reference !== '' ? $reference : null;
+    }
+
+    /**
+     * Counterparty label for lists. Prefers the live supplier name when linked.
+     */
+    public function displaySupplier(): ?string
+    {
+        if ($this->supplier !== null) {
+            $name = trim((string) $this->supplier->name);
+
+            return $name !== '' ? $name : null;
+        }
+
+        if ($this->type === TransactionType::Expense) {
+            $fallback = trim((string) ($this->reference ?? ''));
+
+            return $fallback !== '' ? $fallback : null;
+        }
+
+        return null;
+    }
 }

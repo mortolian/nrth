@@ -24,7 +24,7 @@ class AccountStatementController extends Controller
         $baseQuery = JournalEntry::query()
             ->where('account_id', $account->id)
             ->whereHas('transaction', fn ($q) => $q->where('team_id', $account->team_id))
-            ->with('transaction:id,reference,description,transaction_date');
+            ->with('transaction:id,type,reference,description,expense_meta,transaction_date');
 
         $openingEntries = (clone $baseQuery)
             ->whereHas('transaction', fn ($q) => $q->whereDate('transaction_date', '<', $from))
@@ -53,7 +53,7 @@ class AccountStatementController extends Controller
             return [
                 'id' => $entry->id,
                 'date' => optional($entry->transaction?->transaction_date)->toDateString(),
-                'reference' => $entry->transaction?->reference,
+                'reference' => $entry->transaction?->displayReference(),
                 'description' => $entry->description ?: $entry->transaction?->description,
                 'debit' => $debit,
                 'credit' => $credit,

@@ -10,11 +10,13 @@ type LedgerRow = {
     date: string | null;
     type: string;
     reference: string | null;
+    supplier: string | null;
     description: string | null;
     accounts_affected: string;
     total_amount: number;
     status: string;
     can_delete: boolean;
+    can_edit_expense: boolean;
     invoice_payment_undo: { invoice_id: number; payment_id: number } | null;
     journal_entries: Array<{
         id: number;
@@ -84,6 +86,9 @@ const toggleExpanded = (id: number) => {
 
 const rowActionItems = (row: LedgerRow) => {
     const actions = [{ id: 'view_journal', label: 'View journal entries' }];
+    if (row.can_edit_expense) {
+        actions.push({ id: 'edit_expense', label: 'Edit expense' });
+    }
     if (row.invoice_payment_undo !== null) {
         actions.push({ id: 'undo_invoice_payment', label: 'Undo invoice payment' });
     }
@@ -96,6 +101,8 @@ const rowActionItems = (row: LedgerRow) => {
 const onTransactionAction = (transaction: LedgerRow, actionId: string) => {
     if (actionId === 'view_journal') {
         toggleExpanded(transaction.id);
+    } else if (actionId === 'edit_expense') {
+        router.visit(route('expenses.edit', transaction.id));
     } else if (actionId === 'undo_invoice_payment' && transaction.invoice_payment_undo !== null) {
         if (
             !window.confirm(
@@ -246,8 +253,13 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                                     {{ transaction.status }}
                                 </AppBadge>
                             </div>
-                            <p class="text-sm font-medium text-brand-700">
+                            <p class="text-sm text-slate-800">
+                                <span class="text-slate-500">Ref:</span>
                                 {{ transaction.reference || '—' }}
+                            </p>
+                            <p class="text-sm text-slate-800">
+                                <span class="text-slate-500">Supplier:</span>
+                                {{ transaction.supplier || '—' }}
                             </p>
                             <p class="text-sm leading-snug text-slate-600">
                                 {{ transaction.description || '—' }}
@@ -314,12 +326,13 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
             <!-- Desktop: wide table scrolls horizontally instead of squashing -->
             <div class="hidden md:block">
                 <AppTable
-                    table-class="min-w-[960px]"
+                    table-class="min-w-[1080px] text-sm"
                     :show-pagination="false"
                     :columns="[
                         { key: 'date', label: 'Date', widthClass: 'whitespace-nowrap' },
                         { key: 'type', label: 'Type', widthClass: 'whitespace-nowrap' },
                         { key: 'reference', label: 'Reference', widthClass: 'max-w-[10rem] xl:max-w-none' },
+                        { key: 'supplier', label: 'Supplier', widthClass: 'max-w-[10rem] xl:max-w-none' },
                         { key: 'description', label: 'Description', widthClass: 'max-w-[14rem] xl:max-w-md' },
                         { key: 'accounts', label: 'Accounts affected', widthClass: 'max-w-[12rem] xl:max-w-sm' },
                         { key: 'amount', label: 'Amount', widthClass: 'whitespace-nowrap tabular-nums' },
@@ -332,21 +345,22 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                 >
                     <template v-for="transaction in transactions.data" :key="transaction.id">
                         <tr class="cursor-pointer hover:bg-slate-50" @click="toggleExpanded(transaction.id)">
-                            <td class="px-4 py-3 whitespace-nowrap">{{ transaction.date || '-' }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap">
+                            <td class="px-3 py-2 whitespace-nowrap">{{ transaction.date || '-' }}</td>
+                            <td class="px-3 py-2 whitespace-nowrap">
                                 <AppBadge variant="info">{{ transaction.type }}</AppBadge>
                             </td>
-                            <td class="px-4 py-3">
-                                <a class="text-brand-700 hover:underline" href="#" @click.stop>{{ transaction.reference || '—' }}</a>
+                            <td class="px-3 py-2 whitespace-nowrap">{{ transaction.reference || '—' }}</td>
+                            <td class="px-3 py-2">
+                                <span class="line-clamp-2" :title="transaction.supplier || ''">{{ transaction.supplier || '—' }}</span>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 <span class="line-clamp-2" :title="transaction.description || ''">{{ transaction.description || '—' }}</span>
                             </td>
-                            <td class="px-4 py-3">
+                            <td class="px-3 py-2">
                                 <span class="line-clamp-2 text-slate-600" :title="transaction.accounts_affected">{{ transaction.accounts_affected }}</span>
                             </td>
-                            <td class="px-4 py-3 whitespace-nowrap tabular-nums">{{ formatCents(transaction.total_amount) }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap">
+                            <td class="px-3 py-2 whitespace-nowrap tabular-nums">{{ formatCents(transaction.total_amount) }}</td>
+                            <td class="px-3 py-2 whitespace-nowrap">
                                 <AppBadge
                                     :variant="statusBadgeVariant(transaction.status)"
                                     :class="transaction.status === 'void' ? 'line-through' : ''"
@@ -354,7 +368,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                                     {{ transaction.status }}
                                 </AppBadge>
                             </td>
-                            <td class="px-4 py-3 text-right align-middle" @click.stop>
+                            <td class="px-3 py-2 text-right align-middle" @click.stop>
                                 <div class="inline-flex justify-end">
                                     <InvoiceRowActionsMenu
                                         :actions="rowActionItems(transaction)"
@@ -365,7 +379,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                             </td>
                         </tr>
                         <tr v-if="expandedRows.includes(transaction.id)">
-                            <td colspan="8" class="bg-slate-50 px-4 py-3">
+                            <td colspan="9" class="bg-slate-50 px-3 py-2">
                                 <div :class="journalLinesBlock">
                                     <table class="min-w-full text-sm">
                                         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -399,7 +413,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                         </tr>
                     </template>
                     <tr v-if="!transactions.data.length">
-                        <td colspan="8" class="px-4 py-6">
+                        <td colspan="9" class="px-3 py-6">
                             <EmptyState title="No transactions found" description="Try broadening your filters." />
                         </td>
                     </tr>

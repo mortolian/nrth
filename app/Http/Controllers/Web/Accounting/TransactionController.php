@@ -42,6 +42,7 @@ class TransactionController extends Controller
             ->where('team_id', $teamId)
             ->with([
                 'journalEntries.account',
+                'supplier:id,name',
                 'payments' => fn ($q) => $q
                     ->select(['id', 'team_id', 'invoice_id', 'transaction_id'])
                     ->where('team_id', $teamId)
@@ -64,9 +65,12 @@ class TransactionController extends Controller
             $query->whereHas('journalEntries', fn ($q) => $q->where('account_id', $accountId));
         }
         if ($search !== '') {
-            $query->where(function ($q) use ($search): void {
-                $q->where('reference', 'like', '%'.$search.'%')
-                    ->orWhere('description', 'like', '%'.$search.'%');
+            $like = '%'.$search.'%';
+            $query->where(function ($q) use ($like): void {
+                $q->where('reference', 'like', $like)
+                    ->orWhere('description', 'like', $like)
+                    ->orWhere('expense_meta->external_reference', 'like', $like)
+                    ->orWhereHas('supplier', fn ($supplierQuery) => $supplierQuery->where('name', 'like', $like));
             });
         }
 
@@ -105,10 +109,12 @@ class TransactionController extends Controller
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
                     'type' => $transaction->type->value,
-                    'reference' => $transaction->reference,
+                    'reference' => $transaction->displayReference(),
+                    'supplier' => $transaction->displaySupplier(),
                     'description' => $transaction->description,
                     'status' => $transaction->status->value,
                     'can_delete' => DeleteTransactionAction::canDelete($transaction),
+                    'can_edit_expense' => $transaction->type === TransactionType::Expense,
                     'invoice_payment_undo' => $invoicePaymentUndo,
                     'total_amount' => $amount,
                     'accounts_affected' => $debitAccount.' -> '.$creditAccount,
