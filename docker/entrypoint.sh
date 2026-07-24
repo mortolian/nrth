@@ -85,4 +85,26 @@ if [ "${DOCKER_ROLE:-app}" = "app" ]; then
     fi
 fi
 
+# Ensure Laravel can write logs, cache, takeouts, and Spatie backup zips.
+# App/Octane, scheduler, and Horizon all share the storage_data volume.
+mkdir -p \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/logs \
+    storage/app/private \
+    storage/app/public \
+    storage/app/backup-temp \
+    bootstrap/cache
+if [ "$(id -u)" = "0" ]; then
+    # World-writable dirs avoid root-vs-www-data fights on the shared volume.
+    chmod -R a+rwX storage bootstrap/cache 2>/dev/null || true
+    if [ -f storage/logs/laravel.log ]; then
+        chmod a+rw storage/logs/laravel.log 2>/dev/null || true
+    else
+        : > storage/logs/laravel.log
+        chmod a+rw storage/logs/laravel.log 2>/dev/null || true
+    fi
+fi
+
 exec "$@"
