@@ -59,9 +59,13 @@ Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first adm
 |--|--------------|-----------------|
 | Who | Team owner | Instance operator |
 | What | Period tax/audit zip | Whole install (DB + files) |
-| Restore | N/A | CLI only (not in the app) |
+| Restore | N/A | CLI via **Backups & exports → Instance restore guide** (generated script; not one-click in-app) |
 
 Optional break-glass: `NRTH_OPERATOR_EMAILS` in `.env`. Existing installs with no operators: `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` (also run by `./scripts/update`).
+
+### Restore (CLI)
+
+There is no in-app one-click restore. On **Backups & exports → Instance backup**, operators can open **Instance restore guide**, pick a ready zip, and copy/download a shell script for `./scripts/compose.sh` (self-host) or Sail. The script extracts the dump, stops app services, replaces the Postgres database, then starts services again. Review the script before running — it replaces the live database.
 
 ### Optional AI
 

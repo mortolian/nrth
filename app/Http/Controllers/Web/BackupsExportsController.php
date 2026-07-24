@@ -59,7 +59,8 @@ class BackupsExportsController extends Controller
             'document_categories' => [],
             'recent_takeouts' => [],
             'recent_backups' => [],
-            'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Restore is CLI/docs only — not available in the app.',
+            'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Use the restore guide below for CLI recovery — there is no one-click restore in the app.',
+            'restore_guide' => null,
         ];
 
         if ($isOwner) {
@@ -69,6 +70,7 @@ class BackupsExportsController extends Controller
         if ($canManageBackups) {
             $this->backups->syncDiskBackupsIntoRuns();
             $props['recent_backups'] = $this->backupRunProps();
+            $props['restore_guide'] = $this->backups->restoreGuideProps();
         }
 
         return Inertia::render('BackupsExports/Index', $props);

@@ -80,6 +80,8 @@ class BackupsExportsControllerTest extends TestCase
             ->where('can_manage_backups', true)
             ->where('section', 'backup')
             ->has('recent_backups')
+            ->has('restore_guide')
+            ->has('restore_guide.container_zip_dir')
             ->has('backup_schedule_hint'));
     }
 

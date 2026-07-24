@@ -221,6 +221,34 @@ class InstanceBackupService
     }
 
     /**
+     * Metadata for the operator restore-guide panel (script generation in the UI).
+     *
+     * @return array{
+     *     backup_name: string,
+     *     container_zip_dir: string,
+     *     db_connection: string,
+     *     db_database: string,
+     *     db_username: string,
+     *     archive_password_configured: bool
+     * }
+     */
+    public function restoreGuideProps(): array
+    {
+        $connection = (string) config('database.default');
+        $backupName = (string) config('backup.backup.name', 'nrth');
+
+        return [
+            'backup_name' => $backupName,
+            // Spatie stores zips under {backup.name}/ on the local disk (storage/app/private).
+            'container_zip_dir' => 'storage/app/private/'.$backupName,
+            'db_connection' => $connection,
+            'db_database' => (string) config("database.connections.{$connection}.database"),
+            'db_username' => (string) config("database.connections.{$connection}.username"),
+            'archive_password_configured' => filled(config('backup.backup.password')),
+        ];
+    }
+
+    /**
      * @return list<string>
      */
     public function backupFilenames(): array
