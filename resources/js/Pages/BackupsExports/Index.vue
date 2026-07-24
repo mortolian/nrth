@@ -353,31 +353,27 @@ onBeforeUnmount(() => {
                 </div>
             </AppCard>
 
-            <AppCard class="mt-5">
-                <h3 class="text-base font-semibold text-slate-900">Pre-flight summary</h3>
-                <p class="mt-1 text-sm text-slate-600">{{ period.from }} to {{ period.to }}</p>
-                <ul class="mt-3 space-y-1 text-sm text-slate-700">
-                    <li>{{ preview.invoices_count }} invoice(s)</li>
-                    <li>{{ preview.expenses_count }} expense(s), {{ preview.expense_receipts_count }} with receipts</li>
-                    <li>{{ preview.bank_statement_files }} bank statement file(s)</li>
-                    <li>{{ preview.contracts_count }} contract(s)</li>
-                    <li>{{ preview.vat_periods_count }} VAT period(s)</li>
-                </ul>
-                <div v-if="hasGaps" class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div class="mt-5">
+                <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Pre-flight summary</h3>
+                        <p class="mt-1 text-sm text-slate-600">{{ period.from }} to {{ period.to }}</p>
+                    </div>
+                </div>
+                <div v-if="hasGaps" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                     <p class="font-medium">Warnings</p>
                     <ul class="mt-1 list-disc pl-4">
                         <li v-for="gap in preview.gaps" :key="gap">{{ gap }}</li>
                     </ul>
                 </div>
-            </AppCard>
-
-            <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <AppCard v-for="category in document_categories" :key="category.key">
-                    <h3 class="text-base font-semibold text-slate-900">{{ category.label }}</h3>
-                    <p class="mt-2 text-sm text-slate-600">Count: {{ category.count }}</p>
-                    <p v-if="category.total > 0" class="text-sm text-slate-600">Total value: {{ formatCents(category.total) }}</p>
-                    <p v-if="category.warning" class="mt-2 text-xs text-amber-700">{{ category.warning }}</p>
-                </AppCard>
+                <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <AppCard v-for="category in document_categories" :key="category.key">
+                        <h3 class="text-base font-semibold text-slate-900">{{ category.label }}</h3>
+                        <p class="mt-2 text-sm text-slate-600">Count: {{ category.count }}</p>
+                        <p v-if="category.total > 0" class="text-sm text-slate-600">Total value: {{ formatCents(category.total) }}</p>
+                        <p v-if="category.warning" class="mt-2 text-xs text-amber-700">{{ category.warning }}</p>
+                    </AppCard>
+                </div>
             </div>
 
             <AppCard class="mt-5">
