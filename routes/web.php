@@ -71,12 +71,12 @@ Route::middleware([
     Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');
     Route::get('/backups-exports', [BackupsExportsController::class, 'index'])->name('backups-exports.index');
     Route::post('/backups-exports/backups', [BackupsExportsController::class, 'storeBackup'])->name('backups-exports.backups.store');
-    Route::get('/backups-exports/backups/{filename}/download', [BackupsExportsController::class, 'downloadBackup'])
-        ->where('filename', '[A-Za-z0-9._-]+\.zip')
+    Route::get('/backups-exports/backups/{instanceBackupRun}/download', [BackupsExportsController::class, 'downloadBackup'])
         ->name('backups-exports.backups.download');
-    Route::delete('/backups-exports/backups/{filename}', [BackupsExportsController::class, 'destroyBackup'])
-        ->where('filename', '[A-Za-z0-9._-]+\.zip')
+    Route::delete('/backups-exports/backups/{instanceBackupRun}', [BackupsExportsController::class, 'destroyBackup'])
         ->name('backups-exports.backups.destroy');
+    Route::post('/backups-exports/backups/{instanceBackupRun}/retry', [BackupsExportsController::class, 'retryBackup'])
+        ->name('backups-exports.backups.retry');
     Route::prefix('banking')->name('banking.')->group(function () {
         Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');

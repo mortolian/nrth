@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { useFormatCurrency } from '@/composables/useFormatCurrency';
+import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 type TakeoutRunRow = {
     id: number;
@@ -18,13 +18,16 @@ type TakeoutRunRow = {
     can_retry: boolean;
 };
 
-type BackupRow = {
-    filename: string;
-    path: string;
-    disk: string;
-    date: string | null;
-    size_bytes: number;
-    download_url: string;
+type BackupRunRow = {
+    id: number;
+    status: string;
+    filename: string | null;
+    created_at: string | null;
+    completed_at: string | null;
+    file_size_bytes: number | null;
+    download_url: string | null;
+    error_message: string | null;
+    can_retry: boolean;
 };
 
 const props = defineProps<{
@@ -51,11 +54,8 @@ const props = defineProps<{
         warning: string | null;
     }>;
     recent_takeouts: TakeoutRunRow[];
-    backups: BackupRow[];
-    backup_running: boolean;
-    backup_last_error: string | null;
+    recent_backups: BackupRunRow[];
     backup_schedule_hint: string;
-    latest_backup_at: string | null;
 }>();
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -162,11 +162,16 @@ const runBackup = () => {
     backupForm.post(route('backups-exports.backups.store'), { preserveScroll: true });
 };
 
-const deleteBackup = (filename: string) => {
-    if (!confirm(`Delete backup ${filename}? This cannot be undone.`)) {
+const retryBackup = (run: BackupRunRow) => {
+    router.post(route('backups-exports.backups.retry', run.id), {}, { preserveScroll: true });
+};
+
+const deleteBackup = (run: BackupRunRow) => {
+    const label = run.filename ?? `backup #${run.id}`;
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) {
         return;
     }
-    router.delete(route('backups-exports.backups.destroy', filename), { preserveScroll: true });
+    router.delete(route('backups-exports.backups.destroy', run.id), { preserveScroll: true });
 };
 
 const formatFileSize = (bytes: number | null) => {
@@ -198,7 +203,11 @@ const takeoutBusy = computed(() =>
     props.recent_takeouts.some((run) => run.status === 'queued' || run.status === 'processing'),
 );
 
-const shouldPoll = computed(() => takeoutBusy.value || props.backup_running);
+const backupBusy = computed(() =>
+    props.recent_backups.some((run) => run.status === 'queued' || run.status === 'processing'),
+);
+
+const shouldPoll = computed(() => takeoutBusy.value || backupBusy.value);
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -211,9 +220,11 @@ const startPolling = () => {
             return;
         }
         router.reload({
-            only: ['recent_takeouts', 'backups', 'backup_running', 'backup_last_error', 'latest_backup_at'],
+            only: ['recent_takeouts', 'recent_backups'],
             preserveScroll: true,
+            // Keep form state, but always replace polled lists from the server.
             preserveState: true,
+            replace: true,
         });
     }, 4000);
 };
@@ -449,48 +460,52 @@ onBeforeUnmount(() => {
                 </div>
                 <AppButton
                     variant="primary"
-                    :disabled="backupForm.processing || backup_running"
+                    :disabled="backupForm.processing || backupBusy"
                     @click="runBackup"
                 >
-                    {{ backup_running || backupForm.processing ? 'Backup running…' : 'Run backup now' }}
+                    {{ backupForm.processing || backupBusy ? 'Preparing…' : 'Run backup now' }}
                 </AppButton>
             </div>
 
             <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 {{ backup_schedule_hint }}
-                <span v-if="latest_backup_at" class="mt-1 block text-xs text-slate-500">
-                    Latest backup: {{ latest_backup_at.slice(0, 19).replace('T', ' ') }}
-                </span>
-                <p v-if="backup_running" class="mt-1 text-xs font-medium text-amber-700">A backup is in progress…</p>
-                <p v-if="backup_last_error && !backup_running" class="mt-1 text-xs font-medium text-rose-700">
-                    Last backup failed: {{ backup_last_error }}
-                </p>
             </div>
 
             <AppCard class="mt-5">
-                <h3 class="mb-3 text-base font-semibold text-slate-900">Stored backups</h3>
-                <p v-if="backups.length === 0" class="text-sm text-slate-500">No backups found yet.</p>
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h3 class="text-base font-semibold text-slate-900">Recent backups</h3>
+                    <p v-if="backupBusy" class="text-xs text-slate-500">Refreshing status…</p>
+                </div>
+                <p v-if="recent_backups.length === 0" class="text-sm text-slate-500">No backups yet.</p>
                 <div v-else class="overflow-x-auto">
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="border-b border-slate-200 text-left text-slate-600">
                                 <th class="px-2 py-2 font-medium">File</th>
-                                <th class="px-2 py-2 font-medium">Date</th>
+                                <th class="px-2 py-2 font-medium">Status</th>
                                 <th class="px-2 py-2 font-medium">Size</th>
-                                <th class="px-2 py-2 font-medium">Disk</th>
+                                <th class="px-2 py-2 font-medium">Created</th>
                                 <th class="px-2 py-2 font-medium" />
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="backup in backups" :key="backup.filename" class="border-b border-slate-100">
-                                <td class="px-2 py-2 font-mono text-xs">{{ backup.filename }}</td>
-                                <td class="px-2 py-2">{{ backup.date ? backup.date.slice(0, 19).replace('T', ' ') : '—' }}</td>
-                                <td class="px-2 py-2">{{ formatFileSize(backup.size_bytes) }}</td>
-                                <td class="px-2 py-2">{{ backup.disk }}</td>
+                            <tr v-for="run in recent_backups" :key="run.id" class="border-b border-slate-100">
+                                <td class="px-2 py-2 font-mono text-xs">{{ run.filename ?? '—' }}</td>
+                                <td class="px-2 py-2">
+                                    <span
+                                        :class="run.status === 'failed' ? 'text-rose-600' : run.status === 'ready' ? 'text-brand-700' : 'text-slate-600'"
+                                    >
+                                        {{ statusLabel(run.status) }}
+                                    </span>
+                                    <p v-if="run.error_message" class="mt-0.5 text-xs text-rose-600">{{ run.error_message }}</p>
+                                </td>
+                                <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
+                                <td class="px-2 py-2">{{ run.created_at ? run.created_at.slice(0, 19).replace('T', ' ') : '—' }}</td>
                                 <td class="px-2 py-2 text-right">
-                                    <div class="flex items-center justify-end gap-2">
+                                    <div class="flex flex-wrap items-center justify-end gap-2">
                                         <a
-                                            :href="backup.download_url"
+                                            v-if="run.download_url"
+                                            :href="run.download_url"
                                             class="text-brand-700 hover:underline"
                                             download
                                             data-inertia="false"
@@ -498,9 +513,17 @@ onBeforeUnmount(() => {
                                             Download
                                         </a>
                                         <button
+                                            v-if="run.can_retry"
+                                            type="button"
+                                            class="text-slate-700 hover:underline"
+                                            @click="retryBackup(run)"
+                                        >
+                                            Retry
+                                        </button>
+                                        <button
                                             type="button"
                                             class="text-rose-600 hover:underline"
-                                            @click="deleteBackup(backup.filename)"
+                                            @click="deleteBackup(run)"
                                         >
                                             Delete
                                         </button>

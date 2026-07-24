@@ -2,6 +2,8 @@
 
 namespace App\Domain\Backup\Services;
 
+use App\Domain\Backup\Enums\InstanceBackupRunStatus;
+use App\Domain\Backup\Models\InstanceBackupRun;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -16,21 +18,52 @@ class InstanceBackupService
 {
     public const RUNNING_CACHE_KEY = 'nrth.instance_backup.running';
 
+    /** @deprecated Cleared on read; kept so older workers cannot leave a stuck UI lock. */
+    public const QUEUED_CACHE_KEY = 'nrth.instance_backup.queued';
+
     public const LAST_ERROR_CACHE_KEY = 'nrth.instance_backup.last_error';
 
     public function isRunning(): bool
     {
-        return (bool) Cache::get(self::RUNNING_CACHE_KEY, false);
+        // Drop the old queued lock — it stuck the UI when workers died before start.
+        Cache::forget(self::QUEUED_CACHE_KEY);
+
+        $startedAt = Cache::get(self::RUNNING_CACHE_KEY);
+        if ($startedAt === null || $startedAt === false) {
+            return false;
+        }
+
+        // Legacy boolean locks (and anything non-numeric) are treated as orphaned.
+        if ($startedAt === true || ! is_numeric($startedAt)) {
+            $this->markFinished();
+
+            return false;
+        }
+
+        if (now()->getTimestamp() - (int) $startedAt > 70 * 60) {
+            $this->markFinished();
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public function isBusy(): bool
+    {
+        return $this->isRunning();
     }
 
     public function markRunning(): void
     {
-        Cache::put(self::RUNNING_CACHE_KEY, true, now()->addHour());
+        Cache::put(self::RUNNING_CACHE_KEY, now()->getTimestamp(), now()->addMinutes(70));
+        Cache::forget(self::QUEUED_CACHE_KEY);
     }
 
     public function markFinished(): void
     {
         Cache::forget(self::RUNNING_CACHE_KEY);
+        Cache::forget(self::QUEUED_CACHE_KEY);
     }
 
     public function recordFailure(string $message): void
@@ -50,8 +83,156 @@ class InstanceBackupService
         return is_string($error) && $error !== '' ? $error : null;
     }
 
+    public function hasActiveRun(): bool
+    {
+        $this->failStaleActiveRuns();
+
+        return InstanceBackupRun::query()
+            ->whereIn('status', [
+                InstanceBackupRunStatus::Queued,
+                InstanceBackupRunStatus::Processing,
+            ])
+            ->exists();
+    }
+
     /**
-     * @return list<array{filename: string, path: string, disk: string, date: string|null, size_bytes: int, download_url: string}>
+     * Mark abandoned queued/processing runs as failed so they cannot block the UI forever.
+     */
+    public function failStaleActiveRuns(): void
+    {
+        InstanceBackupRun::query()
+            ->whereIn('status', [
+                InstanceBackupRunStatus::Queued,
+                InstanceBackupRunStatus::Processing,
+            ])
+            ->where('updated_at', '<', now()->subMinutes(75))
+            ->each(function (InstanceBackupRun $run): void {
+                $run->forceFill([
+                    'status' => InstanceBackupRunStatus::Failed,
+                    'error_message' => $run->error_message
+                        ?: 'Backup timed out or the worker restarted before the run could finish.',
+                    'completed_at' => now(),
+                ])->save();
+            });
+    }
+
+    /**
+     * Import zip files on disk that are not yet tracked as runs (scheduled backups, legacy files),
+     * and attach orphan zips to stuck queued runs (e.g. after a Horizon worker restart mid-deploy).
+     */
+    public function syncDiskBackupsIntoRuns(): void
+    {
+        $this->failStaleActiveRuns();
+        $this->reclaimOrphanZipsForActiveRuns();
+
+        $hasFreshActiveRun = InstanceBackupRun::query()
+            ->whereIn('status', [
+                InstanceBackupRunStatus::Queued,
+                InstanceBackupRunStatus::Processing,
+            ])
+            ->exists();
+
+        foreach ($this->listBackups() as $backup) {
+            $exists = InstanceBackupRun::query()
+                ->where('disk', $backup['disk'])
+                ->where('filename', $backup['filename'])
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            // A fresh active run should claim the new zip itself — avoid a duplicate Ready row.
+            if ($hasFreshActiveRun) {
+                continue;
+            }
+
+            InstanceBackupRun::query()->create([
+                'requested_by' => null,
+                'status' => InstanceBackupRunStatus::Ready,
+                'filename' => $backup['filename'],
+                'disk' => $backup['disk'],
+                'storage_path' => $backup['path'],
+                'file_size_bytes' => $backup['size_bytes'],
+                'completed_at' => $backup['date'] ? Carbon::parse($backup['date']) : now(),
+                'error_message' => null,
+            ]);
+        }
+    }
+
+    /**
+     * If backup:run finished but the run row was never updated (stale worker code), attach the zip.
+     */
+    public function reclaimOrphanZipsForActiveRuns(): void
+    {
+        $activeRuns = InstanceBackupRun::query()
+            ->whereIn('status', [
+                InstanceBackupRunStatus::Queued,
+                InstanceBackupRunStatus::Processing,
+            ])
+            ->orderBy('id')
+            ->get();
+
+        if ($activeRuns->isEmpty()) {
+            return;
+        }
+
+        $trackedFilenames = InstanceBackupRun::query()
+            ->whereNotNull('filename')
+            ->pluck('filename')
+            ->all();
+
+        foreach ($this->listBackups() as $backup) {
+            if (in_array($backup['filename'], $trackedFilenames, true)) {
+                continue;
+            }
+
+            $backupAt = $backup['date'] ? Carbon::parse($backup['date']) : null;
+
+            $run = $activeRuns->first(function (InstanceBackupRun $candidate) use ($backupAt): bool {
+                if ($backupAt === null || $candidate->created_at === null) {
+                    return true;
+                }
+
+                // Zip created around the time this run was queued.
+                return $candidate->created_at->between(
+                    $backupAt->copy()->subMinutes(30),
+                    $backupAt->copy()->addMinutes(5),
+                );
+            });
+
+            if ($run === null) {
+                continue;
+            }
+
+            $run->forceFill([
+                'status' => InstanceBackupRunStatus::Ready,
+                'filename' => $backup['filename'],
+                'disk' => $backup['disk'],
+                'storage_path' => $backup['path'],
+                'file_size_bytes' => $backup['size_bytes'],
+                'error_message' => null,
+                'completed_at' => $backupAt ?? now(),
+            ])->save();
+
+            $trackedFilenames[] = $backup['filename'];
+            $activeRuns = $activeRuns->reject(fn (InstanceBackupRun $r): bool => $r->id === $run->id)->values();
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function backupFilenames(): array
+    {
+        return array_map(
+            static fn (array $backup): string => $backup['filename'],
+            $this->listBackups(),
+        );
+    }
+
+    /**
+     * @return list<array{filename: string, path: string, disk: string, date: string|null, size_bytes: int}>
      */
     public function listBackups(): array
     {
@@ -66,7 +247,6 @@ class InstanceBackupService
                         'disk' => $destination->diskName(),
                         'date' => $backup->date()->toIso8601String(),
                         'size_bytes' => (int) $backup->sizeInBytes(),
-                        'download_url' => route('backups-exports.backups.download', ['filename' => $filename]),
                     ];
                 });
             })

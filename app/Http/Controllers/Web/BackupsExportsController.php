@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
+use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Models\TakeoutRun;
@@ -56,11 +58,8 @@ class BackupsExportsController extends Controller
             'preview' => null,
             'document_categories' => [],
             'recent_takeouts' => [],
-            'backups' => [],
-            'backup_running' => false,
-            'backup_last_error' => null,
+            'recent_backups' => [],
             'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Restore is CLI/docs only — not available in the app.',
-            'latest_backup_at' => null,
         ];
 
         if ($isOwner) {
@@ -68,11 +67,8 @@ class BackupsExportsController extends Controller
         }
 
         if ($canManageBackups) {
-            $listed = $this->backups->listBackups();
-            $props['backups'] = $listed;
-            $props['backup_running'] = $this->backups->isRunning();
-            $props['backup_last_error'] = $this->backups->lastError();
-            $props['latest_backup_at'] = $this->backups->latestBackupAt()?->toIso8601String();
+            $this->backups->syncDiskBackupsIntoRuns();
+            $props['recent_backups'] = $this->backupRunProps();
         }
 
         return Inertia::render('BackupsExports/Index', $props);
@@ -89,57 +85,123 @@ class BackupsExportsController extends Controller
                 ->with('error', 'Please wait before starting another backup.');
         }
 
-        if ($this->backups->isRunning()) {
+        if ($this->backups->hasActiveRun()) {
             return redirect()
                 ->route('backups-exports.index', ['section' => 'backup'])
-                ->with('error', 'A backup is already running.');
+                ->with('error', 'A backup is already queued or running.');
         }
 
         RateLimiter::hit($key, 300);
 
-        // Only the job sets the running flag. Marking here left a stuck "already
-        // running" state when the worker failed before handle() cleared it.
         $this->backups->clearLastError();
-        $this->backups->markFinished();
-        RunInstanceBackupJob::dispatch($request->user()->id);
+
+        $run = InstanceBackupRun::query()->create([
+            'requested_by' => $request->user()->id,
+            'status' => InstanceBackupRunStatus::Queued,
+        ]);
+
+        RunInstanceBackupJob::dispatch($run->id);
 
         activity()
             ->causedBy($request->user())
-            ->withProperties(['action' => 'instance_backup_queued'])
+            ->withProperties(['action' => 'instance_backup_queued', 'backup_run_id' => $run->id])
             ->log('Queued instance backup');
 
         return redirect()
             ->route('backups-exports.index', ['section' => 'backup'])
-            ->with('success', 'Instance backup has been queued. This page will refresh while it runs.');
+            ->with('success', 'Instance backup is being prepared.');
     }
 
-    public function downloadBackup(Request $request, string $filename): BinaryFileResponse|StreamedResponse
+    public function downloadBackup(Request $request, InstanceBackupRun $instanceBackupRun): BinaryFileResponse|StreamedResponse
     {
         Gate::authorize('manageInstanceBackups');
+        abort_unless($instanceBackupRun->isDownloadable(), 404);
+        abort_unless(filled($instanceBackupRun->filename), 404);
 
         activity()
             ->causedBy($request->user())
-            ->withProperties(['action' => 'instance_backup_download', 'filename' => basename($filename)])
+            ->withProperties([
+                'action' => 'instance_backup_download',
+                'backup_run_id' => $instanceBackupRun->id,
+                'filename' => $instanceBackupRun->filename,
+            ])
             ->log('Downloaded instance backup');
 
-        return $this->backups->download($filename);
+        return $this->backups->download((string) $instanceBackupRun->filename);
     }
 
-    public function destroyBackup(Request $request, string $filename): RedirectResponse
+    public function destroyBackup(Request $request, InstanceBackupRun $instanceBackupRun): RedirectResponse
     {
         Gate::authorize('manageInstanceBackups');
 
-        $deleted = $this->backups->delete($filename);
-        abort_unless($deleted, 404);
+        if (filled($instanceBackupRun->filename)) {
+            $this->backups->delete((string) $instanceBackupRun->filename);
+        }
+
+        $instanceBackupRun->delete();
 
         activity()
             ->causedBy($request->user())
-            ->withProperties(['action' => 'instance_backup_delete', 'filename' => basename($filename)])
+            ->withProperties(['action' => 'instance_backup_delete', 'backup_run_id' => $instanceBackupRun->id])
             ->log('Deleted instance backup');
 
         return redirect()
             ->route('backups-exports.index', ['section' => 'backup'])
             ->with('success', 'Backup deleted.');
+    }
+
+    public function retryBackup(Request $request, InstanceBackupRun $instanceBackupRun): RedirectResponse
+    {
+        Gate::authorize('manageInstanceBackups');
+        abort_unless($instanceBackupRun->status === InstanceBackupRunStatus::Failed, 422);
+
+        if ($this->backups->hasActiveRun()) {
+            return redirect()
+                ->route('backups-exports.index', ['section' => 'backup'])
+                ->with('error', 'A backup is already queued or running.');
+        }
+
+        $instanceBackupRun->forceFill([
+            'status' => InstanceBackupRunStatus::Queued,
+            'filename' => null,
+            'disk' => null,
+            'storage_path' => null,
+            'file_size_bytes' => null,
+            'error_message' => null,
+            'completed_at' => null,
+        ])->save();
+
+        RunInstanceBackupJob::dispatch($instanceBackupRun->id);
+
+        return redirect()
+            ->route('backups-exports.index', ['section' => 'backup'])
+            ->with('success', 'Backup has been re-queued.');
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function backupRunProps(): array
+    {
+        return InstanceBackupRun::query()
+            ->orderByDesc('created_at')
+            ->limit(25)
+            ->get()
+            ->map(fn (InstanceBackupRun $run): array => [
+                'id' => $run->id,
+                'status' => $run->status->value,
+                'filename' => $run->filename,
+                'created_at' => $run->created_at?->toIso8601String(),
+                'completed_at' => $run->completed_at?->toIso8601String(),
+                'file_size_bytes' => $run->file_size_bytes,
+                'download_url' => $run->isDownloadable()
+                    ? route('backups-exports.backups.download', $run)
+                    : null,
+                'error_message' => $run->error_message,
+                'can_retry' => $run->status === InstanceBackupRunStatus::Failed,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

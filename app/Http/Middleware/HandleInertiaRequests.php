@@ -47,8 +47,11 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'flash' => fn () => [
-                'success' => $request->session()->get('success'),
-                'error' => $request->session()->get('error'),
+                // pull() so Octane/Inertia partial reloads cannot keep re-serving the same toast.
+                'success' => $request->session()->pull('success'),
+                'error' => $request->session()->pull('error'),
+                'warning' => $request->session()->pull('warning'),
+                'info' => $request->session()->pull('info'),
             ],
             'csrf_token' => fn () => csrf_token(),
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,

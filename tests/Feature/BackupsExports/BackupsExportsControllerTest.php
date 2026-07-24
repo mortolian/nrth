@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\BackupsExports;
 
+use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
+use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
@@ -11,6 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -39,7 +42,6 @@ class BackupsExportsControllerTest extends TestCase
         $first = User::factory()->withPersonalTeam()->create([
             'email' => 'first@example.com',
         ]);
-        // Create a second owner-of-their-own-team who is not an instance operator.
         $user = User::factory()->withPersonalTeam()->create([
             'email' => 'owner@example.com',
             'is_instance_operator' => false,
@@ -77,7 +79,7 @@ class BackupsExportsControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->where('can_manage_backups', true)
             ->where('section', 'backup')
-            ->has('backups')
+            ->has('recent_backups')
             ->has('backup_schedule_hint'));
     }
 
@@ -141,61 +143,48 @@ class BackupsExportsControllerTest extends TestCase
         $response = $this->post(route('backups-exports.backups.store'));
 
         $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+        $this->assertDatabaseHas('instance_backup_runs', [
+            'requested_by' => $user->id,
+            'status' => InstanceBackupRunStatus::Queued->value,
+        ]);
         Queue::assertPushed(RunInstanceBackupJob::class, function (RunInstanceBackupJob $job): bool {
-            return $job->queue === 'long';
+            return $job->queue === 'long' && $job->backupRunId > 0;
         });
-        $this->assertFalse(app(InstanceBackupService::class)->isRunning());
-        $this->assertNull(app(InstanceBackupService::class)->lastError());
     }
 
-    public function test_backup_job_records_failure_when_command_exits_nonzero(): void
+    public function test_backup_job_marks_run_failed_when_command_exits_nonzero(): void
     {
-        $service = app(InstanceBackupService::class);
-        $service->clearLastError();
+        Config::set('nrth.operator_emails', []);
+        $user = User::factory()->withPersonalTeam()->create(['is_instance_operator' => true]);
+        $run = InstanceBackupRun::factory()->create([
+            'requested_by' => $user->id,
+            'status' => InstanceBackupRunStatus::Queued,
+        ]);
 
-        \Illuminate\Support\Facades\Artisan::shouldReceive('call')
-            ->once()
-            ->with('backup:run')
-            ->andReturn(1);
-        \Illuminate\Support\Facades\Artisan::shouldReceive('output')
-            ->once()
-            ->andReturn("Backup failed because: pg_dump: command not found\n");
+        Artisan::shouldReceive('call')->once()->with('backup:run')->andReturn(1);
+        Artisan::shouldReceive('output')->once()->andReturn("Backup failed because: pg_dump missing\n");
 
         try {
-            (new RunInstanceBackupJob(1))->handle($service);
+            (new RunInstanceBackupJob($run->id))->handle(app(InstanceBackupService::class));
             $this->fail('Expected backup job to throw.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('Backup failed', $e->getMessage());
         }
 
-        $this->assertFalse($service->isRunning());
-        $this->assertNotNull($service->lastError());
-        $this->assertStringContainsString('Backup failed', (string) $service->lastError());
+        $run->refresh();
+        $this->assertSame(InstanceBackupRunStatus::Failed, $run->status);
+        $this->assertNotNull($run->error_message);
     }
 
-    public function test_operator_cannot_download_invalid_backup_filename(): void
-    {
-        Config::set('nrth.operator_emails', []);
-
-        $user = User::factory()->withPersonalTeam()->create([
-            'email' => 'ops@example.com',
-            'is_instance_operator' => true,
-        ]);
-        $this->actingAsTeamOwner($user, $user->currentTeam);
-
-        $this->get(route('backups-exports.backups.download', ['filename' => '../etc/passwd.zip']))
-            ->assertNotFound();
-    }
-
-    public function test_operator_can_download_backup_file(): void
+    public function test_operator_can_download_ready_backup_run(): void
     {
         Config::set('nrth.operator_emails', []);
         Config::set('backup.backup.name', 'nrth');
         Config::set('backup.backup.destination.disks', ['local']);
-
         Storage::fake('local');
-        $relative = 'nrth/2026-07-24-22-00-00.zip';
-        Storage::disk('local')->put($relative, 'zip-bytes');
+
+        $filename = '2026-07-24-22-00-00.zip';
+        Storage::disk('local')->put('nrth/'.$filename, 'zip-bytes');
 
         $user = User::factory()->withPersonalTeam()->create([
             'email' => 'ops@example.com',
@@ -203,12 +192,78 @@ class BackupsExportsControllerTest extends TestCase
         ]);
         $this->actingAsTeamOwner($user, $user->currentTeam);
 
-        $response = $this->get(route('backups-exports.backups.download', [
-            'filename' => '2026-07-24-22-00-00.zip',
-        ]));
+        $run = InstanceBackupRun::factory()->ready()->create([
+            'requested_by' => $user->id,
+            'filename' => $filename,
+            'disk' => 'local',
+            'storage_path' => 'nrth/'.$filename,
+        ]);
+
+        $response = $this->get(route('backups-exports.backups.download', $run));
 
         $response->assertOk();
-        $response->assertDownload('2026-07-24-22-00-00.zip');
+        $response->assertDownload($filename);
+    }
+
+    public function test_operator_can_retry_failed_backup(): void
+    {
+        Queue::fake();
+        Config::set('nrth.operator_emails', []);
+
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'ops@example.com',
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAsTeamOwner($user, $user->currentTeam);
+
+        $run = InstanceBackupRun::factory()->failed()->create([
+            'requested_by' => $user->id,
+        ]);
+
+        $response = $this->post(route('backups-exports.backups.retry', $run));
+
+        $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+        $run->refresh();
+        $this->assertSame(InstanceBackupRunStatus::Queued, $run->status);
+        Queue::assertPushed(RunInstanceBackupJob::class);
+    }
+
+    public function test_sync_reclaims_orphan_zip_for_stuck_queued_run(): void
+    {
+        Config::set('backup.backup.name', 'nrth');
+        Config::set('backup.backup.destination.disks', ['local']);
+        Storage::fake('local');
+
+        $filename = '2026-07-24-22-50-00.zip';
+        Storage::disk('local')->put('nrth/'.$filename, 'zip-bytes');
+
+        $run = InstanceBackupRun::factory()->create([
+            'status' => InstanceBackupRunStatus::Queued,
+            'filename' => null,
+            'created_at' => now()->subMinutes(2),
+            'updated_at' => now()->subMinutes(2),
+        ]);
+
+        // Spatie reads real filesystem dates; fake disk may not expose BackupDestination well.
+        // Exercise reclaim directly with a partial mock of listBackups via subclassing service is heavy —
+        // instead call reclaim with a real service after binding list via partial mock.
+        $service = \Mockery::mock(InstanceBackupService::class)->makePartial();
+        $service->shouldReceive('listBackups')->andReturn([
+            [
+                'filename' => $filename,
+                'path' => 'nrth/'.$filename,
+                'disk' => 'local',
+                'date' => now()->subMinute()->toIso8601String(),
+                'size_bytes' => 9,
+            ],
+        ]);
+
+        $service->reclaimOrphanZipsForActiveRuns();
+
+        $run->refresh();
+        $this->assertSame(InstanceBackupRunStatus::Ready, $run->status);
+        $this->assertSame($filename, $run->filename);
+        $this->assertSame(9, $run->file_size_bytes);
     }
 
     public function test_owner_can_delete_takeout(): void

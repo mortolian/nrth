@@ -27,7 +27,7 @@ type BridgeState = {
     recentKeys: Map<string, number>;
 };
 
-const DEDUPE_MS = 2500;
+const DEDUPE_MS = 120_000;
 
 const getState = (): BridgeState => {
     const g = globalThis as typeof globalThis & { [GLOBAL_KEY]?: BridgeState };
@@ -121,6 +121,12 @@ export function bindFlashToastBridge(initialPage?: PageLike): void {
     }
 
     router.on('success', (event) => {
-        publish(event.detail.page as PageLike);
+        const page = event.detail.page as PageLike;
+        const flash = page?.props?.flash;
+        // Ignore empty flash payloads (partial reloads / preserveState noise).
+        if (!flash?.success && !flash?.error && !flash?.warning && !flash?.info) {
+            return;
+        }
+        publish(page);
     });
 }
