@@ -3,7 +3,6 @@
 namespace App\Domain\Takeout\Jobs;
 
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
-use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Domain\Takeout\Notifications\TakeoutFailed;
 use App\Domain\Takeout\Notifications\TakeoutReady;
@@ -21,7 +20,9 @@ class GenerateTakeoutJob implements ShouldQueue
 
     public function __construct(
         public int $takeoutRunId,
-    ) {}
+    ) {
+        $this->onQueue('long');
+    }
 
     public function handle(TakeoutBuilder $builder): void
     {
@@ -57,15 +58,40 @@ class GenerateTakeoutJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
 
-            $run->forceFill([
-                'status' => TakeoutRunStatus::Failed,
-                'error_message' => $e->getMessage(),
-            ])->save();
-
-            $run->loadMissing('requestedBy');
-            $run->requestedBy?->notify(new TakeoutFailed($run, $e->getMessage()));
+            $this->markFailed($run, $e->getMessage());
 
             throw $e;
         }
+    }
+
+    public function failed(?Throwable $e): void
+    {
+        $run = TakeoutRun::queryWithoutTeamScope()->find($this->takeoutRunId);
+        if ($run === null) {
+            return;
+        }
+
+        if (! in_array($run->status, [TakeoutRunStatus::Queued, TakeoutRunStatus::Processing], true)) {
+            return;
+        }
+
+        $message = $e?->getMessage() ?: 'Takeout job failed or timed out.';
+        Log::error('Takeout job failed permanently', [
+            'takeout_run_id' => $run->id,
+            'error' => $message,
+        ]);
+
+        $this->markFailed($run, $message);
+    }
+
+    private function markFailed(TakeoutRun $run, string $message): void
+    {
+        $run->forceFill([
+            'status' => TakeoutRunStatus::Failed,
+            'error_message' => $message,
+        ])->save();
+
+        $run->loadMissing('requestedBy');
+        $run->requestedBy?->notify(new TakeoutFailed($run, $message));
     }
 }

@@ -77,12 +77,6 @@ class TakeoutController extends Controller
     {
         Gate::authorize('delete', $takeoutRun);
 
-        if (in_array($takeoutRun->status, [TakeoutRunStatus::Queued, TakeoutRunStatus::Processing], true)) {
-            return redirect()
-                ->route('backups-exports.index', ['section' => 'takeout'])
-                ->with('error', 'Cannot delete a takeout that is still being prepared.');
-        }
-
         if ($takeoutRun->storage_path) {
             Storage::disk('local')->delete($takeoutRun->storage_path);
         }

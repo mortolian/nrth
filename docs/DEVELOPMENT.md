@@ -82,7 +82,8 @@ See `.env.example` for Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwar
 
 - Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).
 - The first user created is an instance operator. Manage operators under **Settings → Instance**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
-
+- Takeout and instance backup jobs run on Horizon’s `long` queue (multi-minute). Restart the worker after pulling changes: `./vendor/bin/sail restart worker` (or `php artisan horizon:terminate`).
+- Instance backups need `pg_dump` matching Compose Postgres (**16**). After Dockerfile client changes: `./vendor/bin/sail build` then recreate containers.
 ## Architecture
 
 - Business logic lives under `app/Domain/{Context}/` (actions, DTOs, models, services).

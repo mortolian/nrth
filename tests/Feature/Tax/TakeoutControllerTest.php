@@ -54,7 +54,7 @@ class TakeoutControllerTest extends TestCase
             'status' => TakeoutRunStatus::Queued->value,
         ]);
 
-        Queue::assertPushed(GenerateTakeoutJob::class, fn (GenerateTakeoutJob $job): bool => $job->takeoutRunId > 0);
+        Queue::assertPushed(GenerateTakeoutJob::class, fn (GenerateTakeoutJob $job): bool => $job->takeoutRunId > 0 && $job->queue === 'long');
     }
 
     public function test_non_owner_cannot_queue_takeout(): void

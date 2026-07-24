@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     unzip \
+    gnupg \
     libicu-dev \
     libpng-dev \
     libjpeg62-turbo-dev \
@@ -39,8 +40,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libexif-dev \
     zlib1g-dev \
     procps \
-    postgresql-client \
     supervisor \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+        https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    # Must match compose postgres:16 — Debian's default client is 15 and cannot dump PG16.
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \

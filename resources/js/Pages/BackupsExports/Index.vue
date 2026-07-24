@@ -52,6 +52,7 @@ const props = defineProps<{
     recent_takeouts: TakeoutRunRow[];
     backups: BackupRow[];
     backup_running: boolean;
+    backup_last_error: string | null;
     backup_schedule_hint: string;
     latest_backup_at: string | null;
 }>();
@@ -209,7 +210,7 @@ const startPolling = () => {
             return;
         }
         router.reload({
-            only: ['recent_takeouts', 'backups', 'backup_running', 'latest_backup_at'],
+            only: ['recent_takeouts', 'backups', 'backup_running', 'backup_last_error', 'latest_backup_at'],
             preserveScroll: true,
             preserveState: true,
         });
@@ -287,10 +288,10 @@ onBeforeUnmount(() => {
                 </div>
                 <AppButton
                     variant="primary"
-                    :disabled="takeoutForm.processing"
+                    :disabled="takeoutForm.processing || takeoutBusy"
                     @click="generateTakeout"
                 >
-                    {{ takeoutForm.processing ? 'Queueing…' : 'Generate takeout' }}
+                    {{ takeoutForm.processing || takeoutBusy ? 'Preparing…' : 'Generate takeout' }}
                 </AppButton>
             </div>
 
@@ -394,7 +395,6 @@ onBeforeUnmount(() => {
                                             Retry
                                         </button>
                                         <button
-                                            v-if="!['queued', 'processing'].includes(run.status)"
                                             type="button"
                                             class="text-rose-600 hover:underline"
                                             @click="deleteTakeout(run)"
@@ -433,6 +433,9 @@ onBeforeUnmount(() => {
                     Latest backup: {{ latest_backup_at.slice(0, 19).replace('T', ' ') }}
                 </span>
                 <p v-if="backup_running" class="mt-1 text-xs font-medium text-amber-700">A backup is in progress…</p>
+                <p v-if="backup_last_error && !backup_running" class="mt-1 text-xs font-medium text-rose-700">
+                    Last backup failed: {{ backup_last_error }}
+                </p>
             </div>
 
             <AppCard class="mt-5">

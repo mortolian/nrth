@@ -129,9 +129,12 @@ services:
     volumes:
       # Host source (hot reload for PHP/Vue) + Linux vendor/node_modules in named volumes.
       - .:/var/www/html
+      - ./docker/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - vendor_data:/var/www/html/vendor
       - node_modules_data:/var/www/html/node_modules
       - storage_data:/var/www/html/storage
+    # Invoke via sh so a missing +x on the bind mount cannot brick the stack.
+    entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
     # --watch --poll: Octane reloads workers when PHP changes; polling works with Docker Desktop file sharing.
     command: ['php', 'artisan', 'octane:start', '--server=swoole', '--host=0.0.0.0', '--port=8000', '--watch', '--poll']
     healthcheck:
@@ -158,9 +161,12 @@ services:
         condition: service_started
     volumes:
       - .:/var/www/html
+      - ./docker/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - ./docker/supervisord.conf:/etc/supervisor/conf.d/laravel.conf:ro
       - vendor_data:/var/www/html/vendor
       - node_modules_data:/var/www/html/node_modules
       - storage_data:/var/www/html/storage
+    entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
     command: ['/usr/bin/supervisord', '-n', '-c', '/etc/supervisor/supervisord.conf']
     healthcheck:
       test: ['CMD-SHELL', 'supervisorctl -c /etc/supervisor/supervisord.conf status horizon | grep -q RUNNING']
@@ -176,7 +182,7 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
-      DOCKER_ROLE: worker
+      DOCKER_ROLE: scheduler
     depends_on:
       postgres:
         condition: service_healthy
@@ -186,9 +192,11 @@ services:
         condition: service_started
     volumes:
       - .:/var/www/html
+      - ./docker/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - vendor_data:/var/www/html/vendor
       - node_modules_data:/var/www/html/node_modules
       - storage_data:/var/www/html/storage
+    entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
     command: ['php', 'artisan', 'schedule:work']
     healthcheck:
       test: ['CMD-SHELL', 'pgrep -f "artisan schedule:work" >/dev/null']

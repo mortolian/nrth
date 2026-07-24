@@ -141,8 +141,36 @@ class BackupsExportsControllerTest extends TestCase
         $response = $this->post(route('backups-exports.backups.store'));
 
         $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
-        Queue::assertPushed(RunInstanceBackupJob::class);
-        $this->assertTrue(app(InstanceBackupService::class)->isRunning());
+        Queue::assertPushed(RunInstanceBackupJob::class, function (RunInstanceBackupJob $job): bool {
+            return $job->queue === 'long';
+        });
+        $this->assertFalse(app(InstanceBackupService::class)->isRunning());
+        $this->assertNull(app(InstanceBackupService::class)->lastError());
+    }
+
+    public function test_backup_job_records_failure_when_command_exits_nonzero(): void
+    {
+        $service = app(InstanceBackupService::class);
+        $service->clearLastError();
+
+        \Illuminate\Support\Facades\Artisan::shouldReceive('call')
+            ->once()
+            ->with('backup:run')
+            ->andReturn(1);
+        \Illuminate\Support\Facades\Artisan::shouldReceive('output')
+            ->once()
+            ->andReturn("Backup failed because: pg_dump: command not found\n");
+
+        try {
+            (new RunInstanceBackupJob(1))->handle($service);
+            $this->fail('Expected backup job to throw.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Backup failed', $e->getMessage());
+        }
+
+        $this->assertFalse($service->isRunning());
+        $this->assertNotNull($service->lastError());
+        $this->assertStringContainsString('Backup failed', (string) $service->lastError());
     }
 
     public function test_operator_cannot_download_invalid_backup_filename(): void
@@ -206,6 +234,6 @@ class BackupsExportsControllerTest extends TestCase
 
         $run->refresh();
         $this->assertSame(TakeoutRunStatus::Queued, $run->status);
-        Queue::assertPushed(GenerateTakeoutJob::class);
+        Queue::assertPushed(GenerateTakeoutJob::class, fn (GenerateTakeoutJob $job): bool => $job->queue === 'long');
     }
 }

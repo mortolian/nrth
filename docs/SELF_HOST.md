@@ -109,6 +109,9 @@ Data-safe: no volume wipe, incremental migrate only. See [INSTALL.md](INSTALL.md
 | Docker permission denied | `./scripts/compose.sh …` or `newgrp docker` |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Queues stuck | `./scripts/compose.sh restart worker` |
+| Backup dump process failed | Image `pg_dump` must match Postgres major (compose uses 16). Rebuild: `./vendor/bin/sail build --no-cache` then `./vendor/bin/sail up -d` |
+| Backup / takeout log permission denied | `./vendor/bin/sail up -d --force-recreate worker app scheduler` then retry. Entrypoint makes `storage` world-writable; Horizon runs as root like Octane. |
+| Backup stuck “already running” | `./vendor/bin/sail artisan cache:clear` then retry |
 | DB password mismatch | `./scripts/repair.sh` |
 
 Useful:

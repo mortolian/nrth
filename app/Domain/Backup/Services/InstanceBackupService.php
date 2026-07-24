@@ -14,6 +14,8 @@ class InstanceBackupService
 {
     public const RUNNING_CACHE_KEY = 'nrth.instance_backup.running';
 
+    public const LAST_ERROR_CACHE_KEY = 'nrth.instance_backup.last_error';
+
     public function isRunning(): bool
     {
         return (bool) Cache::get(self::RUNNING_CACHE_KEY, false);
@@ -27,6 +29,23 @@ class InstanceBackupService
     public function markFinished(): void
     {
         Cache::forget(self::RUNNING_CACHE_KEY);
+    }
+
+    public function recordFailure(string $message): void
+    {
+        Cache::put(self::LAST_ERROR_CACHE_KEY, $message, now()->addDay());
+    }
+
+    public function clearLastError(): void
+    {
+        Cache::forget(self::LAST_ERROR_CACHE_KEY);
+    }
+
+    public function lastError(): ?string
+    {
+        $error = Cache::get(self::LAST_ERROR_CACHE_KEY);
+
+        return is_string($error) && $error !== '' ? $error : null;
     }
 
     /**

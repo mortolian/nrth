@@ -98,6 +98,7 @@ return [
 
     'waits' => [
         'redis:default' => 60,
+        'redis:long' => 300,
     ],
 
     /*
@@ -210,6 +211,19 @@ return [
             'timeout' => 60,
             'nice' => 0,
         ],
+        // Takeouts and instance backups — keep timeout above job $timeout values.
+        'supervisor-long' => [
+            'connection' => 'redis',
+            'queue' => ['long'],
+            'balance' => 'simple',
+            'maxProcesses' => 1,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 512,
+            'tries' => 1,
+            'timeout' => 3700,
+            'nice' => 0,
+        ],
     ],
 
     'environments' => [
@@ -219,11 +233,17 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'supervisor-long' => [
+                'maxProcesses' => 1,
+            ],
         ],
 
         'local' => [
             'supervisor-1' => [
                 'maxProcesses' => 3,
+            ],
+            'supervisor-long' => [
+                'maxProcesses' => 1,
             ],
         ],
     ],

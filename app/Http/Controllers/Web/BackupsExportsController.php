@@ -57,6 +57,7 @@ class BackupsExportsController extends Controller
             'recent_takeouts' => [],
             'backups' => [],
             'backup_running' => false,
+            'backup_last_error' => null,
             'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Restore is CLI/docs only — not available in the app.',
             'latest_backup_at' => null,
         ];
@@ -69,6 +70,7 @@ class BackupsExportsController extends Controller
             $listed = $this->backups->listBackups();
             $props['backups'] = $listed;
             $props['backup_running'] = $this->backups->isRunning();
+            $props['backup_last_error'] = $this->backups->lastError();
             $props['latest_backup_at'] = $this->backups->latestBackupAt()?->toIso8601String();
         }
 
@@ -94,7 +96,10 @@ class BackupsExportsController extends Controller
 
         RateLimiter::hit($key, 300);
 
-        $this->backups->markRunning();
+        // Only the job sets the running flag. Marking here left a stuck "already
+        // running" state when the worker failed before handle() cleared it.
+        $this->backups->clearLastError();
+        $this->backups->markFinished();
         RunInstanceBackupJob::dispatch($request->user()->id);
 
         activity()
