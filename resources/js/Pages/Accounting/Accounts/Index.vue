@@ -115,6 +115,16 @@ const seedDefaultChart = () => {
     router.post(route('accounting.accounts.seed-default'));
 };
 
+const openAccount = (account: AccountRow) => {
+    if (account.is_active) {
+        router.get(route('accounting.accounts.statement', account.id));
+        return;
+    }
+    if (props.can_manage) {
+        router.get(route('accounting.accounts.edit', account.id));
+    }
+};
+
 const typeBadgeClass: Record<string, string> = {
     asset: 'bg-blue-100 text-blue-700',
     liability: 'bg-rose-100 text-rose-700',
@@ -122,6 +132,15 @@ const typeBadgeClass: Record<string, string> = {
     income: 'bg-brand-100 text-brand-700',
     expense: 'bg-amber-100 text-amber-700',
 };
+
+/** Shared across type-group tables so Code / Parent / Balance line up vertically. */
+const accountColumns = [
+    { key: 'code', label: 'Code', widthClass: 'w-[10%] whitespace-nowrap' },
+    { key: 'name', label: 'Account', widthClass: 'w-[52%]' },
+    { key: 'parent', label: 'Parent', widthClass: 'w-[12%] whitespace-nowrap' },
+    { key: 'balance', label: 'Balance', widthClass: 'w-[18%] whitespace-nowrap text-right tabular-nums' },
+    { key: 'actions', label: '', widthClass: 'w-[8%] whitespace-nowrap text-right' },
+];
 </script>
 
 <template>
@@ -196,45 +215,43 @@ const typeBadgeClass: Record<string, string> = {
 
             <AppCard>
                 <AppTable
-                    :columns="[
-                        { key: 'code', label: 'Code' },
-                        { key: 'name', label: 'Account Name' },
-                        { key: 'parent', label: 'Parent' },
-                        { key: 'balance', label: 'Balance' },
-                        { key: 'flags', label: '' },
-                        { key: 'actions', label: '' },
-                    ]"
+                    table-class="text-sm table-fixed"
+                    :show-pagination="false"
+                    :columns="accountColumns"
                 >
                     <tr
                         v-for="account in group.accounts"
                         :key="account.id"
-                        class="hover:bg-slate-50"
+                        class="cursor-pointer hover:bg-slate-50"
                         :class="{ 'opacity-50': !account.is_active }"
+                        role="link"
+                        tabindex="0"
+                        :aria-label="`${account.code} ${account.name}`"
+                        @click="openAccount(account)"
+                        @keydown.enter.prevent="openAccount(account)"
                     >
-                        <td class="px-4 py-3 font-mono text-sm text-slate-600">{{ account.code }}</td>
-                        <td class="px-4 py-3">
-                            <div class="font-medium text-slate-800">{{ account.name }}</div>
-                            <div v-if="account.description" class="text-xs text-slate-400 mt-0.5">{{ account.description }}</div>
+                        <td class="whitespace-nowrap px-3 py-2 font-mono text-slate-600">{{ account.code }}</td>
+                        <td class="px-3 py-2">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="font-medium text-slate-800">{{ account.name }}</span>
+                                <AppBadge v-if="account.is_system" variant="neutral" class="text-xs">System</AppBadge>
+                                <AppBadge v-if="!account.is_active" variant="neutral" class="text-xs">Inactive</AppBadge>
+                            </div>
+                            <div v-if="account.description" class="mt-0.5 text-xs text-slate-400">{{ account.description }}</div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-slate-500">
-                            <span v-if="account.parent">{{ account.parent.code }} – {{ account.parent.name }}</span>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-500">
+                            <span v-if="account.parent">{{ account.parent.code }}</span>
                             <span v-else class="text-slate-300">—</span>
                         </td>
-                        <td class="px-4 py-3 text-sm tabular-nums">
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                             <span
                                 :class="account.balance_cents < 0 ? 'text-rose-600' : 'text-slate-700'"
                             >
                                 {{ formatCents(Math.abs(account.balance_cents)) }}
-                                <span v-if="account.balance_cents < 0" class="text-xs text-rose-400 ml-1">Cr</span>
+                                <span v-if="account.balance_cents < 0" class="ml-1 text-xs text-rose-400">Cr</span>
                             </span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="flex gap-1">
-                                <AppBadge v-if="account.is_system" variant="neutral" class="text-xs">System</AppBadge>
-                                <AppBadge v-if="!account.is_active" variant="neutral" class="text-xs">Inactive</AppBadge>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3 text-right" @click.stop>
+                        <td class="px-3 py-2 text-right" @click.stop>
                             <div
                                 v-if="rowActionItems(account).length"
                                 class="inline-flex justify-end"

@@ -122,7 +122,8 @@ Route::middleware([
     Route::put('/accounting/accounts/{account}', [AccountController::class, 'update'])->name('accounting.accounts.update');
     Route::post('/accounting/accounts/{account}/deactivate', [AccountController::class, 'deactivate'])->name('accounting.accounts.deactivate');
     Route::delete('/accounting/accounts/{account}', [AccountController::class, 'destroy'])->name('accounting.accounts.destroy');
-    Route::get('/accounting/accounts/{account}/statement', AccountStatementController::class)->name('accounting.accounts.statement');
+    Route::get('/accounting/accounts/{account}/statement', [AccountStatementController::class, 'show'])->name('accounting.accounts.statement');
+    Route::get('/accounting/accounts/{account}/statement/export', [AccountStatementController::class, 'exportCsv'])->name('accounting.accounts.statement.export');
     Route::get('/budgeting', [BudgetingController::class, 'index'])->name('budgeting.index');
     Route::get('/budgeting/create', [BudgetingController::class, 'create'])->name('budgeting.create');
     Route::post('/budgeting', [BudgetingController::class, 'store'])->name('budgeting.store');

@@ -9,10 +9,11 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AccountStatementController extends Controller
 {
-    public function __invoke(Request $request, Account $account): Response
+    public function show(Request $request, Account $account): Response
     {
         abort_unless($account->team_id === $request->user()->current_team_id, 403);
 
@@ -98,6 +99,70 @@ class AccountStatementController extends Controller
                 'debits' => $totalDebits,
                 'credits' => $totalCredits,
             ],
+        ]);
+    }
+
+    public function exportCsv(Request $request, Account $account): StreamedResponse
+    {
+        abort_unless($account->team_id === $request->user()->current_team_id, 403);
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+
+        $entries = JournalEntry::query()
+            ->where('account_id', $account->id)
+            ->whereIn('id', $ids)
+            ->whereHas('transaction', fn ($q) => $q->where('team_id', $account->team_id))
+            ->with('transaction:id,type,reference,description,expense_meta,transaction_date')
+            ->get()
+            ->sortBy(fn (JournalEntry $entry) => sprintf(
+                '%s-%010d',
+                optional($entry->transaction?->transaction_date)->toDateString() ?? '0000-00-00',
+                $entry->id
+            ))
+            ->values();
+
+        $safeCode = preg_replace('/[^A-Za-z0-9_-]+/', '-', $account->code) ?: 'account';
+        $filename = 'account-statement-'.$safeCode.'-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($entries): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+
+            // UTF-8 BOM so Excel / Sheets detect encoding correctly.
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Date',
+                'Reference',
+                'Description',
+                'Debit (ZAR)',
+                'Credit (ZAR)',
+            ]);
+
+            foreach ($entries as $entry) {
+                $amount = (int) $entry->getRawOriginal('amount_cents');
+                $debit = $entry->type->value === 'debit' ? $amount : 0;
+                $credit = $entry->type->value === 'credit' ? $amount : 0;
+
+                fputcsv($handle, [
+                    optional($entry->transaction?->transaction_date)->toDateString() ?? '',
+                    (string) ($entry->transaction?->displayReference() ?? ''),
+                    (string) ($entry->description ?: $entry->transaction?->description ?? ''),
+                    number_format($debit / 100, 2, '.', ''),
+                    number_format($credit / 100, 2, '.', ''),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

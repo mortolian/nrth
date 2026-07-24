@@ -297,4 +297,72 @@ class TransactionIndexTest extends TestCase
         $this->get(route('accounting.transactions.export'))
             ->assertSessionHasErrors('ids');
     }
+
+    public function test_account_statement_export_csv_downloads_selected_entries(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $expenseAccount = Account::factory()->for($team)->expense()->create(['code' => '7500']);
+        $bankAccount = Account::factory()->for($team)->asset()->create(['code' => '1010']);
+
+        $transaction = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'type' => TransactionType::Expense,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'STMT-REF',
+            'description' => 'Statement export line',
+            'expense_meta' => [
+                'external_reference' => 'PO-STMT-1',
+            ],
+            'transaction_date' => Carbon::parse('2026-07-12')->toDateString(),
+            'created_by' => $user->id,
+        ]);
+
+        $debit = JournalEntry::query()->create([
+            'transaction_id' => $transaction->id,
+            'account_id' => $expenseAccount->id,
+            'type' => EntryType::Debit,
+            'amount_cents' => 2500,
+            'currency' => 'ZAR',
+        ]);
+        JournalEntry::query()->create([
+            'transaction_id' => $transaction->id,
+            'account_id' => $bankAccount->id,
+            'type' => EntryType::Credit,
+            'amount_cents' => 2500,
+            'currency' => 'ZAR',
+        ]);
+
+        $response = $this->get(route('accounting.accounts.statement.export', [
+            'account' => $expenseAccount,
+            'ids' => [$debit->id],
+        ]));
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('Date,Reference,Description', $csv);
+        $this->assertStringContainsString('Debit (ZAR)', $csv);
+        $this->assertStringContainsString('Credit (ZAR)', $csv);
+        $this->assertStringContainsString('PO-STMT-1', $csv);
+        $this->assertStringContainsString('Statement export line', $csv);
+        $this->assertStringContainsString('25.00', $csv);
+        $this->assertStringContainsString('0.00', $csv);
+    }
+
+    public function test_account_statement_export_csv_rejects_empty_selection(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $expenseAccount = Account::factory()->for($team)->expense()->create(['code' => '7500']);
+
+        $this->get(route('accounting.accounts.statement.export', ['account' => $expenseAccount]))
+            ->assertSessionHasErrors('ids');
+    }
 }
