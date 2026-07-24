@@ -24,6 +24,7 @@ type BackupRow = {
     disk: string;
     date: string | null;
     size_bytes: number;
+    download_url: string;
 };
 
 const props = defineProps<{
@@ -383,6 +384,8 @@ onBeforeUnmount(() => {
                                             v-if="run.download_url"
                                             :href="run.download_url"
                                             class="text-brand-700 hover:underline"
+                                            download
+                                            data-inertia="false"
                                         >
                                             Download
                                         </a>
@@ -461,8 +464,10 @@ onBeforeUnmount(() => {
                                 <td class="px-2 py-2 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <a
-                                            :href="route('backups-exports.backups.download', backup.filename)"
+                                            :href="backup.download_url"
                                             class="text-brand-700 hover:underline"
+                                            download
+                                            data-inertia="false"
                                         >
                                             Download
                                         </a>

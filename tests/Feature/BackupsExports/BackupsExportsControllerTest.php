@@ -187,6 +187,30 @@ class BackupsExportsControllerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_operator_can_download_backup_file(): void
+    {
+        Config::set('nrth.operator_emails', []);
+        Config::set('backup.backup.name', 'nrth');
+        Config::set('backup.backup.destination.disks', ['local']);
+
+        Storage::fake('local');
+        $relative = 'nrth/2026-07-24-22-00-00.zip';
+        Storage::disk('local')->put($relative, 'zip-bytes');
+
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'ops@example.com',
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAsTeamOwner($user, $user->currentTeam);
+
+        $response = $this->get(route('backups-exports.backups.download', [
+            'filename' => '2026-07-24-22-00-00.zip',
+        ]));
+
+        $response->assertOk();
+        $response->assertDownload('2026-07-24-22-00-00.zip');
+    }
+
     public function test_owner_can_delete_takeout(): void
     {
         Storage::fake('local');

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupsExportsController extends Controller
@@ -112,7 +113,7 @@ class BackupsExportsController extends Controller
             ->with('success', 'Instance backup has been queued. This page will refresh while it runs.');
     }
 
-    public function downloadBackup(Request $request, string $filename): StreamedResponse
+    public function downloadBackup(Request $request, string $filename): BinaryFileResponse|StreamedResponse
     {
         Gate::authorize('manageInstanceBackups');
 

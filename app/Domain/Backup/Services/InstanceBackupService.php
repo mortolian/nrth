@@ -6,8 +6,10 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Backup\BackupDestination\Backup;
 use Spatie\Backup\BackupDestination\BackupDestination;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InstanceBackupService
@@ -49,19 +51,22 @@ class InstanceBackupService
     }
 
     /**
-     * @return list<array{filename: string, path: string, disk: string, date: string|null, size_bytes: int}>
+     * @return list<array{filename: string, path: string, disk: string, date: string|null, size_bytes: int, download_url: string}>
      */
     public function listBackups(): array
     {
         return $this->destinations()
             ->flatMap(function (BackupDestination $destination): Collection {
                 return $destination->backups()->map(function (Backup $backup) use ($destination): array {
+                    $filename = basename($backup->path());
+
                     return [
-                        'filename' => basename($backup->path()),
+                        'filename' => $filename,
                         'path' => $backup->path(),
                         'disk' => $destination->diskName(),
                         'date' => $backup->date()->toIso8601String(),
                         'size_bytes' => (int) $backup->sizeInBytes(),
+                        'download_url' => route('backups-exports.backups.download', ['filename' => $filename]),
                     ];
                 });
             })
@@ -99,10 +104,35 @@ class InstanceBackupService
         return null;
     }
 
-    public function download(string $filename): StreamedResponse
+    public function download(string $filename): BinaryFileResponse|StreamedResponse
     {
         $backup = $this->findBackup($filename);
         abort_unless($backup !== null && $backup->exists(), 404);
+
+        $name = basename($backup->path());
+
+        // Prefer a real filesystem download. Octane/Swoole often hangs or returns an
+        // empty body for streamDownload() + fpassthru() on large zip archives.
+        foreach ($this->destinationDiskNames() as $diskName) {
+            $disk = Storage::disk($diskName);
+            $relative = $backup->path();
+
+            if (! $disk->exists($relative)) {
+                continue;
+            }
+
+            try {
+                $absolute = $disk->path($relative);
+            } catch (\Throwable) {
+                break;
+            }
+
+            if (is_string($absolute) && is_file($absolute)) {
+                return response()->download($absolute, $name, [
+                    'Content-Type' => 'application/zip',
+                ]);
+            }
+        }
 
         $stream = $backup->stream();
 
@@ -111,7 +141,7 @@ class InstanceBackupService
             if (is_resource($stream)) {
                 fclose($stream);
             }
-        }, basename($backup->path()), [
+        }, $name, [
             'Content-Type' => 'application/zip',
         ]);
     }
@@ -134,11 +164,21 @@ class InstanceBackupService
     private function destinations(): Collection
     {
         $backupName = (string) config('backup.backup.name');
-        $disks = config('backup.backup.destination.disks', ['local']);
 
-        return collect($disks)->map(
+        return collect($this->destinationDiskNames())->map(
             fn (string $disk): BackupDestination => BackupDestination::create($disk, $backupName)
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function destinationDiskNames(): array
+    {
+        /** @var list<string>|string $disks */
+        $disks = config('backup.backup.destination.disks', ['local']);
+
+        return array_values(array_filter((array) $disks, fn ($disk): bool => is_string($disk) && $disk !== ''));
     }
 
     private function sanitizeFilename(string $filename): ?string
