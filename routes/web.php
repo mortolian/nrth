@@ -111,6 +111,7 @@ Route::middleware([
     Route::put('/suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
     Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
     Route::get('/accounting/transactions', [TransactionController::class, 'index'])->name('accounting.transactions.index');
+    Route::get('/accounting/transactions/export', [TransactionController::class, 'exportCsv'])->name('accounting.transactions.export');
     Route::delete('/accounting/transactions/{transaction}', [TransactionController::class, 'destroy'])->name('accounting.transactions.destroy');
     Route::get('/accounting/journal', GeneralLedgerController::class)->name('accounting.journal.index');
     Route::get('/accounting/accounts', ChartOfAccountsController::class)->name('accounting.accounts.index');

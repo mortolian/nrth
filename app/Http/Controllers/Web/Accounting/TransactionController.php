@@ -17,6 +17,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TransactionController extends Controller
 {
@@ -142,6 +143,76 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'filters' => $this->filters($request),
             'accounts' => $accounts,
+        ]);
+    }
+
+    public function exportCsv(Request $request): StreamedResponse
+    {
+        $teamId = (int) $request->user()->current_team_id;
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+
+        $transactions = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereIn('id', $ids)
+            ->with(['journalEntries.account', 'supplier:id,name'])
+            ->orderByDesc('transaction_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $filename = 'transactions-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($transactions): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                return;
+            }
+
+            // UTF-8 BOM so Excel / Sheets detect encoding correctly.
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Date',
+                'Type',
+                'Reference',
+                'Supplier',
+                'Description',
+                'Accounts affected',
+                'Amount (ZAR)',
+                'Status',
+            ]);
+
+            foreach ($transactions as $transaction) {
+                $lines = $transaction->journalEntries;
+                $debits = $lines->filter(fn ($line) => $line->type === EntryType::Debit);
+                $credits = $lines->filter(fn ($line) => $line->type === EntryType::Credit);
+                $amountCents = (int) max(
+                    $debits->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents')),
+                    $credits->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents'))
+                );
+                $debitAccount = $debits->first()?->account?->name ?? '—';
+                $creditAccount = $credits->first()?->account?->name ?? '—';
+
+                fputcsv($handle, [
+                    optional($transaction->transaction_date)->toDateString() ?? '',
+                    $transaction->type->value,
+                    (string) ($transaction->displayReference() ?? ''),
+                    (string) ($transaction->displaySupplier() ?? ''),
+                    (string) ($transaction->description ?? ''),
+                    $debitAccount.' -> '.$creditAccount,
+                    number_format($amountCents / 100, 2, '.', ''),
+                    $transaction->status->value,
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

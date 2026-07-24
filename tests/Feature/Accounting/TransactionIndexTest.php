@@ -232,4 +232,69 @@ class TransactionIndexTest extends TestCase
                 ->has('entries.data', 1)
                 ->where('entries.data.0.reference', 'RCP-12'));
     }
+
+    public function test_export_csv_downloads_selected_transactions(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $supplier = Supplier::factory()->for($team)->create(['name' => 'Export Supplier']);
+        $expenseAccount = Account::factory()->for($team)->expense()->create(['code' => '7500']);
+        $bankAccount = Account::factory()->for($team)->asset()->create(['code' => '1010']);
+
+        $transaction = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'supplier_id' => $supplier->id,
+            'type' => TransactionType::Expense,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'Old Snapshot',
+            'description' => 'Export me',
+            'expense_meta' => [
+                'external_reference' => 'PO-EXPORT-1',
+            ],
+            'transaction_date' => Carbon::parse('2026-07-12')->toDateString(),
+            'created_by' => $user->id,
+        ]);
+
+        JournalEntry::query()->create([
+            'transaction_id' => $transaction->id,
+            'account_id' => $expenseAccount->id,
+            'type' => EntryType::Debit,
+            'amount_cents' => 1500,
+            'currency' => 'ZAR',
+        ]);
+        JournalEntry::query()->create([
+            'transaction_id' => $transaction->id,
+            'account_id' => $bankAccount->id,
+            'type' => EntryType::Credit,
+            'amount_cents' => 1500,
+            'currency' => 'ZAR',
+        ]);
+
+        $response = $this->get(route('accounting.transactions.export', ['ids' => [$transaction->id]]));
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString('Date,Type,Reference,Supplier,Description', $csv);
+        $this->assertStringContainsString('Amount (ZAR)', $csv);
+        $this->assertStringContainsString('PO-EXPORT-1', $csv);
+        $this->assertStringContainsString('Export Supplier', $csv);
+        $this->assertStringContainsString('Export me', $csv);
+        $this->assertStringContainsString('15.00', $csv);
+        $this->assertStringNotContainsString('Old Snapshot', $csv);
+    }
+
+    public function test_export_csv_rejects_empty_selection(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $this->get(route('accounting.transactions.export'))
+            ->assertSessionHasErrors('ids');
+    }
 }

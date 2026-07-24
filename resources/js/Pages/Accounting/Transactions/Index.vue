@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
@@ -57,6 +57,7 @@ const transactionDeleteError = computed(() => {
 });
 
 const expandedRows = ref<number[]>([]);
+const selected = ref<number[]>([]);
 const filters = ref({
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
@@ -82,6 +83,54 @@ const toggleExpanded = (id: number) => {
         return;
     }
     expandedRows.value = [...expandedRows.value, id];
+};
+
+const toggleSelected = (id: number, checked: boolean) => {
+    if (checked) {
+        if (!selected.value.includes(id)) selected.value.push(id);
+        return;
+    }
+    selected.value = selected.value.filter((item) => item !== id);
+};
+
+const pageIds = computed(() => props.transactions.data.map((transaction) => transaction.id));
+
+const allPageSelected = computed(
+    () => pageIds.value.length > 0 && pageIds.value.every((id) => selected.value.includes(id)),
+);
+
+const somePageSelected = computed(
+    () => pageIds.value.some((id) => selected.value.includes(id)) && !allPageSelected.value,
+);
+
+const selectAllCheckbox = ref<HTMLInputElement | null>(null);
+
+watch([allPageSelected, somePageSelected], async () => {
+    await nextTick();
+    if (selectAllCheckbox.value) {
+        selectAllCheckbox.value.indeterminate = somePageSelected.value;
+    }
+}, { immediate: true });
+
+const toggleSelectAllPage = (checked: boolean) => {
+    if (checked) {
+        selected.value = [...new Set([...selected.value, ...pageIds.value])];
+        return;
+    }
+    const onPage = new Set(pageIds.value);
+    selected.value = selected.value.filter((id) => !onPage.has(id));
+};
+
+const exportSelectedCsv = () => {
+    if (selected.value.length === 0) {
+        return;
+    }
+
+    const params = new URLSearchParams();
+    selected.value.forEach((id) => {
+        params.append('ids[]', String(id));
+    });
+    window.location.assign(`${route('accounting.transactions.export')}?${params.toString()}`);
 };
 
 const rowActionItems = (row: LedgerRow) => {
@@ -153,11 +202,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
             { label: 'Transactions' },
         ]"
     >
-        <PageHeader title="Transactions">
-            <template #actions>
-                <AppButton variant="secondary">Export to Excel</AppButton>
-            </template>
-        </PageHeader>
+        <PageHeader title="Transactions" />
 
         <div
             v-if="transactionDeleteError"
@@ -183,13 +228,14 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                         :model-value="filters.type"
                         :options="[
                             { label: 'All', value: 'all' },
-                            { label: 'Invoice', value: 'invoice' },
-                            { label: 'Payment', value: 'payment' },
                             { label: 'Expense', value: 'expense' },
+                            { label: 'Payment', value: 'payment' },
+                            { label: 'Invoice', value: 'invoice' },
                             { label: 'Transfer', value: 'transfer' },
-                            { label: 'Journal Adjustment', value: 'journal_adjustment' },
+                            { label: 'Journal adjustment', value: 'journal_adjustment' },
+                            { label: 'Opening balance', value: 'opening_balance' },
                         ]"
-                        @update:model-value="filters.type = $event"
+                        @update:model-value="filters.type = String($event)"
                     />
                 </div>
                 <div>
@@ -202,7 +248,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                             { label: 'Posted', value: 'posted' },
                             { label: 'Void', value: 'void' },
                         ]"
-                        @update:model-value="filters.status = $event"
+                        @update:model-value="filters.status = String($event)"
                     />
                 </div>
                 <div>
@@ -213,7 +259,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                             { label: 'All accounts', value: 'all' },
                             ...accounts.map((account) => ({ label: account.name, value: String(account.id) })),
                         ]"
-                        @update:model-value="filters.account_id = $event"
+                        @update:model-value="filters.account_id = String($event)"
                     />
                 </div>
                 <div>
@@ -233,6 +279,18 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
         </AppCard>
 
         <AppCard class="mt-5 p-0">
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <h3 class="text-lg font-semibold text-slate-900">Transaction list</h3>
+                <AppButton
+                    variant="secondary"
+                    size="sm"
+                    :disabled="selected.length === 0"
+                    @click="exportSelectedCsv"
+                >
+                    Export CSV
+                </AppButton>
+            </div>
+
             <!-- Mobile: stacked cards so columns are not crushed -->
             <div class="md:hidden divide-y divide-slate-200">
                 <div
@@ -241,32 +299,41 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                     class="p-4"
                 >
                     <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0 flex-1 space-y-2">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-sm font-semibold text-slate-900">{{ transaction.date || '—' }}</span>
-                                <AppBadge variant="info" class="shrink-0">{{ transaction.type }}</AppBadge>
-                                <AppBadge
-                                    :variant="statusBadgeVariant(transaction.status)"
-                                    class="shrink-0"
-                                    :class="transaction.status === 'void' ? 'line-through' : ''"
-                                >
-                                    {{ transaction.status }}
-                                </AppBadge>
+                        <div class="flex min-w-0 flex-1 items-start gap-3">
+                            <input
+                                type="checkbox"
+                                :checked="selected.includes(transaction.id)"
+                                class="mt-1 h-4 w-4 shrink-0 rounded border-slate-300"
+                                :aria-label="`Select transaction ${transaction.reference || transaction.id}`"
+                                @change="toggleSelected(transaction.id, ($event.target as HTMLInputElement).checked)"
+                            >
+                            <div class="min-w-0 flex-1 space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-sm font-semibold text-slate-900">{{ transaction.date || '—' }}</span>
+                                    <AppBadge variant="info" class="shrink-0">{{ transaction.type }}</AppBadge>
+                                    <AppBadge
+                                        :variant="statusBadgeVariant(transaction.status)"
+                                        class="shrink-0"
+                                        :class="transaction.status === 'void' ? 'line-through' : ''"
+                                    >
+                                        {{ transaction.status }}
+                                    </AppBadge>
+                                </div>
+                                <p class="text-sm text-slate-800">
+                                    <span class="text-slate-500">Ref:</span>
+                                    {{ transaction.reference || '—' }}
+                                </p>
+                                <p class="text-sm text-slate-800">
+                                    <span class="text-slate-500">Supplier:</span>
+                                    {{ transaction.supplier || '—' }}
+                                </p>
+                                <p class="text-sm leading-snug text-slate-600">
+                                    {{ transaction.description || '—' }}
+                                </p>
+                                <p class="text-xs leading-relaxed text-slate-500">
+                                    {{ transaction.accounts_affected }}
+                                </p>
                             </div>
-                            <p class="text-sm text-slate-800">
-                                <span class="text-slate-500">Ref:</span>
-                                {{ transaction.reference || '—' }}
-                            </p>
-                            <p class="text-sm text-slate-800">
-                                <span class="text-slate-500">Supplier:</span>
-                                {{ transaction.supplier || '—' }}
-                            </p>
-                            <p class="text-sm leading-snug text-slate-600">
-                                {{ transaction.description || '—' }}
-                            </p>
-                            <p class="text-xs leading-relaxed text-slate-500">
-                                {{ transaction.accounts_affected }}
-                            </p>
                         </div>
                         <div class="flex shrink-0 flex-col items-end gap-2">
                             <InvoiceRowActionsMenu
@@ -326,9 +393,10 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
             <!-- Desktop: wide table scrolls horizontally instead of squashing -->
             <div class="hidden md:block">
                 <AppTable
-                    table-class="min-w-[1080px] text-sm"
+                    table-class="min-w-[1120px] text-sm"
                     :show-pagination="false"
                     :columns="[
+                        { key: 'select', label: '', widthClass: 'w-10' },
                         { key: 'date', label: 'Date', widthClass: 'whitespace-nowrap' },
                         { key: 'type', label: 'Type', widthClass: 'whitespace-nowrap' },
                         { key: 'reference', label: 'Reference', widthClass: 'max-w-[10rem] xl:max-w-none' },
@@ -343,8 +411,27 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                     :last-page="transactions.last_page"
                     @page-change="applyFilters"
                 >
+                    <template #header-select>
+                        <input
+                            ref="selectAllCheckbox"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-slate-300"
+                            :checked="allPageSelected"
+                            :disabled="transactions.data.length === 0"
+                            :aria-label="allPageSelected ? 'Deselect all on this page' : 'Select all on this page'"
+                            @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
+                        >
+                    </template>
                     <template v-for="transaction in transactions.data" :key="transaction.id">
                         <tr class="cursor-pointer hover:bg-slate-50" @click="toggleExpanded(transaction.id)">
+                            <td class="px-3 py-2" @click.stop>
+                                <input
+                                    type="checkbox"
+                                    :checked="selected.includes(transaction.id)"
+                                    class="h-4 w-4 rounded border-slate-300"
+                                    @change="toggleSelected(transaction.id, ($event.target as HTMLInputElement).checked)"
+                                >
+                            </td>
                             <td class="px-3 py-2 whitespace-nowrap">{{ transaction.date || '-' }}</td>
                             <td class="px-3 py-2 whitespace-nowrap">
                                 <AppBadge variant="info">{{ transaction.type }}</AppBadge>
@@ -379,7 +466,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                             </td>
                         </tr>
                         <tr v-if="expandedRows.includes(transaction.id)">
-                            <td colspan="9" class="bg-slate-50 px-3 py-2">
+                            <td colspan="10" class="bg-slate-50 px-3 py-2">
                                 <div :class="journalLinesBlock">
                                     <table class="min-w-full text-sm">
                                         <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -413,7 +500,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                         </tr>
                     </template>
                     <tr v-if="!transactions.data.length">
-                        <td colspan="9" class="px-3 py-6">
+                        <td colspan="10" class="px-3 py-6">
                             <EmptyState title="No transactions found" description="Try broadening your filters." />
                         </td>
                     </tr>
