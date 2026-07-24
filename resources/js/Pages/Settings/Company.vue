@@ -592,7 +592,7 @@ const removeBankAccount = (index: number) => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Logo</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">Shown on invoices, estimates, and other customer-facing PDFs (PNG or JPG, max 4&nbsp;MB).</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Shown in the app sidebar next to your team name, and on invoices, estimates, and other customer-facing PDFs (PNG or JPG, max 4&nbsp;MB).</p>
                         <div class="mt-4 flex flex-wrap items-center gap-4">
                             <div
                                 class="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"

@@ -54,6 +54,7 @@ class HandleInertiaRequests extends Middleware
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
             'currencyOptions' => fn () => Iso4217Currencies::selectOptions(),
+            'company_logo_url' => fn () => $request->user()?->currentTeam?->getFirstMedia('logo')?->getUrl() ?: null,
             'company_currency' => fn () => Iso4217Currencies::normalize(
                 (string) ($request->user()?->currentTeam?->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
             ),

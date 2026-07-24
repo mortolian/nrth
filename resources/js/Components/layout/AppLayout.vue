@@ -92,6 +92,10 @@ const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
 const canManageBackups = computed(() => Boolean(page.props.can_manage_backups));
+const companyLogoUrl = computed(() => {
+    const url = page.props.company_logo_url;
+    return typeof url === 'string' && url.trim() !== '' ? url.trim() : null;
+});
 
 const navItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = [
@@ -303,17 +307,35 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 ]"
             >
                 <div class="border-b border-slate-900/10 px-4 py-4">
-                    <Link :href="route('dashboard')" class="flex items-center gap-3">
+                    <Link
+                        :href="route('dashboard')"
+                        class="flex items-center gap-3"
+                        :class="collapsed ? 'flex-col gap-2' : ''"
+                    >
                         <ApplicationMark class="h-10 w-10 shrink-0 text-brand-700" />
                         <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
+                        <img
+                            v-if="collapsed && companyLogoUrl"
+                            :src="companyLogoUrl"
+                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Company logo'"
+                            class="h-8 w-8 rounded-md border border-slate-200 bg-white object-contain"
+                        >
                     </Link>
 
                     <div v-if="hasTeamFeatures && !collapsed" class="mt-4">
                         <Dropdown align="left" width="60">
                             <template #trigger>
-                                <button class="flex w-full items-center justify-between rounded-md bg-white/50 px-3 py-2 text-sm hover:bg-white/70">
-                                    <span class="truncate">{{ currentTeam?.name ?? 'Team' }}</span>
-                                    <ChevronRight class="h-4 w-4" />
+                                <button class="flex w-full items-center justify-between gap-2 rounded-md bg-white/50 px-3 py-2 text-sm hover:bg-white/70">
+                                    <span class="flex min-w-0 items-center gap-2">
+                                        <img
+                                            v-if="companyLogoUrl"
+                                            :src="companyLogoUrl"
+                                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Company logo'"
+                                            class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
+                                        >
+                                        <span class="truncate">{{ currentTeam?.name ?? 'Team' }}</span>
+                                    </span>
+                                    <ChevronRight class="h-4 w-4 shrink-0" />
                                 </button>
                             </template>
                             <template #content>
@@ -562,8 +584,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     mobileOpen ? 'translate-x-0' : '-translate-x-full',
                 ]"
             >
-                <div class="mb-4 flex items-center justify-between">
-                    <span class="font-semibold">Menu</span>
+                <div class="mb-4 flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <ApplicationMark class="h-8 w-8 shrink-0 text-brand-700" />
+                            <span class="font-semibold">{{ appDisplayName }}</span>
+                        </div>
+                        <div
+                            v-if="companyLogoUrl || currentTeam?.name"
+                            class="mt-3 flex items-center gap-2 rounded-md bg-white/50 px-2.5 py-1.5"
+                        >
+                            <img
+                                v-if="companyLogoUrl"
+                                :src="companyLogoUrl"
+                                :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Company logo'"
+                                class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
+                            >
+                            <span class="truncate text-sm text-slate-700">{{ currentTeam?.name ?? 'Company' }}</span>
+                        </div>
+                    </div>
                     <button class="rounded-md p-2 hover:bg-white/40" @click="mobileOpen = false">
                         <X class="h-4 w-4" />
                     </button>
