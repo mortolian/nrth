@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\Accounting\Actions\DeleteTransactionAction;
 use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Supplier;
@@ -145,6 +146,7 @@ class SupplierController extends Controller
                     'vat_amount_cents' => $vatAmount,
                     'status' => $transaction->status->value,
                     'has_receipt' => $transaction->media_count > 0,
+                    'can_delete' => DeleteTransactionAction::canDelete($transaction),
                 ];
             });
 

@@ -177,6 +177,15 @@ class SupplierTest extends TestCase
 
         $this->assertNotNull($txn);
         $this->assertSame('Ledger Supplier', $txn->reference);
+
+        $this->get(route('suppliers.show', $supplier))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Suppliers/Show')
+                ->has('expense_history.data', 1)
+                ->where('expense_history.data.0.id', $txn->id)
+                ->where('expense_history.data.0.can_delete', true)
+                ->where('expense_history.data.0.description', 'Office supplies'));
     }
 
     public function test_other_team_cannot_view_supplier(): void
