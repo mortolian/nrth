@@ -429,15 +429,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </div>
                         </div>
                     </template>
-                    <div
-                        v-if="!vatEnabled && !collapsed"
-                        class="mx-2 mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
-                    >
-                        VAT is disabled. VAT and report menus are hidden.
-                        <a :href="route('settings.business', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
-                            Enable in Business settings
-                        </a>
-                    </div>
                 </nav>
 
                 <div class="border-t border-slate-900/10 p-2">
@@ -605,12 +596,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </div>
                         </div>
                     </template>
-                    <div v-if="!vatEnabled" class="mx-1 mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        VAT is disabled. VAT and report menus are hidden.
-                        <a :href="route('settings.business', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
-                            Enable
-                        </a>
-                    </div>
                     <Link
                         :href="route('settings.index')"
                         :class="[
