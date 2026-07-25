@@ -28,6 +28,8 @@ class BudgetingController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('budgets.view', $request);
+
         if (! Schema::hasTable('journal_entries') || ! Schema::hasTable('budgets')) {
             return Inertia::render('Budgeting/Index', [
                 'budgets' => [],
@@ -126,6 +128,8 @@ class BudgetingController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('budgets.manage', $request);
+
         return Inertia::render('Budgeting/Form', [
             'isEditing' => false,
             'budget' => null,
@@ -135,6 +139,7 @@ class BudgetingController extends Controller
 
     public function edit(Request $request, Budget $budget): Response
     {
+        $this->authorizeTeam('budgets.manage', $request);
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
         $budget->loadMissing(['categories.items', 'categories.account']);
 
@@ -147,6 +152,7 @@ class BudgetingController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('budgets.manage', $request);
         $payload = $this->validateBudgetPayload($request);
         $teamId = (int) $request->user()->current_team_id;
 
@@ -169,6 +175,7 @@ class BudgetingController extends Controller
 
     public function update(Request $request, Budget $budget): RedirectResponse
     {
+        $this->authorizeTeam('budgets.manage', $request);
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
         $payload = $this->validateBudgetPayload($request);
 
@@ -191,6 +198,7 @@ class BudgetingController extends Controller
 
     public function destroy(Request $request, Budget $budget): RedirectResponse
     {
+        $this->authorizeTeam('budgets.manage', $request);
         abort_unless($budget->team_id === $request->user()->current_team_id, 403);
         $budget->delete();
 
@@ -199,6 +207,7 @@ class BudgetingController extends Controller
 
     public function restore(Request $request, int $id): RedirectResponse
     {
+        $this->authorizeTeam('budgets.manage', $request);
         $teamId = (int) $request->user()->current_team_id;
         $budget = Budget::queryWithoutTeamScope()
             ->onlyTrashed()
@@ -211,6 +220,7 @@ class BudgetingController extends Controller
 
     public function forceDestroy(Request $request, int $id): RedirectResponse
     {
+        $this->authorizeTeam('budgets.manage', $request);
         $teamId = (int) $request->user()->current_team_id;
         $budget = Budget::queryWithoutTeamScope()
             ->onlyTrashed()

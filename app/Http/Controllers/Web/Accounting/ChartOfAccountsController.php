@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Accounting;
 
 use App\Domain\Accounting\Models\Account;
 use App\Http\Controllers\Controller;
+use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -14,6 +15,8 @@ class ChartOfAccountsController extends Controller
 {
     public function __invoke(Request $request): Response
     {
+        $this->authorizeTeam('accounting.view', $request);
+
         if (! Schema::hasTable('accounts')) {
             $user = $request->user();
             $team = $user->currentTeam;
@@ -21,7 +24,7 @@ class ChartOfAccountsController extends Controller
             return Inertia::render('Accounting/Accounts/Index', [
                 'groups' => [],
                 'account_count' => 0,
-                'can_manage' => $team !== null && $user->can('update', $team),
+                'can_manage' => $team !== null && TeamAccess::allows($user, $team, 'accounting.manage'),
             ]);
         }
 
@@ -81,7 +84,7 @@ class ChartOfAccountsController extends Controller
         return Inertia::render('Accounting/Accounts/Index', [
             'groups' => $groups,
             'account_count' => $accounts->count(),
-            'can_manage' => $team !== null && $user->can('update', $team),
+            'can_manage' => $team !== null && TeamAccess::allows($user, $team, 'accounting.manage'),
         ]);
     }
 

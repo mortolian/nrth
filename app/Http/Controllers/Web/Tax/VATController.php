@@ -29,6 +29,8 @@ class VATController extends Controller
 
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('tax.view', $request);
+
         if (! Schema::hasTable('tax_periods')) {
             return Inertia::render('Tax/VAT/Index', [
                 'current_period' => null,
@@ -184,6 +186,7 @@ class VATController extends Controller
 
     public function submit(Request $request, TaxPeriod $period): RedirectResponse
     {
+        $this->authorizeTeam('tax.manage', $request);
         abort_unless($period->team_id === $request->user()->current_team_id, 403);
         abort_unless($period->type === TaxPeriodType::VAT, 400);
 

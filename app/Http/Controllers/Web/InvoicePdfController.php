@@ -22,6 +22,7 @@ class InvoicePdfController extends Controller
 
     public function download(Invoice $invoice): StreamedResponse|RedirectResponse
     {
+        $this->authorizeTeam('invoices.view');
         abort_unless($invoice->team_id === auth()->user()->current_team_id, 403);
 
         try {
@@ -53,6 +54,7 @@ class InvoicePdfController extends Controller
 
     public function downloadZip(Request $request): StreamedResponse|RedirectResponse|JsonResponse
     {
+        $this->authorizeTeam('invoices.view', $request);
         $teamId = auth()->user()->current_team_id;
         $validated = $request->validate([
             'invoice_ids' => ['required', 'array', 'min:1', 'max:100'],

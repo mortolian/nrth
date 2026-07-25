@@ -19,6 +19,8 @@ class ContractController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('contracts.view', $request);
+
         $teamId = (int) $request->user()->current_team_id;
         $status = (string) $request->string('status')->toString();
         $clientId = (int) $request->integer('client_id');
@@ -78,6 +80,8 @@ class ContractController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('contracts.manage', $request);
+
         return Inertia::render('Contracting/Contracts/Form', [
             'isEditing' => false,
             'contract' => null,
@@ -87,6 +91,7 @@ class ContractController extends Controller
 
     public function edit(Request $request, Contract $contract): Response
     {
+        $this->authorizeTeam('contracts.manage', $request);
         abort_unless($contract->team_id === $request->user()->current_team_id, 403);
 
         return Inertia::render('Contracting/Contracts/Form', [
@@ -98,6 +103,7 @@ class ContractController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('contracts.manage', $request);
         $payload = $this->validateContract($request);
         $teamId = (int) $request->user()->current_team_id;
 
@@ -118,6 +124,7 @@ class ContractController extends Controller
 
     public function update(Request $request, Contract $contract): RedirectResponse
     {
+        $this->authorizeTeam('contracts.manage', $request);
         abort_unless($contract->team_id === $request->user()->current_team_id, 403);
         $payload = $this->validateContract($request);
 
@@ -138,6 +145,7 @@ class ContractController extends Controller
 
     public function generateInvoice(Request $request, Contract $contract): RedirectResponse
     {
+        $this->authorizeTeam('contracts.manage', $request);
         abort_unless($contract->team_id === $request->user()->current_team_id, 403);
         abort_unless($contract->billing_type === 'retainer', 400);
 

@@ -91,6 +91,11 @@ const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeat
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
+const teamPermissions = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) ? (perms as string[]) : [];
+});
+const canTeam = (permission: string) => teamPermissions.value.includes(permission);
 const businessLogoUrl = computed(() => {
     const url = page.props.business_logo_url;
     return typeof url === 'string' && url.trim() !== '' ? url.trim() : null;
@@ -99,40 +104,88 @@ const businessLogoUrl = computed(() => {
 const navItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = [
         { label: 'Dashboard', href: route('dashboard'), icon: Home },
-        {
+    ];
+
+    const moneyInChildren = [
+        canTeam('invoices.view') ? { label: 'Invoices', href: route('invoicing.invoices.index') } : null,
+        canTeam('estimates.view') ? { label: 'Estimates', href: route('invoicing.estimates.index') } : null,
+        canTeam('clients.view') ? { label: 'Clients', href: route('invoicing.clients.index') } : null,
+    ].filter(Boolean) as NavChild[];
+    if (moneyInChildren.length > 0) {
+        items.push({
             label: 'Money In',
-            href: route('invoicing.invoices.index'),
+            href: moneyInChildren[0].href,
             icon: Wallet,
-            group: [{ title: 'Money In', items: [{ label: 'Invoices', href: route('invoicing.invoices.index') }, { label: 'Estimates', href: route('invoicing.estimates.index') }, { label: 'Clients', href: route('invoicing.clients.index') }] }],
-        },
-        {
+            group: [{ title: 'Money In', items: moneyInChildren }],
+        });
+    }
+
+    const moneyOutChildren = [
+        canTeam('expenses.view') ? { label: 'Expenses', href: route('expenses.index') } : null,
+        canTeam('suppliers.view') ? { label: 'Suppliers', href: route('suppliers.index') } : null,
+    ].filter(Boolean) as NavChild[];
+    if (moneyOutChildren.length > 0) {
+        items.push({
             label: 'Money Out',
-            href: route('expenses.index'),
+            href: moneyOutChildren[0].href,
             icon: Landmark,
-            group: [{ title: 'Money Out', items: [{ label: 'Expenses', href: route('expenses.index') }, { label: 'Suppliers', href: route('suppliers.index') }] }],
-        },
-        {
+            group: [{ title: 'Money Out', items: moneyOutChildren }],
+        });
+    }
+
+    if (canTeam('banking.view')) {
+        items.push({
             label: 'Banking',
             href: route('banking.transactions.index'),
             icon: Building2,
-            group: [{ title: 'Banking', items: [{ label: 'Transactions', href: route('banking.transactions.index') }, { label: 'Import statement', href: route('banking.import.create') }, { label: 'Accounts', href: route('banking.accounts.index') }] }],
-        },
-        {
+            group: [{
+                title: 'Banking',
+                items: [
+                    { label: 'Transactions', href: route('banking.transactions.index') },
+                    ...(canTeam('banking.manage')
+                        ? [{ label: 'Import statement', href: route('banking.import.create') }]
+                        : []),
+                    { label: 'Accounts', href: route('banking.accounts.index') },
+                ],
+            }],
+        });
+    }
+
+    if (canTeam('accounting.view')) {
+        items.push({
             label: 'Accounting',
             href: route('accounting.transactions.index'),
             icon: BookOpen,
-            group: [{ title: 'Accounting', items: [{ label: 'Transactions', href: route('accounting.transactions.index') }, { label: 'General Ledger', href: route('accounting.journal.index') }, { label: 'Chart of Accounts', href: route('accounting.accounts.index') }] }],
-        },
-        { label: 'Planning', href: route('budgeting.index'), icon: FolderKanban, group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }] },
-        {
+            group: [{
+                title: 'Accounting',
+                items: [
+                    { label: 'Transactions', href: route('accounting.transactions.index') },
+                    { label: 'General Ledger', href: route('accounting.journal.index') },
+                    { label: 'Chart of Accounts', href: route('accounting.accounts.index') },
+                ],
+            }],
+        });
+    }
+
+    if (canTeam('budgets.view')) {
+        items.push({
+            label: 'Planning',
+            href: route('budgeting.index'),
+            icon: FolderKanban,
+            group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }],
+        });
+    }
+
+    if (canTeam('contracts.view')) {
+        items.push({
             label: 'Contracting',
             href: route('contracting.contracts.index'),
             icon: Briefcase,
             group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }] }],
-        },
-    ];
+        });
+    }
 
-    if (vatEnabled.value) {
+    if (vatEnabled.value && canTeam('tax.view')) {
         items.push({
             label: 'Tax',
             href: route('tax.vat.index'),
@@ -141,17 +194,32 @@ const navItems = computed<MenuItem[]>(() => {
                 title: 'Tax',
                 items: [
                     { label: 'VAT Returns', href: route('tax.vat.index') },
-                    { label: 'VAT rates', href: route('tax.vat-rates.index') },
+                    ...(canTeam('tax.manage')
+                        ? [{ label: 'VAT rates', href: route('tax.vat-rates.index') }]
+                        : []),
                     { label: 'Tax Periods', href: route('tax.provisional.index') },
-                    { label: 'Documents', href: route('tax.documents.index') },
+                    ...(canTeam('tax.manage')
+                        ? [{ label: 'Documents', href: route('tax.documents.index') }]
+                        : []),
                 ],
             }],
         });
+    }
+
+    if (vatEnabled.value && canTeam('reports.view')) {
         items.push({
             label: 'Reports',
             href: route('reports.profit-loss'),
             icon: ChartColumnBig,
-            group: [{ title: 'Reports', items: [{ label: 'Profit And Loss', href: route('reports.profit-loss') }, { label: 'Balance Sheet', href: route('reports.balance-sheet') }, { label: 'Cash Flow', href: route('reports.cash-flow') }, { label: 'Trial Balance', href: route('reports.trial-balance') }] }],
+            group: [{
+                title: 'Reports',
+                items: [
+                    { label: 'Profit And Loss', href: route('reports.profit-loss') },
+                    { label: 'Balance Sheet', href: route('reports.balance-sheet') },
+                    { label: 'Cash Flow', href: route('reports.cash-flow') },
+                    { label: 'Trial Balance', href: route('reports.trial-balance') },
+                ],
+            }],
         });
     }
 
@@ -235,12 +303,20 @@ const isSettingsSectionActive = computed(
 );
 
 const commandPaletteData = computed<PaletteData>(() => ({
-    quickActions: page.props.commandPalette?.quickActions ?? [
-        { id: 'new-invoice', label: 'New Invoice', href: route('invoicing.invoices.create'), icon: 'invoice' },
-        { id: 'new-expense', label: 'New Expense', href: route('expenses.create'), icon: 'expense' },
-        { id: 'record-payment', label: 'Record Payment', href: `${route('dashboard')}#outstanding-invoices`, icon: 'payment' },
-        { id: 'new-client', label: 'New Client', href: route('invoicing.clients.create'), icon: 'client' },
-    ],
+    quickActions: (page.props.commandPalette?.quickActions ?? [
+        canTeam('invoices.manage')
+            ? { id: 'new-invoice', label: 'New Invoice', href: route('invoicing.invoices.create'), icon: 'invoice' as const }
+            : null,
+        canTeam('expenses.manage')
+            ? { id: 'new-expense', label: 'New Expense', href: route('expenses.create'), icon: 'expense' as const }
+            : null,
+        canTeam('invoices.manage')
+            ? { id: 'record-payment', label: 'Record Payment', href: `${route('dashboard')}#outstanding-invoices`, icon: 'payment' as const }
+            : null,
+        canTeam('clients.manage')
+            ? { id: 'new-client', label: 'New Client', href: route('invoicing.clients.create'), icon: 'client' as const }
+            : null,
+    ].filter(Boolean)) as PaletteData['quickActions'],
     navigation: page.props.commandPalette?.navigation ?? [
         { id: 'dashboard', label: 'Dashboard', href: route('dashboard') },
         { id: 'invoices', label: 'Invoices', href: route('invoicing.invoices.index') },
@@ -624,6 +700,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <span>Home</span>
                     </Link>
                     <Link
+                        v-if="canTeam('invoices.view')"
                         :href="route('invoicing.invoices.index')"
                         :class="[
                             'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
@@ -633,7 +710,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <FileText class="h-5 w-5 shrink-0" />
                         <span>Invoices</span>
                     </Link>
-                    <div class="flex justify-center">
+                    <div v-if="canTeam('invoices.manage') || canTeam('expenses.manage') || canTeam('clients.manage')" class="flex justify-center">
                         <button
                             type="button"
                             class="relative -top-5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg ring-4 ring-white"
@@ -643,7 +720,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <Plus class="h-7 w-7" />
                         </button>
                     </div>
-                    <template v-if="vatEnabled">
+                    <template v-if="vatEnabled && canTeam('reports.view')">
                         <Link
                             :href="route('reports.profit-loss')"
                             :class="[
@@ -655,7 +732,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <span>Reports</span>
                         </Link>
                     </template>
-                    <template v-else>
+                    <template v-else-if="!vatEnabled && canTeam('settings.business')">
                         <a
                             :href="route('settings.business', { tab: 'tax' })"
                             class="flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium text-slate-400"
@@ -693,6 +770,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     </p>
                     <div class="grid gap-2">
                         <Link
+                            v-if="canTeam('expenses.manage')"
                             :href="route('expenses.create')"
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"
@@ -701,6 +779,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             New expense
                         </Link>
                         <Link
+                            v-if="canTeam('invoices.manage')"
                             :href="route('invoicing.invoices.create')"
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"
@@ -709,6 +788,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             New invoice
                         </Link>
                         <Link
+                            v-if="canTeam('invoices.manage')"
                             :href="`${route('dashboard')}#outstanding-invoices`"
                             class="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-medium text-slate-900 active:bg-slate-50"
                             @click="quickAddOpen = false"

@@ -10,6 +10,8 @@ class TaxDocumentsController extends Controller
 {
     public function __invoke(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('tax.manage', $request);
+
         return redirect()->route('backups-exports.index', array_filter([
             'section' => 'takeout',
             'preset' => $request->string('preset')->toString() ?: null,

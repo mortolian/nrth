@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Actions\Jetstream\UpdateTeamMemberRole as AppUpdateTeamMemberRole;
 use App\Domain\Ai\AiCatalog;
 use App\Domain\Ai\AiProviderRegistry;
 use App\Domain\Ai\AnthropicProvider;
@@ -22,6 +23,7 @@ use App\Support\Https;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Jetstream\Actions\UpdateTeamMemberRole as JetstreamUpdateTeamMemberRole;
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamController;
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
 
@@ -34,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(JetstreamUserProfileController::class, UserProfileController::class);
         $this->app->bind(JetstreamTeamController::class, AppTeamController::class);
+        $this->app->bind(JetstreamUpdateTeamMemberRole::class, AppUpdateTeamMemberRole::class);
 
         $this->app->singleton(BankingStatementImporterRegistry::class, fn ($app): BankingStatementImporterRegistry => new BankingStatementImporterRegistry(
             $app->make(CsvBankStatementImporter::class),

@@ -24,6 +24,7 @@ class AccountController extends Controller
 {
     public function seedDefault(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('accounting.manage', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -36,6 +37,7 @@ class AccountController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('accounting.manage', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -67,6 +69,7 @@ class AccountController extends Controller
 
     public function store(Request $request, CreateAccountAction $createAccount): RedirectResponse
     {
+        $this->authorizeTeam('accounting.manage', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -101,6 +104,7 @@ class AccountController extends Controller
 
     public function edit(Request $request, Account $account): Response
     {
+        $this->authorizeTeam('accounting.manage', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless($account->team_id === $team->id, 403);
@@ -126,6 +130,7 @@ class AccountController extends Controller
 
     public function update(Request $request, Account $account, UpdateAccountAction $updateAccount): RedirectResponse
     {
+        $this->authorizeTeam('accounting.manage', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless($account->team_id === $team->id, 403);
@@ -172,6 +177,7 @@ class AccountController extends Controller
 
     public function deactivate(Request $request, Account $account, DeactivateAccountAction $deactivate): RedirectResponse
     {
+        $this->authorizeTeam('accounting.manage', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless($account->team_id === $team->id, 403);
@@ -185,6 +191,7 @@ class AccountController extends Controller
 
     public function destroy(Request $request, Account $account): RedirectResponse
     {
+        $this->authorizeTeam('accounting.delete', $request);
         $team = $this->currentTeam($request);
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless($account->team_id === $team->id, 403);

@@ -23,6 +23,8 @@ class TransactionController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('accounting.view', $request);
+
         if (! Schema::hasTable('transactions')) {
             return Inertia::render('Accounting/Transactions/Index', [
                 'transactions' => new LengthAwarePaginator([], 0, 15),
@@ -148,6 +150,7 @@ class TransactionController extends Controller
 
     public function exportCsv(Request $request): StreamedResponse
     {
+        $this->authorizeTeam('accounting.view', $request);
         $teamId = (int) $request->user()->current_team_id;
 
         $validated = $request->validate([
@@ -218,6 +221,7 @@ class TransactionController extends Controller
 
     public function destroy(Request $request, Transaction $transaction, DeleteTransactionAction $deleteTransactionAction): RedirectResponse
     {
+        $this->authorizeTeam('accounting.delete', $request);
         abort_unless($transaction->team_id === (int) $request->user()->current_team_id, 403);
 
         $deleteTransactionAction->execute($transaction);

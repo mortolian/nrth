@@ -16,6 +16,8 @@ class BankingTransactionController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('banking.view', $request);
+
         if (! Schema::hasTable('banking_transactions')) {
             return Inertia::render('Banking/Transactions/Index', [
                 'transactions' => new LengthAwarePaginator([], 0, 25),

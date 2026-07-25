@@ -19,6 +19,7 @@ class EstimatePdfController extends Controller
 
     public function download(Estimate $estimate): StreamedResponse|RedirectResponse
     {
+        $this->authorizeTeam('estimates.view');
         abort_unless($estimate->team_id === auth()->user()->current_team_id, 403);
 
         try {

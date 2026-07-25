@@ -43,6 +43,8 @@ class ExpensesController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('expenses.view', $request);
+
         if (! Schema::hasTable('transactions')) {
             return Inertia::render('Expenses/Index', [
                 'expenses' => new LengthAwarePaginator([], 0, 15),
@@ -176,6 +178,7 @@ class ExpensesController extends Controller
 
     public function exportCsv(Request $request): StreamedResponse
     {
+        $this->authorizeTeam('expenses.view', $request);
         $teamId = (int) $request->user()->current_team_id;
 
         $validated = $request->validate([
@@ -252,6 +255,7 @@ class ExpensesController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
@@ -275,6 +279,7 @@ class ExpensesController extends Controller
 
     public function edit(Request $request, Transaction $transaction): Response
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
@@ -294,6 +299,7 @@ class ExpensesController extends Controller
 
     public function parseReceipt(Request $request, ParseExpenseReceipt $parser): JsonResponse
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
 
@@ -410,6 +416,7 @@ class ExpensesController extends Controller
 
     public function store(Request $request, PostTransactionAction $postTransactionAction): RedirectResponse
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
@@ -479,6 +486,7 @@ class ExpensesController extends Controller
 
     public function update(Request $request, Transaction $transaction, PostTransactionAction $postTransactionAction): RedirectResponse
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
@@ -552,6 +560,7 @@ class ExpensesController extends Controller
 
     public function destroy(Request $request, Transaction $transaction, DeleteTransactionAction $deleteTransactionAction): RedirectResponse
     {
+        $this->authorizeTeam('expenses.delete', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
 
         try {
@@ -565,6 +574,7 @@ class ExpensesController extends Controller
 
     public function storeReceipt(Request $request, Transaction $transaction): RedirectResponse
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $request->validate([
             'receipt' => ['nullable', 'file', 'max:10240'],
@@ -601,6 +611,7 @@ class ExpensesController extends Controller
 
     public function showAttachment(Request $request, Transaction $transaction, Media $media): BinaryFileResponse
     {
+        $this->authorizeTeam('expenses.view', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $media = $this->resolveExpenseAttachment($transaction, $media);
 
@@ -615,6 +626,7 @@ class ExpensesController extends Controller
 
     public function destroyAttachment(Request $request, Transaction $transaction, Media $media): RedirectResponse
     {
+        $this->authorizeTeam('expenses.manage', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $media = $this->resolveExpenseAttachment($transaction, $media);
         $media->delete();

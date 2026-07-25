@@ -46,6 +46,8 @@ class InvoiceController extends Controller
 {
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('invoices.manage', $request);
+
         return Inertia::render('Invoicing/Invoices/Form', [
             'isEditing' => false,
             'invoice' => null,
@@ -55,6 +57,7 @@ class InvoiceController extends Controller
 
     public function edit(Request $request, Invoice $invoice): Response
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         abort_if($invoice->status === InvoiceStatus::Void, 403);
 
@@ -105,6 +108,7 @@ class InvoiceController extends Controller
 
     public function store(Request $request, CreateInvoiceAction $createInvoiceAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         $payload = $this->validateInvoice($request, null);
         $teamId = (int) $request->user()->current_team_id;
 
@@ -129,6 +133,7 @@ class InvoiceController extends Controller
 
     public function update(Request $request, Invoice $invoice): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         abort_if($invoice->status === InvoiceStatus::Void, 403);
 
@@ -198,6 +203,7 @@ class InvoiceController extends Controller
 
     public function destroy(Request $request, Invoice $invoice): RedirectResponse
     {
+        $this->authorizeTeam('invoices.delete', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
 
         if ($invoice->payments()->exists()) {
@@ -217,6 +223,7 @@ class InvoiceController extends Controller
 
     public function send(Request $request, Invoice $invoice, SendInvoiceAction $sendInvoiceAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $sendInvoiceAction->execute($invoice);
 
@@ -225,6 +232,7 @@ class InvoiceController extends Controller
 
     public function markSent(Request $request, Invoice $invoice, MarkInvoiceSentAction $markInvoiceSentAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $markInvoiceSentAction->execute($invoice);
 
@@ -233,6 +241,7 @@ class InvoiceController extends Controller
 
     public function void(Request $request, Invoice $invoice, VoidInvoiceAction $voidInvoiceAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.delete', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $voidInvoiceAction->execute($invoice, 'Voided from invoice UI');
 
@@ -241,6 +250,7 @@ class InvoiceController extends Controller
 
     public function unvoid(Request $request, Invoice $invoice, UnvoidInvoiceAction $unvoidInvoiceAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $unvoidInvoiceAction->execute($invoice);
 
@@ -249,6 +259,8 @@ class InvoiceController extends Controller
 
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('invoices.view', $request);
+
         if (! Schema::hasTable('invoices')) {
             return Inertia::render('Invoicing/Invoices/Index', [
                 'invoices' => new LengthAwarePaginator([], 0, 15),
@@ -438,6 +450,7 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice): Response
     {
+        $this->authorizeTeam('invoices.view');
         abort_unless($invoice->team_id === request()->user()->current_team_id, 403);
 
         $invoice->loadMissing(['team', 'client', 'lineItems', 'payments.transaction']);
@@ -566,6 +579,7 @@ class InvoiceController extends Controller
 
     public function storePublicPayLink(Request $request, Invoice $invoice): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         abort_unless(
             in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
@@ -589,6 +603,7 @@ class InvoiceController extends Controller
 
     public function publicPayQr(Invoice $invoice): SymfonyResponse
     {
+        $this->authorizeTeam('invoices.view');
         abort_unless($invoice->team_id === request()->user()->current_team_id, 403);
         abort_if($invoice->public_token === null, 404);
         $invoice->loadMissing('team');
@@ -605,6 +620,7 @@ class InvoiceController extends Controller
 
     public function recordPayment(Request $request, Invoice $invoice, RecordPaymentAction $recordPaymentAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
 
         $payload = $request->validate([
@@ -648,6 +664,7 @@ class InvoiceController extends Controller
 
     public function undoPayment(Request $request, Invoice $invoice, Payment $payment, UndoInvoicePaymentAction $undoInvoicePaymentAction): RedirectResponse
     {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         abort_unless($payment->invoice_id === $invoice->id, 404);
         abort_unless($payment->team_id === $invoice->team_id, 403);

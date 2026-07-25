@@ -18,6 +18,7 @@ class BankingAccountController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('banking.view', $request);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
         (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
@@ -48,6 +49,7 @@ class BankingAccountController extends Controller
 
     public function store(Request $request, CreateBankingAccountAction $action): RedirectResponse
     {
+        $this->authorizeTeam('banking.manage', $request);
         $teamId = (int) $request->user()->current_team_id;
         $validated = $this->validatedPayload($request, $teamId);
 
@@ -72,6 +74,7 @@ class BankingAccountController extends Controller
         BankingAccount $bankingAccount,
         UpdateBankingAccountAction $action,
     ): RedirectResponse {
+        $this->authorizeTeam('banking.manage', $request);
         abort_unless($bankingAccount->team_id === (int) $request->user()->current_team_id, 403);
 
         $teamId = (int) $request->user()->current_team_id;

@@ -23,6 +23,8 @@ class ProvisionalTaxController extends Controller
 
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('tax.view', $request);
+
         $team = $request->user()->currentTeam;
         $teamId = (int) $team->id;
 

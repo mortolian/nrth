@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
+use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
@@ -91,6 +92,14 @@ class HandleInertiaRequests extends Middleware
 
                 return $isOwner || Gate::forUser($user)->allows('manageInstanceBackups');
             },
+            'team_permissions' => function () use ($request) {
+                $user = $request->user();
+                if ($user === null) {
+                    return [];
+                }
+
+                return TeamAccess::permissionsFor($user, $user->currentTeam);
+            },
         ];
     }
 
@@ -103,43 +112,55 @@ class HandleInertiaRequests extends Middleware
         $teamId = $user?->current_team_id;
         $team = $user?->currentTeam;
         $vatEnabled = $team?->chargesVat() ?? false;
+        $permissions = $user !== null ? TeamAccess::permissionsFor($user, $team) : [];
+        $can = fn (string $permission): bool => in_array($permission, $permissions, true);
 
-        $quickActions = [
-            ['id' => 'new-invoice', 'label' => 'New Invoice', 'href' => route('invoicing.invoices.create'), 'icon' => 'invoice'],
-            ['id' => 'new-expense', 'label' => 'New Expense', 'href' => route('expenses.create'), 'icon' => 'expense'],
-            ['id' => 'record-payment', 'label' => 'Record Payment', 'href' => route('dashboard').'#outstanding-invoices', 'icon' => 'payment'],
-            ['id' => 'new-client', 'label' => 'New Client', 'href' => route('invoicing.clients.create'), 'icon' => 'client'],
-        ];
+        $quickActions = array_values(array_filter([
+            $can('invoices.manage')
+                ? ['id' => 'new-invoice', 'label' => 'New Invoice', 'href' => route('invoicing.invoices.create'), 'icon' => 'invoice']
+                : null,
+            $can('expenses.manage')
+                ? ['id' => 'new-expense', 'label' => 'New Expense', 'href' => route('expenses.create'), 'icon' => 'expense']
+                : null,
+            $can('invoices.manage')
+                ? ['id' => 'record-payment', 'label' => 'Record Payment', 'href' => route('dashboard').'#outstanding-invoices', 'icon' => 'payment']
+                : null,
+            $can('clients.manage')
+                ? ['id' => 'new-client', 'label' => 'New Client', 'href' => route('invoicing.clients.create'), 'icon' => 'client']
+                : null,
+        ]));
 
-        $navigation = [
+        $navigation = array_values(array_filter([
             ['id' => 'dashboard', 'label' => 'Dashboard', 'href' => route('dashboard')],
-            ['id' => 'invoices', 'label' => 'Invoices', 'href' => route('invoicing.invoices.index')],
-            ['id' => 'estimates', 'label' => 'Estimates', 'href' => route('invoicing.estimates.index')],
-            ['id' => 'clients', 'label' => 'Clients', 'href' => route('invoicing.clients.index')],
-            ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')],
-            ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')],
-            ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')],
-            ['id' => 'banking-accounts', 'label' => 'Bank Accounts', 'href' => route('banking.accounts.index')],
-            ['id' => 'accounting-transactions', 'label' => 'Accounting Transactions', 'href' => route('accounting.transactions.index')],
-            ['id' => 'general-ledger', 'label' => 'General Ledger', 'href' => route('accounting.journal.index')],
-            ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts', 'href' => route('accounting.accounts.index')],
-            ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')],
-            ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')],
-            ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')],
+            $can('invoices.view') ? ['id' => 'invoices', 'label' => 'Invoices', 'href' => route('invoicing.invoices.index')] : null,
+            $can('estimates.view') ? ['id' => 'estimates', 'label' => 'Estimates', 'href' => route('invoicing.estimates.index')] : null,
+            $can('clients.view') ? ['id' => 'clients', 'label' => 'Clients', 'href' => route('invoicing.clients.index')] : null,
+            $can('expenses.view') ? ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')] : null,
+            $can('suppliers.view') ? ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')] : null,
+            $can('banking.view') ? ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')] : null,
+            $can('banking.view') ? ['id' => 'banking-accounts', 'label' => 'Bank Accounts', 'href' => route('banking.accounts.index')] : null,
+            $can('accounting.view') ? ['id' => 'accounting-transactions', 'label' => 'Accounting Transactions', 'href' => route('accounting.transactions.index')] : null,
+            $can('accounting.view') ? ['id' => 'general-ledger', 'label' => 'General Ledger', 'href' => route('accounting.journal.index')] : null,
+            $can('accounting.view') ? ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts', 'href' => route('accounting.accounts.index')] : null,
+            $can('budgets.view') ? ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')] : null,
+            $can('contracts.view') ? ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')] : null,
+            $can('settings.business') ? ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')] : null,
             ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('settings.index')],
-        ];
+        ]));
 
         if ($vatEnabled) {
             $navigation = [
                 ...$navigation,
-                ['id' => 'vat-returns', 'label' => 'VAT Returns', 'href' => route('tax.vat.index')],
-                ['id' => 'vat-rates', 'label' => 'VAT Rates', 'href' => route('tax.vat-rates.index')],
-                ['id' => 'tax-periods', 'label' => 'Tax Periods', 'href' => route('tax.provisional.index')],
-                ['id' => 'tax-documents', 'label' => 'Tax Documents', 'href' => route('tax.documents.index')],
-                ['id' => 'profit-loss', 'label' => 'Profit And Loss', 'href' => route('reports.profit-loss')],
-                ['id' => 'balance-sheet', 'label' => 'Balance Sheet', 'href' => route('reports.balance-sheet')],
-                ['id' => 'cash-flow', 'label' => 'Cash Flow', 'href' => route('reports.cash-flow')],
-                ['id' => 'trial-balance', 'label' => 'Trial Balance', 'href' => route('reports.trial-balance')],
+                ...array_values(array_filter([
+                    $can('tax.view') ? ['id' => 'vat-returns', 'label' => 'VAT Returns', 'href' => route('tax.vat.index')] : null,
+                    $can('tax.manage') ? ['id' => 'vat-rates', 'label' => 'VAT Rates', 'href' => route('tax.vat-rates.index')] : null,
+                    $can('tax.view') ? ['id' => 'tax-periods', 'label' => 'Tax Periods', 'href' => route('tax.provisional.index')] : null,
+                    $can('tax.manage') ? ['id' => 'tax-documents', 'label' => 'Tax Documents', 'href' => route('tax.documents.index')] : null,
+                    $can('reports.view') ? ['id' => 'profit-loss', 'label' => 'Profit And Loss', 'href' => route('reports.profit-loss')] : null,
+                    $can('reports.view') ? ['id' => 'balance-sheet', 'label' => 'Balance Sheet', 'href' => route('reports.balance-sheet')] : null,
+                    $can('reports.view') ? ['id' => 'cash-flow', 'label' => 'Cash Flow', 'href' => route('reports.cash-flow')] : null,
+                    $can('reports.view') ? ['id' => 'trial-balance', 'label' => 'Trial Balance', 'href' => route('reports.trial-balance')] : null,
+                ])),
             ];
         }
 

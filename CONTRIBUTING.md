@@ -70,6 +70,7 @@ Or use the unified installer from a clone: `./scripts/install.sh --dev`
 - Follow existing patterns under `app/Domain/` (actions, DTOs, services, team scoping).
 - Keep controllers thin; put business logic in domain actions/services.
 - Use `brick/money` / cents for ledger amounts; do not mix with import-only decimal fields unless intentional.
+- When adding authenticated features, keep **team roles and permissions** current — see [docs/TEAM_ACCESS.md](docs/TEAM_ACCESS.md) and [AGENTS.md](AGENTS.md).
 - Run [Laravel Pint](https://laravel.com/docs/pint) on changed PHP files: `./vendor/bin/pint`
 - Add or update tests for behavior changes when practical.
 - Avoid unrelated refactors in the same PR.
@@ -81,8 +82,11 @@ Or use the unified installer from a clone: `./scripts/install.sh --dev`
 
 ## Documentation
 
-- Update README, `docs/`, or [docs/INSTALL.md](docs/INSTALL.md) when you change setup, hosting, or user-visible behavior.
-- Link new docs from [docs/INSTALL.md](docs/INSTALL.md) or README if they are entry points.
+Docs must stay accurate as the app evolves — same expectation as code and tests. See [AGENTS.md](AGENTS.md) (Documentation section) for the file map and checklist.
+
+- Update README, `docs/`, or [docs/INSTALL.md](docs/INSTALL.md) when you change setup, hosting, configuration, auth/roles, or user-visible behavior — **in the same PR** as the code change when practical.
+- Link new docs from [docs/INSTALL.md](docs/INSTALL.md), README, or this file if they are entry points; prefer cross-links over duplicated instructions.
+- When adding authenticated features, also keep [docs/TEAM_ACCESS.md](docs/TEAM_ACCESS.md) current if permissions change.
 
 ## Community
 

@@ -50,6 +50,8 @@ class OnboardingController extends Controller
             return redirect()->route('dashboard');
         }
 
+        $this->authorizeTeam('settings.business', $request);
+
         $team = $user->currentTeam;
         abort_unless($team !== null && $user->can('update', $team), 403);
 
@@ -93,6 +95,7 @@ class OnboardingController extends Controller
 
     public function saveProgress(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('settings.business', $request);
         $user = $request->user();
         abort_if($user->completed_onboarding_at !== null, 403);
 
@@ -109,6 +112,7 @@ class OnboardingController extends Controller
 
     public function skip(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('settings.business', $request);
         $user = $request->user();
         $team = $user->currentTeam;
         abort_unless($team !== null && $user->can('update', $team), 403);
@@ -127,6 +131,8 @@ class OnboardingController extends Controller
         if ($user->completed_onboarding_at !== null) {
             return redirect()->route('dashboard');
         }
+
+        $this->authorizeTeam('settings.business', $request);
 
         $team = $user->currentTeam;
         abort_unless($team !== null && $user->can('update', $team), 403);

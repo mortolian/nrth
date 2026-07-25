@@ -18,6 +18,7 @@ class InvoiceOnlinePaymentController extends Controller
         Invoice $invoice,
         StartInvoiceOnlinePaymentSessionAction $startOnlinePayment,
     ): BaseResponse|Response {
+        $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
 
         $payload = $request->validate([

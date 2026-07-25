@@ -15,6 +15,7 @@ class AccountStatementController extends Controller
 {
     public function show(Request $request, Account $account): Response
     {
+        $this->authorizeTeam('accounting.view', $request);
         abort_unless($account->team_id === $request->user()->current_team_id, 403);
 
         $from = $request->string('from')->toString() ?: now()->startOfMonth()->toDateString();
@@ -104,6 +105,7 @@ class AccountStatementController extends Controller
 
     public function exportCsv(Request $request, Account $account): StreamedResponse
     {
+        $this->authorizeTeam('accounting.view', $request);
         abort_unless($account->team_id === $request->user()->current_team_id, 403);
 
         $validated = $request->validate([

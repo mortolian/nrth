@@ -50,10 +50,10 @@ class JetstreamServiceProvider extends ServiceProvider
             'create',
             'update',
             'export',
-        ])->description('View and manage data, export reports. Cannot delete transactions.');
+        ])->description('View and manage data, export reports. Cannot delete records or change settings.');
 
         Jetstream::role('viewer', 'Viewer', [
             'read',
-        ])->description('Read-only access to the team.');
+        ])->description('Read-only access to dashboards, records, and reports.');
     }
 }

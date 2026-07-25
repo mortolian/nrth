@@ -51,7 +51,8 @@ const props = defineProps<{
     filter_client: { id: number; name: string } | null;
 }>();
 
-const page = usePage<{ csrf_token?: string; vat_enabled?: boolean }>();
+const page = usePage<{ csrf_token?: string; vat_enabled?: boolean; team_permissions?: string[] }>();
+const canManageInvoices = computed(() => (page.props.team_permissions ?? []).includes('invoices.manage'));
 const selected = ref<number[]>([]);
 const exportingZip = ref(false);
 const paymentDrawerOpen = ref(false);
@@ -258,7 +259,7 @@ const exportSelectedPdfZip = async () => {
         ]"
     >
         <PageHeader title="Invoices">
-            <template #actions>
+            <template v-if="canManageInvoices" #actions>
                 <Link
                     :href="route('invoicing.invoices.create')"
                     class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400"

@@ -15,7 +15,29 @@ type Member = {
 
 type Invitation = { id: number; email: string; role_key: string; role_label: string };
 
-type JetstreamRole = { key: string; name: string; description?: string };
+type TeamRoleOption = {
+    id: number;
+    key: string;
+    name: string;
+    description?: string | null;
+    is_system: boolean;
+    permissions: string[];
+    permission_count: number;
+};
+
+type PermissionGroup = {
+    name: string;
+    permissions: Array<{ key: string; label: string }>;
+};
+
+type RoleSummary = {
+    key: string;
+    title: string;
+    description: string;
+    is_system?: boolean;
+    permission_count?: number;
+    id?: number;
+};
 
 const props = withDefaults(
     defineProps<{
@@ -27,24 +49,32 @@ const props = withDefaults(
         };
         members: Member[];
         invitations: Invitation[];
-        available_roles: JetstreamRole[];
+        available_roles: TeamRoleOption[];
+        permission_groups: PermissionGroup[];
         permissions: {
             canAddTeamMembers: boolean;
             canDeleteTeam: boolean;
             canRemoveTeamMembers: boolean;
             canUpdateTeam: boolean;
             canUpdateTeamMembers: boolean;
+            canManageRoles?: boolean;
         };
-        role_summaries: Array<{ key: string; title: string; description: string }>;
+        role_summaries: RoleSummary[];
         team_settings_entry?: 'settings' | 'direct';
         session_idle_timeout_minutes?: number;
         session_lifetime_minutes?: number;
     }>(),
-    { team_settings_entry: 'settings', session_idle_timeout_minutes: 0, session_lifetime_minutes: 120 },
+    {
+        team_settings_entry: 'settings',
+        session_idle_timeout_minutes: 0,
+        session_lifetime_minutes: 120,
+        permission_groups: () => [],
+    },
 );
 
 const page = usePage();
 const authUserId = computed(() => (page.props.auth as { user?: { id: number } })?.user?.id);
+const canManageRoles = computed(() => Boolean(props.permissions.canManageRoles ?? props.permissions.canUpdateTeam));
 
 const teamSubtitle = computed(
     () =>
@@ -89,6 +119,15 @@ const inviteForm = useForm({
     email: '',
     role: props.available_roles[0]?.key ?? 'accountant',
 });
+
+watch(
+    () => props.available_roles,
+    (roles) => {
+        if (!roles.some((r) => r.key === inviteForm.role)) {
+            inviteForm.role = roles[0]?.key ?? 'accountant';
+        }
+    },
+);
 
 const submitInvite = () => {
     inviteForm.post(route('team-members.store', props.team.id), {
@@ -183,6 +222,70 @@ const deleteTeam = () => {
         errorBag: 'deleteTeam',
     });
 };
+
+const roleEditorOpen = ref(false);
+const editingRole = ref<TeamRoleOption | null>(null);
+const roleForm = useForm({
+    name: '',
+    description: '',
+    permissions: [] as string[],
+});
+
+const openCreateRole = () => {
+    editingRole.value = null;
+    roleForm.name = '';
+    roleForm.description = '';
+    roleForm.permissions = [];
+    roleForm.clearErrors();
+    roleEditorOpen.value = true;
+};
+
+const openEditRole = (summary: RoleSummary) => {
+    const role = props.available_roles.find((r) => r.key === summary.key);
+    if (!role || role.is_system) return;
+    editingRole.value = role;
+    roleForm.name = role.name;
+    roleForm.description = role.description ?? '';
+    roleForm.permissions = [...role.permissions];
+    roleForm.clearErrors();
+    roleEditorOpen.value = true;
+};
+
+const togglePermission = (key: string) => {
+    if (roleForm.permissions.includes(key)) {
+        roleForm.permissions = roleForm.permissions.filter((p) => p !== key);
+    } else {
+        roleForm.permissions = [...roleForm.permissions, key];
+    }
+};
+
+const saveCustomRole = () => {
+    if (editingRole.value) {
+        roleForm.put(route('settings.team.roles.update', editingRole.value.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                roleEditorOpen.value = false;
+                editingRole.value = null;
+            },
+        });
+        return;
+    }
+
+    roleForm.post(route('settings.team.roles.store'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            roleEditorOpen.value = false;
+        },
+    });
+};
+
+const deleteCustomRole = (summary: RoleSummary) => {
+    if (!summary.id) return;
+    if (!window.confirm(`Delete role “${summary.title}”? Members using it must be reassigned first.`)) {
+        return;
+    }
+    router.delete(route('settings.team.roles.destroy', summary.id), { preserveScroll: true });
+};
 </script>
 
 <template>
@@ -233,18 +336,52 @@ const deleteTeam = () => {
                     </section>
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
-                        <h4 class="text-sm font-semibold text-slate-900">Roles on this team</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">
-                            Each role limits what teammates can see and change. Pick the smallest role that still lets someone do their job.
-                        </p>
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h4 class="text-sm font-semibold text-slate-900">Roles on this team</h4>
+                                <p class="mt-0.5 text-xs text-slate-500">
+                                    Built-in roles plus custom presets you define from the permission catalog.
+                                </p>
+                            </div>
+                            <AppButton
+                                v-if="canManageRoles"
+                                variant="secondary"
+                                size="sm"
+                                @click="openCreateRole"
+                            >
+                                Create role
+                            </AppButton>
+                        </div>
                         <div class="mt-4 grid gap-3 md:grid-cols-3">
                             <div
                                 v-for="summary in role_summaries"
                                 :key="summary.key"
                                 class="rounded-lg border border-slate-200/90 bg-white p-4 shadow-sm"
                             >
-                                <h5 class="text-sm font-semibold text-slate-900">{{ summary.title }}</h5>
+                                <div class="flex items-start justify-between gap-2">
+                                    <h5 class="text-sm font-semibold text-slate-900">{{ summary.title }}</h5>
+                                    <span
+                                        v-if="!summary.is_system"
+                                        class="shrink-0 text-[10px] font-medium uppercase tracking-wide text-slate-400"
+                                    >
+                                        Custom
+                                    </span>
+                                </div>
                                 <p class="mt-2 text-sm leading-relaxed text-slate-600">{{ summary.description }}</p>
+                                <p v-if="summary.permission_count != null" class="mt-2 text-xs text-slate-400">
+                                    {{ summary.permission_count }} permissions
+                                </p>
+                                <div
+                                    v-if="canManageRoles && !summary.is_system && summary.key !== 'owner'"
+                                    class="mt-3 flex flex-wrap gap-3"
+                                >
+                                    <button type="button" class="text-xs font-medium text-brand-700 hover:underline" @click="openEditRole(summary)">
+                                        Edit
+                                    </button>
+                                    <button type="button" class="text-xs font-medium text-rose-600 hover:underline" @click="deleteCustomRole(summary)">
+                                        Delete
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -475,6 +612,61 @@ const deleteTeam = () => {
                 <div class="mt-6 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="roleModalOpen = false">Cancel</AppButton>
                     <AppButton variant="primary" :disabled="updateRoleForm.processing" @click="saveRole">Save</AppButton>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="roleEditorOpen"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+            @click.self="roleEditorOpen = false"
+        >
+            <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-5 shadow-xl">
+                <h4 class="text-lg font-semibold text-slate-900">
+                    {{ editingRole ? 'Edit role' : 'Create role' }}
+                </h4>
+                <p class="mt-1 text-sm text-slate-500">
+                    Choose a name and the permissions this role should include.
+                </p>
+                <div class="mt-4 space-y-4">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
+                        <AppInput v-model="roleForm.name" type="text" placeholder="Bookkeeper" />
+                        <p v-if="roleForm.errors.name" class="mt-1 text-xs text-rose-600">{{ roleForm.errors.name }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Description</label>
+                        <AppInput v-model="roleForm.description" type="text" placeholder="Optional short summary" />
+                        <p v-if="roleForm.errors.description" class="mt-1 text-xs text-rose-600">{{ roleForm.errors.description }}</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div v-for="group in permission_groups" :key="group.name">
+                            <h5 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ group.name }}</h5>
+                            <div class="space-y-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3">
+                                <label
+                                    v-for="perm in group.permissions"
+                                    :key="perm.key"
+                                    class="flex cursor-pointer items-start gap-2 text-sm text-slate-700"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                                        :checked="roleForm.permissions.includes(perm.key)"
+                                        @change="togglePermission(perm.key)"
+                                    >
+                                    <span>{{ perm.label }}</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p v-if="roleForm.errors.permissions" class="text-xs text-rose-600">{{ roleForm.errors.permissions }}</p>
+                        <p v-if="roleForm.errors.role" class="text-xs text-rose-600">{{ roleForm.errors.role }}</p>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <AppButton variant="ghost" @click="roleEditorOpen = false">Cancel</AppButton>
+                    <AppButton variant="primary" :disabled="roleForm.processing" @click="saveCustomRole">
+                        {{ editingRole ? 'Save role' : 'Create role' }}
+                    </AppButton>
                 </div>
             </div>
         </div>

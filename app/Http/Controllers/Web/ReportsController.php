@@ -26,6 +26,7 @@ class ReportsController extends Controller
 
     public function profitLoss(Request $request): Response
     {
+        $this->authorizeTeam('reports.view', $request);
         $team = $request->user()->currentTeam;
         $preset = (string) $request->string('preset')->toString() ?: 'this_month';
         $compare = (string) $request->string('compare')->toString() ?: 'none';
@@ -61,6 +62,7 @@ class ReportsController extends Controller
 
     public function balanceSheet(Request $request): Response
     {
+        $this->authorizeTeam('reports.view', $request);
         $team = $request->user()->currentTeam;
         $asOf = $request->string('as_of')->toString()
             ? Carbon::parse($request->string('as_of')->toString())->endOfDay()
@@ -128,6 +130,7 @@ class ReportsController extends Controller
 
     public function cashFlow(Request $request): Response
     {
+        $this->authorizeTeam('reports.view', $request);
         $team = $request->user()->currentTeam;
         $teamId = (int) $team->id;
         $preset = (string) $request->string('preset')->toString() ?: 'this_month';
@@ -309,6 +312,7 @@ class ReportsController extends Controller
 
     public function trialBalance(Request $request): Response
     {
+        $this->authorizeTeam('reports.view', $request);
         $team = $request->user()->currentTeam;
         $asOf = $request->string('as_of')->toString()
             ? Carbon::parse($request->string('as_of')->toString())->endOfDay()

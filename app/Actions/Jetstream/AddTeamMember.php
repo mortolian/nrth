@@ -4,6 +4,7 @@ namespace App\Actions\Jetstream;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\TeamRoleKey;
 use Closure;
 use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Support\Facades\Gate;
@@ -12,7 +13,6 @@ use Laravel\Jetstream\Contracts\AddsTeamMembers;
 use Laravel\Jetstream\Events\AddingTeamMember;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Jetstream\Jetstream;
-use Laravel\Jetstream\Rules\Role;
 
 class AddTeamMember implements AddsTeamMembers
 {
@@ -44,7 +44,7 @@ class AddTeamMember implements AddsTeamMembers
         Validator::make([
             'email' => $email,
             'role' => $role,
-        ], $this->rules(), [
+        ], $this->rules($team), [
             'email.exists' => __('We were unable to find a registered user with this email address.'),
         ])->after(
             $this->ensureUserIsNotAlreadyOnTeam($team, $email)
@@ -56,12 +56,12 @@ class AddTeamMember implements AddsTeamMembers
      *
      * @return array<string, Rule|array|string>
      */
-    protected function rules(): array
+    protected function rules(Team $team): array
     {
         return array_filter([
             'email' => ['required', 'email', 'exists:users'],
             'role' => Jetstream::hasRoles()
-                            ? ['required', 'string', new Role]
+                            ? ['required', 'string', new TeamRoleKey($team)]
                             : null,
         ]);
     }

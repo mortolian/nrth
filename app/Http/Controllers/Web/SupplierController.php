@@ -20,6 +20,8 @@ class SupplierController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('suppliers.view', $request);
+
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());
         $status = (string) $request->string('status')->toString();
@@ -72,6 +74,8 @@ class SupplierController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('suppliers.manage', $request);
+
         $returnQuery = $request->query('return');
         $namePrefill = trim((string) $request->query('name', ''));
 
@@ -87,6 +91,8 @@ class SupplierController extends Controller
 
     public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
+        $this->authorizeTeam('suppliers.manage', $request);
+
         $payload = $this->validateSupplier($request);
         $teamId = (int) $request->user()->current_team_id;
         $returnTo = $this->safeInternalReturn(
@@ -116,6 +122,7 @@ class SupplierController extends Controller
 
     public function show(Request $request, Supplier $supplier): Response
     {
+        $this->authorizeTeam('suppliers.view', $request);
         abort_unless($supplier->team_id === $request->user()->current_team_id, 403);
 
         $teamId = (int) $supplier->team_id;
@@ -176,6 +183,7 @@ class SupplierController extends Controller
 
     public function edit(Request $request, Supplier $supplier): Response
     {
+        $this->authorizeTeam('suppliers.manage', $request);
         abort_unless($supplier->team_id === $request->user()->current_team_id, 403);
 
         return Inertia::render('Suppliers/Form', [
@@ -186,6 +194,7 @@ class SupplierController extends Controller
 
     public function update(Request $request, Supplier $supplier): RedirectResponse
     {
+        $this->authorizeTeam('suppliers.manage', $request);
         abort_unless($supplier->team_id === $request->user()->current_team_id, 403);
 
         $supplier->update($this->validateSupplier($request));
@@ -195,6 +204,7 @@ class SupplierController extends Controller
 
     public function destroy(Request $request, Supplier $supplier): RedirectResponse
     {
+        $this->authorizeTeam('suppliers.delete', $request);
         abort_unless($supplier->team_id === $request->user()->current_team_id, 403);
 
         if (Transaction::queryWithoutTeamScope()

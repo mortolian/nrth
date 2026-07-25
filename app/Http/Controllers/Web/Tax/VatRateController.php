@@ -14,6 +14,7 @@ class VatRateController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('tax.manage', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -41,6 +42,7 @@ class VatRateController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('tax.manage', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -78,6 +80,7 @@ class VatRateController extends Controller
 
     public function update(Request $request, TaxRate $taxRate): RedirectResponse
     {
+        $this->authorizeTeam('tax.manage', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);
@@ -119,6 +122,7 @@ class VatRateController extends Controller
 
     public function destroy(Request $request, TaxRate $taxRate): RedirectResponse
     {
+        $this->authorizeTeam('tax.manage', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);

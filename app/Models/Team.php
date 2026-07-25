@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Ai\AiCatalog;
 use App\Domain\Tax\Models\TaxRate;
+use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -53,6 +54,13 @@ class Team extends JetstreamTeam implements HasMedia
         'deleted' => TeamDeleted::class,
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (Team $team): void {
+            EnsureTeamSystemRoles::ensureFor($team);
+        });
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -64,6 +72,14 @@ class Team extends JetstreamTeam implements HasMedia
             'personal_team' => 'boolean',
             'business_settings' => 'array',
         ];
+    }
+
+    /**
+     * @return HasMany<TeamRole, $this>
+     */
+    public function teamRoles(): HasMany
+    {
+        return $this->hasMany(TeamRole::class)->orderBy('is_system', 'desc')->orderBy('name');
     }
 
     public function registerMediaCollections(): void

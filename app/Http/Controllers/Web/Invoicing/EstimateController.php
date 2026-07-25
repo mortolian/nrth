@@ -25,6 +25,8 @@ class EstimateController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('estimates.view', $request);
+
         $teamId = (int) $request->user()->current_team_id;
         $status = (string) $request->string('status')->toString();
         $search = trim((string) $request->string('search')->toString());
@@ -72,6 +74,8 @@ class EstimateController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('estimates.manage', $request);
+
         $teamId = (int) $request->user()->current_team_id;
 
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
@@ -103,6 +107,7 @@ class EstimateController extends Controller
 
     public function edit(Request $request, Estimate $estimate): Response
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
@@ -134,6 +139,7 @@ class EstimateController extends Controller
 
     public function show(Request $request, Estimate $estimate): Response
     {
+        $this->authorizeTeam('estimates.view', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
 
         return Inertia::render('Invoicing/Estimates/Show', [
@@ -152,6 +158,8 @@ class EstimateController extends Controller
 
     public function store(Request $request, SendEstimateAction $sendEstimateAction): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
+
         $payload = $this->validateEstimate($request, null);
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
@@ -185,6 +193,7 @@ class EstimateController extends Controller
 
     public function update(Request $request, Estimate $estimate, SendEstimateAction $sendEstimateAction): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $payload = $this->validateEstimate($request, $estimate);
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
@@ -214,6 +223,7 @@ class EstimateController extends Controller
 
     public function send(Request $request, Estimate $estimate, SendEstimateAction $sendEstimateAction): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $sendEstimateAction->execute($estimate);
 
@@ -222,6 +232,7 @@ class EstimateController extends Controller
 
     public function markSent(Request $request, Estimate $estimate, MarkEstimateSentAction $markEstimateSentAction): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $markEstimateSentAction->execute($estimate);
 
@@ -230,6 +241,7 @@ class EstimateController extends Controller
 
     public function accept(Request $request, Estimate $estimate): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $estimate->update(['status' => EstimateStatus::Accepted, 'accepted_at' => now(), 'declined_at' => null]);
 
@@ -238,6 +250,7 @@ class EstimateController extends Controller
 
     public function decline(Request $request, Estimate $estimate): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $estimate->update(['status' => EstimateStatus::Declined, 'declined_at' => now(), 'accepted_at' => null]);
 
@@ -246,6 +259,7 @@ class EstimateController extends Controller
 
     public function convert(Request $request, Estimate $estimate, InvoiceNumberService $invoiceNumberService): RedirectResponse
     {
+        $this->authorizeTeam('estimates.manage', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         abort_if($estimate->converted_invoice_id !== null, 422, 'Estimate already converted.');
         $payload = $request->validate([
@@ -323,6 +337,7 @@ class EstimateController extends Controller
 
     public function destroy(Request $request, Estimate $estimate): RedirectResponse
     {
+        $this->authorizeTeam('estimates.delete', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
 
         DB::transaction(function () use ($estimate): void {

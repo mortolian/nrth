@@ -24,6 +24,8 @@ class BankingStatementImportController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('banking.manage', $request);
+
         return Inertia::render('Banking/Import/Upload', [
             'accounts' => $this->accountOptions(),
         ]);
@@ -31,6 +33,8 @@ class BankingStatementImportController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('banking.manage', $request);
+
         $validated = $request->validate([
             'account_id' => [
                 'required',
@@ -91,6 +95,7 @@ class BankingStatementImportController extends Controller
 
     public function map(BankingStatementImport $import): Response|RedirectResponse
     {
+        $this->authorizeTeam('banking.view');
         $this->authorizeImport($import);
 
         if (! in_array($import->file_type, ['csv', 'txt'], true)) {
@@ -127,6 +132,7 @@ class BankingStatementImportController extends Controller
 
     public function parseMapping(Request $request, BankingStatementImport $import): RedirectResponse
     {
+        $this->authorizeTeam('banking.manage', $request);
         $this->authorizeImport($import);
 
         if (! in_array($import->status, [ImportStatus::Pending, ImportStatus::Parsed], true)) {
@@ -180,6 +186,7 @@ class BankingStatementImportController extends Controller
 
     public function preview(Request $request, BankingStatementImport $import): Response|RedirectResponse
     {
+        $this->authorizeTeam('banking.view', $request);
         $this->authorizeImport($import);
 
         if ($import->status === ImportStatus::Pending && in_array($import->file_type, ['csv', 'txt'], true)) {
@@ -222,6 +229,7 @@ class BankingStatementImportController extends Controller
 
     public function confirm(BankingStatementImport $import): RedirectResponse
     {
+        $this->authorizeTeam('banking.manage');
         $this->authorizeImport($import);
 
         if ($import->status !== ImportStatus::Parsed) {
@@ -256,6 +264,7 @@ class BankingStatementImportController extends Controller
 
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('banking.view', $request);
         $teamId = (int) $request->user()->current_team_id;
         $accountId = (int) $request->integer('account_id');
 
@@ -304,6 +313,7 @@ class BankingStatementImportController extends Controller
 
     public function undo(BankingStatementImport $import): RedirectResponse
     {
+        $this->authorizeTeam('banking.manage');
         $this->authorizeImport($import);
 
         $this->importService->undoImport($import);
@@ -315,6 +325,7 @@ class BankingStatementImportController extends Controller
 
     public function reimport(BankingStatementImport $import): RedirectResponse
     {
+        $this->authorizeTeam('banking.manage');
         $this->authorizeImport($import);
 
         $result = $this->importService->reimport($import);

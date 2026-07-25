@@ -21,6 +21,7 @@ class BusinessSettingsController extends Controller
 {
     public function edit(Request $request): Response
     {
+        $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -92,6 +93,7 @@ class BusinessSettingsController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -335,6 +337,7 @@ class BusinessSettingsController extends Controller
 
     public function storeTaxRate(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
 
@@ -372,6 +375,7 @@ class BusinessSettingsController extends Controller
 
     public function updateTaxRate(Request $request, TaxRate $taxRate): RedirectResponse
     {
+        $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);
@@ -413,6 +417,7 @@ class BusinessSettingsController extends Controller
 
     public function destroyTaxRate(Request $request, TaxRate $taxRate): RedirectResponse
     {
+        $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);

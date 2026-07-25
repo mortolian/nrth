@@ -20,6 +20,8 @@ class ClientController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->authorizeTeam('clients.view', $request);
+
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());
         $status = (string) $request->string('status')->toString();
@@ -81,6 +83,8 @@ class ClientController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->authorizeTeam('clients.manage', $request);
+
         $returnQuery = $request->query('return');
 
         return Inertia::render('Invoicing/Clients/Form', [
@@ -92,6 +96,8 @@ class ClientController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->authorizeTeam('clients.manage', $request);
+
         $payload = $this->validateClient($request);
         $teamId = (int) $request->user()->current_team_id;
         $returnTo = $this->safeInternalReturn(
@@ -112,6 +118,7 @@ class ClientController extends Controller
 
     public function show(Request $request, Client $client): Response
     {
+        $this->authorizeTeam('clients.view', $request);
         abort_unless($client->team_id === $request->user()->current_team_id, 403);
 
         $teamId = (int) $client->team_id;
@@ -199,6 +206,7 @@ class ClientController extends Controller
 
     public function edit(Request $request, Client $client): Response
     {
+        $this->authorizeTeam('clients.manage', $request);
         abort_unless($client->team_id === $request->user()->current_team_id, 403);
 
         return Inertia::render('Invoicing/Clients/Form', [
@@ -209,6 +217,7 @@ class ClientController extends Controller
 
     public function update(Request $request, Client $client): RedirectResponse
     {
+        $this->authorizeTeam('clients.manage', $request);
         abort_unless($client->team_id === $request->user()->current_team_id, 403);
 
         $client->update($this->validateClient($request));

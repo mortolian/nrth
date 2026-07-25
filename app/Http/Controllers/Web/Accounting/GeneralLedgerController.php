@@ -14,6 +14,8 @@ class GeneralLedgerController extends Controller
 {
     public function __invoke(Request $request): Response
     {
+        $this->authorizeTeam('accounting.view', $request);
+
         if (! Schema::hasTable('accounts')) {
             return Inertia::render('Accounting/Journal/Index', [
                 'groups' => [],

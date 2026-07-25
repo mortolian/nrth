@@ -25,6 +25,7 @@ use App\Http\Controllers\Web\PublicInvoicePayController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
 use App\Http\Controllers\Web\Settings\InstanceSettingsController;
+use App\Http\Controllers\Web\Settings\TeamRoleController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
 use App\Http\Controllers\Web\SupplierController;
@@ -70,6 +71,9 @@ Route::middleware([
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
     Route::put('/settings/team/session-idle-timeout', [TeamSettingsController::class, 'updateSessionIdleTimeout'])
         ->name('settings.team.session-idle-timeout');
+    Route::post('/settings/team/roles', [TeamRoleController::class, 'store'])->name('settings.team.roles.store');
+    Route::put('/settings/team/roles/{teamRole}', [TeamRoleController::class, 'update'])->name('settings.team.roles.update');
+    Route::delete('/settings/team/roles/{teamRole}', [TeamRoleController::class, 'destroy'])->name('settings.team.roles.destroy');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
     Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
     Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');
