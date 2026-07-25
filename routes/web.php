@@ -62,6 +62,7 @@ Route::middleware([
     Route::post('/onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
     Route::post('/onboarding/skip', [OnboardingController::class, 'skip'])->name('onboarding.skip');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/settings', fn () => redirect()->route('profile.show'))->name('settings.index');
     Route::get('/settings/business', [BusinessSettingsController::class, 'edit'])->name('settings.business');
     Route::post('/settings/business', [BusinessSettingsController::class, 'update'])->name('settings.business.update');
     Route::get('/settings/company', fn () => redirect()->route('settings.business'));

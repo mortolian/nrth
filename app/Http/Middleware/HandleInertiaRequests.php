@@ -125,8 +125,8 @@ class HandleInertiaRequests extends Middleware
             ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts', 'href' => route('accounting.accounts.index')],
             ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')],
             ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')],
-            ['id' => 'company-settings', 'label' => 'Business Settings', 'href' => route('settings.business')],
-            ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('profile.show')],
+            ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')],
+            ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('settings.index')],
         ];
 
         if ($vatEnabled) {

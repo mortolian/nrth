@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue';
 import SectionBorder from '@/Components/SectionBorder.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
 import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
 import LogoutOtherBrowserSessionsForm from '@/Pages/Profile/Partials/LogoutOtherBrowserSessionsForm.vue';
 import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthenticationForm.vue';
@@ -24,16 +24,8 @@ defineProps<{
 </script>
 
 <template>
-    <AppLayout
-        title="Profile"
-        :breadcrumbs="[
-            { label: 'Settings' },
-            { label: 'Profile' },
-        ]"
-    >
-        <PageHeader title="Profile & security" subtitle="Your account, password, two-factor authentication, and preferences" />
-
-        <div class="mt-6 space-y-6">
+    <SettingsShell section="profile">
+        <div class="space-y-6">
             <div v-if="$page.props.jetstream.canUpdateProfileInformation">
                 <UpdateProfileInformationForm :user="$page.props.auth.user" />
                 <SectionBorder />
@@ -61,5 +53,5 @@ defineProps<{
                 <DeleteUserForm />
             </template>
         </div>
-    </AppLayout>
+    </SettingsShell>
 </template>

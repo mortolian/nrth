@@ -91,7 +91,6 @@ const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeat
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
-const canManageBackups = computed(() => Boolean(page.props.can_manage_backups));
 const businessLogoUrl = computed(() => {
     const url = page.props.business_logo_url;
     return typeof url === 'string' && url.trim() !== '' ? url.trim() : null;
@@ -234,27 +233,7 @@ const isSettingsSectionActive = computed(
         || isActivePath(route('settings.business'))
         || isActivePath(route('settings.instance'))
         || isTeamSettingsPath.value,
-
 );
-
-/** Collapsed unless the user explicitly opens the section (not auto-expanded on settings routes). */
-const isSettingsSectionExpanded = computed(
-    () => navManualOverride.value[SETTINGS_SECTION_LABEL] === true,
-);
-
-function toggleSettingsSection(): void {
-    const next = !isSettingsSectionExpanded.value;
-    navManualOverride.value = { ...navManualOverride.value, [SETTINGS_SECTION_LABEL]: next };
-}
-
-function onSettingsRowClick(): void {
-    if (collapsed.value) {
-        collapsed.value = false;
-        navManualOverride.value = { ...navManualOverride.value, [SETTINGS_SECTION_LABEL]: true };
-        return;
-    }
-    toggleSettingsSection();
-}
 
 const commandPaletteData = computed<PaletteData>(() => ({
     quickActions: page.props.commandPalette?.quickActions ?? [
@@ -274,7 +253,7 @@ const commandPaletteData = computed<PaletteData>(() => ({
         { id: 'accounting-transactions', label: 'Accounting Transactions', href: route('accounting.transactions.index') },
         { id: 'budgets', label: 'Budgets', href: route('budgeting.index') },
         { id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') },
-        { id: 'profile', label: 'Profile Settings', href: route('profile.show') },
+        { id: 'profile', label: 'Settings', href: route('settings.index') },
     ],
     recent: page.props.commandPalette?.recent ?? {},
 }));
@@ -463,8 +442,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 </nav>
 
                 <div class="border-t border-slate-900/10 p-2">
-                    <button
-                        type="button"
+                    <Link
+                        :href="route('settings.index')"
                         :class="[
                             'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
                             collapsed ? 'justify-center' : '',
@@ -472,69 +451,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
                                 : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
                         ]"
-                        :aria-expanded="!collapsed && isSettingsSectionExpanded"
-                        :aria-controls="navSectionDomId(SETTINGS_SECTION_LABEL)"
-                        @click="onSettingsRowClick"
                     >
                         <Settings class="h-4 w-4 shrink-0" />
                         <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ SETTINGS_SECTION_LABEL }}</span>
-                        <ChevronDown
-                            v-if="!collapsed"
-                            class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
-                            :class="isSettingsSectionExpanded ? 'rotate-180' : ''"
-                        />
-                    </button>
-                    <div
-                        :id="navSectionDomId(SETTINGS_SECTION_LABEL)"
-                        v-show="isSettingsSectionExpanded && !collapsed"
-                        class="ml-9 mt-1 space-y-1 border-l border-slate-900/20 pl-2"
-                    >
-                        <Link
-                            :href="route('profile.show')"
-                            :class="[
-                                'block rounded px-2 py-1 text-xs transition',
-                                isActivePath(route('profile.show'))
-                                    ? 'bg-brand-500/30 font-medium text-brand-800'
-                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
-                            ]"
-                        >
-                            Profile
-                        </Link>
-                        <Link
-                            :href="route('settings.business')"
-                            :class="[
-                                'block rounded px-2 py-1 text-xs transition',
-                                isActivePath(route('settings.business'))
-                                    ? 'bg-brand-500/30 font-medium text-brand-800'
-                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
-                            ]"
-                        >
-                            Business
-                        </Link>
-                        <a
-                            :href="route('settings.team')"
-                            :class="[
-                                'block rounded px-2 py-1 text-xs transition',
-                                isTeamSettingsPath
-                                    ? 'bg-brand-500/30 font-medium text-brand-800'
-                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
-                            ]"
-                        >
-                            Team members
-                        </a>
-                        <Link
-                            v-if="canManageBackups"
-                            :href="route('settings.instance')"
-                            :class="[
-                                'block rounded px-2 py-1 text-xs transition',
-                                isActivePath(route('settings.instance'))
-                                    ? 'bg-brand-500/30 font-medium text-brand-800'
-                                    : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
-                            ]"
-                        >
-                            Instance
-                        </Link>
-                    </div>
+                    </Link>
                 </div>
             </aside>
 
@@ -585,7 +505,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     </button>
                                 </template>
                                 <template #content>
-                                    <DropdownLink :href="route('profile.show')">Profile</DropdownLink>
+                                    <DropdownLink :href="route('settings.index')">Settings</DropdownLink>
                                     <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">API Tokens</DropdownLink>
                                     <div class="my-2 border-t border-slate-200" />
                                     <form @submit.prevent="logout">
@@ -692,54 +612,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             Enable
                         </a>
                     </div>
-                    <button
-                        type="button"
-                        class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-white/30"
-                        :aria-expanded="isSettingsSectionExpanded"
-                        :aria-controls="'m-' + navSectionDomId(SETTINGS_SECTION_LABEL)"
-                        @click="toggleSettingsSection"
+                    <Link
+                        :href="route('settings.index')"
+                        :class="[
+                            'block rounded-md px-3 py-2 text-sm',
+                            isSettingsSectionActive ? 'bg-brand-500/25 font-medium text-brand-800' : 'hover:bg-white/40',
+                        ]"
+                        @click="mobileOpen = false"
                     >
-                        <span class="min-w-0 flex-1">{{ SETTINGS_SECTION_LABEL }}</span>
-                        <ChevronDown
-                            class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
-                            :class="isSettingsSectionExpanded ? 'rotate-180' : ''"
-                        />
-                    </button>
-                    <div
-                        :id="'m-' + navSectionDomId(SETTINGS_SECTION_LABEL)"
-                        v-show="isSettingsSectionExpanded"
-                        class="ml-3 mt-1 space-y-0.5 border-l border-slate-900/20 pl-2"
-                    >
-                        <Link
-                            :href="route('profile.show')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
-                            @click="mobileOpen = false"
-                        >
-                            Profile
-                        </Link>
-                        <Link
-                            :href="route('settings.business')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
-                            @click="mobileOpen = false"
-                        >
-                            Business
-                        </Link>
-                        <a
-                            :href="route('settings.team')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
-                            @click="mobileOpen = false"
-                        >
-                            Team members
-                        </a>
-                        <Link
-                            v-if="canManageBackups"
-                            :href="route('settings.instance')"
-                            class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
-                            @click="mobileOpen = false"
-                        >
-                            Instance
-                        </Link>
-                    </div>
+                        {{ SETTINGS_SECTION_LABEL }}
+                    </Link>
                 </div>
             </aside>
 

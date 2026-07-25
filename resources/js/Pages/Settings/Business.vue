@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
+import AppTabs from '@/Components/AppTabs.vue';
 import ActionMessage from '@/Components/ActionMessage.vue';
 import AppButton from '@/Components/AppButton.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
@@ -299,6 +300,8 @@ const tabs = [
     { id: 'security' as const, label: 'Security' },
 ];
 
+const businessTabs = computed(() => tabs.map((t) => ({ id: t.id, label: t.label })));
+
 const idleTimeoutOptions = computed(() => {
     const max = Math.max(0, Number(props.session_lifetime_minutes ?? 120));
     const presets = [
@@ -487,32 +490,15 @@ const removeBankAccount = (index: number) => {
 </script>
 
 <template>
-    <AppLayout
-        title="Business settings"
-        :breadcrumbs="[
-            { label: 'Settings', href: route('profile.show') },
-            { label: 'Business' },
-        ]"
-    >
-        <PageHeader
-            title="Business settings"
-            subtitle="Profile, invoicing, tax, banking, and online payments (card checkout). Use the Online payments tab for Stripe, PayFast, and other gateways."
+    <SettingsShell section="business">
+        <AppTabs
+            :model-value="tab"
+            :tabs="businessTabs"
+            aria-label="Business settings"
+            @update:model-value="(id) => (tab = id as BusinessTab)"
         />
 
-        <div class="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-            <button
-                v-for="t in tabs"
-                :key="t.id"
-                type="button"
-                class="rounded-md px-3 py-1.5 text-sm font-medium transition"
-                :class="tab === t.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
-                @click="tab = t.id"
-            >
-                {{ t.label }}
-            </button>
-        </div>
-
-        <div class="mt-5 space-y-6">
+        <div class="mt-6 space-y-6">
             <div v-if="Object.keys(form.errors).length" class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
                 <p class="font-medium">Could not save business settings.</p>
                 <ul class="mt-1 list-disc space-y-0.5 pl-5">
@@ -1256,5 +1242,5 @@ const removeBankAccount = (index: number) => {
                 {{ form.processing ? 'Saving…' : 'Save' }}
             </AppButton>
         </div>
-    </AppLayout>
+    </SettingsShell>
 </template>

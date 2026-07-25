@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, withDefaults } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
 
 type Member = {
     id: number;
@@ -41,21 +41,13 @@ const props = withDefaults(
     { team_settings_entry: 'settings' },
 );
 
-const breadcrumbs = computed(() => {
-    if (props.team_settings_entry === 'direct') {
-        return [
-            { label: 'Account', href: route('profile.show') },
-            { label: props.team.name },
-        ];
-    }
-    return [
-        { label: 'Settings', href: route('profile.show') },
-        { label: 'Team members' },
-    ];
-});
-
 const page = usePage();
 const authUserId = computed(() => (page.props.auth as { user?: { id: number } })?.user?.id);
+
+const teamSubtitle = computed(
+    () =>
+        `People who can access the currently selected business “${props.team.name}”. Invite members and assign roles for this business only.`,
+);
 
 const inviteForm = useForm({
     email: '',
@@ -158,13 +150,8 @@ const deleteTeam = () => {
 </script>
 
 <template>
-    <AppLayout title="Team members" :breadcrumbs="breadcrumbs">
-        <PageHeader
-            title="Team members"
-            :subtitle="`People who can access the currently selected business “${team.name}”. Invite members and assign roles for this business only.`"
-        />
-
-        <div class="mt-5 space-y-6">
+    <SettingsShell section="team" :subtitle="teamSubtitle">
+        <div class="space-y-6">
             <AppCard>
                 <h3 class="text-base font-semibold text-slate-900">Team members</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
@@ -441,5 +428,5 @@ const deleteTeam = () => {
                 </div>
             </div>
         </div>
-    </AppLayout>
+    </SettingsShell>
 </template>
