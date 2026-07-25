@@ -231,7 +231,6 @@ const isTeamSettingsPath = computed(
 const isSettingsSectionActive = computed(
     () => isActivePath(route('profile.show'))
         || isActivePath(route('settings.business'))
-        || isActivePath(route('settings.instance'))
         || isTeamSettingsPath.value,
 );
 

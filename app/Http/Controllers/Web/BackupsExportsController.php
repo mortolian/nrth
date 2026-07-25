@@ -6,6 +6,7 @@ use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
+use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Domain\Takeout\Services\TakeoutPreviewService;
@@ -26,6 +27,7 @@ class BackupsExportsController extends Controller
         private readonly TakeoutPeriodResolver $periodResolver,
         private readonly TakeoutPreviewService $previewService,
         private readonly InstanceBackupService $backups,
+        private readonly InstanceOperatorService $operators,
     ) {}
 
     public function index(Request $request): Response
@@ -59,6 +61,8 @@ class BackupsExportsController extends Controller
             'document_categories' => [],
             'recent_takeouts' => [],
             'recent_backups' => [],
+            'operators' => [],
+            'env_break_glass_configured' => false,
             'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Use the restore guide below for CLI recovery — there is no one-click restore in the app.',
             'restore_guide' => null,
         ];
@@ -71,6 +75,8 @@ class BackupsExportsController extends Controller
             $this->backups->syncDiskBackupsIntoRuns();
             $props['recent_backups'] = $this->backupRunProps();
             $props['restore_guide'] = $this->backups->restoreGuideProps();
+            $props['operators'] = $this->operators->listEffectiveOperators();
+            $props['env_break_glass_configured'] = $this->operators->envOperatorEmails() !== [];
         }
 
         return Inertia::render('BackupsExports/Index', $props);

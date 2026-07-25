@@ -27,7 +27,7 @@ class InstanceSettingsTest extends TestCase
         $this->assertFalse($second->fresh()->is_instance_operator);
     }
 
-    public function test_operator_can_view_instance_settings(): void
+    public function test_operator_instance_settings_redirects_to_backups_exports(): void
     {
         $user = User::factory()->withPersonalTeam()->create([
             'is_instance_operator' => true,
@@ -35,11 +35,24 @@ class InstanceSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->get(route('settings.instance'))
+            ->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+    }
+
+    public function test_operator_sees_operators_on_backups_exports(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->get(route('backups-exports.index', ['section' => 'backup']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('Settings/Instance')
+                ->component('BackupsExports/Index')
+                ->where('can_manage_backups', true)
+                ->where('section', 'backup')
                 ->has('operators')
-                ->has('backup_schedule_hint'));
+                ->has('env_break_glass_configured'));
     }
 
     public function test_non_operator_cannot_view_instance_settings(): void
@@ -50,7 +63,6 @@ class InstanceSettingsTest extends TestCase
         $member = User::factory()->withPersonalTeam()->create([
             'is_instance_operator' => false,
         ]);
-        // Ensure first still has the flag from bootstrap; member does not.
         $this->assertTrue($first->fresh()->is_instance_operator);
 
         $this->actingAs($member);
@@ -72,7 +84,7 @@ class InstanceSettingsTest extends TestCase
             'email' => 'colleague@example.com',
         ]);
 
-        $response->assertRedirect(route('settings.instance'));
+        $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
         $this->assertTrue($other->fresh()->is_instance_operator);
     }
 
@@ -105,7 +117,7 @@ class InstanceSettingsTest extends TestCase
         $this->actingAs($operator);
         $response = $this->delete(route('settings.instance.operators.destroy', $other));
 
-        $response->assertRedirect(route('settings.instance'));
+        $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
         $this->assertFalse($other->fresh()->is_instance_operator);
     }
 
@@ -117,11 +129,11 @@ class InstanceSettingsTest extends TestCase
             'email' => 'breakglass@example.com',
             'is_instance_operator' => false,
         ]);
-        // Another user may already be first-operator; force this one off.
         $user->forceFill(['is_instance_operator' => false])->save();
 
         $this->actingAs($user->fresh());
-        $this->get(route('settings.instance'))->assertOk();
+        $this->get(route('settings.instance'))
+            ->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
     }
 
     public function test_promote_first_operator_command(): void

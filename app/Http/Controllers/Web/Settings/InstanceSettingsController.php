@@ -8,8 +8,6 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class InstanceSettingsController extends Controller
 {
@@ -17,15 +15,11 @@ class InstanceSettingsController extends Controller
         private readonly InstanceOperatorService $operators,
     ) {}
 
-    public function edit(Request $request): Response
+    public function edit(Request $request): RedirectResponse
     {
         Gate::authorize('manageInstanceBackups');
 
-        return Inertia::render('Settings/Instance', [
-            'operators' => $this->operators->listEffectiveOperators(),
-            'backup_schedule_hint' => 'Instance backups run daily at 03:00 (cleanup at 03:30). Manage runs under Backups & exports.',
-            'env_break_glass_configured' => $this->operators->envOperatorEmails() !== [],
-        ]);
+        return redirect()->route('backups-exports.index', ['section' => 'backup']);
     }
 
     public function addOperator(Request $request): RedirectResponse
@@ -45,7 +39,7 @@ class InstanceSettingsController extends Controller
             ->log('Added instance operator');
 
         return redirect()
-            ->route('settings.instance')
+            ->route('backups-exports.index', ['section' => 'backup'])
             ->with('success', "Added {$user->email} as an instance operator.");
     }
 
@@ -62,7 +56,7 @@ class InstanceSettingsController extends Controller
             ->log('Removed instance operator');
 
         return redirect()
-            ->route('settings.instance')
+            ->route('backups-exports.index', ['section' => 'backup'])
             ->with('success', "Removed {$user->email} as an instance operator.");
     }
 }

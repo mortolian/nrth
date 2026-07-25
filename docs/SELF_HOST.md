@@ -53,7 +53,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 ## Backups
 
-Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first admin is an **instance operator** — manage operators under **Settings → Instance**, runs under **Backups & exports**.
+Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first admin is an **instance operator** — manage operators and runs under **Backups & exports → Instance backup**.
 
 | | Data takeout | Instance backup |
 |--|--------------|-----------------|
