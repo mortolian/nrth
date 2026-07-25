@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -20,6 +21,27 @@ class TeamSettingsController extends Controller
         abort_unless($team !== null && $user->belongsToTeam($team), 403);
 
         return $this->show($request, $team);
+    }
+
+    public function updateSessionIdleTimeout(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        $team = $user->currentTeam;
+
+        abort_unless($team !== null && $user->belongsToTeam($team), 403);
+        abort_unless($user->can('update', $team), 403);
+
+        $max = (int) config('session.lifetime');
+        $validated = $request->validate([
+            'session_idle_timeout_minutes' => ['required', 'integer', 'min:0', 'max:'.$max],
+        ]);
+
+        $settings = $team->mergedBusinessSettings();
+        $settings['session_idle_timeout_minutes'] = (int) $validated['session_idle_timeout_minutes'];
+        $team->business_settings = $settings;
+        $team->save();
+
+        return back()->with('success', __('Session idle timeout saved.'));
     }
 
     public function show(Request $request, Team $team): Response
@@ -75,6 +97,8 @@ class TeamSettingsController extends Controller
             ];
         })->values()->all();
 
+        $settings = $team->mergedBusinessSettings();
+
         return Inertia::render('Settings/Team', [
             'team_settings_entry' => $request->routeIs('teams.show') ? 'direct' : 'settings',
             'team' => [
@@ -97,6 +121,8 @@ class TeamSettingsController extends Controller
                 'canUpdateTeam' => Gate::check('update', $team),
                 'canUpdateTeamMembers' => Gate::check('updateTeamMember', $team),
             ],
+            'session_idle_timeout_minutes' => (int) ($settings['session_idle_timeout_minutes'] ?? 0),
+            'session_lifetime_minutes' => (int) config('session.lifetime'),
             'role_summaries' => [
                 [
                     'key' => 'owner',

@@ -68,6 +68,8 @@ Route::middleware([
     Route::get('/settings/company', fn () => redirect()->route('settings.business'));
     Route::post('/settings/company', [BusinessSettingsController::class, 'update']);
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
+    Route::put('/settings/team/session-idle-timeout', [TeamSettingsController::class, 'updateSessionIdleTimeout'])
+        ->name('settings.team.session-idle-timeout');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
     Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
     Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');

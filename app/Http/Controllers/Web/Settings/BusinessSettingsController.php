@@ -80,7 +80,6 @@ class BusinessSettingsController extends Controller
                 ['value' => 'current', 'label' => 'Current'],
                 ['value' => 'savings', 'label' => 'Savings'],
             ],
-            'session_lifetime_minutes' => (int) config('session.lifetime'),
             'ai_providers' => AiCatalog::providerOptions(),
             'ai_models_by_provider' => collect(AiCatalog::modelsByProvider())
                 ->map(fn (array $models): array => collect($models)->map(fn (string $model): array => [
@@ -163,7 +162,7 @@ class BusinessSettingsController extends Controller
             'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('team_id', $teamId)],
             'payment_pages_enabled' => ['sometimes', 'boolean'],
             'session_idle_timeout_minutes' => [
-                'required',
+                'sometimes',
                 'integer',
                 'min:0',
                 'max:'.(int) config('session.lifetime'),
@@ -327,7 +326,7 @@ class BusinessSettingsController extends Controller
         }
 
         $tab = (string) $request->input('tab', 'profile');
-        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security', 'ai'], true)) {
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'ai'], true)) {
             $tab = 'profile';
         }
 

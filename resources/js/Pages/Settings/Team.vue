@@ -37,8 +37,10 @@ const props = withDefaults(
         };
         role_summaries: Array<{ key: string; title: string; description: string }>;
         team_settings_entry?: 'settings' | 'direct';
+        session_idle_timeout_minutes?: number;
+        session_lifetime_minutes?: number;
     }>(),
-    { team_settings_entry: 'settings' },
+    { team_settings_entry: 'settings', session_idle_timeout_minutes: 0, session_lifetime_minutes: 120 },
 );
 
 const page = usePage();
@@ -48,6 +50,40 @@ const teamSubtitle = computed(
     () =>
         `People who can access the currently selected business “${props.team.name}”. Invite members and assign roles for this business only.`,
 );
+
+const idleTimeoutForm = useForm({
+    session_idle_timeout_minutes: String(Number(props.session_idle_timeout_minutes ?? 0)),
+});
+
+watch(
+    () => props.session_idle_timeout_minutes,
+    (value) => {
+        idleTimeoutForm.session_idle_timeout_minutes = String(Number(value ?? 0));
+    },
+);
+
+const idleTimeoutOptions = computed(() => {
+    const max = Math.max(0, Number(props.session_lifetime_minutes ?? 120));
+    const presets = [
+        { label: 'Off', value: '0' },
+        { label: '15 minutes', value: '15' },
+        { label: '30 minutes', value: '30' },
+        { label: '60 minutes', value: '60' },
+        { label: '120 minutes', value: '120' },
+    ];
+
+    return presets.filter((option) => Number(option.value) <= max);
+});
+
+const saveIdleTimeout = () => {
+    idleTimeoutForm
+        .transform((data) => ({
+            session_idle_timeout_minutes: Number(data.session_idle_timeout_minutes),
+        }))
+        .put(route('settings.team.session-idle-timeout'), {
+            preserveScroll: true,
+        });
+};
 
 const inviteForm = useForm({
     email: '',
@@ -321,6 +357,39 @@ const deleteTeam = () => {
                                     </td>
                                 </tr>
                             </AppTable>
+                        </div>
+                    </section>
+
+                    <section
+                        v-if="permissions.canUpdateTeam"
+                        class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5"
+                    >
+                        <h4 class="text-sm font-semibold text-slate-900">Session policy</h4>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            How long people signed into this business can stay idle before they are signed out. Off uses only the server session lifetime ({{ session_lifetime_minutes }} minutes).
+                        </p>
+                        <div class="mt-4 max-w-md">
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Idle session timeout</label>
+                            <AppSelect
+                                v-model="idleTimeoutForm.session_idle_timeout_minutes"
+                                :options="idleTimeoutOptions"
+                            />
+                            <p class="mt-2 text-xs text-slate-500">
+                                After this period with no activity, users are signed out automatically. The maximum is the server session lifetime.
+                            </p>
+                            <p v-if="idleTimeoutForm.errors.session_idle_timeout_minutes" class="mt-1 text-xs text-rose-600">
+                                {{ idleTimeoutForm.errors.session_idle_timeout_minutes }}
+                            </p>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center gap-3">
+                            <AppButton
+                                variant="primary"
+                                :disabled="idleTimeoutForm.processing"
+                                @click="saveIdleTimeout"
+                            >
+                                Save timeout
+                            </AppButton>
+                            <span v-if="idleTimeoutForm.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
                         </div>
                     </section>
 
