@@ -20,10 +20,10 @@ type InvoiceRow = {
     is_overdue: boolean;
     days_overdue: number;
     can_delete: boolean;
-    company_currency_code?: string | null;
-    fx_rate_invoice_to_company?: string | null;
+    business_currency_code?: string | null;
+    fx_rate_invoice_to_business?: string | null;
     fx_rate_date?: string | null;
-    total_company_currency_cents?: number | null;
+    total_business_currency_cents?: number | null;
 };
 
 const props = defineProps<{
@@ -67,10 +67,10 @@ const recordPaymentInvoice = computed(() => {
         amount_due_cents: inv.amount_due,
         total_cents: inv.total,
         currency: inv.currency,
-        company_currency_code: inv.company_currency_code ?? null,
-        fx_rate_invoice_to_company: inv.fx_rate_invoice_to_company ?? null,
+        business_currency_code: inv.business_currency_code ?? null,
+        fx_rate_invoice_to_business: inv.fx_rate_invoice_to_business ?? null,
         fx_rate_date: inv.fx_rate_date ?? null,
-        total_company_currency_cents: inv.total_company_currency_cents ?? null,
+        total_business_currency_cents: inv.total_business_currency_cents ?? null,
     };
 });
 

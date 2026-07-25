@@ -25,7 +25,7 @@ class Payment extends Model
         'invoice_id',
         'amount_cents',
         'currency',
-        'bank_amount_company_cents',
+        'bank_amount_business_cents',
         'payment_date',
         'method',
         'reference',

@@ -299,7 +299,7 @@ class ExpensesController extends Controller
 
         if (! $parser->enabledFor($team)) {
             throw ValidationException::withMessages([
-                'receipt' => __('AI is not configured. Add an API key in Company settings → AI.'),
+                'receipt' => __('AI is not configured. Add an API key in Business settings → AI.'),
             ]);
         }
 
@@ -914,7 +914,7 @@ class ExpensesController extends Controller
 
         if ($account === null) {
             throw ValidationException::withMessages([
-                'paid_from_banking_account_id' => __('Select a valid banking account for this company.'),
+                'paid_from_banking_account_id' => __('Select a valid banking account for this business.'),
             ]);
         }
 

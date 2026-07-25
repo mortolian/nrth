@@ -50,7 +50,7 @@ const breadcrumbs = computed(() => {
     }
     return [
         { label: 'Settings', href: route('profile.show') },
-        { label: 'Teams and members' },
+        { label: 'Team members' },
     ];
 });
 
@@ -158,24 +158,24 @@ const deleteTeam = () => {
 </script>
 
 <template>
-    <AppLayout title="Teams and members" :breadcrumbs="breadcrumbs">
+    <AppLayout title="Team members" :breadcrumbs="breadcrumbs">
         <PageHeader
-            title="Teams and members"
-            :subtitle="`Workspace “${team.name}”: invite people, assign roles, and control who can use billing and invoicing with you.`"
+            title="Team members"
+            :subtitle="`People who can access the currently selected business “${team.name}”. Invite members and assign roles for this business only.`"
         />
 
         <div class="mt-5 space-y-6">
             <AppCard>
-                <h3 class="text-base font-semibold text-slate-900">Teams and members</h3>
+                <h3 class="text-base font-semibold text-slate-900">Team members</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-                    Same layout as Company settings—grouped sections with short descriptions. The owner always has full access; other members follow the role you assign.
+                    Same layout as Business settings—grouped sections with short descriptions. The owner always has full access; other members follow the role you assign.
                 </p>
 
                 <div class="mt-6 space-y-5">
                     <section v-if="team.owner" class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
-                        <h4 class="text-sm font-semibold text-slate-900">Workspace &amp; owner</h4>
+                        <h4 class="text-sm font-semibold text-slate-900">Business &amp; owner</h4>
                         <p class="mt-0.5 text-xs text-slate-500">
-                            Display name for this team and the person who owns the workspace (billing and full control).
+                            Display name for this business and the person who owns it (billing and full control).
                         </p>
                         <div class="mt-4 flex items-center gap-3 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
                             <img
@@ -186,11 +186,11 @@ const deleteTeam = () => {
                             <div class="min-w-0">
                                 <div class="text-sm font-medium text-slate-900">{{ team.owner.name }}</div>
                                 <div class="truncate text-xs text-slate-500">{{ team.owner.email }}</div>
-                                <div class="text-xs text-slate-400">Team owner</div>
+                                <div class="text-xs text-slate-400">Business owner</div>
                             </div>
                         </div>
                         <div class="mt-4">
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Team name</label>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Business name</label>
                             <AppInput
                                 v-model="updateTeamNameForm.name"
                                 type="text"

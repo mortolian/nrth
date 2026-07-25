@@ -39,7 +39,7 @@ const props = defineProps<{
     charges_vat: boolean;
     next_number: string;
     default_currency: string;
-    /** Company settings: used when creating a new estimate only */
+    /** Business settings: used when creating a new estimate only */
     default_notes?: string;
     default_terms?: string;
 }>();
@@ -295,7 +295,7 @@ const submit = (submitAction: 'draft' | 'send') => {
 
                 <AppCard>
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        VAT is not applied on this estimate. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
+                        VAT is not applied on this estimate. Enable VAT registered and choose a default VAT rate in Business settings to charge VAT.
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
 

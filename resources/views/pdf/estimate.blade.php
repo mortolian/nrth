@@ -19,7 +19,7 @@
         'registration_number' => null,
         'vat_number' => null,
     ];
-    $companyName = $issuer['name'];
+    $businessName = $issuer['name'];
     $companyVat = $issuer['vat_number'];
     $companyReg = $issuer['registration_number'];
     $companyEmail = $issuer['email'];
@@ -79,7 +79,7 @@
             @if($logoSrc)
                 <img src="{{ $logoSrc }}" alt="" style="max-width: 200px; max-height: 70px; object-fit: contain; margin-bottom: 6px;">
             @endif
-            <div class="company-name">{{ $companyName }}</div>
+            <div class="company-name">{{ $businessName }}</div>
             @if($physical)<div class="company-line">{{ $physical }}</div>@endif
             @if($companyEmail)<div class="company-line">{{ $companyEmail }}</div>@endif
             @if($companyPhone)<div class="company-line">{{ $companyPhone }}</div>@endif
@@ -175,7 +175,7 @@
 @include('pdf._prose-section', ['title' => 'Terms & conditions', 'content' => $estimate->terms])
 
 <div class="footer">
-    {{ $companyName }} &middot; Estimate {{ $estimate->number }} &middot; Generated {{ now()->format('d M Y') }}
+    {{ $businessName }} &middot; Estimate {{ $estimate->number }} &middot; Generated {{ now()->format('d M Y') }}
 </div>
 </body>
 </html>

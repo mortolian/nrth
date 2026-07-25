@@ -93,7 +93,7 @@ class InvoiceNumberService
     {
         $team = Team::query()->find($teamId);
 
-        return $team?->mergedCompanySettings() ?? [];
+        return $team?->mergedBusinessSettings() ?? [];
     }
 
     private function randomIdentifier(): string

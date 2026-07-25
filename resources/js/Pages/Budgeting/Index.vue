@@ -16,7 +16,7 @@ const props = defineProps({
     trashed_budgets: { type: Array, default: () => [] },
     /** Still sent for Inertia/tests; variance chart uses per-budget `monthly_variance`. */
     active_budget: { type: Object, default: null },
-    company_currency: { type: String, default: 'ZAR' },
+    business_currency: { type: String, default: 'ZAR' },
 });
 
 const expandedBudgetId = ref(null);
@@ -151,9 +151,9 @@ function budgetVarianceChartOption(budget) {
             itemStyle: { color: '#0ea5e9' },
         },
     ];
-    if (budget.company_spend_aligned) {
+    if (budget.business_spend_aligned) {
         series.push({
-            name: `Actual (${props.company_currency})`,
+            name: `Actual (${props.business_currency})`,
             type: 'line',
             data: rows.map((row) => row.actual ?? 0),
             lineStyle: { color: '#22c55e' },
@@ -271,9 +271,9 @@ function budgetVarianceChartOption(budget) {
                                             {{ formatCents(budget.total_spent, budget.currency) }} /
                                             {{ formatCents(budget.total_allocated, budget.currency) }}
                                         </p>
-                                        <p v-if="!budget.company_spend_aligned" class="mt-1 text-xs text-amber-700">
+                                        <p v-if="!budget.business_spend_aligned" class="mt-1 text-xs text-amber-700">
                                             Spend totals mix ledger-linked categories only; set budget currency to
-                                            {{ company_currency }} to compare all expenses.
+                                            {{ business_currency }} to compare all expenses.
                                         </p>
                                         <div class="mt-3 h-3 w-full rounded-full bg-slate-100">
                                             <div
@@ -463,9 +463,9 @@ function budgetVarianceChartOption(budget) {
 
                             <div class="mt-8 border-t border-slate-200 pt-6">
                                 <h4 class="mb-3 text-base font-semibold text-slate-900">Monthly variance</h4>
-                                <p v-if="!budget.company_spend_aligned" class="mb-3 text-sm text-amber-800">
-                                    This budget is in {{ budget.currency }} but books use {{ company_currency }}; only the budgeted
-                                    series is shown (actuals are in {{ company_currency }}).
+                                <p v-if="!budget.business_spend_aligned" class="mb-3 text-sm text-amber-800">
+                                    This budget is in {{ budget.currency }} but books use {{ business_currency }}; only the budgeted
+                                    series is shown (actuals are in {{ business_currency }}).
                                 </p>
                                 <VChart class="h-72 w-full min-h-[18rem]" :option="budgetVarianceChartOption(budget)" autoresize />
                                 <div class="mt-3 flex flex-wrap gap-2 text-xs">

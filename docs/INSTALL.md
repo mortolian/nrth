@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
 
 From a git clone: `./scripts/install.sh --production` (or `--lan`).
 
-The installer installs Docker if needed, writes `.env`, starts Compose, and runs `app:install` (admin + company). Open the URL it prints and sign in.
+The installer installs Docker if needed, writes `.env`, starts Compose, and runs `app:install` (admin + business). Open the URL it prints and sign in.
 
 If the admin wizard did not run (non-interactive install):
 

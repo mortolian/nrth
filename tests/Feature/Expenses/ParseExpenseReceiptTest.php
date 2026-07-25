@@ -41,8 +41,8 @@ class ParseExpenseReceiptTest extends TestCase
     private function configureAi(Team $team, array $ai = []): void
     {
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 [
                     'ai' => array_merge([
                         'provider' => 'openai',

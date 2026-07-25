@@ -45,7 +45,7 @@ const props = defineProps<{
 }>();
 
 type Wizard = {
-    companyName: string;
+    businessName: string;
     vatRegistered: boolean;
     vatNumber: string;
     financialYearEndMonth: number;
@@ -67,7 +67,7 @@ type Wizard = {
 
 function defaultWizard(i: InitialPayload): Wizard {
     return {
-        companyName: i.team_name,
+        businessName: i.team_name,
         vatRegistered: i.vat_registered,
         vatNumber: i.vat_number,
         financialYearEndMonth: i.financial_year_end_month,
@@ -158,8 +158,8 @@ function normalizeWizard(raw: Partial<Wizard>, initial: InitialPayload): Wizard 
 }
 
 const errorStepMap: Record<string, number> = {
-    company_name: 2,
-    companyName: 2,
+    business_name: 2,
+    businessName: 2,
     vat_registered: 2,
     vat_number: 2,
     vatNumber: 2,
@@ -232,8 +232,8 @@ function next(): void {
         return;
     }
     if (step.value === 2) {
-        if (!wizard.value.companyName.trim()) {
-            fieldErrors.value.companyName = 'Company name is required.';
+        if (!wizard.value.businessName.trim()) {
+            fieldErrors.value.businessName = 'Business name is required.';
             return;
         }
         if (wizard.value.vatRegistered && !/^4\d{9}$/.test(wizard.value.vatNumber.trim())) {
@@ -274,7 +274,7 @@ function buildPayload(): Record<string, string | number | File> {
     const sequence = Math.max(1, Number(wizard.value.invoiceStartNumber) || 1);
 
     const payload: Record<string, string | number | File> = {
-        company_name: wizard.value.companyName.trim(),
+        business_name: wizard.value.businessName.trim(),
         vat_registered: wizard.value.vatRegistered ? 1 : 0,
         vat_number: wizard.value.vatRegistered ? wizard.value.vatNumber.trim() : '',
         financial_year_end_month: wizard.value.financialYearEndMonth,
@@ -304,8 +304,8 @@ function buildPayload(): Record<string, string | number | File> {
 function validateBeforeFinish(): boolean {
     fieldErrors.value = {};
 
-    if (!wizard.value.companyName.trim()) {
-        fieldErrors.value.company_name = 'Company name is required.';
+    if (!wizard.value.businessName.trim()) {
+        fieldErrors.value.business_name = 'Business name is required.';
         step.value = 2;
         return false;
     }
@@ -434,28 +434,28 @@ const liveInvoicePreview = computed(() => {
                 <!-- Step 2 -->
                 <div v-else-if="step === 2" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">Company details</h1>
+                        <h1 class="text-2xl font-semibold tracking-tight text-white">Business details</h1>
                         <p class="mt-1 text-sm text-slate-400">We&rsquo;ll use this on invoices, tax returns, and reports.</p>
                     </div>
 
                     <div class="space-y-4">
                         <div>
-                            <InputLabel for="co_name" value="Company name" class="!text-slate-300" />
+                            <InputLabel for="co_name" value="Business name" class="!text-slate-300" />
                             <TextInput
                                 id="co_name"
-                                v-model="wizard.companyName"
+                                v-model="wizard.businessName"
                                 type="text"
                                 class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
                                 autocomplete="organization"
                             />
-                            <InputError :message="fieldErrors.company_name || fieldErrors.companyName" class="mt-1" />
+                            <InputError :message="fieldErrors.business_name || fieldErrors.businessName" class="mt-1" />
                         </div>
 
                         <div class="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950/40 p-4">
                             <Checkbox id="vat_reg" :checked="wizard.vatRegistered" @update:checked="wizard.vatRegistered = $event" />
                             <div class="flex-1">
                                 <InputLabel for="vat_reg" value="Are you VAT registered?" class="!text-slate-300" />
-                                <p class="mt-1 text-xs text-slate-500">You can change this later in company settings.</p>
+                                <p class="mt-1 text-xs text-slate-500">You can change this later in business settings.</p>
                             </div>
                         </div>
 
@@ -598,7 +598,7 @@ const liveInvoicePreview = computed(() => {
 
                     <div class="space-y-4">
                         <div>
-                            <InputLabel value="Company logo" class="!text-slate-300" />
+                            <InputLabel value="Business logo" class="!text-slate-300" />
                             <div class="mt-2 flex flex-wrap items-center gap-3">
                                 <input
                                     ref="logoInput"
@@ -766,8 +766,8 @@ const liveInvoicePreview = computed(() => {
 
                     <ul class="space-y-3 rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
                         <li>
-                            <span class="text-slate-500">Company:</span>
-                            {{ wizard.companyName }}
+                            <span class="text-slate-500">Business:</span>
+                            {{ wizard.businessName }}
                         </li>
                         <li>
                             <span class="text-slate-500">VAT:</span>

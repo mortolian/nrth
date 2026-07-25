@@ -16,7 +16,7 @@ class AiSettingsTest extends TestCase
      */
     private function companySettingsPayload(Team $team, array $overrides = []): array
     {
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
 
         return array_replace_recursive([
             'tab' => 'ai',
@@ -38,9 +38,9 @@ class AiSettingsTest extends TestCase
             'postal_province' => $settings['postal_province'],
             'postal_postal_code' => $settings['postal_postal_code'],
             'postal_country' => $settings['postal_country'],
-            'company_email' => $settings['company_email'],
-            'company_phone' => $settings['company_phone'],
-            'company_website' => $settings['company_website'],
+            'business_email' => $settings['business_email'],
+            'business_phone' => $settings['business_phone'],
+            'business_website' => $settings['business_website'],
             'invoice_default_payment_terms_days' => $settings['invoice_default_payment_terms_days'],
             'invoice_default_currency' => $settings['invoice_default_currency'],
             'invoice_prefix' => $settings['invoice_prefix'],
@@ -91,7 +91,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'anthropic',
@@ -100,9 +100,9 @@ class AiSettingsTest extends TestCase
                 ],
                 'tab' => 'ai',
             ])
-        )->assertRedirect(route('settings.company', ['tab' => 'ai']));
+        )->assertRedirect(route('settings.business', ['tab' => 'ai']));
 
-        $ai = $team->fresh()->mergedCompanySettings()['ai'];
+        $ai = $team->fresh()->mergedBusinessSettings()['ai'];
         $this->assertSame('anthropic', $ai['provider']);
         $this->assertSame('sk-ant-live', $ai['api_key']);
         $this->assertSame('claude-sonnet-4-5', $ai['model']);
@@ -119,7 +119,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'anthropic',
@@ -140,7 +140,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'not-a-provider',
@@ -160,7 +160,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'gemini',
@@ -169,7 +169,7 @@ class AiSettingsTest extends TestCase
                 ],
                 'tab' => 'ai',
             ])
-        )->assertRedirect(route('settings.company', ['tab' => 'ai']));
+        )->assertRedirect(route('settings.business', ['tab' => 'ai']));
 
         $this->assertSame('gemini', $team->fresh()->aiProvider());
         $this->assertSame('AIza-test', $team->fresh()->aiApiKey());
@@ -183,7 +183,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'openai_compatible',
@@ -193,7 +193,7 @@ class AiSettingsTest extends TestCase
                 ],
                 'tab' => 'ai',
             ])
-        )->assertRedirect(route('settings.company', ['tab' => 'ai']));
+        )->assertRedirect(route('settings.business', ['tab' => 'ai']));
 
         $fresh = $team->fresh();
         $this->assertSame('openai_compatible', $fresh->aiProvider());
@@ -208,7 +208,7 @@ class AiSettingsTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => [
+            'business_settings' => [
                 'ai' => [
                     'provider' => 'ollama',
                     'api_key' => null,
@@ -231,7 +231,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'openai_compatible',
@@ -252,7 +252,7 @@ class AiSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
                     'provider' => 'openrouter',
@@ -262,7 +262,7 @@ class AiSettingsTest extends TestCase
                 ],
                 'tab' => 'ai',
             ])
-        )->assertRedirect(route('settings.company', ['tab' => 'ai']));
+        )->assertRedirect(route('settings.business', ['tab' => 'ai']));
 
         $fresh = $team->fresh();
         $this->assertSame('openrouter', $fresh->aiProvider());
@@ -276,7 +276,7 @@ class AiSettingsTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => [
+            'business_settings' => [
                 'receipt_scan' => [
                     'provider' => 'openai',
                     'api_key' => 'sk-legacy',
@@ -287,6 +287,6 @@ class AiSettingsTest extends TestCase
 
         $this->assertSame('sk-legacy', $team->fresh()->aiApiKey());
         $this->assertSame('gpt-4o', $team->fresh()->aiModel());
-        $this->assertArrayNotHasKey('receipt_scan', $team->fresh()->mergedCompanySettings());
+        $this->assertArrayNotHasKey('receipt_scan', $team->fresh()->mergedBusinessSettings());
     }
 }

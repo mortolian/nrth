@@ -116,7 +116,7 @@ On an empty database:
 php artisan app:install
 ```
 
-Interactive admin user and company team. Further setup (company profile, chart of accounts, VAT) happens in the in-app wizard after sign-in.
+Interactive admin user and business team. Further setup (business profile, chart of accounts, VAT) happens in the in-app wizard after sign-in.
 
 ## Useful commands
 

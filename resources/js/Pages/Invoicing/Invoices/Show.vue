@@ -38,10 +38,10 @@ type InvoicePayload = {
     viewed_at: string | null;
     paid_at: string | null;
     currency: string;
-    company_currency_code?: string | null;
-    fx_rate_invoice_to_company?: string | null;
+    business_currency_code?: string | null;
+    fx_rate_invoice_to_business?: string | null;
     fx_rate_date?: string | null;
-    total_company_currency_cents?: number | null;
+    total_business_currency_cents?: number | null;
     client: {
         id: number | null;
         name: string | null;
@@ -76,8 +76,8 @@ type InvoicePayload = {
 
 const props = defineProps<{
     issuer: Issuer;
-    /** Company default currency (settings); for internal FX hint only. */
-    company_currency: string;
+    /** Business default currency (settings); for internal FX hint only. */
+    business_currency: string;
     /** Mirrors company VAT settings: when false, VAT is not shown in totals. */
     charges_vat: boolean;
     invoice: InvoicePayload;
@@ -103,20 +103,20 @@ const props = defineProps<{
 const bookCurrencySnapshot = computed(() => {
     const inv = props.invoice;
     if (
-        inv.fx_rate_invoice_to_company == null
+        inv.fx_rate_invoice_to_business == null
         || inv.fx_rate_date == null
-        || inv.total_company_currency_cents == null
+        || inv.total_business_currency_cents == null
     ) {
         return null;
     }
-    const r = Number(inv.fx_rate_invoice_to_company);
+    const r = Number(inv.fx_rate_invoice_to_business);
     if (!Number.isFinite(r) || r <= 0) {
         return null;
     }
     return {
         fx_rate: r,
         fx_rate_date: inv.fx_rate_date,
-        total_company_currency_cents: inv.total_company_currency_cents,
+        total_business_currency_cents: inv.total_business_currency_cents,
     };
 });
 
@@ -129,10 +129,10 @@ const recordPaymentInvoice = computed((): RecordPaymentInvoiceInput => ({
     amount_due_cents: props.invoice.amount_due_cents,
     total_cents: props.invoice.total_cents,
     currency: props.invoice.currency,
-    company_currency_code: props.invoice.company_currency_code ?? null,
-    fx_rate_invoice_to_company: props.invoice.fx_rate_invoice_to_company ?? null,
+    business_currency_code: props.invoice.business_currency_code ?? null,
+    fx_rate_invoice_to_business: props.invoice.fx_rate_invoice_to_business ?? null,
     fx_rate_date: props.invoice.fx_rate_date ?? null,
-    total_company_currency_cents: props.invoice.total_company_currency_cents ?? null,
+    total_business_currency_cents: props.invoice.total_business_currency_cents ?? null,
 }));
 
 const invoiceCurrency = computed(() => props.invoice.currency || 'ZAR');
@@ -406,7 +406,7 @@ const undoPayment = (paymentId: number) => {
                     <InvoiceInternalCurrencyApprox
                         class="mt-3"
                         :invoice-currency="invoice.currency"
-                        :company-currency="company_currency"
+                        :company-currency="business_currency"
                         :total-cents="invoice.total_cents"
                         :amount-due-cents="invoice.amount_due_cents"
                         :book-snapshot="bookCurrencySnapshot"

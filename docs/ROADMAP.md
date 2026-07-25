@@ -18,7 +18,7 @@ These areas exist and are usable, but expect rough edges and breaking changes:
 | **Banking** | CSV/OFX import, duplicate detection, transaction list |
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
-| **Teams** | Multi-user companies via Jetstream |
+| **Teams** | Multi-user businesses via Jetstream |
 | **Self-hosting** | Docker Compose install via `scripts/install.sh` |
 
 See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.

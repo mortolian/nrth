@@ -38,17 +38,17 @@ const props = defineProps<{
         amount_paid_cents: number;
         amount_due_cents: number;
         currency: string;
-        company_currency_code?: string | null;
-        fx_rate_invoice_to_company?: string | null;
+        business_currency_code?: string | null;
+        fx_rate_invoice_to_business?: string | null;
         fx_rate_date?: string | null;
-        total_company_currency_cents?: number | null;
+        total_business_currency_cents?: number | null;
         line_items: InvoiceLine[];
     };
     clients: ClientOption[];
     tax_rates: TaxRateOption[];
     accounts: AccountOption[];
     next_number: string;
-    /** Company default when no client or before client selection. */
+    /** Business default when no client or before client selection. */
     default_currency: string;
     defaults?: {
         payment_terms_days: number;
@@ -443,7 +443,7 @@ const onSave = () => {
 
                 <AppCard>
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        VAT is not applied on this invoice. Enable VAT registered and choose a default VAT rate in Company settings to charge VAT.
+                        VAT is not applied on this invoice. Enable VAT registered and choose a default VAT rate in Business settings to charge VAT.
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
 

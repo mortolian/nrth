@@ -53,7 +53,7 @@ class OnboardingController extends Controller
         $team = $user->currentTeam;
         abort_unless($team !== null && $user->can('update', $team), 403);
 
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
         $year = (int) now()->format('Y');
         $sequenceRow = InvoiceNumberSequence::query()
             ->where('team_id', $team->id)
@@ -134,7 +134,7 @@ class OnboardingController extends Controller
         $industryValues = array_column($this->industryOptions(), 'value');
 
         $validated = $request->validate([
-            'company_name' => ['required', 'string', 'max:255'],
+            'business_name' => ['required', 'string', 'max:255'],
             'vat_registered' => ['required', 'boolean'],
             'vat_number' => [
                 'nullable',
@@ -206,9 +206,9 @@ class OnboardingController extends Controller
         }
 
         DB::transaction(function () use ($user, $team, $validated, $newSettings, $request): void {
-            $team->name = $validated['company_name'];
-            $team->company_settings = array_replace_recursive(
-                $team->mergedCompanySettings(),
+            $team->name = $validated['business_name'];
+            $team->business_settings = array_replace_recursive(
+                $team->mergedBusinessSettings(),
                 $newSettings
             );
             $team->save();

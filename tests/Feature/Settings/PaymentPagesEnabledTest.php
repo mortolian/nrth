@@ -20,8 +20,8 @@ class PaymentPagesEnabledTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 [
                     'payment_pages_enabled' => false,
                     'payment_gateways' => [
@@ -50,8 +50,8 @@ class PaymentPagesEnabledTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 [
                     'payment_gateways' => [
                         'stripe' => [
@@ -79,8 +79,8 @@ class PaymentPagesEnabledTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 [
                     'payment_pages_enabled' => true,
                     'payment_gateways' => [
@@ -110,8 +110,8 @@ class PaymentPagesEnabledTest extends TestCase
         $user->forceFill(['current_team_id' => $team->id])->save();
 
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 [
                     'payment_pages_enabled' => false,
                     'payment_gateways' => [

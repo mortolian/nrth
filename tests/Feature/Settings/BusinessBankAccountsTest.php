@@ -7,7 +7,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class CompanyBankAccountsTest extends TestCase
+class BusinessBankAccountsTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -53,13 +53,13 @@ class CompanyBankAccountsTest extends TestCase
         $this->assertSame('Primary operating account', $shown[0]['title']);
     }
 
-    public function test_legacy_company_settings_bank_used_when_no_table_rows(): void
+    public function test_legacy_business_settings_bank_used_when_no_table_rows(): void
     {
         $team = User::factory()->withPersonalTeam()->create()->currentTeam;
         $this->assertNotNull($team);
 
-        $team->company_settings = array_replace_recursive(
-            $team->company_settings ?? [],
+        $team->business_settings = array_replace_recursive(
+            $team->business_settings ?? [],
             [
                 'bank_name' => 'Legacy Bank',
                 'bank_account_number' => '999',

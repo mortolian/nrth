@@ -74,7 +74,7 @@ class OnboardingWizardTest extends TestCase
         $this->actingAs($user);
 
         $this->post(route('onboarding.complete'), [
-            'company_name' => 'Acme Trading (Pty) Ltd',
+            'business_name' => 'Acme Trading (Pty) Ltd',
             'vat_registered' => '0',
             'vat_number' => '',
             'financial_year_end_month' => '2',
@@ -96,7 +96,7 @@ class OnboardingWizardTest extends TestCase
 
         $team->refresh();
         $this->assertSame('Acme Trading (Pty) Ltd', $team->name);
-        $this->assertSame('retail', $team->mergedCompanySettings()['industry']);
+        $this->assertSame('retail', $team->mergedBusinessSettings()['industry']);
         $this->assertNotNull($user->fresh()->completed_onboarding_at);
 
         $transaction = Transaction::queryWithoutTeamScope()
@@ -126,7 +126,7 @@ class OnboardingWizardTest extends TestCase
         $this->actingAs($user);
 
         $this->post(route('onboarding.complete'), [
-            'company_name' => 'Random Invoices Ltd',
+            'business_name' => 'Random Invoices Ltd',
             'vat_registered' => '0',
             'vat_number' => '',
             'financial_year_end_month' => '2',
@@ -147,6 +147,6 @@ class OnboardingWizardTest extends TestCase
         ])->assertRedirect(route('dashboard'));
 
         $team->refresh();
-        $this->assertTrue($team->mergedCompanySettings()['invoice_number_use_random_suffix']);
+        $this->assertTrue($team->mergedBusinessSettings()['invoice_number_use_random_suffix']);
     }
 }

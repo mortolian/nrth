@@ -30,7 +30,16 @@ class Team extends JetstreamTeam implements HasMedia
     protected $fillable = [
         'name',
         'personal_team',
-        'company_settings',
+        'business_settings',
+    ];
+
+    /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array<int, string>
+     */
+    protected $appends = [
+        'logo_url',
     ];
 
     /**
@@ -53,13 +62,18 @@ class Team extends JetstreamTeam implements HasMedia
     {
         return [
             'personal_team' => 'boolean',
-            'company_settings' => 'array',
+            'business_settings' => 'array',
         ];
     }
 
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('logo')->singleFile();
+    }
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->getFirstMedia('logo')?->getUrl() ?: null;
     }
 
     /**
@@ -108,7 +122,7 @@ class Team extends JetstreamTeam implements HasMedia
                 ->all();
         }
 
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         $bank = [
             'title' => null,
             'name' => $settings['bank_name'] ?? null,
@@ -169,7 +183,7 @@ class Team extends JetstreamTeam implements HasMedia
     /**
      * @return array<string, mixed>
      */
-    public static function defaultCompanySettings(): array
+    public static function defaultBusinessSettings(): array
     {
         return [
             'trading_name' => null,
@@ -189,9 +203,9 @@ class Team extends JetstreamTeam implements HasMedia
             'postal_province' => null,
             'postal_postal_code' => null,
             'postal_country' => null,
-            'company_email' => null,
-            'company_phone' => null,
-            'company_website' => null,
+            'business_email' => null,
+            'business_phone' => null,
+            'business_website' => null,
             'invoice_default_payment_terms_days' => 30,
             'invoice_default_currency' => 'ZAR',
             'invoice_prefix' => 'INV',
@@ -206,8 +220,8 @@ class Team extends JetstreamTeam implements HasMedia
             'invoice_default_notes' => null,
             'invoice_default_footer' => null,
             'invoice_show_street_address' => true,
-            'invoice_email_subject_template' => 'Invoice {{number}} from {{company}}',
-            'invoice_email_body_template' => "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{company}}",
+            'invoice_email_subject_template' => 'Invoice {{number}} from {{business}}',
+            'invoice_email_body_template' => "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{business}}",
             'vat_registered' => false,
             'vat_period_type' => 'bi_monthly',
             'default_tax_rate_id' => null,
@@ -268,9 +282,9 @@ class Team extends JetstreamTeam implements HasMedia
     /**
      * @return array<string, mixed>
      */
-    public function mergedCompanySettings(): array
+    public function mergedBusinessSettings(): array
     {
-        $stored = is_array($this->company_settings) ? $this->company_settings : [];
+        $stored = is_array($this->business_settings) ? $this->business_settings : [];
         $normalized = $stored;
 
         foreach ([
@@ -285,6 +299,16 @@ class Team extends JetstreamTeam implements HasMedia
 
         if (! array_key_exists('estimate_show_street_address', $normalized) && array_key_exists('invoice_show_street_address', $normalized)) {
             $normalized['estimate_show_street_address'] = $normalized['invoice_show_street_address'];
+        }
+
+        // Legacy company_* contact keys → business_*.
+        foreach (['email', 'phone', 'website'] as $suffix) {
+            $legacy = 'company_'.$suffix;
+            $key = 'business_'.$suffix;
+            if (array_key_exists($legacy, $normalized) && ! array_key_exists($key, $normalized)) {
+                $normalized[$key] = $normalized[$legacy];
+            }
+            unset($normalized[$legacy]);
         }
 
         // Legacy key from early receipt-scan settings.
@@ -302,9 +326,28 @@ class Team extends JetstreamTeam implements HasMedia
         }
 
         return array_replace_recursive(
-            self::defaultCompanySettings(),
+            self::defaultBusinessSettings(),
             $normalized
         );
+    }
+
+    /**
+     * Substitute invoice email template placeholders.
+     * Primary token is {{business}}; {{company}} is accepted as a legacy alias.
+     *
+     * @param  array{number?: string, business?: string, company?: string, client_name?: string}  $vars
+     */
+    public static function renderInvoiceEmailTemplate(string $template, array $vars): string
+    {
+        $business = (string) ($vars['business'] ?? $vars['company'] ?? '');
+        $replacements = [
+            '{{number}}' => (string) ($vars['number'] ?? ''),
+            '{{client_name}}' => (string) ($vars['client_name'] ?? ''),
+            '{{business}}' => $business,
+            '{{company}}' => $business,
+        ];
+
+        return strtr($template, $replacements);
     }
 
     /**
@@ -322,7 +365,7 @@ class Team extends JetstreamTeam implements HasMedia
      */
     public function issuerForInvoicingDocuments(string $documentType = 'invoice'): array
     {
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
 
         $trading = trim((string) ($settings['trading_name'] ?? ''));
         $name = $trading !== '' ? $trading : (string) $this->name;
@@ -358,9 +401,9 @@ class Team extends JetstreamTeam implements HasMedia
         return [
             'name' => $name,
             'address' => $address,
-            'email' => $nullIfEmpty($settings['company_email'] ?? null),
-            'phone' => $nullIfEmpty($settings['company_phone'] ?? null),
-            'website' => $nullIfEmpty($settings['company_website'] ?? null),
+            'email' => $nullIfEmpty($settings['business_email'] ?? null),
+            'phone' => $nullIfEmpty($settings['business_phone'] ?? null),
+            'website' => $nullIfEmpty($settings['business_website'] ?? null),
             'registration_number' => $nullIfEmpty($settings['registration_number'] ?? null),
             'vat_number' => $nullIfEmpty($settings['vat_number'] ?? null),
         ];
@@ -371,7 +414,7 @@ class Team extends JetstreamTeam implements HasMedia
      */
     public function chargesVat(): bool
     {
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         if (! filter_var($settings['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
             return false;
         }
@@ -395,7 +438,7 @@ class Team extends JetstreamTeam implements HasMedia
             return 0.0;
         }
 
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         $taxRateId = (int) ($settings['default_tax_rate_id'] ?? 0);
         $rate = TaxRate::queryWithoutTeamScope()
             ->where('team_id', $this->id)
@@ -418,7 +461,7 @@ class Team extends JetstreamTeam implements HasMedia
 
     public function aiProvider(): string
     {
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         $fromTeam = trim((string) ($settings['ai']['provider'] ?? ''));
         if ($fromTeam !== '' && AiCatalog::isValidProvider($fromTeam)) {
             return $fromTeam;
@@ -433,7 +476,7 @@ class Team extends JetstreamTeam implements HasMedia
 
     public function aiApiKey(): string
     {
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         $fromTeam = trim((string) ($settings['ai']['api_key'] ?? ''));
         if ($fromTeam !== '') {
             return $fromTeam;
@@ -451,7 +494,7 @@ class Team extends JetstreamTeam implements HasMedia
     public function aiModel(): string
     {
         $provider = $this->aiProvider();
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         $fromTeam = trim((string) ($settings['ai']['model'] ?? ''));
         if ($fromTeam !== '' && AiCatalog::isValidModel($provider, $fromTeam)) {
             return $fromTeam;
@@ -475,7 +518,7 @@ class Team extends JetstreamTeam implements HasMedia
     public function aiBaseUrl(): string
     {
         $provider = $this->aiProvider();
-        $settings = $this->mergedCompanySettings();
+        $settings = $this->mergedBusinessSettings();
         $fromTeam = trim((string) ($settings['ai']['base_url'] ?? ''));
         if ($fromTeam !== '') {
             return rtrim($fromTeam, '/');

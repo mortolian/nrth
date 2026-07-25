@@ -35,7 +35,7 @@ class ParseExpenseReceipt
     {
         if (! $this->enabledFor($team)) {
             throw ValidationException::withMessages([
-                'receipt' => __('AI is not configured. Add an API key in Company settings → AI.'),
+                'receipt' => __('AI is not configured. Add an API key in Business settings → AI.'),
             ]);
         }
 
@@ -54,7 +54,7 @@ class ParseExpenseReceipt
             $provider = $this->providers->get($providerKey);
         } catch (Throwable) {
             throw ValidationException::withMessages([
-                'receipt' => __('AI provider is not supported. Choose a provider in Company settings → AI.'),
+                'receipt' => __('AI provider is not supported. Choose a provider in Business settings → AI.'),
             ]);
         }
 

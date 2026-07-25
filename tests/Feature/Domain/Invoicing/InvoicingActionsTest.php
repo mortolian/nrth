@@ -57,7 +57,7 @@ class InvoicingActionsTest extends TestCase
             'rate' => 0.15,
         ]);
         $team->forceFill([
-            'company_settings' => array_replace($team->company_settings ?? [], [
+            'business_settings' => array_replace($team->business_settings ?? [], [
                 'vat_registered' => true,
                 'default_tax_rate_id' => $taxRate->id,
             ]),
@@ -83,10 +83,10 @@ class InvoicingActionsTest extends TestCase
         $this->assertSame(125_00, (int) $invoice->getRawOriginal('total_cents'));
 
         $invoice->refresh();
-        $this->assertSame('ZAR', $invoice->company_currency_code);
-        $this->assertEquals(1.0, (float) $invoice->fx_rate_invoice_to_company);
+        $this->assertSame('ZAR', $invoice->business_currency_code);
+        $this->assertEquals(1.0, (float) $invoice->fx_rate_invoice_to_business);
         $this->assertSame('2026-04-25', $invoice->fx_rate_date?->toDateString());
-        $this->assertSame(125_00, (int) $invoice->getRawOriginal('total_company_currency_cents'));
+        $this->assertSame(125_00, (int) $invoice->getRawOriginal('total_business_currency_cents'));
     }
 
     public function test_create_invoice_action_stores_fx_snapshot_for_foreign_currency(): void
@@ -97,7 +97,7 @@ class InvoicingActionsTest extends TestCase
         $client = Client::factory()->for($team)->create();
 
         $team->forceFill([
-            'company_settings' => array_replace($team->company_settings ?? [], [
+            'business_settings' => array_replace($team->business_settings ?? [], [
                 'invoice_default_currency' => 'ZAR',
             ]),
         ])->save();
@@ -125,10 +125,10 @@ class InvoicingActionsTest extends TestCase
         $invoice = app(CreateInvoiceAction::class)->execute($dto);
         $invoice->refresh();
 
-        $this->assertSame('ZAR', $invoice->company_currency_code);
-        $this->assertEquals(18.0, (float) $invoice->fx_rate_invoice_to_company);
+        $this->assertSame('ZAR', $invoice->business_currency_code);
+        $this->assertEquals(18.0, (float) $invoice->fx_rate_invoice_to_business);
         $this->assertSame('2026-04-25', $invoice->fx_rate_date?->toDateString());
-        $this->assertSame(180_000, (int) $invoice->getRawOriginal('total_company_currency_cents'));
+        $this->assertSame(180_000, (int) $invoice->getRawOriginal('total_business_currency_cents'));
     }
 
     public function test_send_invoice_action_marks_invoice_as_sent(): void
@@ -245,12 +245,12 @@ class InvoicingActionsTest extends TestCase
             ->create([
                 'status' => InvoiceStatus::Sent,
                 'currency' => 'USD',
-                'company_currency_code' => 'ZAR',
+                'business_currency_code' => 'ZAR',
                 'subtotal_cents' => 100_00,
                 'vat_amount_cents' => 0,
                 'total_cents' => 100_00,
-                'total_company_currency_cents' => 1800_00,
-                'fx_rate_invoice_to_company' => '18',
+                'total_business_currency_cents' => 1800_00,
+                'fx_rate_invoice_to_business' => '18',
                 'fx_rate_date' => '2026-04-25',
                 'amount_paid_cents' => 0,
             ]);
@@ -268,11 +268,11 @@ class InvoicingActionsTest extends TestCase
             method: PaymentMethod::Eft,
             currency: 'USD',
             createdBy: $user->id,
-            bankAmountCompanyCents: 1700_00,
+            bankAmountBusinessCents: 1700_00,
             bookFxLossToExpense: true,
         ));
 
-        $this->assertSame(1700_00, (int) $payment->getRawOriginal('bank_amount_company_cents'));
+        $this->assertSame(1700_00, (int) $payment->getRawOriginal('bank_amount_business_cents'));
 
         $lossAccountId = Account::queryWithoutTeamScope()
             ->where('team_id', $team->id)

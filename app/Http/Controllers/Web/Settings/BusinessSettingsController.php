@@ -17,7 +17,7 @@ use Inertia\Response;
 use Propaganistas\LaravelPhone\PhoneNumber;
 use Propaganistas\LaravelPhone\Rules\Phone;
 
-class CompanySettingsController extends Controller
+class BusinessSettingsController extends Controller
 {
     public function edit(Request $request): Response
     {
@@ -31,10 +31,10 @@ class CompanySettingsController extends Controller
             ->where('year', $year)
             ->first();
 
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
         $nextSeq = $sequenceRow?->next_number ?? 1;
 
-        return Inertia::render('Settings/Company', [
+        return Inertia::render('Settings/Business', [
             'team' => [
                 'id' => $team->id,
                 'name' => $team->name,
@@ -138,9 +138,9 @@ class CompanySettingsController extends Controller
             'postal_province' => ['nullable', 'string', 'max:255'],
             'postal_postal_code' => ['nullable', 'string', 'max:32'],
             'postal_country' => ['nullable', 'string', 'max:255'],
-            'company_email' => ['nullable', 'email', 'max:255'],
-            'company_phone' => ['nullable', 'string', 'max:64', (new Phone)->international()],
-            'company_website' => ['nullable', 'string', 'max:255'],
+            'business_email' => ['nullable', 'email', 'max:255'],
+            'business_phone' => ['nullable', 'string', 'max:64', (new Phone)->international()],
+            'business_website' => ['nullable', 'string', 'max:255'],
             'invoice_default_payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'invoice_default_currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'invoice_prefix' => ['required', 'string', 'max:32'],
@@ -231,10 +231,10 @@ class CompanySettingsController extends Controller
             $validated['vat_number'] = null;
         }
 
-        if (! empty($validated['company_phone'])) {
-            $validated['company_phone'] = (new PhoneNumber((string) $validated['company_phone']))->formatE164();
+        if (! empty($validated['business_phone'])) {
+            $validated['business_phone'] = (new PhoneNumber((string) $validated['business_phone']))->formatE164();
         } else {
-            $validated['company_phone'] = null;
+            $validated['business_phone'] = null;
         }
 
         $settingsKeys = [
@@ -242,7 +242,7 @@ class CompanySettingsController extends Controller
             'financial_year_end_month', 'physical_street', 'physical_city', 'physical_province',
             'physical_postal_code', 'physical_country', 'postal_same_as_physical',
             'postal_street', 'postal_city', 'postal_province', 'postal_postal_code', 'postal_country',
-            'company_email', 'company_phone', 'company_website',
+            'business_email', 'business_phone', 'business_website',
             'invoice_default_payment_terms_days', 'invoice_default_currency', 'invoice_prefix',
             'invoice_number_include_month', 'invoice_number_use_random_suffix',
             'estimate_prefix', 'estimate_number_include_month', 'estimate_number_use_random_suffix',
@@ -296,13 +296,13 @@ class CompanySettingsController extends Controller
 
         $team->name = $validated['name'];
         $mergedSettings = array_replace_recursive(
-            $team->mergedCompanySettings(),
+            $team->mergedBusinessSettings(),
             $newSettings
         );
         foreach (['quote_prefix', 'quote_number_include_month', 'quote_number_use_random_suffix', 'receipt_scan'] as $legacyKey) {
             unset($mergedSettings[$legacyKey]);
         }
-        $team->company_settings = $mergedSettings;
+        $team->business_settings = $mergedSettings;
         $team->save();
 
         if ($request->boolean('remove_logo')) {
@@ -331,7 +331,7 @@ class CompanySettingsController extends Controller
             $tab = 'profile';
         }
 
-        return to_route('settings.company', ['tab' => $tab])->with('success', 'Company settings saved.');
+        return to_route('settings.business', ['tab' => $tab])->with('success', 'Business settings saved.');
     }
 
     public function storeTaxRate(Request $request): RedirectResponse
@@ -368,7 +368,7 @@ class CompanySettingsController extends Controller
             'is_default' => (bool) ($validated['is_default'] ?? false),
         ]);
 
-        return to_route('settings.company', ['tab' => 'tax'])->with('success', 'VAT rate added.');
+        return to_route('settings.business', ['tab' => 'tax'])->with('success', 'VAT rate added.');
     }
 
     public function updateTaxRate(Request $request, TaxRate $taxRate): RedirectResponse
@@ -409,7 +409,7 @@ class CompanySettingsController extends Controller
             'is_default' => $isDefault,
         ]);
 
-        return to_route('settings.company', ['tab' => 'tax'])->with('success', 'VAT rate updated.');
+        return to_route('settings.business', ['tab' => 'tax'])->with('success', 'VAT rate updated.');
     }
 
     public function destroyTaxRate(Request $request, TaxRate $taxRate): RedirectResponse
@@ -421,13 +421,13 @@ class CompanySettingsController extends Controller
         $taxRateId = (int) $taxRate->id;
         $taxRate->delete();
 
-        $team->company_settings = array_replace_recursive(
-            $team->mergedCompanySettings(),
-            ['default_tax_rate_id' => $team->mergedCompanySettings()['default_tax_rate_id'] === $taxRateId ? null : $team->mergedCompanySettings()['default_tax_rate_id']]
+        $team->business_settings = array_replace_recursive(
+            $team->mergedBusinessSettings(),
+            ['default_tax_rate_id' => $team->mergedBusinessSettings()['default_tax_rate_id'] === $taxRateId ? null : $team->mergedBusinessSettings()['default_tax_rate_id']]
         );
         $team->save();
 
-        return to_route('settings.company', ['tab' => 'tax'])->with('success', 'VAT rate removed.');
+        return to_route('settings.business', ['tab' => 'tax'])->with('success', 'VAT rate removed.');
     }
 
     /**

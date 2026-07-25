@@ -18,7 +18,7 @@ class PayFastPaymentWebhookController extends Controller
         Team $team,
         CompleteInvoiceOnlinePaymentSessionAction $complete,
     ): Response {
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
         /** @var array<string, mixed> $gateways */
         $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
         /** @var array<string, mixed> $payfast */

@@ -8,7 +8,7 @@ use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Estimate;
 use App\Domain\Invoicing\Models\Invoice;
-use App\Domain\Invoicing\Services\InvoiceCompanyCurrencySnapshot;
+use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
@@ -75,7 +75,7 @@ class EstimateController extends Controller
         $teamId = (int) $request->user()->current_team_id;
 
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
-        $settings = $request->user()->currentTeam?->mergedCompanySettings() ?? [];
+        $settings = $request->user()->currentTeam?->mergedBusinessSettings() ?? [];
 
         return Inertia::render('Invoicing/Estimates/Form', [
             'isEditing' => false,
@@ -106,7 +106,7 @@ class EstimateController extends Controller
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
-        $settings = $request->user()->currentTeam?->mergedCompanySettings() ?? [];
+        $settings = $request->user()->currentTeam?->mergedBusinessSettings() ?? [];
 
         return Inertia::render('Invoicing/Estimates/Form', [
             'isEditing' => true,
@@ -308,7 +308,7 @@ class EstimateController extends Controller
                 'total_cents' => $subtotalCents + $vatCents,
             ]);
             $invoice->refresh();
-            app(InvoiceCompanyCurrencySnapshot::class)->sync($invoice);
+            app(InvoiceBusinessCurrencySnapshot::class)->sync($invoice);
 
             $estimate->update([
                 'status' => EstimateStatus::Converted,
@@ -494,7 +494,7 @@ class EstimateController extends Controller
     {
         $team = Team::query()->find($teamId);
 
-        return $team?->mergedCompanySettings() ?? [];
+        return $team?->mergedBusinessSettings() ?? [];
     }
 
     private function randomIdentifier(): string

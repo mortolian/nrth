@@ -54,12 +54,12 @@ class AppInstallCommand extends Command
         });
 
         $this->newLine();
-        $this->components->info('Create the administrator account and company');
+        $this->components->info('Create the administrator account and business');
         $this->newLine();
 
         $name = (string) $this->ask('Full name');
         $email = (string) $this->ask('Email address');
-        $companyName = (string) $this->ask('Company name (team)');
+        $businessName = (string) $this->ask('Business name (team)');
         $password = (string) $this->secret('Password');
         $passwordConfirmation = (string) $this->secret('Confirm password');
 
@@ -67,14 +67,14 @@ class AppInstallCommand extends Command
             [
                 'name' => $name,
                 'email' => $email,
-                'company_name' => $companyName,
+                'business_name' => $businessName,
                 'password' => $password,
                 'password_confirmation' => $passwordConfirmation,
             ],
             [
                 'name' => ['required', 'string', 'max:255'],
                 'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-                'company_name' => ['required', 'string', 'max:255'],
+                'business_name' => ['required', 'string', 'max:255'],
                 'password' => ['required', 'confirmed', Password::defaults()],
             ]
         );
@@ -91,7 +91,7 @@ class AppInstallCommand extends Command
         $team = null;
 
         try {
-            DB::transaction(function () use ($name, $email, $password, $companyName, &$user, &$team): void {
+            DB::transaction(function () use ($name, $email, $password, $businessName, &$user, &$team): void {
                 $user = User::query()->create([
                     'name' => $name,
                     'email' => $email,
@@ -101,7 +101,7 @@ class AppInstallCommand extends Command
                 ]);
 
                 $team = $user->ownedTeams()->create([
-                    'name' => $companyName,
+                    'name' => $businessName,
                     'personal_team' => false,
                 ]);
 
@@ -124,12 +124,12 @@ class AppInstallCommand extends Command
             return self::FAILURE;
         }
 
-        $this->printInstallSummary($name, $email, $companyName);
+        $this->printInstallSummary($name, $email, $businessName);
 
         return self::SUCCESS;
     }
 
-    private function printInstallSummary(string $name, string $email, string $companyName): void
+    private function printInstallSummary(string $name, string $email, string $businessName): void
     {
         $url = rtrim((string) config('app.url'), '/');
         $appName = (string) config('app.name');
@@ -141,7 +141,7 @@ class AppInstallCommand extends Command
         $this->newLine();
         $this->line('  <fg=gray>Application</>  <fg=cyan;options=bold>'.$url.'</>');
         $this->line('  <fg=gray>Administrator</>  '.$name.' <fg=gray>\<</>'.$email.'<fg=gray>\></>');
-        $this->line('  <fg=gray>Company</>       '.$companyName);
+        $this->line('  <fg=gray>Business</>      '.$businessName);
         $this->newLine();
         $this->line('  <fg=yellow;options=bold>Next steps</>');
         $this->line('  <fg=gray>1.</> Sign in at the URL above with your email and password');

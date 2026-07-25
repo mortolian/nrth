@@ -5,13 +5,13 @@ import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 type BookCurrencySnapshot = {
     fx_rate: number;
     fx_rate_date: string;
-    total_company_currency_cents: number;
+    total_business_currency_cents: number;
 };
 
 const props = defineProps<{
     invoiceCurrency: string;
-    /** Company default from settings (invoice_default_currency). */
-    companyCurrency: string;
+    /** Business default from settings (invoice_default_currency). */
+    businessCurrency: string;
     totalCents: number;
     amountDueCents?: number;
     /**
@@ -28,8 +28,8 @@ const rateDate = ref<string | null>(null);
 const visible = computed(
     () =>
         props.invoiceCurrency
-        && props.companyCurrency
-        && props.invoiceCurrency !== props.companyCurrency,
+        && props.businessCurrency
+        && props.invoiceCurrency !== props.businessCurrency,
 );
 
 async function loadRate(): Promise<void> {
@@ -46,7 +46,7 @@ async function loadRate(): Promise<void> {
         && Number.isFinite(snap.fx_rate)
         && snap.fx_rate > 0
         && typeof snap.fx_rate_date === 'string'
-        && Number.isFinite(snap.total_company_currency_cents)
+        && Number.isFinite(snap.total_business_currency_cents)
     ) {
         loading.value = false;
         error.value = null;
@@ -63,7 +63,7 @@ async function loadRate(): Promise<void> {
     try {
         const url = `${route('invoicing.exchange-rate')}?${new URLSearchParams({
             from: props.invoiceCurrency,
-            to: props.companyCurrency,
+            to: props.businessCurrency,
         })}`;
         const res = await fetch(url, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -88,7 +88,7 @@ async function loadRate(): Promise<void> {
 }
 
 watch(
-    () => [props.invoiceCurrency, props.companyCurrency, props.bookSnapshot],
+    () => [props.invoiceCurrency, props.businessCurrency, props.bookSnapshot],
     () => {
         void loadRate();
     },
@@ -100,15 +100,15 @@ function convertMajor(cents: number): string {
     const snap = props.bookSnapshot;
     if (
         snap
-        && Number.isFinite(snap.total_company_currency_cents)
+        && Number.isFinite(snap.total_business_currency_cents)
         && props.totalCents > 0
         && cents === props.totalCents
     ) {
-        return useFormatCurrency(snap.total_company_currency_cents / 100, props.companyCurrency);
+        return useFormatCurrency(snap.total_business_currency_cents / 100, props.businessCurrency);
     }
     const major = (Number(cents) || 0) / 100;
     const converted = major * rate.value;
-    return useFormatCurrency(converted, props.companyCurrency);
+    return useFormatCurrency(converted, props.businessCurrency);
 }
 </script>
 
@@ -118,7 +118,7 @@ function convertMajor(cents: number): string {
         class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
     >
         <p class="font-medium text-slate-800">
-            {{ bookSnapshot ? 'Book value in' : 'Approximate in' }} {{ companyCurrency }} (internal)
+            {{ bookSnapshot ? 'Book value in' : 'Approximate in' }} {{ businessCurrency }} (internal)
         </p>
         <p v-if="loading" class="mt-1 text-slate-500">Loading reference rate (Frankfurter)…</p>
         <p v-else-if="error" class="mt-1 text-rose-700">{{ error }}</p>
@@ -132,7 +132,7 @@ function convertMajor(cents: number): string {
                 {{ convertMajor(amountDueCents) }}
             </p>
             <p v-if="rateDate" class="mt-1.5 text-[11px] text-slate-500">
-                1 {{ invoiceCurrency }} ≈ {{ rate.toFixed(4) }} {{ companyCurrency }} · Rate date {{ rateDate
+                1 {{ invoiceCurrency }} ≈ {{ rate.toFixed(4) }} {{ businessCurrency }} · Rate date {{ rateDate
                 }}{{ bookSnapshot ? ' (saved at issue)' : ' (Frankfurter)' }} · Indicative only; not shown on PDF or
                 client-facing invoice.
             </p>

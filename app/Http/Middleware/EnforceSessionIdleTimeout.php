@@ -28,7 +28,7 @@ class EnforceSessionIdleTimeout
             return $next($request);
         }
 
-        $minutes = (int) ($team->mergedCompanySettings()['session_idle_timeout_minutes'] ?? 0);
+        $minutes = (int) ($team->mergedBusinessSettings()['session_idle_timeout_minutes'] ?? 0);
         if ($minutes <= 0) {
             return $next($request);
         }

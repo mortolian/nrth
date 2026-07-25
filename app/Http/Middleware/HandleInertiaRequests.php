@@ -57,9 +57,9 @@ class HandleInertiaRequests extends Middleware
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
             'currencyOptions' => fn () => Iso4217Currencies::selectOptions(),
-            'company_logo_url' => fn () => $request->user()?->currentTeam?->getFirstMedia('logo')?->getUrl() ?: null,
-            'company_currency' => fn () => Iso4217Currencies::normalize(
-                (string) ($request->user()?->currentTeam?->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+            'business_logo_url' => fn () => $request->user()?->currentTeam?->getFirstMedia('logo')?->getUrl() ?: null,
+            'business_currency' => fn () => Iso4217Currencies::normalize(
+                (string) ($request->user()?->currentTeam?->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
             ),
             'invoice_payment_methods' => fn () => $request->user()?->current_team_id
                 ? PaymentMethodOptions::forInertia()
@@ -76,7 +76,7 @@ class HandleInertiaRequests extends Middleware
             },
             'commandPalette' => fn () => $this->commandPaletteData($request),
             'session_idle_timeout_minutes' => fn () => (int) (
-                $request->user()?->currentTeam?->mergedCompanySettings()['session_idle_timeout_minutes'] ?? 0
+                $request->user()?->currentTeam?->mergedBusinessSettings()['session_idle_timeout_minutes'] ?? 0
             ),
             'ai_enabled' => fn () => (bool) $request->user()?->currentTeam?->aiEnabled(),
             'can_manage_backups' => fn () => $request->user() !== null
@@ -125,7 +125,7 @@ class HandleInertiaRequests extends Middleware
             ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts', 'href' => route('accounting.accounts.index')],
             ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')],
             ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')],
-            ['id' => 'company-settings', 'label' => 'Company Settings', 'href' => route('settings.company')],
+            ['id' => 'company-settings', 'label' => 'Business Settings', 'href' => route('settings.business')],
             ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('profile.show')],
         ];
 

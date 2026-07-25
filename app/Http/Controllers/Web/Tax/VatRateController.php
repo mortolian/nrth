@@ -126,9 +126,9 @@ class VatRateController extends Controller
         $taxRateId = (int) $taxRate->id;
         $taxRate->delete();
 
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
         if (($settings['default_tax_rate_id'] ?? null) === $taxRateId) {
-            $team->company_settings = array_replace_recursive($settings, ['default_tax_rate_id' => null]);
+            $team->business_settings = array_replace_recursive($settings, ['default_tax_rate_id' => null]);
             $team->save();
         }
 

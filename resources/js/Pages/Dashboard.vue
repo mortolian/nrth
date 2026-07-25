@@ -151,10 +151,10 @@ const recordPaymentInvoice = computed(() => {
         amount_due_cents: inv.amount_due_cents ?? inv.amount,
         total_cents: inv.total_cents,
         currency: inv.currency,
-        company_currency_code: inv.company_currency_code ?? null,
-        fx_rate_invoice_to_company: inv.fx_rate_invoice_to_company ?? null,
+        business_currency_code: inv.business_currency_code ?? null,
+        fx_rate_invoice_to_business: inv.fx_rate_invoice_to_business ?? null,
         fx_rate_date: inv.fx_rate_date ?? null,
-        total_company_currency_cents: inv.total_company_currency_cents ?? null,
+        total_business_currency_cents: inv.total_business_currency_cents ?? null,
     };
 });
 
@@ -257,10 +257,10 @@ const onInvoiceAction = (invoice, actionId) => {
                 <AppCard v-else>
                     <h3 class="mb-2 text-lg font-semibold text-slate-900">VAT is disabled</h3>
                     <p class="text-sm text-slate-600">
-                        VAT cards and reports are hidden until VAT is enabled in company settings.
+                        VAT cards and reports are hidden until VAT is enabled in business settings.
                     </p>
-                    <a :href="route('settings.company', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
-                        Enable VAT in Company settings
+                    <a :href="route('settings.business', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+                        Enable VAT in Business settings
                     </a>
                 </AppCard>
             </div>

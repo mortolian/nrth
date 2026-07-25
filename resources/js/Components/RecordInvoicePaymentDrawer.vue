@@ -12,10 +12,10 @@ export type RecordPaymentInvoiceInput = {
     amount_due_cents: number;
     total_cents: number;
     currency: string;
-    company_currency_code?: string | null;
-    fx_rate_invoice_to_company?: string | null;
+    business_currency_code?: string | null;
+    fx_rate_invoice_to_business?: string | null;
     fx_rate_date?: string | null;
-    total_company_currency_cents?: number | null;
+    total_business_currency_cents?: number | null;
 };
 
 const props = defineProps<{
@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 const page = usePage<{
     errors?: Record<string, string | string[]> | undefined;
-    company_currency?: string;
+    business_currency?: string;
     invoice_payment_methods?: Array<{ value: string; label: string }>;
     banking_deposit_accounts?: Array<{ id: number; name: string; gl_account_id: number; gl_label: string }>;
 }>();
@@ -50,7 +50,7 @@ const defaultDepositAccountId = (): number => {
     return depositAccounts.value[0]?.id ?? 0;
 };
 
-const companyCurrencyFallback = computed(() => page.props.company_currency ?? 'ZAR');
+const businessCurrencyFallback = computed(() => page.props.business_currency ?? 'ZAR');
 
 const normalizeCode = (code: string) => String(code || 'ZAR').trim().toUpperCase();
 
@@ -62,16 +62,16 @@ const clientLabel = computed(() => {
 
 const bookCurrency = computed(() => {
     const inv = props.invoice;
-    if (!inv) return companyCurrencyFallback.value;
-    return inv.company_currency_code
-        ? normalizeCode(inv.company_currency_code)
-        : normalizeCode(companyCurrencyFallback.value);
+    if (!inv) return businessCurrencyFallback.value;
+    return inv.business_currency_code
+        ? normalizeCode(inv.business_currency_code)
+        : normalizeCode(businessCurrencyFallback.value);
 });
 
 const isForeignBooked = computed(() => {
     const inv = props.invoice;
     if (!inv) return false;
-    if (inv.total_company_currency_cents == null) return false;
+    if (inv.total_business_currency_cents == null) return false;
     return normalizeCode(inv.currency) !== normalizeCode(bookCurrency.value);
 });
 
@@ -82,7 +82,7 @@ const form = ref({
     banking_account_id: 0,
     reference: '',
     notes: '',
-    bank_amount_company: '',
+    bank_amount_business: '',
     book_fx_loss_to_expense: false,
 });
 
@@ -97,28 +97,28 @@ const parseMajorToCents = (raw: string): number => {
 
 const paymentInvoiceCents = computed(() => parseMajorToCents(form.value.amount));
 
-const bookClearingCompanyCents = computed(() => {
+const bookClearingBusinessCents = computed(() => {
     const inv = props.invoice;
     if (!inv || !isForeignBooked.value) return null;
     const totalInv = Math.max(1, Number(inv.total_cents) || 0);
-    const totalCo = Number(inv.total_company_currency_cents);
+    const totalCo = Number(inv.total_business_currency_cents);
     if (!Number.isFinite(totalCo)) return null;
     const pay = paymentInvoiceCents.value;
     if (pay <= 0) return null;
     return Math.round((pay * totalCo) / totalInv);
 });
 
-const bankCompanyCents = computed(() => {
+const bankBusinessCents = computed(() => {
     if (!isForeignBooked.value) return null;
-    const raw = form.value.bank_amount_company.trim();
+    const raw = form.value.bank_amount_business.trim();
     if (raw === '') return null;
     return parseMajorToCents(raw);
 });
 
 const fxDifferenceCents = computed(() => {
-    if (!isForeignBooked.value || bookClearingCompanyCents.value == null) return null;
-    const bank = bankCompanyCents.value ?? bookClearingCompanyCents.value;
-    return bank - bookClearingCompanyCents.value;
+    if (!isForeignBooked.value || bookClearingBusinessCents.value == null) return null;
+    const bank = bankBusinessCents.value ?? bookClearingBusinessCents.value;
+    return bank - bookClearingBusinessCents.value;
 });
 
 const formatInv = (cents: number) =>
@@ -136,7 +136,7 @@ const errorKeys = [
     'notes',
     'account',
     'invoice_id',
-    'bank_amount_company_cents',
+    'bank_amount_business_cents',
     'book_fx_loss_to_expense',
 ] as const;
 
@@ -160,7 +160,7 @@ const resetForm = () => {
         banking_account_id: defaultDepositAccountId(),
         reference: '',
         notes: '',
-        bank_amount_company: '',
+        bank_amount_business: '',
         book_fx_loss_to_expense: false,
     };
     spotHint.value = null;
@@ -182,10 +182,10 @@ watch(
         props.open,
         props.invoice?.id ?? 0,
         props.invoice?.currency ?? '',
-        props.invoice?.company_currency_code ?? '',
-        props.invoice?.total_company_currency_cents ?? null,
+        props.invoice?.business_currency_code ?? '',
+        props.invoice?.total_business_currency_cents ?? null,
         form.value.payment_date,
-        companyCurrencyFallback.value,
+        businessCurrencyFallback.value,
     ],
     async () => {
         if (!props.open || !props.invoice) {
@@ -194,11 +194,11 @@ watch(
             return;
         }
         const inv = props.invoice;
-        const book = inv.company_currency_code
-            ? normalizeCode(inv.company_currency_code)
-            : normalizeCode(companyCurrencyFallback.value);
+        const book = inv.business_currency_code
+            ? normalizeCode(inv.business_currency_code)
+            : normalizeCode(businessCurrencyFallback.value);
         const foreign =
-            inv.total_company_currency_cents != null && normalizeCode(inv.currency) !== book;
+            inv.total_business_currency_cents != null && normalizeCode(inv.currency) !== book;
         if (!foreign) {
             spotHint.value = null;
             spotError.value = null;
@@ -261,9 +261,9 @@ const submit = () => {
     };
 
     if (isForeignBooked.value) {
-        const bank = bankCompanyCents.value;
+        const bank = bankBusinessCents.value;
         if (bank != null) {
-            body.bank_amount_company_cents = bank;
+            body.bank_amount_business_cents = bank;
         }
         if (form.value.book_fx_loss_to_expense) {
             body.book_fx_loss_to_expense = true;
@@ -355,11 +355,11 @@ const submit = () => {
                     </p>
                 </div>
 
-                <template v-if="isForeignBooked && bookClearingCompanyCents != null">
+                <template v-if="isForeignBooked && bookClearingBusinessCents != null">
                     <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                         <p>
                             Book value of this payment ({{ bookCurrency }}):
-                            <strong>{{ formatCo(bookClearingCompanyCents) }}</strong>
+                            <strong>{{ formatCo(bookClearingBusinessCents) }}</strong>
                         </p>
                         <p v-if="indicativeBankCents != null" class="mt-1 text-slate-600">
                             Indicative bank deposit at above rate:
@@ -371,7 +371,7 @@ const submit = () => {
                             Bank received ({{ bookCurrency }}) — optional
                         </label>
                         <AppInput
-                            v-model="form.bank_amount_company"
+                            v-model="form.bank_amount_business"
                             type="text"
                             inputmode="decimal"
                             autocomplete="off"

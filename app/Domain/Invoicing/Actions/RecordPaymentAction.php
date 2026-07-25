@@ -46,25 +46,25 @@ class RecordPaymentAction
             (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
             (new EnsureDefaultBankingAccount)->execute($team);
 
-            if ($this->shouldPostInCompanyFunctionalCurrency($invoice)) {
-                if ($dto->bankAmountCompanyCents !== null && $dto->bankAmountCompanyCents < 0) {
+            if ($this->shouldPostInBusinessFunctionalCurrency($invoice)) {
+                if ($dto->bankAmountBusinessCents !== null && $dto->bankAmountBusinessCents < 0) {
                     throw ValidationException::withMessages([
-                        'bank_amount_company_cents' => __('Bank amount cannot be negative.'),
+                        'bank_amount_business_cents' => __('Bank amount cannot be negative.'),
                     ]);
                 }
 
                 return $this->executeFunctionalCurrencyPayment($dto, $invoice);
             }
 
-            if ($dto->bankAmountCompanyCents !== null) {
+            if ($dto->bankAmountBusinessCents !== null) {
                 throw ValidationException::withMessages([
-                    'bank_amount_company_cents' => __('Bank amount in company currency only applies when the invoice currency differs from the company book currency and a company-currency snapshot exists.'),
+                    'bank_amount_business_cents' => __('Bank amount in business currency only applies when the invoice currency differs from the business book currency and a business-currency snapshot exists.'),
                 ]);
             }
 
             if ($dto->bookFxLossToExpense) {
                 throw ValidationException::withMessages([
-                    'book_fx_loss_to_expense' => __('Foreign exchange loss posting is only used for foreign-currency invoices with a company snapshot.'),
+                    'book_fx_loss_to_expense' => __('Foreign exchange loss posting is only used for foreign-currency invoices with a business snapshot.'),
                 ]);
             }
 
@@ -72,21 +72,21 @@ class RecordPaymentAction
         });
     }
 
-    private function shouldPostInCompanyFunctionalCurrency(Invoice $invoice): bool
+    private function shouldPostInBusinessFunctionalCurrency(Invoice $invoice): bool
     {
         $invoiceCurrency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
         $bookCurrency = Iso4217Currencies::normalize((string) (
-            $invoice->company_currency_code
-            ?? $invoice->team?->mergedCompanySettings()['invoice_default_currency']
+            $invoice->business_currency_code
+            ?? $invoice->team?->mergedBusinessSettings()['invoice_default_currency']
             ?? 'ZAR'
         ));
         if ($invoiceCurrency === $bookCurrency) {
             return false;
         }
 
-        $rawTotalCompany = $invoice->getRawOriginal('total_company_currency_cents');
+        $rawTotalBusiness = $invoice->getRawOriginal('total_business_currency_cents');
 
-        return $rawTotalCompany !== null;
+        return $rawTotalBusiness !== null;
     }
 
     private function executeInvoiceCurrencyPayment(RecordPaymentDTO $dto, Invoice $invoice): Payment
@@ -157,8 +157,8 @@ class RecordPaymentAction
     private function executeFunctionalCurrencyPayment(RecordPaymentDTO $dto, Invoice $invoice): Payment
     {
         $bookCurrency = Iso4217Currencies::normalize((string) (
-            $invoice->company_currency_code
-            ?? $invoice->team?->mergedCompanySettings()['invoice_default_currency']
+            $invoice->business_currency_code
+            ?? $invoice->team?->mergedBusinessSettings()['invoice_default_currency']
             ?? 'ZAR'
         ));
 
@@ -171,11 +171,11 @@ class RecordPaymentAction
 
         $paymentInvoiceCents = $dto->amountCents;
         $totalInvoiceCents = max(1, (int) $invoice->getRawOriginal('total_cents'));
-        $totalCompanyCents = (int) $invoice->getRawOriginal('total_company_currency_cents');
+        $totalBusinessCents = (int) $invoice->getRawOriginal('total_business_currency_cents');
 
-        $bookClearingCompany = (int) round(($paymentInvoiceCents * $totalCompanyCents) / $totalInvoiceCents);
-        $bankCompany = $dto->bankAmountCompanyCents ?? $bookClearingCompany;
-        $fxDiff = $bankCompany - $bookClearingCompany;
+        $bookClearingBusiness = (int) round(($paymentInvoiceCents * $totalBusinessCents) / $totalInvoiceCents);
+        $bankBusiness = $dto->bankAmountBusinessCents ?? $bookClearingBusiness;
+        $fxDiff = $bankBusiness - $bookClearingBusiness;
 
         if ($fxDiff < 0 && ! $dto->bookFxLossToExpense) {
             throw ValidationException::withMessages([
@@ -186,16 +186,16 @@ class RecordPaymentAction
         $vatPartInvoice = $this->calculateVatPart($invoice, $paymentInvoiceCents);
 
         if ($vatPartInvoice > 0 && $vatOutputAccount !== null) {
-            $vatPartCompany = $paymentInvoiceCents > 0
-                ? (int) round(($vatPartInvoice * $bookClearingCompany) / $paymentInvoiceCents)
+            $vatPartBusiness = $paymentInvoiceCents > 0
+                ? (int) round(($vatPartInvoice * $bookClearingBusiness) / $paymentInvoiceCents)
                 : 0;
-            $arPartCompany = max(0, $bookClearingCompany - $vatPartCompany);
+            $arPartBusiness = max(0, $bookClearingBusiness - $vatPartBusiness);
         } elseif ($vatPartInvoice > 0) {
-            $vatPartCompany = 0;
-            $arPartCompany = $bookClearingCompany;
+            $vatPartBusiness = 0;
+            $arPartBusiness = $bookClearingBusiness;
         } else {
-            $vatPartCompany = 0;
-            $arPartCompany = $bookClearingCompany;
+            $vatPartBusiness = 0;
+            $arPartBusiness = $bookClearingBusiness;
         }
 
         $transaction = Transaction::query()->create([
@@ -212,7 +212,7 @@ class RecordPaymentAction
             'transaction_id' => $transaction->id,
             'account_id' => $bankAccount->id,
             'type' => EntryType::Debit,
-            'amount_cents' => $bankCompany,
+            'amount_cents' => $bankBusiness,
             'currency' => $bookCurrency,
             'description' => 'Payment received for '.$invoice->number,
         ]);
@@ -221,17 +221,17 @@ class RecordPaymentAction
             'transaction_id' => $transaction->id,
             'account_id' => $receivableAccount->id,
             'type' => EntryType::Credit,
-            'amount_cents' => $arPartCompany,
+            'amount_cents' => $arPartBusiness,
             'currency' => $bookCurrency,
             'description' => 'Reduce accounts receivable for '.$invoice->number,
         ]);
 
-        if ($vatPartCompany > 0 && $vatOutputAccount !== null) {
+        if ($vatPartBusiness > 0 && $vatOutputAccount !== null) {
             JournalEntry::query()->create([
                 'transaction_id' => $transaction->id,
                 'account_id' => $vatOutputAccount->id,
                 'type' => EntryType::Credit,
-                'amount_cents' => $vatPartCompany,
+                'amount_cents' => $vatPartBusiness,
                 'currency' => $bookCurrency,
                 'description' => 'VAT output on payment for '.$invoice->number,
             ]);
@@ -244,7 +244,7 @@ class RecordPaymentAction
                 ->first();
             if ($gainAccount === null) {
                 throw ValidationException::withMessages([
-                    'bank_amount_company_cents' => __('Missing chart account Foreign Exchange Gain (4950). Run chart setup or contact support.'),
+                    'bank_amount_business_cents' => __('Missing chart account Foreign Exchange Gain (4950). Run chart setup or contact support.'),
                 ]);
             }
             JournalEntry::query()->create([
@@ -277,7 +277,7 @@ class RecordPaymentAction
 
         $this->postTransactionAction->execute($transaction->fresh());
 
-        return $this->finalizePayment($dto, $invoice, $transaction->id, $bankCompany);
+        return $this->finalizePayment($dto, $invoice, $transaction->id, $bankBusiness);
     }
 
     private function resolveDepositGlAccount(RecordPaymentDTO $dto): Account
@@ -290,7 +290,7 @@ class RecordPaymentAction
 
         if ($bankingAccount === null) {
             throw ValidationException::withMessages([
-                'banking_account_id' => __('Select a valid banking account for this company.'),
+                'banking_account_id' => __('Select a valid banking account for this business.'),
             ]);
         }
 
@@ -322,14 +322,14 @@ class RecordPaymentAction
         return $gl;
     }
 
-    private function finalizePayment(RecordPaymentDTO $dto, Invoice $invoice, int $transactionId, ?int $bankCompanyCents): Payment
+    private function finalizePayment(RecordPaymentDTO $dto, Invoice $invoice, int $transactionId, ?int $bankBusinessCents): Payment
     {
         $payment = Payment::queryWithoutTeamScope()->create([
             'team_id' => $dto->teamId,
             'invoice_id' => $invoice->id,
             'amount_cents' => $dto->amountCents,
             'currency' => $dto->currency,
-            'bank_amount_company_cents' => $bankCompanyCents,
+            'bank_amount_business_cents' => $bankBusinessCents,
             'payment_date' => $dto->paymentDate,
             'method' => $dto->method,
             'reference' => $dto->reference,

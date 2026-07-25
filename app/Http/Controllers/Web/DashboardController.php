@@ -59,11 +59,11 @@ class DashboardController extends Controller
                 ->first()
             : null;
 
-        $companyCurrency = Iso4217Currencies::normalize(
-            (string) ($team->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+        $businessCurrency = Iso4217Currencies::normalize(
+            (string) ($team->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
         );
         $budgetProgressAligned = $activeBudget === null
-            || strcasecmp((string) $activeBudget->currency, $companyCurrency) === 0;
+            || strcasecmp((string) $activeBudget->currency, $businessCurrency) === 0;
 
         $vatDueCurrent = 0;
         $vatOutputCurrent = 0;
@@ -104,7 +104,7 @@ class DashboardController extends Controller
                     ->all()
                 : [],
             'budget_progress_currency' => Iso4217Currencies::normalize(
-                (string) ($activeBudget?->currency ?? $companyCurrency)
+                (string) ($activeBudget?->currency ?? $businessCurrency)
             ),
             'vat_summary' => [
                 'current_period' => $monthStart->format('M Y'),
@@ -190,15 +190,15 @@ class DashboardController extends Controller
                     'days_overdue' => $dueDate->isPast() ? abs($dueDate->diffInDays($asOf)) : 0,
                     'status' => $invoice->status->value,
                     'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
-                    'company_currency_code' => $invoice->company_currency_code !== null
-                        ? Iso4217Currencies::normalize((string) $invoice->company_currency_code)
+                    'business_currency_code' => $invoice->business_currency_code !== null
+                        ? Iso4217Currencies::normalize((string) $invoice->business_currency_code)
                         : null,
-                    'fx_rate_invoice_to_company' => $invoice->fx_rate_invoice_to_company !== null
-                        ? (string) $invoice->fx_rate_invoice_to_company
+                    'fx_rate_invoice_to_business' => $invoice->fx_rate_invoice_to_business !== null
+                        ? (string) $invoice->fx_rate_invoice_to_business
                         : null,
                     'fx_rate_date' => optional($invoice->fx_rate_date)->toDateString(),
-                    'total_company_currency_cents' => $invoice->total_company_currency_cents !== null
-                        ? (int) $invoice->getRawOriginal('total_company_currency_cents')
+                    'total_business_currency_cents' => $invoice->total_business_currency_cents !== null
+                        ? (int) $invoice->getRawOriginal('total_business_currency_cents')
                         : null,
                     'can_delete' => (int) $invoice->payments_count === 0,
                 ];

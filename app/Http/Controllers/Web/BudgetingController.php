@@ -33,14 +33,14 @@ class BudgetingController extends Controller
                 'budgets' => [],
                 'trashed_budgets' => [],
                 'active_budget' => null,
-                'company_currency' => 'ZAR',
+                'business_currency' => 'ZAR',
             ]);
         }
 
         $teamId = (int) $request->user()->current_team_id;
         $team = $request->user()->currentTeam;
-        $companyCurrency = Iso4217Currencies::normalize(
-            (string) ($team?->mergedCompanySettings()['invoice_default_currency'] ?? 'ZAR')
+        $businessCurrency = Iso4217Currencies::normalize(
+            (string) ($team?->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
         );
 
         $budgetRows = Budget::queryWithoutTeamScope()
@@ -71,12 +71,12 @@ class BudgetingController extends Controller
         $active = $budgetRows->firstWhere('is_active', true);
         $months = collect(range(0, 5))->map(fn (int $i) => now()->subMonths(5 - $i)->startOfMonth());
 
-        $varianceAligned = $active === null || strcasecmp((string) $active->currency, $companyCurrency) === 0;
-        $periodSpentCompany = $active !== null && $varianceAligned
+        $varianceAligned = $active === null || strcasecmp((string) $active->currency, $businessCurrency) === 0;
+        $periodSpentBusiness = $active !== null && $varianceAligned
             ? $this->spentForPeriod($teamId, $active->start_date->toDateString(), $active->end_date->toDateString())
             : null;
 
-        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $companyCurrency, $months): array {
+        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $businessCurrency, $months): array {
             $allocated = (int) $budget->categories->sum('envelope_cents');
             $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
             $monthsInPeriod = $this->monthsInBudgetPeriod($budget->start_date, $budget->end_date);
@@ -92,8 +92,8 @@ class BudgetingController extends Controller
                 'percentage_used' => $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0,
                 'status' => $budget->is_active ? 'active' : 'closed',
                 'categories' => $this->budgetIndexCategoryBreakdown($budget, $teamId),
-                'company_spend_aligned' => strcasecmp((string) $budget->currency, $companyCurrency) === 0,
-                'monthly_variance' => $this->monthlyVarianceSeriesForBudget($budget, $teamId, $companyCurrency, $months),
+                'business_spend_aligned' => strcasecmp((string) $budget->currency, $businessCurrency) === 0,
+                'monthly_variance' => $this->monthlyVarianceSeriesForBudget($budget, $teamId, $businessCurrency, $months),
             ];
         })->values()->all();
 
@@ -101,7 +101,7 @@ class BudgetingController extends Controller
         if ($active !== null) {
             $categories = $this->budgetIndexCategoryBreakdown($active, $teamId);
             $allocated = (int) collect($categories)->sum('envelope_cents');
-            $spentTotal = $periodSpentCompany !== null ? (int) $periodSpentCompany : (int) collect($categories)->sum('spent_cents');
+            $spentTotal = $periodSpentBusiness !== null ? (int) $periodSpentBusiness : (int) collect($categories)->sum('spent_cents');
             $activeBudgetPayload = [
                 'id' => $active->id,
                 'name' => $active->name,
@@ -110,7 +110,7 @@ class BudgetingController extends Controller
                 'is_active' => (bool) $active->is_active,
                 'total_allocated' => $allocated,
                 'total_spent' => $spentTotal,
-                'company_spend_aligned' => $periodSpentCompany !== null,
+                'business_spend_aligned' => $periodSpentBusiness !== null,
                 'percentage_used' => $allocated > 0 ? (int) round(($spentTotal / $allocated) * 100) : 0,
                 'categories' => $categories,
             ];
@@ -120,7 +120,7 @@ class BudgetingController extends Controller
             'budgets' => $budgets,
             'trashed_budgets' => $trashedBudgets,
             'active_budget' => $activeBudgetPayload,
-            'company_currency' => $companyCurrency,
+            'business_currency' => $businessCurrency,
         ]);
     }
 
@@ -351,14 +351,14 @@ class BudgetingController extends Controller
     }
 
     /**
-     * Last six calendar months: budgeted vs actual (when budget currency matches company books currency).
+     * Last six calendar months: budgeted vs actual (when budget currency matches business books currency).
      *
      * @param  Collection<int, Carbon>  $months
      * @return array<int, array{month: string, budgeted: int, actual: int|null, variance: int|null}>
      */
-    private function monthlyVarianceSeriesForBudget(Budget $budget, int $teamId, string $companyCurrency, Collection $months): array
+    private function monthlyVarianceSeriesForBudget(Budget $budget, int $teamId, string $businessCurrency, Collection $months): array
     {
-        $aligned = strcasecmp((string) $budget->currency, $companyCurrency) === 0;
+        $aligned = strcasecmp((string) $budget->currency, $businessCurrency) === 0;
 
         return $months->map(function (Carbon $month) use ($teamId, $budget, $aligned): array {
             $from = $month->copy()->startOfMonth()->toDateString();

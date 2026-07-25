@@ -59,10 +59,10 @@ const apply = () => {
         <AppCard v-if="!vatEnabled" class="mt-5">
             <h3 class="text-lg font-semibold text-slate-900">Reports are unavailable</h3>
             <p class="mt-2 text-sm text-slate-600">
-                VAT is disabled in Company settings, so report pages are hidden.
+                VAT is disabled in Business settings, so report pages are hidden.
             </p>
-            <a :href="route('settings.company', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
-                Enable VAT in Company settings
+            <a :href="route('settings.business', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+                Enable VAT in Business settings
             </a>
         </AppCard>
         <template v-else>

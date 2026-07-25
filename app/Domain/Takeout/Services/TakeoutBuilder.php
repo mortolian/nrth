@@ -103,7 +103,7 @@ final class TakeoutBuilder
             'nrth data takeout',
             '=================',
             '',
-            'Company: '.$teamName,
+            'Business: '.$teamName,
             'Period: '.$run->from_date->toDateString().' to '.$run->to_date->toDateString(),
             'Generated: '.now()->toDateTimeString(),
             '',

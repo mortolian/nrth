@@ -98,7 +98,7 @@ class CompleteInvoiceOnlinePaymentSessionAction
                 reference: $gatewayReference,
                 notes: $notes,
                 createdBy: null,
-                bankAmountCompanyCents: null,
+                bankAmountBusinessCents: null,
                 bookFxLossToExpense: false,
             ));
 

@@ -69,7 +69,7 @@ There is no in-app one-click restore. On **Backups & exports → Instance backup
 
 ### Optional AI
 
-Configure under **Company settings → AI** (provider, model, API key, and base URL where needed).
+Configure under **Business settings → AI** (provider, model, API key, and base URL where needed).
 
 Supported providers:
 
@@ -88,7 +88,7 @@ Optional server-wide fallback in `.env`:
 - `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` / `OPENROUTER_BASE_URL`
 - `OPENAI_COMPATIBLE_API_KEY` / `OPENAI_COMPATIBLE_MODEL` / `OPENAI_COMPATIBLE_BASE_URL`
 
-Env values are used only when the company setting is empty.
+Env values are used only when the business setting is empty.
 
 ---
 

@@ -23,7 +23,7 @@ final class ResolveLinkedGlAccount
 
         if ($account === null) {
             throw ValidationException::withMessages([
-                'gl_account_id' => __('Select a valid ledger account for this company.'),
+                'gl_account_id' => __('Select a valid ledger account for this business.'),
             ]);
         }
 

@@ -17,7 +17,7 @@ class SessionIdleTimeoutTest extends TestCase
      */
     private function companySettingsPayload(Team $team, array $overrides = []): array
     {
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
 
         return array_replace_recursive([
             'tab' => 'security',
@@ -39,9 +39,9 @@ class SessionIdleTimeoutTest extends TestCase
             'postal_province' => $settings['postal_province'],
             'postal_postal_code' => $settings['postal_postal_code'],
             'postal_country' => $settings['postal_country'],
-            'company_email' => $settings['company_email'],
-            'company_phone' => $settings['company_phone'],
-            'company_website' => $settings['company_website'],
+            'business_email' => $settings['business_email'],
+            'business_phone' => $settings['business_phone'],
+            'business_website' => $settings['business_website'],
             'invoice_default_payment_terms_days' => $settings['invoice_default_payment_terms_days'],
             'invoice_default_currency' => $settings['invoice_default_currency'],
             'invoice_prefix' => $settings['invoice_prefix'],
@@ -92,14 +92,14 @@ class SessionIdleTimeoutTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'session_idle_timeout_minutes' => 30,
                 'tab' => 'security',
             ])
-        )->assertRedirect(route('settings.company', ['tab' => 'security']));
+        )->assertRedirect(route('settings.business', ['tab' => 'security']));
 
-        $this->assertSame(30, (int) $team->fresh()->mergedCompanySettings()['session_idle_timeout_minutes']);
+        $this->assertSame(30, (int) $team->fresh()->mergedBusinessSettings()['session_idle_timeout_minutes']);
     }
 
     public function test_idle_timeout_cannot_exceed_session_lifetime(): void
@@ -113,14 +113,14 @@ class SessionIdleTimeoutTest extends TestCase
         $this->actingAs($user);
 
         $this->post(
-            route('settings.company.update'),
+            route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'session_idle_timeout_minutes' => 121,
                 'tab' => 'security',
             ])
         )->assertSessionHasErrors('session_idle_timeout_minutes');
 
-        $this->assertSame(0, (int) $team->fresh()->mergedCompanySettings()['session_idle_timeout_minutes']);
+        $this->assertSame(0, (int) $team->fresh()->mergedBusinessSettings()['session_idle_timeout_minutes']);
     }
 
     public function test_request_past_idle_window_logs_user_out(): void
@@ -130,8 +130,8 @@ class SessionIdleTimeoutTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 ['session_idle_timeout_minutes' => 15]
             ),
         ])->save();
@@ -156,8 +156,8 @@ class SessionIdleTimeoutTest extends TestCase
         $this->assertNotNull($team);
 
         $team->forceFill([
-            'company_settings' => array_replace_recursive(
-                is_array($team->company_settings) ? $team->company_settings : [],
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
                 ['session_idle_timeout_minutes' => 15]
             ),
         ])->save();
@@ -184,7 +184,7 @@ class SessionIdleTimeoutTest extends TestCase
         $team = $user->currentTeam;
         $this->assertNotNull($team);
 
-        $this->assertSame(0, (int) $team->mergedCompanySettings()['session_idle_timeout_minutes']);
+        $this->assertSame(0, (int) $team->mergedBusinessSettings()['session_idle_timeout_minutes']);
 
         $this->actingAs($user);
 

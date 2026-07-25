@@ -50,10 +50,10 @@ class StartInvoiceOnlinePaymentSessionAction
         }
 
         $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
         if (! InvoiceOnlinePaymentProviders::paymentPagesEnabledForSettings($settings)) {
             throw ValidationException::withMessages([
-                'provider' => __('Online payment pages are disabled for this company.'),
+                'provider' => __('Online payment pages are disabled for this business.'),
             ]);
         }
         /** @var array<string, mixed> $gateways */
@@ -79,7 +79,7 @@ class StartInvoiceOnlinePaymentSessionAction
         $cfg = is_array($gateways['stripe'] ?? null) ? $gateways['stripe'] : [];
         if (! ($cfg['enabled'] ?? false)) {
             throw ValidationException::withMessages([
-                'provider' => __('Stripe is not enabled for this company.'),
+                'provider' => __('Stripe is not enabled for this business.'),
             ]);
         }
         $secret = isset($cfg['secret_key']) && is_string($cfg['secret_key']) ? trim($cfg['secret_key']) : '';
@@ -159,7 +159,7 @@ class StartInvoiceOnlinePaymentSessionAction
         $cfg = is_array($gateways['payfast'] ?? null) ? $gateways['payfast'] : [];
         if (! ($cfg['enabled'] ?? false)) {
             throw ValidationException::withMessages([
-                'provider' => __('PayFast is not enabled for this company.'),
+                'provider' => __('PayFast is not enabled for this business.'),
             ]);
         }
 
@@ -198,10 +198,10 @@ class StartInvoiceOnlinePaymentSessionAction
         $cancelUrl = $checkoutReturnUrls['payfast_cancel'] ?? ($defaultShow.'?online_payment=cancelled');
 
         $invoice->loadMissing('client');
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
         $email = trim((string) ($invoice->client?->email ?? ''));
         if ($email === '') {
-            $email = trim((string) ($settings['company_email'] ?? ''));
+            $email = trim((string) ($settings['business_email'] ?? ''));
         }
         if ($email === '') {
             throw ValidationException::withMessages([

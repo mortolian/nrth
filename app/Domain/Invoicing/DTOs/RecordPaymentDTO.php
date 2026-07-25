@@ -18,7 +18,7 @@ readonly class RecordPaymentDTO
         public ?string $notes = null,
         public ?int $createdBy = null,
         /** Actual bank deposit in company (functional) currency when invoice is foreign; null = book rate (no FX difference). */
-        public ?int $bankAmountCompanyCents = null,
+        public ?int $bankAmountBusinessCents = null,
         /** When the payment implies an FX loss, posting requires this to be true. */
         public bool $bookFxLossToExpense = false,
     ) {}

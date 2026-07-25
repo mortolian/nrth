@@ -7,11 +7,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
-class CompanyLogoSharedPropTest extends TestCase
+class BusinessLogoSharedPropTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_company_logo_url_is_null_when_team_has_no_logo(): void
+    public function test_business_logo_url_is_null_when_team_has_no_logo(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
 
@@ -19,11 +19,11 @@ class CompanyLogoSharedPropTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('company_logo_url', null)
+                ->where('business_logo_url', null)
             );
     }
 
-    public function test_company_logo_url_is_shared_when_team_has_logo(): void
+    public function test_business_logo_url_is_shared_when_team_has_logo(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -39,7 +39,7 @@ class CompanyLogoSharedPropTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('company_logo_url', $expected)
+                ->where('business_logo_url', $expected)
             );
     }
 }

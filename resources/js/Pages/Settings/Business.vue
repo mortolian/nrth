@@ -62,15 +62,15 @@ const props = defineProps<{
     ai_models_by_provider: Record<string, Array<{ value: string; label: string }>>;
 }>();
 
-type CompanyTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages' | 'security' | 'ai';
+type BusinessTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages' | 'security' | 'ai';
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const allowedTabs: CompanyTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security', 'ai'];
+const allowedTabs: BusinessTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'security', 'ai'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
-const tab = ref<CompanyTab>(allowedTabs.includes(initialTab as CompanyTab) ? (initialTab as CompanyTab) : 'profile');
+const tab = ref<BusinessTab>(allowedTabs.includes(initialTab as BusinessTab) ? (initialTab as BusinessTab) : 'profile');
 
 watch(tab, (next) => {
     const url = new URL(window.location.href);
@@ -97,9 +97,9 @@ const form = useForm({
     postal_province: String(props.settings.postal_province ?? ''),
     postal_postal_code: String(props.settings.postal_postal_code ?? ''),
     postal_country: String(props.settings.postal_country ?? ''),
-    company_email: String(props.settings.company_email ?? ''),
-    company_phone: String(props.settings.company_phone ?? ''),
-    company_website: String(props.settings.company_website ?? ''),
+    business_email: String(props.settings.business_email ?? ''),
+    business_phone: String(props.settings.business_phone ?? ''),
+    business_website: String(props.settings.business_website ?? ''),
     invoice_default_payment_terms_days: Number(props.settings.invoice_default_payment_terms_days ?? 30),
     invoice_default_currency: String(props.settings.invoice_default_currency ?? 'ZAR'),
     invoice_prefix: String(props.settings.invoice_prefix ?? 'INV'),
@@ -276,7 +276,7 @@ const onLogo = (event: Event) => {
 };
 
 const clearLogo = () => {
-    if (!window.confirm('Remove the company logo? Save company settings to apply; you can upload a new logo later.')) {
+    if (!window.confirm('Remove the business logo? Save business settings to apply; you can upload a new logo later.')) {
         return;
     }
     logoFile.value = null;
@@ -288,7 +288,7 @@ const clearLogo = () => {
 };
 
 const tabs = [
-    { id: 'profile' as const, label: 'Company profile' },
+    { id: 'profile' as const, label: 'Business profile' },
     { id: 'contact' as const, label: 'Contact' },
     { id: 'invoice' as const, label: 'Invoices' },
     { id: 'estimate' as const, label: 'Estimates' },
@@ -371,9 +371,9 @@ const submit = () => {
         postal_province: form.postal_province,
         postal_postal_code: form.postal_postal_code,
         postal_country: form.postal_country,
-        company_email: form.company_email,
-        company_phone: form.company_phone,
-        company_website: form.company_website,
+        business_email: form.business_email,
+        business_phone: form.business_phone,
+        business_website: form.business_website,
         invoice_default_payment_terms_days: form.invoice_default_payment_terms_days,
         invoice_default_currency: form.invoice_default_currency,
         invoice_prefix: form.invoice_prefix,
@@ -459,7 +459,7 @@ const submit = () => {
 
     payload.tab = tab.value;
 
-    form.transform(() => payload).post(route('settings.company.update', { tab: tab.value }), {
+    form.transform(() => payload).post(route('settings.business.update', { tab: tab.value }), {
         preserveState: true,
         preserveScroll: true,
         forceFormData: Boolean(logoFile.value),
@@ -488,14 +488,14 @@ const removeBankAccount = (index: number) => {
 
 <template>
     <AppLayout
-        title="Company settings"
+        title="Business settings"
         :breadcrumbs="[
             { label: 'Settings', href: route('profile.show') },
-            { label: 'Company' },
+            { label: 'Business' },
         ]"
     >
         <PageHeader
-            title="Company settings"
+            title="Business settings"
             subtitle="Profile, invoicing, tax, banking, and online payments (card checkout). Use the Online payments tab for Stripe, PayFast, and other gateways."
         />
 
@@ -514,14 +514,14 @@ const removeBankAccount = (index: number) => {
 
         <div class="mt-5 space-y-6">
             <div v-if="Object.keys(form.errors).length" class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                <p class="font-medium">Could not save company settings.</p>
+                <p class="font-medium">Could not save business settings.</p>
                 <ul class="mt-1 list-disc space-y-0.5 pl-5">
                     <li v-for="(message, field) in form.errors" :key="field">{{ message }}</li>
                 </ul>
             </div>
 
             <AppCard v-show="tab === 'profile'">
-                <h3 class="text-base font-semibold text-slate-900">Company profile</h3>
+                <h3 class="text-base font-semibold text-slate-900">Business profile</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
                     Legal and trading identity, tax references, and your logo. These feed invoices, estimates, and reports.
                 </p>
@@ -532,13 +532,13 @@ const removeBankAccount = (index: number) => {
                         <p class="mt-0.5 text-xs text-slate-500">Registered name as on official documents; trading name if you market under a different brand.</p>
                         <div class="mt-4 space-y-4">
                             <div>
-                                <label class="mb-1 block text-xs font-medium text-slate-500">Company name</label>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Business name</label>
                                 <AppInput v-model="form.name" />
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-slate-500">Trading name (optional)</label>
-                                    <AppInput v-model="form.trading_name" placeholder="If different from company name" />
+                                    <AppInput v-model="form.trading_name" placeholder="If different from business name" />
                                 </div>
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-slate-500">Registration number</label>
@@ -705,15 +705,15 @@ const removeBankAccount = (index: number) => {
                         <div class="mt-4 grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
-                                <AppInput v-model="form.company_email" type="email" />
+                                <AppInput v-model="form.business_email" type="email" />
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                                <AppPhoneInput v-model="form.company_phone" />
+                                <AppPhoneInput v-model="form.business_phone" />
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Website</label>
-                                <AppInput v-model="form.company_website" placeholder="https://" />
+                                <AppInput v-model="form.business_website" placeholder="https://" />
                             </div>
                         </div>
                     </section>
@@ -799,14 +799,14 @@ const removeBankAccount = (index: number) => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">PDF &amp; letterhead</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">What appears on invoice PDFs generated from your company profile.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">What appears on invoice PDFs generated from your business profile.</p>
                         <div class="mt-4">
                             <label class="flex cursor-pointer items-start gap-2.5 text-sm text-slate-800">
                                 <input v-model="form.invoice_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                                 <span>
                                     Show street address on invoice PDFs
                                     <span class="mt-1 block text-xs font-normal leading-relaxed text-slate-500">
-                                        If off, only city, province, postal code and country show under your company name (email, phone and website stay as configured).
+                                        If off, only city, province, postal code and country show under your business name (email, phone and website stay as configured).
                                     </span>
                                 </span>
                             </label>
@@ -843,7 +843,7 @@ const removeBankAccount = (index: number) => {
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Subject</label>
                                 <AppInput v-model="form.invoice_email_subject_template" />
-                                <p v-pre class="mt-1 text-xs text-slate-500">Placeholders: {{number}}, {{company}}, {{client_name}}</p>
+                                <p v-pre class="mt-1 text-xs text-slate-500">Placeholders: {{number}}, {{business}}, {{client_name}}</p>
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Body</label>
@@ -894,14 +894,14 @@ const removeBankAccount = (index: number) => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">PDF &amp; letterhead</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">Company block on estimate PDFs.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Business block on estimate PDFs.</p>
                         <div class="mt-4">
                             <label class="flex cursor-pointer items-start gap-2.5 text-sm text-slate-800">
                                 <input v-model="form.estimate_show_street_address" type="checkbox" class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500">
                                 <span>
                                     Show street address on estimate PDFs
                                     <span class="mt-1 block text-xs font-normal leading-relaxed text-slate-500">
-                                        If off, only city, province, postal code and country show under your company name (email, phone and website stay as configured).
+                                        If off, only city, province, postal code and country show under your business name (email, phone and website stay as configured).
                                     </span>
                                 </span>
                             </label>

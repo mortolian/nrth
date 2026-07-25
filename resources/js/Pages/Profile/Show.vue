@@ -22,7 +22,7 @@ defineProps({
     >
         <PageHeader
             title="Profile"
-            subtitle="Your personal sign-in, password, and security settings. Company and team workspaces are configured under Settings."
+            subtitle="Your personal sign-in, password, and security settings. Business profile and team members are configured under Settings."
         />
 
         <div class="mt-5 space-y-6">

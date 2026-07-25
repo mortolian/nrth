@@ -92,8 +92,8 @@ const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
 const canManageBackups = computed(() => Boolean(page.props.can_manage_backups));
-const companyLogoUrl = computed(() => {
-    const url = page.props.company_logo_url;
+const businessLogoUrl = computed(() => {
+    const url = page.props.business_logo_url;
     return typeof url === 'string' && url.trim() !== '' ? url.trim() : null;
 });
 
@@ -231,7 +231,7 @@ const isTeamSettingsPath = computed(
 
 const isSettingsSectionActive = computed(
     () => isActivePath(route('profile.show'))
-        || isActivePath(route('settings.company'))
+        || isActivePath(route('settings.business'))
         || isActivePath(route('settings.instance'))
         || isTeamSettingsPath.value,
 
@@ -315,9 +315,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <ApplicationMark class="h-10 w-10 shrink-0 text-brand-700" />
                         <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
                         <img
-                            v-if="collapsed && companyLogoUrl"
-                            :src="companyLogoUrl"
-                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Company logo'"
+                            v-if="collapsed && businessLogoUrl"
+                            :src="businessLogoUrl"
+                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Business logo'"
                             class="h-8 w-8 rounded-md border border-slate-200 bg-white object-contain"
                         >
                     </Link>
@@ -328,30 +328,60 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 <button class="flex w-full items-center justify-between gap-2 rounded-md bg-white/50 px-3 py-2 text-sm hover:bg-white/70">
                                     <span class="flex min-w-0 items-center gap-2">
                                         <img
-                                            v-if="companyLogoUrl"
-                                            :src="companyLogoUrl"
-                                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Company logo'"
+                                            v-if="businessLogoUrl"
+                                            :src="businessLogoUrl"
+                                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Business logo'"
                                             class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
                                         >
-                                        <span class="truncate">{{ currentTeam?.name ?? 'Team' }}</span>
+                                        <span
+                                            v-else
+                                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
+                                            aria-hidden="true"
+                                        >
+                                            <Building2 class="h-3.5 w-3.5" />
+                                        </span>
+                                        <span class="truncate">{{ currentTeam?.name ?? 'Business' }}</span>
                                     </span>
                                     <ChevronRight class="h-4 w-4 shrink-0" />
                                 </button>
                             </template>
                             <template #content>
                                 <div class="w-60">
-                                    <a
-                                        :href="route('settings.team')"
-                                        class="block px-4 py-2 text-sm leading-5 text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
-                                    >
-                                        Team and Member Settings
-                                    </a>
-                                    <DropdownLink v-if="$page.props.jetstream.canCreateTeams" :href="route('teams.create')">Create Team</DropdownLink>
-                                    <div class="my-2 border-t border-slate-200" />
                                     <template v-for="team in teams" :key="team.id">
                                         <form @submit.prevent="switchTeam(team)">
-                                            <DropdownLink as="button">{{ team.name }}</DropdownLink>
+                                            <DropdownLink as="button">
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <img
+                                                        v-if="team.logo_url"
+                                                        :src="team.logo_url"
+                                                        :alt="`${team.name} logo`"
+                                                        class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
+                                                    >
+                                                    <span
+                                                        v-else
+                                                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <Building2 class="h-3.5 w-3.5" />
+                                                    </span>
+                                                    <span class="truncate">{{ team.name }}</span>
+                                                </span>
+                                            </DropdownLink>
                                         </form>
+                                    </template>
+                                    <template v-if="$page.props.jetstream.canCreateTeams">
+                                        <div class="my-2 border-t border-slate-200" />
+                                        <DropdownLink :href="route('teams.create')">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <span
+                                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-slate-500"
+                                                    aria-hidden="true"
+                                                >
+                                                    <Plus class="h-3.5 w-3.5" />
+                                                </span>
+                                                <span class="truncate">Create business</span>
+                                            </span>
+                                        </DropdownLink>
                                     </template>
                                 </div>
                             </template>
@@ -426,8 +456,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         class="mx-2 mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"
                     >
                         VAT is disabled. VAT and report menus are hidden.
-                        <a :href="route('settings.company', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
-                            Enable in Company settings
+                        <a :href="route('settings.business', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
+                            Enable in Business settings
                         </a>
                     </div>
                 </nav>
@@ -471,15 +501,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             Profile
                         </Link>
                         <Link
-                            :href="route('settings.company')"
+                            :href="route('settings.business')"
                             :class="[
                                 'block rounded px-2 py-1 text-xs transition',
-                                isActivePath(route('settings.company'))
+                                isActivePath(route('settings.business'))
                                     ? 'bg-brand-500/30 font-medium text-brand-800'
                                     : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
                             ]"
                         >
-                            Company
+                            Business
                         </Link>
                         <a
                             :href="route('settings.team')"
@@ -490,7 +520,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
                             ]"
                         >
-                            Teams and Members
+                            Team members
                         </a>
                         <Link
                             v-if="canManageBackups"
@@ -591,16 +621,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <span class="font-semibold">{{ appDisplayName }}</span>
                         </div>
                         <div
-                            v-if="companyLogoUrl || currentTeam?.name"
+                            v-if="currentTeam?.name"
                             class="mt-3 flex items-center gap-2 rounded-md bg-white/50 px-2.5 py-1.5"
                         >
                             <img
-                                v-if="companyLogoUrl"
-                                :src="companyLogoUrl"
-                                :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Company logo'"
+                                v-if="businessLogoUrl"
+                                :src="businessLogoUrl"
+                                :alt="`${currentTeam.name} logo`"
                                 class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
                             >
-                            <span class="truncate text-sm text-slate-700">{{ currentTeam?.name ?? 'Company' }}</span>
+                            <span
+                                v-else
+                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
+                                aria-hidden="true"
+                            >
+                                <Building2 class="h-3.5 w-3.5" />
+                            </span>
+                            <span class="truncate text-sm text-slate-700">{{ currentTeam.name }}</span>
                         </div>
                     </div>
                     <button class="rounded-md p-2 hover:bg-white/40" @click="mobileOpen = false">
@@ -651,7 +688,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     </template>
                     <div v-if="!vatEnabled" class="mx-1 mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                         VAT is disabled. VAT and report menus are hidden.
-                        <a :href="route('settings.company', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
+                        <a :href="route('settings.business', { tab: 'tax' })" class="ml-1 font-medium text-brand-700 hover:underline">
                             Enable
                         </a>
                     </div>
@@ -681,18 +718,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             Profile
                         </Link>
                         <Link
-                            :href="route('settings.company')"
+                            :href="route('settings.business')"
                             class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
                             @click="mobileOpen = false"
                         >
-                            Company
+                            Business
                         </Link>
                         <a
                             :href="route('settings.team')"
                             class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
                             @click="mobileOpen = false"
                         >
-                            Teams and Members
+                            Team members
                         </a>
                         <Link
                             v-if="canManageBackups"
@@ -754,7 +791,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     </template>
                     <template v-else>
                         <a
-                            :href="route('settings.company', { tab: 'tax' })"
+                            :href="route('settings.business', { tab: 'tax' })"
                             class="flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium text-slate-400"
                         >
                             <Calculator class="h-5 w-5 shrink-0" />

@@ -43,7 +43,7 @@ echo 'env_OPENAI_API_KEY_len='.strlen($envOpenAi)."\n";
 
 $key = $team->aiApiKey();
 if ($key === '') {
-    echo "ERROR: no API key resolved (Company settings → AI, or .env)\n";
+    echo "ERROR: no API key resolved (Business settings → AI, or .env)\n";
     exit(1);
 }
 

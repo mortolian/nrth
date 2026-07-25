@@ -107,4 +107,14 @@ class User extends Authenticatable
     {
         return array_merge(self::defaultPreferences(), $this->preferences ?? []);
     }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, \App\Models\Team>
+     */
+    public function allTeams()
+    {
+        $this->loadMissing(['ownedTeams.media', 'teams.media']);
+
+        return $this->ownedTeams->merge($this->teams)->sortBy('name');
+    }
 }

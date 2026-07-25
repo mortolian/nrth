@@ -8,11 +8,11 @@ use App\Models\Team;
 final class InvoiceOnlinePaymentProviders
 {
     /**
-     * @param  array<string, mixed>  $mergedCompanySettings
+     * @param  array<string, mixed>  $mergedBusinessSettings
      */
-    public static function paymentPagesEnabledForSettings(array $mergedCompanySettings): bool
+    public static function paymentPagesEnabledForSettings(array $mergedBusinessSettings): bool
     {
-        return filter_var($mergedCompanySettings['payment_pages_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        return filter_var($mergedBusinessSettings['payment_pages_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
     public static function paymentPagesEnabledForTeam(?Team $team): bool
@@ -21,7 +21,7 @@ final class InvoiceOnlinePaymentProviders
             return false;
         }
 
-        return self::paymentPagesEnabledForSettings($team->mergedCompanySettings());
+        return self::paymentPagesEnabledForSettings($team->mergedBusinessSettings());
     }
 
     /**
@@ -35,7 +35,7 @@ final class InvoiceOnlinePaymentProviders
             return [];
         }
 
-        $settings = $team->mergedCompanySettings();
+        $settings = $team->mergedBusinessSettings();
 
         /** @var array<string, mixed> $gateways */
         $gateways = is_array($settings['payment_gateways'] ?? null) ? $settings['payment_gateways'] : [];
