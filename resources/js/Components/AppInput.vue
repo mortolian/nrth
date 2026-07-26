@@ -17,7 +17,7 @@ const props = defineProps<{
 const attrs = useAttrs();
 const mergedClass = computed(() =>
     cn(
-        'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-slate-300 transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100',
+        'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-100',
         attrs.class as string | string[] | Record<string, boolean> | undefined,
     ),
 );

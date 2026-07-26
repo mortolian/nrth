@@ -16,7 +16,7 @@ defineProps<{
     >
         <div class="min-w-0 flex-1">
             <h1 class="truncate text-2xl font-semibold tracking-tight text-slate-900" :title="title">{{ title }}</h1>
-            <p v-if="subtitle" class="mt-1 text-sm text-slate-500">{{ subtitle }}</p>
+            <p v-if="subtitle" class="mt-1 text-sm text-slate-600">{{ subtitle }}</p>
         </div>
         <div class="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
             <slot name="actions" />

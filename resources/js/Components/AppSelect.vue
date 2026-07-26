@@ -59,7 +59,7 @@ const selectModel = computed<string | undefined>({
 <template>
     <SelectRoot v-model="selectModel" :disabled="props.disabled">
         <SelectTrigger
-            class="inline-flex h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm leading-normal outline-none ring-slate-300 transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 data-[placeholder]:text-slate-400"
+            class="inline-flex h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm leading-normal text-slate-900 outline-none ring-slate-300 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 data-[placeholder]:text-slate-400"
             :class="props.disabled ? 'cursor-not-allowed opacity-60' : ''"
         >
             <SelectValue :placeholder="props.placeholder" class="min-w-0 flex-1 truncate text-left" />

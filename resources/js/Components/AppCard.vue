@@ -9,7 +9,7 @@ const attrs = useAttrs();
 
 const sectionClass = computed(() =>
     cn(
-        'rounded-xl border border-slate-200 bg-white p-5 shadow-sm',
+        'rounded-xl border border-slate-300/70 bg-white p-5 shadow-sm',
         attrs.class as ClassValue,
     ),
 );

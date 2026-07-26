@@ -297,11 +297,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
         <div class="min-h-screen bg-white text-slate-900 lg:pl-0">
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-900/10 bg-[#F8FAFD] text-slate-900 lg:flex lg:flex-col transition-all',
+                    'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-300/80 bg-[#F1F5FA] text-slate-900 lg:flex lg:flex-col transition-all',
                     collapsed ? 'w-20' : 'w-[260px]',
                 ]"
             >
-                <div class="border-b border-slate-900/10 px-4 py-4">
+                <div class="border-b border-slate-300/70 px-4 py-4">
                     <Link
                         :href="route('dashboard')"
                         class="flex items-center gap-3"
@@ -321,8 +321,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
                                     collapsed ? 'justify-center' : '',
                                     isNavItemActive(item)
-                                        ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
-                                        : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
+                                        ? 'border-l-brand-700 bg-brand-500/20 text-brand-800'
+                                        : 'border-l-transparent text-slate-700 hover:bg-white/70 hover:text-slate-900',
                                 ]"
                             >
                                 <component :is="item.icon" class="h-4 w-4 shrink-0" />
@@ -334,7 +334,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             </aside>
 
             <div :class="[collapsed ? 'lg:pl-20' : 'lg:pl-[260px]']" class="transition-all">
-                <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+                <header class="sticky top-0 z-30 border-b border-slate-300/80 bg-white/95 backdrop-blur">
                     <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                         <div class="flex items-center gap-2">
                             <button class="rounded-md p-2 hover:bg-slate-100 lg:hidden" @click="mobileOpen = true">
@@ -523,7 +523,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             <div v-if="mobileOpen" class="fixed inset-0 z-50 bg-black/50 lg:hidden" @click="mobileOpen = false" />
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-[#F8FAFD] p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
+                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-[#F1F5FA] p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
                     mobileOpen ? 'translate-x-0' : '-translate-x-full',
                 ]"
             >
@@ -544,7 +544,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             :href="item.href"
                             :class="[
                                 'block rounded-md px-3 py-2 text-sm',
-                                isNavItemActive(item) ? 'bg-brand-500/25 font-medium text-brand-800' : 'hover:bg-white/40',
+                                isNavItemActive(item) ? 'bg-brand-500/20 font-medium text-brand-800' : 'hover:bg-white/70',
                             ]"
                             @click="mobileOpen = false"
                         >
