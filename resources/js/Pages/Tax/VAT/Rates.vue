@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import AppButton from '@/Components/AppButton.vue';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import { useTaxTabs } from '@/Composables/useFeatureTabs';
 
@@ -132,14 +133,15 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
                     Exempt
                 </label>
                 <div class="mt-5 flex items-end justify-end">
-                    <button
+                    <AppButton
                         type="button"
-                        class="inline-flex items-center justify-center rounded-md bg-brand-500 px-3 py-2 text-xs font-medium text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="vatRateForm.processing"
+                        variant="primary"
+                        size="sm"
+                        :loading="vatRateForm.processing"
                         @click="submitVatRate"
                     >
                         {{ vatRateForm.processing ? 'Adding…' : 'Add VAT rate' }}
-                    </button>
+                    </AppButton>
                 </div>
             </div>
         </AppCard>
@@ -179,12 +181,24 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
                                 </td>
                                 <td class="px-3 py-2 text-right">
                                     <div class="inline-flex items-center gap-2">
-                                        <button type="button" class="text-xs font-medium text-brand-700 hover:underline" :disabled="editingVatRateForm.processing" @click="saveEditVatRate">
-                                            Save
-                                        </button>
-                                        <button type="button" class="text-xs text-slate-500 hover:underline" :disabled="editingVatRateForm.processing" @click="cancelEditVatRate">
+                                        <AppButton
+                                            type="button"
+                                            variant="primary"
+                                            size="sm"
+                                            :loading="editingVatRateForm.processing"
+                                            @click="saveEditVatRate"
+                                        >
+                                            {{ editingVatRateForm.processing ? 'Saving…' : 'Save' }}
+                                        </AppButton>
+                                        <AppButton
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            :disabled="editingVatRateForm.processing"
+                                            @click="cancelEditVatRate"
+                                        >
                                             Cancel
-                                        </button>
+                                        </AppButton>
                                     </div>
                                 </td>
                             </template>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
-
+import { useToast } from '@/Composables/useToast';
 const props = defineProps<{
     isEditing: boolean;
     return_to?: string | null;
@@ -31,6 +31,9 @@ const props = defineProps<{
         is_active: boolean;
     };
 }>();
+
+const toast = useToast();
+const saving = ref(false);
 
 const { values, setFieldValue } = useForm({
     initialValues: {
@@ -73,15 +76,34 @@ const schema = z.object({
 });
 
 const submit = () => {
+    if (saving.value) return;
+
     const result = schema.safeParse(formValues.value);
     if (!result.success) return;
 
+    const visitOptions = {
+        onStart: () => {
+            saving.value = true;
+        },
+        onSuccess: () => {
+            toast.success(props.isEditing ? 'Supplier saved.' : 'Supplier created.');
+        },
+        onError: (errors: Record<string, string>) => {
+            if (!Object.keys(errors).length) {
+                toast.error('Could not save this supplier.');
+            }
+        },
+        onFinish: () => {
+            saving.value = false;
+        },
+    };
+
     if (props.isEditing && props.supplier) {
-        router.put(route('suppliers.update', props.supplier.id), result.data);
+        router.put(route('suppliers.update', props.supplier.id), result.data, visitOptions);
         return;
     }
     const payload = props.return_to ? { ...result.data, return: props.return_to } : result.data;
-    router.post(route('suppliers.store'), payload);
+    router.post(route('suppliers.store'), payload, visitOptions);
 };
 </script>
 
@@ -151,7 +173,15 @@ const submit = () => {
             </div>
             <div class="mt-5 flex justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('suppliers.index'))">Cancel</AppButton>
-                <AppButton variant="primary" @click="submit">{{ isEditing ? 'Update Supplier' : 'Create Supplier' }}</AppButton>
+                <AppButton variant="primary" :loading="saving" @click="submit">
+                    {{
+                        saving
+                            ? 'Saving…'
+                            : isEditing
+                                ? 'Update Supplier'
+                                : 'Create Supplier'
+                    }}
+                </AppButton>
             </div>
         </AppCard>
     </AppLayout>

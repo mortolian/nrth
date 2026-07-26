@@ -7,9 +7,9 @@ import Checkbox from '@/Components/Checkbox.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppButton from '@/Components/AppButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { useAppDisplayName } from '@/lib/appName';
-
 const STORAGE_KEY = 'nrth_onboarding_v1';
 
 const appDisplayName = useAppDisplayName();
@@ -815,14 +815,15 @@ const liveInvoicePreview = computed(() => {
                         >
                             Back
                         </button>
-                        <PrimaryButton
+                        <AppButton
                             type="button"
-                            class="!bg-brand-500 !tracking-normal hover:!bg-brand-400 disabled:opacity-50"
-                            :disabled="finishing"
+                            variant="primary"
+                            class="!bg-brand-500 !tracking-normal hover:!bg-brand-400"
+                            :loading="finishing"
                             @click="finish"
                         >
                             {{ finishing ? 'Saving…' : 'Finish setup' }}
-                        </PrimaryButton>
+                        </AppButton>
                     </div>
                 </div>
             </div>

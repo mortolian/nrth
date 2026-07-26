@@ -1,13 +1,14 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
 import FormSection from '@/Components/FormSection.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppButton from '@/Components/AppButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useToast } from '@/Composables/useToast';
 
+const toast = useToast();
 const passwordInput = ref(null);
 const currentPasswordInput = ref(null);
 
@@ -21,7 +22,10 @@ const updatePassword = () => {
     form.put(route('user-password.update'), {
         errorBag: 'updatePassword',
         preserveScroll: true,
-        onSuccess: () => form.reset(),
+        onSuccess: () => {
+            form.reset();
+            toast.success('Password updated.');
+        },
         onError: () => {
             if (form.errors.password) {
                 form.reset('password', 'password_confirmation');
@@ -31,6 +35,10 @@ const updatePassword = () => {
             if (form.errors.current_password) {
                 form.reset('current_password');
                 currentPasswordInput.value.focus();
+            }
+
+            if (!form.hasErrors) {
+                toast.error('Could not update your password.');
             }
         },
     });
@@ -48,8 +56,8 @@ const updatePassword = () => {
         </template>
 
         <template #form>
-            <div>
-                <InputLabel for="current_password" value="Current Password" />
+            <div class="col-span-6 sm:col-span-4">
+                <InputLabel for="current_password" value="Current password" />
                 <TextInput
                     id="current_password"
                     ref="currentPasswordInput"
@@ -61,8 +69,8 @@ const updatePassword = () => {
                 <InputError :message="form.errors.current_password" class="mt-2" />
             </div>
 
-            <div>
-                <InputLabel for="password" value="New Password" />
+            <div class="col-span-6 sm:col-span-4">
+                <InputLabel for="password" value="New password" />
                 <TextInput
                     id="password"
                     ref="passwordInput"
@@ -74,8 +82,8 @@ const updatePassword = () => {
                 <InputError :message="form.errors.password" class="mt-2" />
             </div>
 
-            <div>
-                <InputLabel for="password_confirmation" value="Confirm Password" />
+            <div class="col-span-6 sm:col-span-4">
+                <InputLabel for="password_confirmation" value="Confirm password" />
                 <TextInput
                     id="password_confirmation"
                     v-model="form.password_confirmation"
@@ -88,13 +96,9 @@ const updatePassword = () => {
         </template>
 
         <template #actions>
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Save
-            </PrimaryButton>
+            <AppButton type="submit" variant="primary" :loading="form.processing">
+                {{ form.processing ? 'Saving…' : 'Save' }}
+            </AppButton>
         </template>
     </FormSection>
 </template>

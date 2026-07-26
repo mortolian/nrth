@@ -7,6 +7,7 @@ import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
 type ClientOption = { id: number; name: string; payment_terms_days: number; currency: string };
@@ -76,6 +77,8 @@ const goToCreateClient = () => {
 
 const hasClients = computed(() => props.clients.length > 0);
 const canSaveInvoice = computed(() => props.isEditing || hasClients.value);
+const saving = ref(false);
+const toast = useToast();
 
 const initialClientId = props.invoice?.client_id ?? props.clients[0]?.id ?? null;
 const clientForInitialCurrency = initialClientId
@@ -321,6 +324,8 @@ const removeLine = (index: number) => {
 };
 
 const onSave = () => {
+    if (saving.value) return;
+
     // Read `values` directly: nested line rows use v-model on shared objects; vee-validate's
     // handleSubmit() can pass a stale snapshot that omits those edits.
     const result = invoiceSchema.safeParse(formValues.value);
@@ -344,12 +349,29 @@ const onSave = () => {
         })),
     };
 
+    const visitOptions = {
+        onStart: () => {
+            saving.value = true;
+        },
+        onSuccess: () => {
+            toast.success(props.isEditing ? 'Invoice saved.' : 'Invoice created.');
+        },
+        onError: (errors: Record<string, string>) => {
+            if (!Object.keys(errors).length) {
+                toast.error('Could not save this invoice.');
+            }
+        },
+        onFinish: () => {
+            saving.value = false;
+        },
+    };
+
     if (props.isEditing && props.invoice?.id) {
-        router.put(route('invoicing.invoices.update', props.invoice.id), payload);
+        router.put(route('invoicing.invoices.update', props.invoice.id), payload, visitOptions);
         return;
     }
 
-    router.post(route('invoicing.invoices.store'), payload);
+    router.post(route('invoicing.invoices.store'), payload, visitOptions);
 };
 </script>
 
@@ -602,7 +624,14 @@ const onSave = () => {
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
             <div class="flex items-center justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('invoicing.invoices.index'))">Cancel</AppButton>
-                <AppButton variant="primary" :disabled="!canSaveInvoice" @click="onSave">Save</AppButton>
+                <AppButton
+                    variant="primary"
+                    :disabled="!canSaveInvoice"
+                    :loading="saving"
+                    @click="onSave"
+                >
+                    {{ saving ? 'Saving…' : 'Save' }}
+                </AppButton>
             </div>
         </div>
     </AppLayout>

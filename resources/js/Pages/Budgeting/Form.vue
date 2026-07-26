@@ -5,6 +5,7 @@ import { z } from 'zod';
 import Sortable from 'sortablejs';
 import { Menu, Trash2 } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import { useToast } from '@/Composables/useToast';
 
 type Item = {
     uid: string;
@@ -800,6 +801,8 @@ function importFromPrevious() {
 
 /** Client-side validation message (Zod / blur) so failed saves are not silent */
 const clientSubmitErrors = ref<string | null>(null);
+const saving = ref(false);
+const toast = useToast();
 
 /** Match server: same-currency lines send null for FX; Zod must accept null, not only undefined */
 const submitSchema = z.object({
@@ -900,6 +903,10 @@ const combinedSaveBanner = computed(
 );
 
 const submit = () => {
+    if (saving.value) {
+        return;
+    }
+
     clientSubmitErrors.value = null;
     inertiaRouterErrorBanner.value = null;
 
@@ -972,14 +979,23 @@ const submit = () => {
 
         const visitOptions = {
             preserveScroll: true,
+            onStart: () => {
+                saving.value = true;
+            },
             onSuccess: () => {
                 clientSubmitErrors.value = null;
+                toast.success(props.isEditing ? 'Budget saved.' : 'Budget created.');
             },
             onError: (errors: Record<string, string | string[]>) => {
                 const msgs = collectNestedErrorStrings(errors as unknown);
                 if (msgs.length) {
                     clientSubmitErrors.value = msgs.join(' ');
+                } else {
+                    toast.error('Could not save this budget.');
                 }
+            },
+            onFinish: () => {
+                saving.value = false;
             },
         };
 
@@ -1300,7 +1316,9 @@ const submit = () => {
         <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <div class="flex gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('budgeting.index'))">Back to budgets</AppButton>
-                <AppButton variant="primary" @click="submit">Save budget</AppButton>
+                <AppButton variant="primary" :loading="saving" @click="submit">
+                    {{ saving ? 'Saving…' : 'Save budget' }}
+                </AppButton>
             </div>
         </div>
     </AppLayout>

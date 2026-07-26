@@ -278,8 +278,14 @@ const submit = () => {
                 </div>
 
                 <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
-                    <AppButton type="submit" variant="primary" :disabled="form.processing">
-                        {{ editingId ? 'Save changes' : 'Save account' }}
+                    <AppButton type="submit" variant="primary" :loading="form.processing">
+                        {{
+                            form.processing
+                                ? 'Saving…'
+                                : editingId
+                                    ? 'Save changes'
+                                    : 'Save account'
+                        }}
                     </AppButton>
                     <AppButton type="button" variant="ghost" :disabled="form.processing" @click="cancelForm">
                         Cancel

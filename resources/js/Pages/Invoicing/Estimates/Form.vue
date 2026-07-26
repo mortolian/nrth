@@ -6,6 +6,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
 type ClientOption = { id: number; name: string; currency: string };
@@ -89,6 +90,8 @@ const form = ref({
     terms: props.estimate?.terms ?? (props.default_terms ?? ''),
 });
 
+const saving = ref(false);
+const toast = useToast();
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
 const lineItems = ref<EstimateLineForm[]>(
@@ -233,6 +236,8 @@ const removeLine = (index: number) => {
 };
 
 const submit = (submitAction: 'draft' | 'send') => {
+    if (saving.value) return;
+
     const payload = {
         ...form.value,
         submit_action: submitAction,
@@ -244,11 +249,28 @@ const submit = (submitAction: 'draft' | 'send') => {
         })),
     };
 
+    const visitOptions = {
+        onStart: () => {
+            saving.value = true;
+        },
+        onSuccess: () => {
+            toast.success(props.isEditing ? 'Estimate saved.' : 'Estimate created.');
+        },
+        onError: (errors: Record<string, string>) => {
+            if (!Object.keys(errors).length) {
+                toast.error('Could not save this estimate.');
+            }
+        },
+        onFinish: () => {
+            saving.value = false;
+        },
+    };
+
     if (props.isEditing && props.estimate?.id) {
-        router.put(route('invoicing.estimates.update', props.estimate.id), payload);
+        router.put(route('invoicing.estimates.update', props.estimate.id), payload, visitOptions);
         return;
     }
-    router.post(route('invoicing.estimates.store'), payload);
+    router.post(route('invoicing.estimates.store'), payload, visitOptions);
 };
 </script>
 
@@ -410,7 +432,9 @@ const submit = (submitAction: 'draft' | 'send') => {
         <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
             <div class="flex justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('invoicing.estimates.index'))">Cancel</AppButton>
-                <AppButton variant="primary" @click="submit('draft')">Save</AppButton>
+                <AppButton variant="primary" :loading="saving" @click="submit('draft')">
+                    {{ saving ? 'Saving…' : 'Save' }}
+                </AppButton>
             </div>
         </div>
     </AppLayout>

@@ -836,7 +836,7 @@ onBeforeUnmount(() => {
                         <AppInput v-model="operatorForm.email" type="email" required placeholder="user@example.com" />
                         <p v-if="operatorForm.errors.email" class="mt-1 text-xs text-rose-600">{{ operatorForm.errors.email }}</p>
                     </div>
-                    <AppButton type="submit" variant="primary" :disabled="operatorForm.processing">
+                    <AppButton type="submit" variant="primary" :loading="operatorForm.processing">
                         {{ operatorForm.processing ? 'Adding…' : 'Add operator' }}
                     </AppButton>
                 </form>

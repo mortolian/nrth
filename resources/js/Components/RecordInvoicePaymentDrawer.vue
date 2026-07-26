@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
+import AppButton from '@/Components/AppButton.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 import { CalendarClock, X } from 'lucide-vue-next';
-
 export type RecordPaymentInvoiceInput = {
     id: number;
     number: string;
@@ -245,7 +246,12 @@ const indicativeBankCents = computed(() => {
 
 const close = () => emit('update:open', false);
 
+const toast = useToast();
+const saving = ref(false);
+
 const submit = () => {
+    if (saving.value) return;
+
     const inv = props.invoice;
     if (!inv) return;
     const amountCents = paymentInvoiceCents.value;
@@ -272,8 +278,20 @@ const submit = () => {
 
     router.post(route('invoicing.invoices.payments.store', inv.id), body, {
         preserveScroll: true,
+        onStart: () => {
+            saving.value = true;
+        },
         onSuccess: () => {
+            toast.success('Payment recorded.');
             close();
+        },
+        onError: (errors) => {
+            if (!Object.keys(errors).length) {
+                toast.error('Could not record this payment.');
+            }
+        },
+        onFinish: () => {
+            saving.value = false;
         },
     });
 };
@@ -451,9 +469,9 @@ const submit = () => {
                     <textarea v-model="form.notes" class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2" />
                 </div>
                 <div class="flex justify-end pb-2">
-                    <AppButton variant="primary" @click="submit">
-                        <CalendarClock class="mr-1 h-4 w-4" />
-                        Record payment
+                    <AppButton variant="primary" :loading="saving" @click="submit">
+                        <CalendarClock v-if="!saving" class="mr-1 h-4 w-4" />
+                        {{ saving ? 'Recording…' : 'Record payment' }}
                     </AppButton>
                 </div>
             </div>

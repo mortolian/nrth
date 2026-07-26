@@ -82,8 +82,13 @@ const submit = () => {
                 </div>
 
                 <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
-                    <AppButton type="submit" variant="primary" :disabled="form.processing || !accounts.length">
-                        Continue
+                    <AppButton
+                        type="submit"
+                        variant="primary"
+                        :loading="form.processing"
+                        :disabled="!accounts.length"
+                    >
+                        {{ form.processing ? 'Uploading…' : 'Continue' }}
                     </AppButton>
                     <AppButton
                         type="button"

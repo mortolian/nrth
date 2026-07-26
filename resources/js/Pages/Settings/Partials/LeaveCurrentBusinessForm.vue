@@ -2,8 +2,10 @@
 import { computed, ref } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import AppButton from '@/Components/AppButton.vue';
+import { useToast } from '@/Composables/useToast';
 
 const page = usePage();
+const toast = useToast();
 const leaveModalOpen = ref(false);
 const form = useForm({});
 
@@ -20,6 +22,11 @@ const leave = () => {
         errorBag: 'removeTeamMember',
         onSuccess: () => {
             leaveModalOpen.value = false;
+        },
+        onError: () => {
+            if (!form.hasErrors) {
+                toast.error('Could not leave this business.');
+            }
         },
     });
 };
@@ -51,8 +58,8 @@ const leave = () => {
                 </p>
                 <div class="mt-5 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="leaveModalOpen = false">Cancel</AppButton>
-                    <AppButton variant="primary" class="!bg-rose-600" :disabled="form.processing" @click="leave">
-                        Leave business
+                    <AppButton variant="primary" class="!bg-rose-600" :loading="form.processing" @click="leave">
+                        {{ form.processing ? 'Leaving…' : 'Leave business' }}
                     </AppButton>
                 </div>
             </div>

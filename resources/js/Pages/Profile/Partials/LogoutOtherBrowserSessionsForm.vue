@@ -1,18 +1,18 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
 import ActionSection from '@/Components/ActionSection.vue';
 import DialogModal from '@/Components/DialogModal.vue';
 import InputError from '@/Components/InputError.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
+import AppButton from '@/Components/AppButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useToast } from '@/Composables/useToast';
 
 defineProps({
     sessions: Array,
 });
 
+const toast = useToast();
 const confirmingLogout = ref(false);
 const passwordInput = ref(null);
 
@@ -29,8 +29,16 @@ const confirmLogout = () => {
 const logoutOtherBrowserSessions = () => {
     form.delete(route('other-browser-sessions.destroy'), {
         preserveScroll: true,
-        onSuccess: () => closeModal(),
-        onError: () => passwordInput.value.focus(),
+        onSuccess: () => {
+            closeModal();
+            toast.success('Other browser sessions signed out.');
+        },
+        onError: () => {
+            passwordInput.value.focus();
+            if (!form.hasErrors) {
+                toast.error('Could not sign out other sessions.');
+            }
+        },
         onFinish: () => form.reset(),
     });
 };
@@ -57,7 +65,6 @@ const closeModal = () => {
                 If necessary, you may log out of all of your other browser sessions across all of your devices. Some of your recent sessions are listed below; however, this list may not be exhaustive. If you feel your account has been compromised, you should also update your password.
             </div>
 
-            <!-- Other Browser Sessions -->
             <div v-if="sessions.length > 0" class="mt-5 space-y-6">
                 <div v-for="(session, i) in sessions" :key="i" class="flex items-center">
                     <div>
@@ -87,17 +94,12 @@ const closeModal = () => {
                 </div>
             </div>
 
-            <div class="flex items-center mt-5">
-                <PrimaryButton @click="confirmLogout">
+            <div class="mt-5">
+                <AppButton variant="primary" @click="confirmLogout">
                     Log Out Other Browser Sessions
-                </PrimaryButton>
-
-                <ActionMessage :on="form.recentlySuccessful" class="ms-3">
-                    Done.
-                </ActionMessage>
+                </AppButton>
             </div>
 
-            <!-- Log Out Other Devices Confirmation Modal -->
             <DialogModal :show="confirmingLogout" @close="closeModal">
                 <template #title>
                     Log Out Other Browser Sessions
@@ -122,18 +124,18 @@ const closeModal = () => {
                 </template>
 
                 <template #footer>
-                    <SecondaryButton @click="closeModal">
+                    <AppButton variant="secondary" :disabled="form.processing" @click="closeModal">
                         Cancel
-                    </SecondaryButton>
+                    </AppButton>
 
-                    <PrimaryButton
+                    <AppButton
                         class="ms-3"
-                        :class="{ 'opacity-25': form.processing }"
-                        :disabled="form.processing"
+                        variant="primary"
+                        :loading="form.processing"
                         @click="logoutOtherBrowserSessions"
                     >
-                        Log Out Other Browser Sessions
-                    </PrimaryButton>
+                        {{ form.processing ? 'Signing out…' : 'Log Out Other Browser Sessions' }}
+                    </AppButton>
                 </template>
             </DialogModal>
         </template>

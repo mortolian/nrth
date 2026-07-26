@@ -3,10 +3,12 @@ import { computed, ref, watch } from 'vue';
 import { useForm, usePage } from '@inertiajs/vue3';
 import SettingsShell from '@/Components/SettingsShell.vue';
 import AppTabs from '@/Components/AppTabs.vue';
-import ActionMessage from '@/Components/ActionMessage.vue';
 import AppButton from '@/Components/AppButton.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
+import { useToast } from '@/Composables/useToast';
 import { Building2, ImagePlus, Plus, Trash2 } from 'lucide-vue-next';
+
+const toast = useToast();
 
 type Settings = Record<string, unknown>;
 
@@ -452,6 +454,9 @@ const submit = () => {
         onError: (errors) => {
             if (errors.vat_number && tab.value !== 'profile' && tab.value !== 'tax') {
                 tab.value = 'tax';
+            }
+            if (!Object.keys(errors).length) {
+                toast.error('Could not save business settings.');
             }
         },
     });
@@ -1201,10 +1206,11 @@ const removeBankAccount = (index: number) => {
         </div>
 
         <div class="mt-8 flex items-center justify-end pt-6">
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-            <AppButton variant="primary" :class="{ 'opacity-25': form.processing }" :disabled="form.processing" @click="submit">
+            <AppButton
+                variant="primary"
+                :loading="form.processing"
+                @click="submit"
+            >
                 {{ form.processing ? 'Saving…' : 'Save' }}
             </AppButton>
         </div>

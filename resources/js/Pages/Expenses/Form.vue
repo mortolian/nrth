@@ -4,6 +4,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 import { Camera, Plus, ScanLine, Upload, X } from 'lucide-vue-next';
 import { FALLBACK_EXPENSE_TAX_RATES, type ExpenseTaxRateOption } from './fallbackTaxRates';
 
@@ -85,6 +86,7 @@ const defaultPaidFromAccountId = (): number => {
 };
 
 const page = usePage();
+const toast = useToast();
 const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
 const scanningKey = ref<string | null>(null);
 const scanReceiptError = ref<string | null>(null);
@@ -92,7 +94,6 @@ const scanReceiptApplied = ref(false);
 const receiptUploadSuccess = ref<string | null>(null);
 const saveSupplierLoading = ref(false);
 const saveSupplierError = ref<string | null>(null);
-const saveSupplierSuccess = ref(false);
 const scanReceiptLoading = computed(() => scanningKey.value !== null);
 
 const schema = z
@@ -161,7 +162,6 @@ const form = reactive(initialFromProps());
 watch(
     () => [form.supplier_id, form.supplier_custom],
     () => {
-        saveSupplierSuccess.value = false;
         saveSupplierError.value = null;
     },
 );
@@ -570,7 +570,6 @@ const saveAsSupplier = async () => {
 
     saveSupplierLoading.value = true;
     saveSupplierError.value = null;
-    saveSupplierSuccess.value = false;
 
     try {
         const res = await fetch(route('suppliers.store'), {
@@ -606,6 +605,7 @@ const saveAsSupplier = async () => {
                 ? Object.values(payload.errors).flat()[0]
                 : null;
             saveSupplierError.value = firstError || payload?.message || 'Could not save this supplier.';
+            toast.error(saveSupplierError.value);
             return;
         }
 
@@ -613,15 +613,17 @@ const saveAsSupplier = async () => {
         const savedName = String(payload?.data?.name ?? name);
         if (id <= 0) {
             saveSupplierError.value = 'Could not save this supplier.';
+            toast.error(saveSupplierError.value);
             return;
         }
 
         createdSuppliers.value = [...createdSuppliers.value, { id, name: savedName }];
         form.supplier_id = id;
         form.supplier_custom = '';
-        saveSupplierSuccess.value = true;
+        toast.success('Supplier saved and selected.');
     } catch {
         saveSupplierError.value = 'Could not save this supplier. Try again.';
+        toast.error(saveSupplierError.value);
     } finally {
         saveSupplierLoading.value = false;
     }
@@ -1035,7 +1037,7 @@ const submit = () => {
                                 type="button"
                                 variant="secondary"
                                 size="sm"
-                                :disabled="saveSupplierLoading"
+                                :loading="saveSupplierLoading"
                                 @click="saveAsSupplier"
                             >
                                 {{ saveSupplierLoading ? 'Saving…' : 'Save as supplier' }}
@@ -1045,7 +1047,6 @@ const submit = () => {
                             </p>
                         </div>
                         <p v-if="saveSupplierError" class="text-xs text-rose-700">{{ saveSupplierError }}</p>
-                        <p v-if="saveSupplierSuccess" class="text-xs text-emerald-700">Supplier saved and selected.</p>
                     </div>
                 </div>
                 <div>
@@ -1157,7 +1158,7 @@ const submit = () => {
                     variant="primary"
                     size="touch"
                     class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
-                    :disabled="submitting"
+                    :loading="submitting"
                     @click="submit"
                 >
                     {{ submitting ? 'Saving…' : props.isEditing ? 'Update Expense' : 'Save Expense' }}

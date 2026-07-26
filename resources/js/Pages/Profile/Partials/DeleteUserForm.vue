@@ -88,10 +88,10 @@ const closeModal = () => {
                 <AppButton
                     variant="primary"
                     class="ms-3 !bg-rose-600"
-                    :disabled="form.processing"
+                    :loading="form.processing"
                     @click="deleteUser"
                 >
-                    Delete account
+                    {{ form.processing ? 'Deleting…' : 'Delete account' }}
                 </AppButton>
             </template>
         </DialogModal>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 
@@ -34,9 +34,18 @@ const props = defineProps<{
 }>();
 
 const pageTitle = computed(() => `Import preview — ${props.bankImport.original_filename}`);
+const confirming = ref(false);
 
 const confirmImport = (importId: number) => {
-    router.post(route('banking.import.confirm', importId));
+    if (confirming.value) return;
+    router.post(route('banking.import.confirm', importId), {}, {
+        onStart: () => {
+            confirming.value = true;
+        },
+        onFinish: () => {
+            confirming.value = false;
+        },
+    });
 };
 </script>
 
@@ -106,18 +115,20 @@ const confirmImport = (importId: number) => {
             <AppButton
                 v-if="canConfirm"
                 variant="primary"
+                :loading="confirming"
                 @click="confirmImport(bankImport.id)"
             >
-                Confirm import
+                {{ confirming ? 'Importing…' : 'Confirm import' }}
             </AppButton>
             <AppButton
                 v-if="canChangeMapping"
                 variant="secondary"
+                :disabled="confirming"
                 @click="router.visit(route('banking.import.map', bankImport.id))"
             >
                 Change mapping
             </AppButton>
-            <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
+            <AppButton variant="secondary" :disabled="confirming" @click="router.visit(route('banking.import.create'))">
                 Cancel
             </AppButton>
         </div>

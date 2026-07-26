@@ -8,12 +8,15 @@ const props = withDefaults(defineProps<{
     size?: 'sm' | 'md' | 'lg' | 'touch';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
+    /** Shows a spinner and disables the button while an action runs. */
+    loading?: boolean;
 }>(), {
     as: 'button',
     variant: 'primary',
     size: 'md',
     type: 'button',
     disabled: false,
+    loading: false,
 });
 
 const emit = defineEmits<{
@@ -39,10 +42,25 @@ const sizeClass = {
     <Primitive
         :as="as"
         :type="type"
-        :disabled="disabled"
-        :class="cn('inline-flex items-center justify-center rounded-md font-medium transition active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100', variantClass[variant], sizeClass[size])"
+        :disabled="disabled || loading"
+        :aria-busy="loading || undefined"
+        :class="cn('inline-flex items-center justify-center gap-2 rounded-md font-medium transition active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100', variantClass[variant], sizeClass[size])"
         @click="emit('click', $event)"
     >
+        <svg
+            v-if="loading"
+            class="h-4 w-4 shrink-0 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+        >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+        </svg>
         <slot />
     </Primitive>
 </template>

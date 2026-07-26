@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
-
+import { useToast } from '@/Composables/useToast';
 const props = defineProps<{
     isEditing: boolean;
     contract: null | {
@@ -75,7 +75,12 @@ const onFile = (event: Event) => {
     values.value.signed_contract = file;
 };
 
+const toast = useToast();
+const saving = ref(false);
+
 const submit = () => {
+    if (saving.value) return;
+
     const parsed = schema.safeParse(values.value);
     if (!parsed.success) return;
 
@@ -93,12 +98,30 @@ const submit = () => {
     form.set('scope_of_work', parsed.data.scope_of_work ?? '');
     if (values.value.signed_contract) form.set('signed_contract', values.value.signed_contract);
 
+    const visitOptions = {
+        onStart: () => {
+            saving.value = true;
+        },
+        onSuccess: () => {
+            toast.success(props.isEditing ? 'Contract saved.' : 'Contract created.');
+        },
+        onError: (errors: Record<string, string>) => {
+            if (!Object.keys(errors).length) {
+                toast.error('Could not save this contract.');
+            }
+        },
+        onFinish: () => {
+            saving.value = false;
+        },
+        forceFormData: true,
+    };
+
     if (props.isEditing && props.contract) {
         form.set('_method', 'PUT');
-        router.post(route('contracting.contracts.update', props.contract.id), form);
+        router.post(route('contracting.contracts.update', props.contract.id), form, visitOptions);
         return;
     }
-    router.post(route('contracting.contracts.store'), form);
+    router.post(route('contracting.contracts.store'), form, visitOptions);
 };
 
 const generateRetainerInvoice = () => {
@@ -231,7 +254,9 @@ const generateRetainerInvoice = () => {
 
             <div class="mt-5 flex justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('contracting.contracts.index'))">Cancel</AppButton>
-                <AppButton variant="primary" @click="submit">Save Contract</AppButton>
+                <AppButton variant="primary" :loading="saving" @click="submit">
+                    {{ saving ? 'Saving…' : 'Save Contract' }}
+                </AppButton>
             </div>
         </AppCard>
     </AppLayout>

@@ -93,7 +93,9 @@ const pageTitle = computed(() => `Map columns — ${props.bankImport.original_fi
             <p v-if="form.errors.mapping" class="mt-3 text-xs text-red-600">{{ form.errors.mapping }}</p>
 
             <div class="mt-4">
-                <AppButton variant="primary" :disabled="form.processing" @click="submit">Preview import</AppButton>
+                <AppButton variant="primary" :loading="form.processing" @click="submit">
+                    {{ form.processing ? 'Working…' : 'Preview import' }}
+                </AppButton>
             </div>
         </AppCard>
 

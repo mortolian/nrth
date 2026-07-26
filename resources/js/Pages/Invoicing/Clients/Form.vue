@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
-
+import { useToast } from '@/Composables/useToast';
 const props = defineProps<{
     isEditing: boolean;
     /** When set (e.g. from invoice create), redirect here after successful create. */
@@ -33,6 +33,8 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
+const toast = useToast();
+const saving = ref(false);
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
@@ -89,17 +91,36 @@ const schema = z.object({
 });
 
 const submit = () => {
+    if (saving.value) return;
+
     const result = schema.safeParse(formValues.value);
     if (!result.success) return;
 
+    const visitOptions = {
+        onStart: () => {
+            saving.value = true;
+        },
+        onSuccess: () => {
+            toast.success(props.isEditing ? 'Client saved.' : 'Client created.');
+        },
+        onError: (errors: Record<string, string>) => {
+            if (!Object.keys(errors).length) {
+                toast.error('Could not save this client.');
+            }
+        },
+        onFinish: () => {
+            saving.value = false;
+        },
+    };
+
     if (props.isEditing && props.client) {
-        router.put(route('invoicing.clients.update', props.client.id), result.data);
+        router.put(route('invoicing.clients.update', props.client.id), result.data, visitOptions);
         return;
     }
     const payload = props.return_to
         ? { ...result.data, return: props.return_to }
         : result.data;
-    router.post(route('invoicing.clients.store'), payload);
+    router.post(route('invoicing.clients.store'), payload, visitOptions);
 };
 </script>
 
@@ -181,7 +202,15 @@ const submit = () => {
             </div>
             <div class="mt-5 flex justify-end gap-2">
                 <AppButton variant="ghost" @click="router.visit(route('invoicing.clients.index'))">Cancel</AppButton>
-                <AppButton variant="primary" @click="submit">{{ isEditing ? 'Update Client' : 'Create Client' }}</AppButton>
+                <AppButton variant="primary" :loading="saving" @click="submit">
+                    {{
+                        saving
+                            ? 'Saving…'
+                            : isEditing
+                                ? 'Update Client'
+                                : 'Create Client'
+                    }}
+                </AppButton>
             </div>
         </AppCard>
     </AppLayout>

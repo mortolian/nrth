@@ -1,7 +1,6 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
 import ActionSection from '@/Components/ActionSection.vue';
 import Checkbox from '@/Components/Checkbox.vue';
 import ConfirmationModal from '@/Components/ConfirmationModal.vue';
@@ -10,16 +9,19 @@ import DialogModal from '@/Components/DialogModal.vue';
 import FormSection from '@/Components/FormSection.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppButton from '@/Components/AppButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import SectionBorder from '@/Components/SectionBorder.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useToast } from '@/Composables/useToast';
 
 const props = defineProps({
     tokens: Array,
     availablePermissions: Array,
     defaultPermissions: Array,
 });
+
+const toast = useToast();
 
 const createApiTokenForm = useForm({
     name: '',
@@ -42,6 +44,12 @@ const createApiToken = () => {
         onSuccess: () => {
             displayingToken.value = true;
             createApiTokenForm.reset();
+            toast.success('API token created.');
+        },
+        onError: () => {
+            if (!createApiTokenForm.hasErrors) {
+                toast.error('Could not create the API token.');
+            }
         },
     });
 };
@@ -55,7 +63,15 @@ const updateApiToken = () => {
     updateApiTokenForm.put(route('api-tokens.update', managingPermissionsFor.value), {
         preserveScroll: true,
         preserveState: true,
-        onSuccess: () => (managingPermissionsFor.value = null),
+        onSuccess: () => {
+            managingPermissionsFor.value = null;
+            toast.success('API token permissions updated.');
+        },
+        onError: () => {
+            if (!updateApiTokenForm.hasErrors) {
+                toast.error('Could not update token permissions.');
+            }
+        },
     });
 };
 
@@ -67,7 +83,11 @@ const deleteApiToken = () => {
     deleteApiTokenForm.delete(route('api-tokens.destroy', apiTokenBeingDeleted.value), {
         preserveScroll: true,
         preserveState: true,
-        onSuccess: () => (apiTokenBeingDeleted.value = null),
+        onSuccess: () => {
+            apiTokenBeingDeleted.value = null;
+            toast.success('API token deleted.');
+        },
+        onError: () => toast.error('Could not delete the API token.'),
     });
 };
 </script>
@@ -114,13 +134,9 @@ const deleteApiToken = () => {
             </template>
 
             <template #actions>
-                <ActionMessage :on="createApiTokenForm.recentlySuccessful" class="me-3">
-                    Created.
-                </ActionMessage>
-
-                <PrimaryButton :class="{ 'opacity-25': createApiTokenForm.processing }" :disabled="createApiTokenForm.processing">
-                    Create
-                </PrimaryButton>
+                <AppButton type="submit" variant="primary" :loading="createApiTokenForm.processing">
+                    {{ createApiTokenForm.processing ? 'Creating…' : 'Create' }}
+                </AppButton>
             </template>
         </FormSection>
 
@@ -211,18 +227,18 @@ const deleteApiToken = () => {
             </template>
 
             <template #footer>
-                <SecondaryButton @click="managingPermissionsFor = null">
+                <SecondaryButton :disabled="updateApiTokenForm.processing" @click="managingPermissionsFor = null">
                     Cancel
                 </SecondaryButton>
 
-                <PrimaryButton
+                <AppButton
                     class="ms-3"
-                    :class="{ 'opacity-25': updateApiTokenForm.processing }"
-                    :disabled="updateApiTokenForm.processing"
+                    variant="primary"
+                    :loading="updateApiTokenForm.processing"
                     @click="updateApiToken"
                 >
-                    Save
-                </PrimaryButton>
+                    {{ updateApiTokenForm.processing ? 'Saving…' : 'Save' }}
+                </AppButton>
             </template>
         </DialogModal>
 
@@ -247,7 +263,7 @@ const deleteApiToken = () => {
                     :disabled="deleteApiTokenForm.processing"
                     @click="deleteApiToken"
                 >
-                    Delete
+                    {{ deleteApiTokenForm.processing ? 'Deleting…' : 'Delete' }}
                 </DangerButton>
             </template>
         </ConfirmationModal>

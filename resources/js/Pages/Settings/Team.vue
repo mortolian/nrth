@@ -2,6 +2,9 @@
 import { computed, ref, watch, withDefaults } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import SettingsShell from '@/Components/SettingsShell.vue';
+import { useToast } from '@/Composables/useToast';
+
+const toast = useToast();
 
 type Member = {
     id: number;
@@ -181,6 +184,12 @@ const saveRole = () => {
         onSuccess: () => {
             roleModalOpen.value = false;
             roleTarget.value = null;
+            toast.success('Member role updated.');
+        },
+        onError: () => {
+            if (!updateRoleForm.hasErrors) {
+                toast.error('Could not update member role.');
+            }
         },
     });
 };
@@ -227,6 +236,12 @@ const submitTeamName = () => {
     updateTeamNameForm.put(route('teams.update', props.team.id), {
         errorBag: 'updateTeamName',
         preserveScroll: true,
+        onSuccess: () => toast.success('Business name saved.'),
+        onError: () => {
+            if (!updateTeamNameForm.hasErrors) {
+                toast.error('Could not save the business name.');
+            }
+        },
     });
 };
 
@@ -344,10 +359,13 @@ const deleteCustomRole = (summary: RoleSummary) => {
                             </p>
                         </div>
                         <div v-if="permissions.canUpdateTeam" class="mt-4 flex flex-wrap items-center gap-3">
-                            <AppButton variant="primary" :disabled="updateTeamNameForm.processing" @click="submitTeamName">
-                                Save name
+                            <AppButton
+                                variant="primary"
+                                :loading="updateTeamNameForm.processing"
+                                @click="submitTeamName"
+                            >
+                                {{ updateTeamNameForm.processing ? 'Saving…' : 'Save name' }}
                             </AppButton>
-                            <span v-if="updateTeamNameForm.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
                         </div>
                     </section>
 
@@ -424,8 +442,12 @@ const deleteCustomRole = (summary: RoleSummary) => {
                             </div>
                         </div>
                         <div class="mt-4">
-                            <AppButton variant="primary" :disabled="inviteForm.processing" @click="submitInvite">
-                                Send invitation
+                            <AppButton
+                                variant="primary"
+                                :loading="inviteForm.processing"
+                                @click="submitInvite"
+                            >
+                                {{ inviteForm.processing ? 'Sending…' : 'Send invitation' }}
                             </AppButton>
                         </div>
                     </section>
@@ -548,12 +570,11 @@ const deleteCustomRole = (summary: RoleSummary) => {
                         <div class="mt-4 flex flex-wrap items-center gap-3">
                             <AppButton
                                 variant="primary"
-                                :disabled="idleTimeoutForm.processing"
+                                :loading="idleTimeoutForm.processing"
                                 @click="saveIdleTimeout"
                             >
-                                Save timeout
+                                {{ idleTimeoutForm.processing ? 'Saving…' : 'Save timeout' }}
                             </AppButton>
-                            <span v-if="idleTimeoutForm.recentlySuccessful" class="text-sm text-brand-600">Saved.</span>
                         </div>
                     </section>
 
@@ -591,8 +612,13 @@ const deleteCustomRole = (summary: RoleSummary) => {
                 </p>
                 <div class="mt-6 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="deleteTeamModalOpen = false">Cancel</AppButton>
-                    <AppButton variant="primary" class="!bg-rose-600" :disabled="deleteTeamForm.processing" @click="deleteTeam">
-                        Delete team
+                    <AppButton
+                        variant="primary"
+                        class="!bg-rose-600"
+                        :loading="deleteTeamForm.processing"
+                        @click="deleteTeam"
+                    >
+                        {{ deleteTeamForm.processing ? 'Deleting…' : 'Delete team' }}
                     </AppButton>
                 </div>
             </div>
@@ -608,8 +634,13 @@ const deleteCustomRole = (summary: RoleSummary) => {
                 <p class="mt-2 text-sm text-slate-600">Are you sure you want to leave this team? You will lose access immediately.</p>
                 <div class="mt-6 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="leaveModalOpen = false">Cancel</AppButton>
-                    <AppButton variant="primary" class="!bg-rose-600" :disabled="leaveForm.processing" @click="leaveTeam">
-                        Leave
+                    <AppButton
+                        variant="primary"
+                        class="!bg-rose-600"
+                        :loading="leaveForm.processing"
+                        @click="leaveTeam"
+                    >
+                        {{ leaveForm.processing ? 'Leaving…' : 'Leave' }}
                     </AppButton>
                 </div>
             </div>
@@ -638,7 +669,13 @@ const deleteCustomRole = (summary: RoleSummary) => {
                 </div>
                 <div class="mt-6 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="roleModalOpen = false">Cancel</AppButton>
-                    <AppButton variant="primary" :disabled="updateRoleForm.processing" @click="saveRole">Save</AppButton>
+                    <AppButton
+                        variant="primary"
+                        :loading="updateRoleForm.processing"
+                        @click="saveRole"
+                    >
+                        {{ updateRoleForm.processing ? 'Saving…' : 'Save' }}
+                    </AppButton>
                 </div>
             </div>
         </div>
@@ -691,8 +728,16 @@ const deleteCustomRole = (summary: RoleSummary) => {
                 </div>
                 <div class="mt-6 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="roleEditorOpen = false">Cancel</AppButton>
-                    <AppButton variant="primary" :disabled="roleForm.processing" @click="saveCustomRole">
-                        {{ editingRole ? 'Save role' : 'Create role' }}
+                    <AppButton variant="primary" :loading="roleForm.processing" @click="saveCustomRole">
+                        {{
+                            roleForm.processing
+                                ? editingRole
+                                    ? 'Saving…'
+                                    : 'Creating…'
+                                : editingRole
+                                    ? 'Save role'
+                                    : 'Create role'
+                        }}
                     </AppButton>
                 </div>
             </div>
@@ -710,8 +755,13 @@ const deleteCustomRole = (summary: RoleSummary) => {
                 </p>
                 <div class="mt-6 flex justify-end gap-2">
                     <AppButton variant="ghost" @click="removeTarget = null">Cancel</AppButton>
-                    <AppButton variant="primary" class="!bg-rose-600" :disabled="removeForm.processing" @click="removeMember">
-                        Remove
+                    <AppButton
+                        variant="primary"
+                        class="!bg-rose-600"
+                        :loading="removeForm.processing"
+                        @click="removeMember"
+                    >
+                        {{ removeForm.processing ? 'Removing…' : 'Remove' }}
                     </AppButton>
                 </div>
             </div>

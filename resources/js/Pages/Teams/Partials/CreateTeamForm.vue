@@ -1,10 +1,13 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
+import AppButton from '@/Components/AppButton.vue';
 import FormSection from '@/Components/FormSection.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useToast } from '@/Composables/useToast';
+
+const toast = useToast();
 
 const form = useForm({
     name: '',
@@ -14,6 +17,11 @@ const createTeam = () => {
     form.post(route('teams.store'), {
         errorBag: 'createTeam',
         preserveScroll: true,
+        onError: () => {
+            if (!form.hasErrors) {
+                toast.error('Could not create the business.');
+            }
+        },
     });
 };
 </script>
@@ -58,9 +66,9 @@ const createTeam = () => {
         </template>
 
         <template #actions>
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Create
-            </PrimaryButton>
+            <AppButton type="submit" variant="primary" :loading="form.processing">
+                {{ form.processing ? 'Creating…' : 'Create' }}
+            </AppButton>
         </template>
     </FormSection>
 </template>

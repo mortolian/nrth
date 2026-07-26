@@ -1,17 +1,19 @@
 <script setup>
 import { ref } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import ActionMessage from '@/Components/ActionMessage.vue';
 import FormSection from '@/Components/FormSection.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
+import AppButton from '@/Components/AppButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
+import { useToast } from '@/Composables/useToast';
 
 const props = defineProps({
     user: Object,
 });
+
+const toast = useToast();
 
 const form = useForm({
     _method: 'PUT',
@@ -32,7 +34,15 @@ const updateProfileInformation = () => {
     form.post(route('user-profile-information.update'), {
         errorBag: 'updateProfileInformation',
         preserveScroll: true,
-        onSuccess: () => clearPhotoFileInput(),
+        onSuccess: () => {
+            clearPhotoFileInput();
+            toast.success('Profile saved.');
+        },
+        onError: () => {
+            if (!form.hasErrors) {
+                toast.error('Could not save your profile.');
+            }
+        },
     });
 };
 
@@ -59,14 +69,12 @@ const updatePhotoPreview = () => {
 };
 
 const deletePhoto = () => {
-    if (!window.confirm('Remove your profile photo? You can upload a new one at any time.')) {
-        return;
-    }
     router.delete(route('current-user-photo.destroy'), {
         preserveScroll: true,
         onSuccess: () => {
             photoPreview.value = null;
             clearPhotoFileInput();
+            toast.success('Profile photo removed.');
         },
     });
 };
@@ -85,15 +93,14 @@ const clearPhotoFileInput = () => {
         </template>
 
         <template #description>
-            Your display name, photo, and email used for sign-in and notifications.
+            Update your account’s profile information and email address.
         </template>
 
         <template #form>
             <!-- Profile Photo -->
-            <div v-if="$page.props.jetstream.managesProfilePhotos">
+            <div v-if="$page.props.jetstream.managesProfilePhotos" class="col-span-6 sm:col-span-4">
                 <!-- Profile Photo File Input -->
                 <input
-                    id="photo"
                     ref="photoInput"
                     type="file"
                     class="hidden"
@@ -104,13 +111,13 @@ const clearPhotoFileInput = () => {
 
                 <!-- Current Profile Photo -->
                 <div v-show="! photoPreview" class="mt-2">
-                    <img :src="user.profile_photo_url" :alt="user.name" class="rounded-full size-20 object-cover">
+                    <img :src="user.profile_photo_url" :alt="user.name" class="rounded-full h-20 w-20 object-cover">
                 </div>
 
                 <!-- New Profile Photo Preview -->
                 <div v-show="photoPreview" class="mt-2">
                     <span
-                        class="block rounded-full size-20 bg-cover bg-no-repeat bg-center"
+                        class="block rounded-full w-20 h-20 bg-cover bg-no-repeat bg-center"
                         :style="'background-image: url(\'' + photoPreview + '\');'"
                     />
                 </div>
@@ -132,7 +139,7 @@ const clearPhotoFileInput = () => {
             </div>
 
             <!-- Name -->
-            <div>
+            <div class="col-span-6 sm:col-span-4">
                 <InputLabel for="name" value="Name" />
                 <TextInput
                     id="name"
@@ -146,7 +153,7 @@ const clearPhotoFileInput = () => {
             </div>
 
             <!-- Email -->
-            <div>
+            <div class="col-span-6 sm:col-span-4">
                 <InputLabel for="email" value="Email" />
                 <TextInput
                     id="email"
@@ -159,14 +166,14 @@ const clearPhotoFileInput = () => {
                 <InputError :message="form.errors.email" class="mt-2" />
 
                 <div v-if="$page.props.jetstream.hasEmailVerification && user.email_verified_at === null">
-                    <p class="mt-2 text-sm text-slate-600">
+                    <p class="text-sm mt-2">
                         Your email address is unverified.
 
                         <Link
                             :href="route('verification.send')"
                             method="post"
                             as="button"
-                            class="rounded-md text-sm text-brand-700 underline hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+                            class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             @click.prevent="sendEmailVerification"
                         >
                             Click here to re-send the verification email.
@@ -181,13 +188,9 @@ const clearPhotoFileInput = () => {
         </template>
 
         <template #actions>
-            <ActionMessage :on="form.recentlySuccessful" class="me-3">
-                Saved.
-            </ActionMessage>
-
-            <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                Save
-            </PrimaryButton>
+            <AppButton type="submit" variant="primary" :loading="form.processing">
+                {{ form.processing ? 'Saving…' : 'Save' }}
+            </AppButton>
         </template>
     </FormSection>
 </template>

@@ -261,8 +261,14 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
                 </div>
 
                 <div class="flex flex-wrap gap-3">
-                    <AppButton variant="primary" type="submit" :disabled="form.processing">
-                        {{ isEditing ? 'Save changes' : 'Create account' }}
+                    <AppButton variant="primary" type="submit" :loading="form.processing">
+                        {{
+                            form.processing
+                                ? 'Saving…'
+                                : isEditing
+                                    ? 'Save changes'
+                                    : 'Create account'
+                        }}
                     </AppButton>
                     <AppButton variant="ghost" type="button" @click="router.visit(route('accounting.accounts.index'))">
                         Cancel

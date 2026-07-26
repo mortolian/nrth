@@ -2,6 +2,7 @@
 import { useForm } from '@inertiajs/vue3';
 import AppButton from '@/Components/AppButton.vue';
 import AppSelect from '@/Components/AppSelect.vue';
+import { useToast } from '@/Composables/useToast';
 
 const props = defineProps<{
     preferences: {
@@ -13,6 +14,8 @@ const props = defineProps<{
     };
 }>();
 
+const toast = useToast();
+
 const form = useForm({
     notify_invoice_overdue: props.preferences.notify_invoice_overdue,
     notify_vat_due: props.preferences.notify_vat_due,
@@ -22,7 +25,14 @@ const form = useForm({
 });
 
 const submit = () => {
-    form.put(route('user-preferences.update'), { preserveScroll: true });
+    form.put(route('user-preferences.update'), {
+        preserveScroll: true,
+        onError: () => {
+            if (!form.hasErrors) {
+                toast.error('Could not save preferences.');
+            }
+        },
+    });
 };
 </script>
 
@@ -92,7 +102,9 @@ const submit = () => {
             </div>
 
             <div class="mt-6 flex flex-wrap items-center gap-3 pt-4">
-                <AppButton variant="primary" type="submit" :disabled="form.processing">Save preferences</AppButton>
+                <AppButton variant="primary" type="submit" :loading="form.processing">
+                    {{ form.processing ? 'Saving…' : 'Save preferences' }}
+                </AppButton>
             </div>
         </form>
     </section>
