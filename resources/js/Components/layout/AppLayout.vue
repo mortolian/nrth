@@ -79,7 +79,7 @@ const canTeam = (permission: string) => teamPermissions.value.includes(permissio
 
 const navItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = [
-        { label: 'Dashboard', href: route('dashboard'), icon: Home },
+        { label: 'Dashboard', href: route('dashboard'), icon: Home, matchPrefixes: ['/dashboard'] },
     ];
 
     const moneyInLanding = canTeam('invoices.view')
@@ -178,7 +178,27 @@ const navItems = computed<MenuItem[]>(() => {
     return items;
 });
 
-const isActivePath = (href: string) => href !== '#' && currentPath.value === href.split('?')[0];
+const isActivePath = (href: string) => {
+    if (!href || href === '#') {
+        return false;
+    }
+
+    return currentPath.value === hrefToPath(href);
+};
+
+/** Ziggy often returns absolute URLs; Inertia `page.url` is path-only. */
+function hrefToPath(href: string): string {
+    const withoutHash = href.split('#')[0] ?? href;
+    try {
+        if (/^https?:\/\//i.test(withoutHash)) {
+            return new URL(withoutHash).pathname;
+        }
+    } catch {
+        /* fall through */
+    }
+
+    return withoutHash.split('?')[0] || '/';
+}
 
 function pathMatchesPrefix(prefix: string): boolean {
     const path = currentPath.value;
