@@ -12,6 +12,7 @@ use App\Domain\Ai\OpenAiCompatibleProvider;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
+use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
@@ -95,6 +96,12 @@ class AppServiceProvider extends ServiceProvider
 
             return app(InstanceOperatorService::class)->userCanManageInstance($user);
         });
+
+        try {
+            app(InstanceBackupRetentionSettings::class)->applyToConfig();
+        } catch (\Throwable) {
+            // DB may be unavailable during early install / migrate.
+        }
 
         // After Jetstream registers Fortify views, enrich login for invitation joins.
         $this->app->booted(function (): void {

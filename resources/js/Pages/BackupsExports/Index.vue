@@ -47,6 +47,15 @@ type OperatorRow = {
     can_remove: boolean;
 };
 
+type BackupRetention = {
+    keep_all_backups_for_days: number;
+    keep_daily_backups_for_days: number;
+    keep_weekly_backups_for_weeks: number;
+    keep_monthly_backups_for_months: number;
+    keep_yearly_backups_for_years: number;
+    delete_oldest_backups_when_using_more_megabytes_than: number | null;
+};
+
 const props = defineProps<{
     section: 'takeout' | 'backup';
     can_generate_takeout: boolean;
@@ -76,6 +85,7 @@ const props = defineProps<{
     env_break_glass_configured: boolean;
     backup_schedule_hint: string;
     restore_guide: RestoreGuide | null;
+    backup_retention: BackupRetention | null;
 }>();
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -96,6 +106,48 @@ const backupForm = useForm({});
 const operatorForm = useForm({
     email: '',
 });
+
+const retentionForm = useForm({
+    keep_all_backups_for_days: props.backup_retention?.keep_all_backups_for_days ?? 7,
+    keep_daily_backups_for_days: props.backup_retention?.keep_daily_backups_for_days ?? 16,
+    keep_weekly_backups_for_weeks: props.backup_retention?.keep_weekly_backups_for_weeks ?? 8,
+    keep_monthly_backups_for_months: props.backup_retention?.keep_monthly_backups_for_months ?? 4,
+    keep_yearly_backups_for_years: props.backup_retention?.keep_yearly_backups_for_years ?? 2,
+    delete_oldest_backups_when_using_more_megabytes_than:
+        props.backup_retention?.delete_oldest_backups_when_using_more_megabytes_than ?? null,
+});
+
+watch(
+    () => props.backup_retention,
+    (next) => {
+        if (!next) {
+            return;
+        }
+        retentionForm.keep_all_backups_for_days = next.keep_all_backups_for_days;
+        retentionForm.keep_daily_backups_for_days = next.keep_daily_backups_for_days;
+        retentionForm.keep_weekly_backups_for_weeks = next.keep_weekly_backups_for_weeks;
+        retentionForm.keep_monthly_backups_for_months = next.keep_monthly_backups_for_months;
+        retentionForm.keep_yearly_backups_for_years = next.keep_yearly_backups_for_years;
+        retentionForm.delete_oldest_backups_when_using_more_megabytes_than =
+            next.delete_oldest_backups_when_using_more_megabytes_than;
+        retentionForm.clearErrors();
+    },
+);
+
+const saveRetention = () => {
+    retentionForm
+        .transform((data) => ({
+            ...data,
+            delete_oldest_backups_when_using_more_megabytes_than:
+                data.delete_oldest_backups_when_using_more_megabytes_than === ''
+                || data.delete_oldest_backups_when_using_more_megabytes_than === null
+                    ? null
+                    : Number(data.delete_oldest_backups_when_using_more_megabytes_than),
+        }))
+        .put(route('settings.instance.backup-retention.update'), {
+            preserveScroll: true,
+        });
+};
 
 const addOperator = () => {
     operatorForm.post(route('settings.instance.operators.store'), {
@@ -661,6 +713,104 @@ onBeforeUnmount(() => {
             <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 {{ backup_schedule_hint }}
             </div>
+
+            <AppCard v-if="backup_retention" class="mt-5">
+                <h3 class="text-base font-semibold text-slate-900">Backup retention</h3>
+                <p class="mt-1 text-sm text-slate-600">
+                    Backups still run once a day. These settings control how cleanup keeps copies over time
+                    (all → daily → weekly → monthly → yearly). Applied on the next scheduled cleanup (03:30).
+                </p>
+
+                <form class="mt-4 space-y-4" @submit.prevent="saveRetention">
+                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep all for (days)</label>
+                            <AppInput
+                                v-model="retentionForm.keep_all_backups_for_days"
+                                type="number"
+                                min="1"
+                                max="90"
+                                required
+                            />
+                            <p v-if="retentionForm.errors.keep_all_backups_for_days" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_all_backups_for_days }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then daily for (days)</label>
+                            <AppInput
+                                v-model="retentionForm.keep_daily_backups_for_days"
+                                type="number"
+                                min="0"
+                                max="90"
+                                required
+                            />
+                            <p v-if="retentionForm.errors.keep_daily_backups_for_days" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_daily_backups_for_days }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then weekly for (weeks)</label>
+                            <AppInput
+                                v-model="retentionForm.keep_weekly_backups_for_weeks"
+                                type="number"
+                                min="0"
+                                max="104"
+                                required
+                            />
+                            <p v-if="retentionForm.errors.keep_weekly_backups_for_weeks" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_weekly_backups_for_weeks }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then monthly for (months)</label>
+                            <AppInput
+                                v-model="retentionForm.keep_monthly_backups_for_months"
+                                type="number"
+                                min="0"
+                                max="60"
+                                required
+                            />
+                            <p v-if="retentionForm.errors.keep_monthly_backups_for_months" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_monthly_backups_for_months }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then yearly for (years)</label>
+                            <AppInput
+                                v-model="retentionForm.keep_yearly_backups_for_years"
+                                type="number"
+                                min="0"
+                                max="20"
+                                required
+                            />
+                            <p v-if="retentionForm.errors.keep_yearly_backups_for_years" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_yearly_backups_for_years }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Max storage (MB)</label>
+                            <AppInput
+                                v-model="retentionForm.delete_oldest_backups_when_using_more_megabytes_than"
+                                type="number"
+                                min="100"
+                                max="200000"
+                                placeholder="Unlimited"
+                            />
+                            <p class="mt-1 text-xs text-slate-500">Leave blank for no size cap. Oldest backups are removed first.</p>
+                            <p v-if="retentionForm.errors.delete_oldest_backups_when_using_more_megabytes_than" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.delete_oldest_backups_when_using_more_megabytes_than }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <FormActions class="!mt-2">
+                        <AppButton type="submit" variant="primary" :loading="retentionForm.processing">
+                            {{ retentionForm.processing ? 'Saving…' : 'Save retention' }}
+                        </AppButton>
+                    </FormActions>
+                </form>
+            </AppCard>
 
             <AppCard class="mt-5">
                 <div class="mb-3 flex items-center justify-between gap-2">

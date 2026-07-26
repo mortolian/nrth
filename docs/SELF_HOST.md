@@ -55,6 +55,8 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first admin is an **instance operator** — manage operators and runs under **Backups & exports → Instance backup**.
 
+Retention (how long daily backups are kept as daily / weekly / monthly / yearly copies, plus an optional size cap) is editable on that same screen under **Backup retention**. Defaults match `config/backup.php` until changed.
+
 | | Data takeout | Instance backup |
 |--|--------------|-----------------|
 | Who | Team owner | Instance operator |

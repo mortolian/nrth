@@ -83,6 +83,8 @@ Route::middleware([
     Route::post('/team-invitations/{invitation}/resend', [TeamInvitationController::class, 'resend'])
         ->name('team-invitations.resend');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
+    Route::put('/settings/instance/backup-retention', [InstanceSettingsController::class, 'updateBackupRetention'])
+        ->name('settings.instance.backup-retention.update');
     Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
     Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');
     Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');

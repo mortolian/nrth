@@ -6,6 +6,7 @@ use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
+use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Models\TakeoutRun;
@@ -28,6 +29,7 @@ class BackupsExportsController extends Controller
         private readonly TakeoutPreviewService $previewService,
         private readonly InstanceBackupService $backups,
         private readonly InstanceOperatorService $operators,
+        private readonly InstanceBackupRetentionSettings $backupRetention,
     ) {}
 
     public function index(Request $request): Response
@@ -63,8 +65,9 @@ class BackupsExportsController extends Controller
             'recent_backups' => [],
             'operators' => [],
             'env_break_glass_configured' => false,
-            'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Use the restore guide below for CLI recovery — there is no one-click restore in the app.',
+            'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Retention below decides how long daily/weekly/monthly copies are kept. Use the restore guide for CLI recovery — there is no one-click restore in the app.',
             'restore_guide' => null,
+            'backup_retention' => null,
         ];
 
         if ($isOwner) {
@@ -77,6 +80,7 @@ class BackupsExportsController extends Controller
             $props['restore_guide'] = $this->backups->restoreGuideProps();
             $props['operators'] = $this->operators->listEffectiveOperators();
             $props['env_break_glass_configured'] = $this->operators->envOperatorEmails() !== [];
+            $props['backup_retention'] = $this->backupRetention->current();
         }
 
         return Inertia::render('BackupsExports/Index', $props);
