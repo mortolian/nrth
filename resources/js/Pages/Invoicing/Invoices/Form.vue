@@ -5,7 +5,9 @@ import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import FormValidationBanner from '@/Components/FormValidationBanner.vue';
 import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
+import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
@@ -79,6 +81,7 @@ const hasClients = computed(() => props.clients.length > 0);
 const canSaveInvoice = computed(() => props.isEditing || hasClients.value);
 const saving = ref(false);
 const toast = useToast();
+const { fieldErrors, setFromZod, setFromServer, clear, clearField, messages: clientErrorMessages } = useFieldErrors();
 
 const initialClientId = props.invoice?.client_id ?? props.clients[0]?.id ?? null;
 const clientForInitialCurrency = initialClientId
@@ -116,20 +119,22 @@ const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const inertiaErrors = computed(() => {
+const inertiaErrorMessages = computed(() => {
     const raw = page.props.errors as Record<string, string | string[] | undefined>;
     if (!raw || typeof raw !== 'object') {
-        return [] as { key: string; message: string }[];
+        return [] as string[];
     }
-    return Object.entries(raw).flatMap(([key, val]) => {
+    return Object.values(raw).flatMap((val) => {
         if (val === undefined || val === null) {
             return [];
         }
-        const message = Array.isArray(val) ? val.join(' ') : String(val);
-
-        return [{ key, message }];
+        return [Array.isArray(val) ? val.join(' ') : String(val)];
     });
 });
+
+const visibleValidationErrors = computed(() =>
+    clientErrorMessages.value.length ? clientErrorMessages.value : inertiaErrorMessages.value,
+);
 
 /** Options for VAT select when VAT applies. */
 const taxRateSelectOptions = computed(() => {
@@ -143,7 +148,7 @@ const taxRateSelectOptions = computed(() => {
     return [{ label: 'No VAT', value: '0' }];
 });
 
-const { setErrors, values, setFieldValue } = useForm({
+const { values, setFieldValue: setVeeFieldValue } = useForm({
     initialValues: {
         client_id: initialClientId,
         number: props.invoice?.number ?? props.next_number,
@@ -165,6 +170,11 @@ const { setErrors, values, setFieldValue } = useForm({
             : [{ row_key: makeRowKey(), description: '', quantity: 1, unit_price: '0.00', vat_rate: defaultVatRate.value, account_id: null }],
     },
 });
+
+const setFieldValue = (path: string, value: unknown) => {
+    setVeeFieldValue(path, value);
+    clearField(path);
+};
 
 /**
  * vee-validate `values` can be returned as either a ref-like wrapper or a reactive object
@@ -330,13 +340,11 @@ const onSave = () => {
     // handleSubmit() can pass a stale snapshot that omits those edits.
     const result = invoiceSchema.safeParse(formValues.value);
     if (!result.success) {
-        const mapped: Record<string, string> = {};
-        for (const issue of result.error.issues) {
-            mapped[issue.path.join('.')] = issue.message;
-        }
-        setErrors(mapped);
+        setFromZod(result.error);
         return;
     }
+
+    clear();
 
     const { line_items: lineItems, ...rest } = result.data;
     const payload = {
@@ -357,6 +365,7 @@ const onSave = () => {
             toast.success(props.isEditing ? 'Invoice saved.' : 'Invoice created.');
         },
         onError: (errors: Record<string, string>) => {
+            setFromServer(errors);
             if (!Object.keys(errors).length) {
                 toast.error('Could not save this invoice.');
             }
@@ -386,15 +395,11 @@ const onSave = () => {
     >
         <PageHeader :title="isEditing ? `Edit ${invoice?.number}` : 'Create Invoice'" />
 
-        <div
-            v-if="inertiaErrors.length"
-            class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
-        >
-            <p class="font-medium">Could not save invoice</p>
-            <ul class="mt-2 list-inside list-disc space-y-1 text-rose-800">
-                <li v-for="err in inertiaErrors" :key="err.key">{{ err.message }}</li>
-            </ul>
-        </div>
+        <FormValidationBanner
+            class="mt-4"
+            title="Could not save invoice"
+            :errors="visibleValidationErrors"
+        />
 
         <div class="mt-5 space-y-6">
                 <AppCard>
@@ -422,6 +427,7 @@ const onSave = () => {
                                     placeholder="Select client"
                                     @update:model-value="setFieldValue('client_id', Number($event))"
                                 />
+                                <p v-if="fieldErrors.client_id" class="mt-1 text-xs text-rose-600">{{ fieldErrors.client_id }}</p>
                                 <button
                                     type="button"
                                     class="mt-2 inline-block text-xs text-brand-700 hover:underline"
@@ -434,6 +440,7 @@ const onSave = () => {
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Invoice number</label>
                             <AppInput :model-value="values.number as string" @update:model-value="setFieldValue('number', $event)" />
+                            <p v-if="fieldErrors.number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.number }}</p>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Reference</label>
@@ -443,10 +450,12 @@ const onSave = () => {
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Issue date</label>
                                 <AppInput type="date" :model-value="values.issue_date as string" @update:model-value="setFieldValue('issue_date', $event)" />
+                                <p v-if="fieldErrors.issue_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.issue_date }}</p>
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Due date</label>
                                 <AppInput type="date" :model-value="values.due_date as string" @update:model-value="setFieldValue('due_date', $event)" />
+                                <p v-if="fieldErrors.due_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.due_date }}</p>
                             </div>
                         </div>
                         <div class="md:col-span-2">
@@ -456,6 +465,7 @@ const onSave = () => {
                                 :options="currencyOptions"
                                 @update:model-value="setFieldValue('currency', $event)"
                             />
+                            <p v-if="fieldErrors.currency" class="mt-1 text-xs text-rose-600">{{ fieldErrors.currency }}</p>
                             <p class="mt-1 text-xs text-slate-500">
                                 Defaults to the selected client&rsquo;s currency; change here to override for this invoice only.
                             </p>
@@ -468,6 +478,7 @@ const onSave = () => {
                         VAT is not applied on this invoice. Enable VAT registered and choose a default VAT rate in Business settings to charge VAT.
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
+                    <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>
 
                     <div class="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]">
                         <table class="w-full min-w-[52rem] table-fixed divide-y divide-slate-200 text-sm">

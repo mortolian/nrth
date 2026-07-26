@@ -141,7 +141,12 @@ const errorKeys = [
     'book_fx_loss_to_expense',
 ] as const;
 
+const localErrors = ref<{ key: string; message: string }[]>([]);
+
 const errorsList = computed(() => {
+    if (localErrors.value.length) {
+        return localErrors.value;
+    }
     const raw = page.props.errors;
     if (!raw || typeof raw !== 'object') return [] as { key: string; message: string }[];
     return errorKeys.flatMap((key) => {
@@ -166,6 +171,7 @@ const resetForm = () => {
     };
     spotHint.value = null;
     spotError.value = null;
+    localErrors.value = [];
 };
 
 watch(
@@ -255,7 +261,20 @@ const submit = () => {
     const inv = props.invoice;
     if (!inv) return;
     const amountCents = paymentInvoiceCents.value;
-    if (amountCents < 1) return;
+    if (amountCents < 1) {
+        localErrors.value = [{ key: 'amount', message: 'Enter a payment amount greater than zero.' }];
+        return;
+    }
+    if (!form.value.payment_date) {
+        localErrors.value = [{ key: 'payment_date', message: 'Payment date is required.' }];
+        return;
+    }
+    if (!Number(form.value.banking_account_id || 0)) {
+        localErrors.value = [{ key: 'banking_account_id', message: 'Select a deposit account.' }];
+        return;
+    }
+
+    localErrors.value = [];
 
     const body: Record<string, unknown> = {
         amount_cents: amountCents,
@@ -363,11 +382,15 @@ const submit = () => {
                         Amount ({{ invoice.currency }})
                     </label>
                     <AppInput
-                        v-model="form.amount"
+                        :model-value="form.amount"
                         type="text"
                         inputmode="decimal"
                         autocomplete="off"
+                        @update:model-value="(v) => { form.amount = v; localErrors = []; }"
                     />
+                    <p v-if="localErrors.some((e) => e.key === 'amount')" class="mt-1 text-xs text-rose-600">
+                        Enter a payment amount greater than zero.
+                    </p>
                     <p v-if="chargesVat" class="mt-1 text-xs text-slate-500">
                         VAT is allocated from this payment in proportion to the invoice total.
                     </p>

@@ -5,9 +5,12 @@ import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
+import FormValidationBanner from '@/Components/FormValidationBanner.vue';
+import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
+import { z } from 'zod';
 
 type ClientOption = { id: number; name: string; currency: string };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
@@ -92,7 +95,27 @@ const form = ref({
 
 const saving = ref(false);
 const toast = useToast();
+const { fieldErrors, setFromZod, setFromServer, clear, clearField, messages: clientErrorMessages } = useFieldErrors();
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+
+const estimateSchema = z.object({
+    client_id: z.coerce.number().int().positive('Select a client'),
+    number: z.string().trim().min(1, 'Estimate number is required'),
+    issue_date: z.string().min(1, 'Issue date is required'),
+    expiry_date: z.string().min(1, 'Expiry date is required'),
+    currency: z
+        .string()
+        .length(3, 'Select a currency')
+        .regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
+    notes: z.string().optional(),
+    terms: z.string().optional(),
+    line_items: z.array(z.object({
+        description: z.string().min(1, 'Description is required'),
+        quantity: z.coerce.number().positive('Qty must be greater than 0'),
+        unit_price: z.coerce.number().min(0, 'Unit price cannot be negative'),
+        vat_rate: z.coerce.number().min(0).max(1),
+    })).min(1, 'Add at least one line item'),
+});
 
 const lineItems = ref<EstimateLineForm[]>(
     props.estimate?.line_items?.length
@@ -238,10 +261,21 @@ const removeLine = (index: number) => {
 const submit = (submitAction: 'draft' | 'send') => {
     if (saving.value) return;
 
-    const payload = {
+    const result = estimateSchema.safeParse({
         ...form.value,
+        line_items: lineItems.value,
+    });
+    if (!result.success) {
+        setFromZod(result.error);
+        return;
+    }
+
+    clear();
+
+    const payload = {
+        ...result.data,
         submit_action: submitAction,
-        line_items: lineItems.value.map((line) => ({
+        line_items: result.data.line_items.map((line) => ({
             description: line.description,
             quantity: Number(line.quantity),
             unit_price_cents: Math.round(Number(line.unit_price) * 100),
@@ -257,6 +291,7 @@ const submit = (submitAction: 'draft' | 'send') => {
             toast.success(props.isEditing ? 'Estimate saved.' : 'Estimate created.');
         },
         onError: (errors: Record<string, string>) => {
+            setFromServer(errors);
             if (!Object.keys(errors).length) {
                 toast.error('Could not save this estimate.');
             }
@@ -286,7 +321,13 @@ const submit = (submitAction: 'draft' | 'send') => {
         <Head :title="isEditing ? 'Edit Estimate' : 'Create Estimate'" />
         <PageHeader :title="isEditing ? `Edit ${form.number}` : 'Create Estimate'" />
 
-        <div class="space-y-6">
+        <FormValidationBanner
+            class="mt-4"
+            title="Could not save estimate"
+            :errors="clientErrorMessages"
+        />
+
+        <div class="mt-5 space-y-6">
                 <AppCard>
                     <div class="grid gap-3 md:grid-cols-2">
                         <div>
@@ -295,12 +336,36 @@ const submit = (submitAction: 'draft' | 'send') => {
                                 :model-value="String(form.client_id)"
                                 :options="clients.map((c) => ({ label: c.name, value: String(c.id) }))"
                                 placeholder="Select client"
-                                @update:model-value="form.client_id = Number($event)"
+                                @update:model-value="form.client_id = Number($event); clearField('client_id')"
                             />
+                            <p v-if="fieldErrors.client_id" class="mt-1 text-xs text-rose-600">{{ fieldErrors.client_id }}</p>
                         </div>
-                        <div><label class="mb-1 block text-xs font-medium text-slate-500">Estimate number</label><AppInput v-model="form.number" /></div>
-                        <div><label class="mb-1 block text-xs font-medium text-slate-500">Issue date</label><AppInput v-model="form.issue_date" type="date" /></div>
-                        <div><label class="mb-1 block text-xs font-medium text-slate-500">Expiry date</label><AppInput v-model="form.expiry_date" type="date" /></div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Estimate number</label>
+                            <AppInput
+                                :model-value="form.number"
+                                @update:model-value="(v) => { form.number = v; clearField('number'); }"
+                            />
+                            <p v-if="fieldErrors.number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.number }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Issue date</label>
+                            <AppInput
+                                :model-value="form.issue_date"
+                                type="date"
+                                @update:model-value="(v) => { form.issue_date = v; clearField('issue_date'); }"
+                            />
+                            <p v-if="fieldErrors.issue_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.issue_date }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Expiry date</label>
+                            <AppInput
+                                :model-value="form.expiry_date"
+                                type="date"
+                                @update:model-value="(v) => { form.expiry_date = v; clearField('expiry_date'); }"
+                            />
+                            <p v-if="fieldErrors.expiry_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.expiry_date }}</p>
+                        </div>
                         <div class="md:col-span-2">
                             <label class="mb-1 block text-xs font-medium text-slate-500">Estimate currency</label>
                             <AppSelect
@@ -320,6 +385,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                         VAT is not applied on this estimate. Enable VAT registered and choose a default VAT rate in Business settings to charge VAT.
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
+                    <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>
 
                     <div class="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]">
                         <table class="w-full min-w-[52rem] table-fixed divide-y divide-slate-200 text-sm">

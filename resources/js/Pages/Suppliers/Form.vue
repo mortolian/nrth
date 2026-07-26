@@ -5,7 +5,9 @@ import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
+import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useToast } from '@/Composables/useToast';
+
 const props = defineProps<{
     isEditing: boolean;
     return_to?: string | null;
@@ -34,8 +36,9 @@ const props = defineProps<{
 
 const toast = useToast();
 const saving = ref(false);
+const { fieldErrors, setFromZod, setFromServer, clear, clearField } = useFieldErrors();
 
-const { values, setFieldValue } = useForm({
+const { values, setFieldValue: setVeeFieldValue } = useForm({
     initialValues: {
         name: props.supplier?.name ?? props.prefill?.name ?? '',
         contact_name: props.supplier?.contact_name ?? '',
@@ -55,10 +58,15 @@ const { values, setFieldValue } = useForm({
     },
 });
 
+const setFieldValue = (path: string, value: unknown) => {
+    setVeeFieldValue(path, value);
+    clearField(path);
+};
+
 const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
 
 const schema = z.object({
-    name: z.string().min(1, 'Supplier name is required'),
+    name: z.string().trim().min(1, 'Supplier name is required'),
     contact_name: z.string().optional(),
     email: z.string().email('Invalid email').or(z.literal('')),
     phone: z.string().optional(),
@@ -79,7 +87,12 @@ const submit = () => {
     if (saving.value) return;
 
     const result = schema.safeParse(formValues.value);
-    if (!result.success) return;
+    if (!result.success) {
+        setFromZod(result.error);
+        return;
+    }
+
+    clear();
 
     const visitOptions = {
         onStart: () => {
@@ -89,6 +102,7 @@ const submit = () => {
             toast.success(props.isEditing ? 'Supplier saved.' : 'Supplier created.');
         },
         onError: (errors: Record<string, string>) => {
+            setFromServer(errors);
             if (!Object.keys(errors).length) {
                 toast.error('Could not save this supplier.');
             }
@@ -119,72 +133,80 @@ const submit = () => {
         <PageHeader :title="isEditing ? 'Edit Supplier' : 'Create Supplier'" />
 
         <AppCard class="mt-5">
-            <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Supplier name</label>
-                    <AppInput :model-value="values.name" @update:model-value="setFieldValue('name', $event)" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Contact name</label>
-                    <AppInput :model-value="values.contact_name" @update:model-value="setFieldValue('contact_name', $event)" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
-                    <AppInput :model-value="values.email" type="email" @update:model-value="setFieldValue('email', $event)" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                    <AppPhoneInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event ?? '')" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
-                    <AppInput :model-value="values.vat_number" placeholder="4XXXXXXXXX" @update:model-value="setFieldValue('vat_number', $event)" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Registration number</label>
-                    <AppInput :model-value="values.registration_number" @update:model-value="setFieldValue('registration_number', $event)" />
-                </div>
-                <div class="md:col-span-2">
-                    <h3 class="mb-2 text-sm font-semibold text-slate-800">Address</h3>
-                    <div class="grid gap-3 md:grid-cols-2">
-                        <AppInput :model-value="values.address.street" placeholder="Street" @update:model-value="setFieldValue('address.street', $event)" />
-                        <AppInput :model-value="values.address.city" placeholder="City" @update:model-value="setFieldValue('address.city', $event)" />
-                        <AppInput :model-value="values.address.province" placeholder="Province" @update:model-value="setFieldValue('address.province', $event)" />
-                        <AppInput :model-value="values.address.postal_code" placeholder="Postal code" @update:model-value="setFieldValue('address.postal_code', $event)" />
-                        <AppInput :model-value="values.address.country" placeholder="Country" @update:model-value="setFieldValue('address.country', $event)" />
+            <form @submit.prevent="submit">
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Supplier name</label>
+                        <AppInput :model-value="values.name" @update:model-value="setFieldValue('name', $event)" />
+                        <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Contact name</label>
+                        <AppInput :model-value="values.contact_name" @update:model-value="setFieldValue('contact_name', $event)" />
+                        <p v-if="fieldErrors.contact_name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.contact_name }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
+                        <AppInput :model-value="values.email" type="email" @update:model-value="setFieldValue('email', $event)" />
+                        <p v-if="fieldErrors.email" class="mt-1 text-xs text-rose-600">{{ fieldErrors.email }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
+                        <AppPhoneInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event ?? '')" />
+                        <p v-if="fieldErrors.phone" class="mt-1 text-xs text-rose-600">{{ fieldErrors.phone }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
+                        <AppInput :model-value="values.vat_number" placeholder="4XXXXXXXXX" @update:model-value="setFieldValue('vat_number', $event)" />
+                        <p v-if="fieldErrors.vat_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.vat_number }}</p>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Registration number</label>
+                        <AppInput :model-value="values.registration_number" @update:model-value="setFieldValue('registration_number', $event)" />
+                        <p v-if="fieldErrors.registration_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.registration_number }}</p>
+                    </div>
+                    <div class="md:col-span-2">
+                        <h3 class="mb-2 text-sm font-semibold text-slate-800">Address</h3>
+                        <div class="grid gap-3 md:grid-cols-2">
+                            <AppInput :model-value="values.address.street" placeholder="Street" @update:model-value="setFieldValue('address.street', $event)" />
+                            <AppInput :model-value="values.address.city" placeholder="City" @update:model-value="setFieldValue('address.city', $event)" />
+                            <AppInput :model-value="values.address.province" placeholder="Province" @update:model-value="setFieldValue('address.province', $event)" />
+                            <AppInput :model-value="values.address.postal_code" placeholder="Postal code" @update:model-value="setFieldValue('address.postal_code', $event)" />
+                            <AppInput :model-value="values.address.country" placeholder="Country" @update:model-value="setFieldValue('address.country', $event)" />
+                        </div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
+                        <textarea
+                            :value="values.notes"
+                            class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                            @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                        <AppSelect
+                            :model-value="values.is_active ? 'active' : 'inactive'"
+                            :options="[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]"
+                            @update:model-value="setFieldValue('is_active', $event === 'active')"
+                        />
                     </div>
                 </div>
-                <div class="md:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                    <textarea
-                        :value="values.notes"
-                        class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                        @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
-                    />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
-                    <AppSelect
-                        :model-value="values.is_active ? 'active' : 'inactive'"
-                        :options="[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]"
-                        @update:model-value="setFieldValue('is_active', $event === 'active')"
-                    />
-                </div>
-            </div>
-            <FormActions>
-                <AppButton variant="primary" :loading="saving" @click="submit">
-                    {{
-                        saving
-                            ? 'Saving…'
-                            : isEditing
-                                ? 'Update Supplier'
-                                : 'Create Supplier'
-                    }}
-                </AppButton>
-                <AppButton variant="secondary" @click="router.visit(route('suppliers.index'))">
-                    Cancel
-                </AppButton>
-            </FormActions>
+                <FormActions>
+                    <AppButton type="submit" variant="primary" :loading="saving">
+                        {{
+                            saving
+                                ? 'Saving…'
+                                : isEditing
+                                    ? 'Update Supplier'
+                                    : 'Create Supplier'
+                        }}
+                    </AppButton>
+                    <AppButton type="button" variant="secondary" @click="router.visit(route('suppliers.index'))">
+                        Cancel
+                    </AppButton>
+                </FormActions>
+            </form>
         </AppCard>
     </AppLayout>
 </template>

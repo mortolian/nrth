@@ -4,7 +4,10 @@ import { Head, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
+import FormValidationBanner from '@/Components/FormValidationBanner.vue';
+import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 
 type EstimateDetail = {
     id: number;
@@ -44,6 +47,9 @@ const props = defineProps<{
 }>();
 
 const convertDrawerOpen = ref(false);
+const convertSaving = ref(false);
+const toast = useToast();
+const { fieldErrors, setFromServer, clear, clearField, messages: convertErrors } = useFieldErrors();
 const convertForm = ref({
     invoice_due_date: props.convert_defaults.invoice_due_date,
     invoice_footer: props.convert_defaults.invoice_footer,
@@ -61,9 +67,30 @@ const badgeVariant = () => {
 };
 
 const submitConvert = () => {
+    if (convertSaving.value) return;
+
+    if (!convertForm.value.invoice_due_date) {
+        setFromServer({ invoice_due_date: 'Invoice due date is required.' });
+        return;
+    }
+
+    clear();
     router.post(route('invoicing.estimates.convert', props.estimate.id), convertForm.value, {
+        onStart: () => {
+            convertSaving.value = true;
+        },
         onSuccess: () => {
+            toast.success('Invoice created from estimate.');
             convertDrawerOpen.value = false;
+        },
+        onError: (errors: Record<string, string>) => {
+            setFromServer(errors);
+            if (!Object.keys(errors).length) {
+                toast.error('Could not convert this estimate.');
+            }
+        },
+        onFinish: () => {
+            convertSaving.value = false;
         },
     });
 };
@@ -216,9 +243,15 @@ const deleteEstimate = () => {
                 <button class="rounded p-1 hover:bg-slate-100" @click="convertDrawerOpen = false">✕</button>
             </div>
             <div class="space-y-4 px-5 py-4 text-sm">
+                <FormValidationBanner title="Could not convert estimate" :errors="convertErrors" />
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Invoice due date</label>
-                    <AppInput v-model="convertForm.invoice_due_date" type="date" />
+                    <AppInput
+                        :model-value="convertForm.invoice_due_date"
+                        type="date"
+                        @update:model-value="(v) => { convertForm.invoice_due_date = v; clearField('invoice_due_date'); }"
+                    />
+                    <p v-if="fieldErrors.invoice_due_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.invoice_due_date }}</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Invoice notes</label>
@@ -235,7 +268,9 @@ const deleteEstimate = () => {
                     />
                 </div>
                 <div class="flex justify-end">
-                    <AppButton variant="primary" @click="submitConvert">Create invoice</AppButton>
+                    <AppButton variant="primary" :loading="convertSaving" @click="submitConvert">
+                        {{ convertSaving ? 'Creating…' : 'Create invoice' }}
+                    </AppButton>
                 </div>
             </div>
         </aside>
