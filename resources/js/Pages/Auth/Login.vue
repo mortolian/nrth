@@ -7,13 +7,17 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
 
-defineProps({
+const props = defineProps({
     canResetPassword: Boolean,
     status: String,
+    invitation: {
+        type: Object,
+        default: null,
+    },
 });
 
 const form = useForm({
-    email: '',
+    email: props.invitation?.email ?? '',
     password: '',
     remember: false,
 });
@@ -50,11 +54,29 @@ const submit = () => {
                 class="rounded-2xl border border-stone-200/90 bg-white px-6 py-7 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-24px_rgba(15,23,42,0.18)]"
             >
                 <h2 class="text-base font-semibold tracking-tight text-slate-900">
-                    Sign in
+                    <template v-if="invitation">Join {{ invitation.team_name }}</template>
+                    <template v-else>Sign in</template>
                 </h2>
 
                 <div
-                    v-if="status"
+                    v-if="invitation"
+                    class="mt-4 space-y-2 rounded-lg border border-brand-200 bg-brand-50 px-3 py-3 text-sm text-brand-900"
+                >
+                    <p>
+                        An account already exists for
+                        <strong>{{ invitation.email }}</strong>.
+                        Enter that account’s password to join
+                        <strong>{{ invitation.team_name }}</strong>.
+                    </p>
+                    <p class="text-brand-800/90">
+                        Don’t know the password? Use
+                        <strong>Forgot your password?</strong>
+                        below — you’ll set a new one, then we’ll bring you into the business.
+                    </p>
+                </div>
+
+                <div
+                    v-else-if="status"
                     class="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-sm font-medium text-brand-800"
                 >
                     {{ status }}
@@ -68,8 +90,10 @@ const submit = () => {
                             v-model="form.email"
                             type="email"
                             class="mt-1 block w-full"
+                            :class="{ 'bg-slate-50': invitation }"
                             required
-                            autofocus
+                            :readonly="Boolean(invitation)"
+                            :autofocus="!invitation"
                             autocomplete="username"
                         />
                         <InputError class="mt-2" :message="form.errors.email" />
@@ -83,6 +107,7 @@ const submit = () => {
                             type="password"
                             class="mt-1 block w-full"
                             required
+                            :autofocus="Boolean(invitation)"
                             autocomplete="current-password"
                         />
                         <InputError class="mt-2" :message="form.errors.password" />
@@ -101,14 +126,14 @@ const submit = () => {
                             :class="{ 'opacity-25': form.processing }"
                             :disabled="form.processing"
                         >
-                            Log in
+                            {{ invitation ? 'Sign in & join' : 'Log in' }}
                         </PrimaryButton>
                         <Link
                             v-if="canResetPassword"
                             :href="route('password.request')"
-                            class="text-center text-sm text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-800"
+                            class="text-center text-sm font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 hover:text-brand-800"
                         >
-                            Forgot your password?
+                            {{ invitation ? 'Forgot your password? Set a new one' : 'Forgot your password?' }}
                         </Link>
                     </div>
                 </form>

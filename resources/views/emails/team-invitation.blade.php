@@ -1,23 +1,13 @@
 @component('mail::message')
-{{ __('You have been invited to join the :team team!', ['team' => $invitation->team->name]) }}
+# {{ __('Join :team', ['team' => $invitation->team->name]) }}
 
-@if (Laravel\Fortify\Features::enabled(Laravel\Fortify\Features::registration()))
-{{ __('If you do not have an account, you may create one by clicking the button below. After creating an account, you may click the invitation acceptance button in this email to accept the team invitation:') }}
+{{ __('You’ve been invited to collaborate on :team in :app.', ['team' => $invitation->team->name, 'app' => config('app.name')]) }}
 
-@component('mail::button', ['url' => route('register')])
-{{ __('Create Account') }}
+{{ __('Click the button below. If you’re new, you’ll create a password and join immediately — no separate business setup.') }}
+
+@component('mail::button', ['url' => $joinUrl])
+{{ __('Join :team', ['team' => $invitation->team->name]) }}
 @endcomponent
 
-{{ __('If you already have an account, you may accept this invitation by clicking the button below:') }}
-
-@else
-{{ __('You may accept this invitation by clicking the button below:') }}
-@endif
-
-
-@component('mail::button', ['url' => $acceptUrl])
-{{ __('Accept Invitation') }}
-@endcomponent
-
-{{ __('If you did not expect to receive an invitation to this team, you may discard this email.') }}
+{{ __('This link is for :email only. If you did not expect this invitation, you can ignore this email.', ['email' => $invitation->email]) }}
 @endcomponent

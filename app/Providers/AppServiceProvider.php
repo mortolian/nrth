@@ -15,17 +15,22 @@ use App\Domain\Banking\Services\BankingStatementImporterRegistry;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
+use App\Http\Controllers\Web\Jetstream\TeamInvitationController as AppTeamInvitationController;
 use App\Http\Controllers\Web\UserProfileController;
 use App\Models\User;
 use App\Policies\TakeoutRunPolicy;
 use App\Support\EnsureTeamSpatieRoles;
 use App\Support\Https;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Inertia\Inertia;
+use Laravel\Fortify\Fortify;
 use Laravel\Jetstream\Actions\UpdateTeamMemberRole as JetstreamUpdateTeamMemberRole;
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamController;
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
+use Laravel\Jetstream\Http\Controllers\TeamInvitationController as JetstreamTeamInvitationController;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(JetstreamUserProfileController::class, UserProfileController::class);
         $this->app->bind(JetstreamTeamController::class, AppTeamController::class);
+        $this->app->bind(JetstreamTeamInvitationController::class, AppTeamInvitationController::class);
         $this->app->bind(JetstreamUpdateTeamMemberRole::class, AppUpdateTeamMemberRole::class);
 
         $this->app->singleton(BankingStatementImporterRegistry::class, fn ($app): BankingStatementImporterRegistry => new BankingStatementImporterRegistry(
@@ -85,6 +91,17 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return app(InstanceOperatorService::class)->userCanManageInstance($user);
+        });
+
+        // After Jetstream registers Fortify views, enrich login for invitation joins.
+        $this->app->booted(function (): void {
+            Fortify::loginView(function () {
+                return Inertia::render('Auth/Login', [
+                    'canResetPassword' => Route::has('password.request'),
+                    'status' => session('status'),
+                    'invitation' => session('invitation_join'),
+                ]);
+            });
         });
     }
 

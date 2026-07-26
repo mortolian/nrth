@@ -33,7 +33,19 @@ Resolution order for a member: belong to team → if owner, all permissions → 
 - **delete** — destroy, void, and other destructive actions
 - **export** — dedicated export endpoints (e.g. `reports.export`)
 
-Owner-only product areas that stay outside (or beside) the matrix: tax takeout, instance backups / operators (`manageInstanceBackups`). Team invites and team rename remain Jetstream `TeamPolicy` (owner), aligned with `settings.team`.
+Owner-only product areas that stay outside (or beside) the matrix: tax takeout, instance backups / operators (`manageInstanceBackups`). Renaming or deleting a business stays Jetstream `TeamPolicy` (owner). Inviting members, changing roles, and custom role CRUD use `settings.team` (owner by default; grantable on a custom role). Business settings pages use `settings.business` the same way.
+
+**Settings navigation:** Profile is always available. Business and Team members tabs appear only when the signed-in user has `settings.business` / `settings.team` respectively — viewers and accountants should not see those links (and get 403 if they hit the URLs directly).
+
+## Invitations
+
+Invited people should **join the existing business**, not create a new one:
+
+1. Owner invites by email (role = `team_roles.key`).
+2. The email has one button: **Join {business}** → signed `/invitations/{id}` (`team-invitations.join`).
+3. **New user** (no account): join page asks only for name + password (email locked). Registering accepts the invite automatically — no personal team, no owner onboarding.
+4. **Existing user**: sign in with that email; login automatically accepts pending invites and lands on the invited business (skips owner onboarding even if a leftover personal team exists).
+5. Middleware / onboarding also settle pending invites and prefer membership on another business over unfinished personal-team setup.
 
 ## When adding a feature
 

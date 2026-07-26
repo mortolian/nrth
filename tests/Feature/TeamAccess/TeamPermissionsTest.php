@@ -43,11 +43,68 @@ class TeamPermissionsTest extends TestCase
 
         $this->assertFalse(TeamAccess::allows($accountant, $owner->currentTeam, 'expenses.delete'));
         $this->assertFalse(TeamAccess::allows($accountant, $owner->currentTeam, 'settings.business'));
+        $this->assertFalse(TeamAccess::allows($accountant, $owner->currentTeam, 'settings.team'));
         $this->assertTrue(TeamAccess::allows($accountant, $owner->currentTeam, 'expenses.manage'));
 
         $this->actingAs($accountant)
             ->get(route('settings.business'))
             ->assertForbidden();
+
+        $this->actingAs($accountant)
+            ->get(route('settings.team'))
+            ->assertForbidden();
+    }
+
+    public function test_viewer_cannot_open_business_or_team_settings(): void
+    {
+        [$owner, $viewer] = $this->ownerAndMember(RolePresets::VIEWER);
+
+        $this->assertFalse(TeamAccess::allows($viewer, $owner->currentTeam, 'settings.business'));
+        $this->assertFalse(TeamAccess::allows($viewer, $owner->currentTeam, 'settings.team'));
+
+        $this->actingAs($viewer)
+            ->get(route('settings.business'))
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
+            ->get(route('settings.team'))
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
+            ->get(route('profile.show'))
+            ->assertOk();
+    }
+
+    public function test_custom_role_with_settings_permissions_can_open_settings_pages(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $role = TeamRole::query()->create([
+            'team_id' => $team->id,
+            'key' => 'office-admin',
+            'name' => 'Office admin',
+            'description' => 'Business and team settings',
+            'permissions' => ['settings.business', 'settings.team'],
+            'is_system' => false,
+        ]);
+
+        $member = User::factory()->create();
+        $team->users()->attach($member, ['role' => $role->key]);
+        $member->forceFill(['current_team_id' => $team->id])->save();
+        $member = $member->fresh();
+
+        $this->assertTrue(TeamAccess::allows($member, $team->fresh(), 'settings.business'));
+        $this->assertTrue(TeamAccess::allows($member, $team->fresh(), 'settings.team'));
+
+        $this->actingAs($member)
+            ->get(route('settings.business'))
+            ->assertOk();
+
+        $this->actingAs($member)
+            ->get(route('settings.team'))
+            ->assertOk();
     }
 
     public function test_custom_role_with_only_reports_view_can_open_profit_loss_but_not_create_invoices(): void

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AcceptTeamInvitations;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,15 +22,31 @@ class RedirectIncompleteOnboarding
             return $next($request);
         }
 
-        if ($user->completed_onboarding_at !== null) {
-            return $next($request);
-        }
-
         if ($request->routeIs([
             'onboarding.*',
             'verification.*',
             'logout',
+            'team-invitations.accept',
+            'team-invitations.join',
+            'login',
+            'register',
+            'password.*',
         ])) {
+            return $next($request);
+        }
+
+        // Pending invites / membership on another business take priority over
+        // unfinished personal-team owner setup.
+        AcceptTeamInvitations::settleMembership($user);
+        $user = $user->fresh();
+
+        if ($user === null || $user->completed_onboarding_at !== null) {
+            return $next($request);
+        }
+
+        // Only owners of the *current* business need the setup wizard.
+        $team = $user->currentTeam;
+        if ($team === null || ! $user->ownsTeam($team)) {
             return $next($request);
         }
 

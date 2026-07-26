@@ -19,6 +19,8 @@ class TeamSettingsController extends Controller
 {
     public function edit(Request $request): Response
     {
+        $this->authorizeTeam('settings.team', $request);
+
         $user = $request->user();
         $team = $user->currentTeam;
 
@@ -34,7 +36,6 @@ class TeamSettingsController extends Controller
         $team = $user->currentTeam;
 
         abort_unless($team !== null && $user->belongsToTeam($team), 403);
-        abort_unless($user->can('update', $team), 403);
 
         $max = (int) config('session.lifetime');
         $validated = $request->validate([
@@ -54,6 +55,7 @@ class TeamSettingsController extends Controller
         $user = $request->user();
 
         abort_unless($user->belongsToTeam($team), 403);
+        abort_unless(TeamAccess::allows($user, $team, 'settings.team'), 403);
 
         Gate::authorize('view', $team);
 
@@ -146,7 +148,7 @@ class TeamSettingsController extends Controller
                 'canRemoveTeamMembers' => Gate::check('removeTeamMember', $team),
                 'canUpdateTeam' => Gate::check('update', $team),
                 'canUpdateTeamMembers' => Gate::check('updateTeamMember', $team),
-                'canManageRoles' => Gate::check('update', $team),
+                'canManageRoles' => TeamAccess::allows($user, $team, 'settings.team'),
             ],
             'session_idle_timeout_minutes' => (int) ($settings['session_idle_timeout_minutes'] ?? 0),
             'session_lifetime_minutes' => (int) config('session.lifetime'),

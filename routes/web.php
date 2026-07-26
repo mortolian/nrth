@@ -20,11 +20,13 @@ use App\Http\Controllers\Web\Invoicing\EstimatePdfController;
 use App\Http\Controllers\Web\Invoicing\ExchangeRateController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\Invoicing\InvoiceOnlinePaymentController;
+use App\Http\Controllers\Web\JoinTeamInvitationController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\PublicInvoicePayController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
 use App\Http\Controllers\Web\Settings\InstanceSettingsController;
+use App\Http\Controllers\Web\Settings\TeamInvitationController;
 use App\Http\Controllers\Web\Settings\TeamRoleController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
@@ -52,6 +54,10 @@ Route::get('/pay/{token}', [PublicInvoicePayController::class, 'show'])->where('
 Route::post('/pay/{token}/checkout', [PublicInvoicePayController::class, 'checkout'])->where('token', '[a-f0-9]{32}')->name('public.invoice.checkout');
 Route::get('/pay/{token}/pdf', [PublicInvoicePayController::class, 'pdf'])->where('token', '[a-f0-9]{32}')->name('public.invoice.pdf');
 
+Route::get('/invitations/{invitation}', JoinTeamInvitationController::class)
+    ->middleware(['signed'])
+    ->name('team-invitations.join');
+
 Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
@@ -74,6 +80,8 @@ Route::middleware([
     Route::post('/settings/team/roles', [TeamRoleController::class, 'store'])->name('settings.team.roles.store');
     Route::put('/settings/team/roles/{teamRole}', [TeamRoleController::class, 'update'])->name('settings.team.roles.update');
     Route::delete('/settings/team/roles/{teamRole}', [TeamRoleController::class, 'destroy'])->name('settings.team.roles.destroy');
+    Route::post('/team-invitations/{invitation}/resend', [TeamInvitationController::class, 'resend'])
+        ->name('team-invitations.resend');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
     Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
     Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');

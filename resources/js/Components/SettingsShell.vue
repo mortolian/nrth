@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
@@ -10,11 +11,28 @@ const props = defineProps<{
     subtitle?: string;
 }>();
 
-const sections = computed((): AppTabItem[] => [
-    { id: 'profile', label: 'Profile', href: route('profile.show') },
-    { id: 'business', label: 'Business', href: route('settings.business') },
-    { id: 'team', label: 'Team members', href: route('settings.team') },
-]);
+const page = usePage();
+const teamPermissions = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) ? (perms as string[]) : [];
+});
+const canTeam = (permission: string) => teamPermissions.value.includes(permission);
+
+const sections = computed((): AppTabItem[] => {
+    const tabs: AppTabItem[] = [
+        { id: 'profile', label: 'Profile', href: route('profile.show') },
+    ];
+
+    if (canTeam('settings.business')) {
+        tabs.push({ id: 'business', label: 'Business', href: route('settings.business') });
+    }
+
+    if (canTeam('settings.team')) {
+        tabs.push({ id: 'team', label: 'Team members', href: route('settings.team') });
+    }
+
+    return tabs;
+});
 
 const activeSection = computed(() => sections.value.find((s) => s.id === props.section));
 

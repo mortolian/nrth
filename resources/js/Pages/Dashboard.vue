@@ -1,6 +1,6 @@
 <script setup>
-import { computed } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
@@ -11,7 +11,6 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
 import VChart from 'vue-echarts';
 import { CircleDollarSign, HandCoins, Landmark, TrendingUp } from 'lucide-vue-next';
-import { ref } from 'vue';
 
 use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -24,6 +23,12 @@ const props = defineProps({
     budget_progress_currency: { type: String, default: 'ZAR' },
     vat_summary: { type: Object, default: () => ({}) },
     vat_enabled: { type: Boolean, default: false },
+});
+
+const page = usePage();
+const canManageBusinessSettings = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('settings.business');
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -259,7 +264,11 @@ const onInvoiceAction = (invoice, actionId) => {
                     <p class="text-sm text-slate-600">
                         VAT cards and reports are hidden until VAT is enabled in business settings.
                     </p>
-                    <a :href="route('settings.business', { tab: 'tax' })" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">
+                    <a
+                        v-if="canManageBusinessSettings"
+                        :href="route('settings.business', { tab: 'tax' })"
+                        class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
+                    >
                         Enable VAT in Business settings
                     </a>
                 </AppCard>

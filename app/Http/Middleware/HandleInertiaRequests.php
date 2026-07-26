@@ -145,6 +145,7 @@ class HandleInertiaRequests extends Middleware
             $can('budgets.view') ? ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')] : null,
             $can('contracts.view') ? ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')] : null,
             $can('settings.business') ? ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')] : null,
+            $can('settings.team') ? ['id' => 'team-settings', 'label' => 'Team Members', 'href' => route('settings.team')] : null,
             ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('settings.index')],
         ]));
 

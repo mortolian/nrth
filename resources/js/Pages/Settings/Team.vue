@@ -148,6 +148,22 @@ const cancelInvitation = (invitation: Invitation) => {
     router.delete(route('team-invitations.destroy', invitation.id), { preserveScroll: true });
 };
 
+const resendingInvitationId = ref<number | null>(null);
+
+const resendInvitation = (invitation: Invitation) => {
+    resendingInvitationId.value = invitation.id;
+    router.post(
+        route('team-invitations.resend', invitation.id),
+        {},
+        {
+            preserveScroll: true,
+            onFinish: () => {
+                resendingInvitationId.value = null;
+            },
+        },
+    );
+};
+
 const roleModalOpen = ref(false);
 const roleTarget = ref<Member | null>(null);
 const updateRoleForm = useForm({ role: '' as string });
@@ -426,14 +442,25 @@ const deleteCustomRole = (summary: RoleSummary) => {
                                     <span class="font-medium text-slate-900">{{ inv.email }}</span>
                                     <span class="ml-2 text-slate-500">({{ inv.role_label }})</span>
                                 </div>
-                                <button
-                                    v-if="permissions.canRemoveTeamMembers"
-                                    type="button"
-                                    class="shrink-0 text-rose-600 hover:underline"
-                                    @click="cancelInvitation(inv)"
-                                >
-                                    Revoke
-                                </button>
+                                <div class="flex shrink-0 items-center gap-3">
+                                    <button
+                                        v-if="permissions.canAddTeamMembers"
+                                        type="button"
+                                        class="text-brand-700 hover:underline disabled:opacity-50"
+                                        :disabled="resendingInvitationId === inv.id"
+                                        @click="resendInvitation(inv)"
+                                    >
+                                        {{ resendingInvitationId === inv.id ? 'Sending…' : 'Resend' }}
+                                    </button>
+                                    <button
+                                        v-if="permissions.canRemoveTeamMembers"
+                                        type="button"
+                                        class="text-rose-600 hover:underline"
+                                        @click="cancelInvitation(inv)"
+                                    >
+                                        Revoke
+                                    </button>
+                                </div>
                             </li>
                         </ul>
                     </section>

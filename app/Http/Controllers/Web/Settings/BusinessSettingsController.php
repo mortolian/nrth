@@ -23,8 +23,6 @@ class BusinessSettingsController extends Controller
     {
         $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
-        abort_unless($request->user()->can('update', $team), 403);
-
         $teamId = (int) $team->id;
         $year = (int) now()->format('Y');
         $sequenceRow = InvoiceNumberSequence::query()
@@ -95,8 +93,6 @@ class BusinessSettingsController extends Controller
     {
         $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
-        abort_unless($request->user()->can('update', $team), 403);
-
         $teamId = (int) $team->id;
 
         if ($request->filled('vat_number')) {
@@ -339,8 +335,6 @@ class BusinessSettingsController extends Controller
     {
         $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
-        abort_unless($request->user()->can('update', $team), 403);
-
         $teamId = (int) $team->id;
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -377,7 +371,6 @@ class BusinessSettingsController extends Controller
     {
         $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
-        abort_unless($request->user()->can('update', $team), 403);
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);
 
         $teamId = (int) $team->id;
@@ -419,7 +412,6 @@ class BusinessSettingsController extends Controller
     {
         $this->authorizeTeam('settings.business', $request);
         $team = $request->user()->currentTeam;
-        abort_unless($request->user()->can('update', $team), 403);
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);
 
         $taxRateId = (int) $taxRate->id;

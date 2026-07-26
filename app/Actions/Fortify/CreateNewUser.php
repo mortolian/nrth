@@ -4,6 +4,7 @@ namespace App\Actions\Fortify;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Support\AcceptTeamInvitations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -21,6 +22,11 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        $invite = session('invitation_join');
+        if (is_array($invite) && isset($invite['email']) && is_string($invite['email']) && $invite['email'] !== '') {
+            $input['email'] = $invite['email'];
+        }
+
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
@@ -34,7 +40,13 @@ class CreateNewUser implements CreatesNewUsers
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
             ]), function (User $user) {
-                $this->createTeam($user);
+                $joined = AcceptTeamInvitations::forUser($user);
+
+                if ($joined === null) {
+                    $this->createTeam($user);
+                }
+
+                session()->forget('invitation_join');
             });
         });
     }

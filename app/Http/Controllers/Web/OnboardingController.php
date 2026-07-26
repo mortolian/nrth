@@ -15,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\TeamBankAccount;
 use App\Models\User;
+use App\Support\AcceptTeamInvitations;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,14 +47,20 @@ class OnboardingController extends Controller
     public function show(Request $request): Response|RedirectResponse
     {
         $user = $request->user();
+
+        AcceptTeamInvitations::settleMembership($user);
+        $user = $user->fresh();
+
         if ($user->completed_onboarding_at !== null) {
             return redirect()->route('dashboard');
         }
 
-        $this->authorizeTeam('settings.business', $request);
-
         $team = $user->currentTeam;
-        abort_unless($team !== null && $user->can('update', $team), 403);
+        if ($team === null || ! $user->ownsTeam($team)) {
+            return redirect()->route('dashboard');
+        }
+
+        $this->authorizeTeam('settings.business', $request);
 
         $settings = $team->mergedBusinessSettings();
         $year = (int) now()->format('Y');

@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Team;
 use App\Models\User;
+use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class TeamPolicy
@@ -47,7 +48,7 @@ class TeamPolicy
      */
     public function addTeamMember(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $this->canManageTeamAccess($user, $team);
     }
 
     /**
@@ -55,7 +56,7 @@ class TeamPolicy
      */
     public function updateTeamMember(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $this->canManageTeamAccess($user, $team);
     }
 
     /**
@@ -63,7 +64,7 @@ class TeamPolicy
      */
     public function removeTeamMember(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $this->canManageTeamAccess($user, $team);
     }
 
     /**
@@ -72,5 +73,11 @@ class TeamPolicy
     public function delete(User $user, Team $team): bool
     {
         return $user->ownsTeam($team);
+    }
+
+    private function canManageTeamAccess(User $user, Team $team): bool
+    {
+        return $user->ownsTeam($team)
+            || TeamAccess::allows($user, $team, 'settings.team');
     }
 }

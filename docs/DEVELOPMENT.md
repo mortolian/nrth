@@ -78,6 +78,24 @@ composer sail -- npm run dev
 
 See `.env.example` for Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
 
+### Email (invitations, invoices, password reset)
+
+Team invitations use Laravel mail **synchronously**. If `MAIL_MAILER=log` (the `.env.example` default), messages are written to `storage/logs/laravel.log` and **never reach an inbox**.
+
+With Docker Compose / Sail, containers send via **Mailpit** (`smtp` → `mailpit:1025`). Open the catcher UI:
+
+[http://localhost:8025](http://localhost:8025)
+
+On the host (Mailpit port forwarded), set:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=127.0.0.1
+MAIL_PORT=1025
+```
+
+Then recreate app containers so env is picked up (`sail up -d` or `./scripts/compose.sh up -d`). Production must use a real SMTP provider — see [SELF_HOST.md](SELF_HOST.md).
+
 ### Backups & exports (local)
 
 - Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).

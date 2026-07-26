@@ -114,6 +114,8 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
+      MAIL_PORT: '1025'
+      MAIL_MAILER: smtp
       DOCKER_ROLE: app
       LARAVEL_SAIL: '1'
       # Octane's file-watcher.cjs runs under vendor/laravel/octane/bin; NODE_PATH guarantees
@@ -151,6 +153,8 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
+      MAIL_PORT: '1025'
+      MAIL_MAILER: smtp
       DOCKER_ROLE: worker
     depends_on:
       postgres:
@@ -182,6 +186,8 @@ services:
       DB_HOST: postgres
       REDIS_HOST: redis
       MAIL_HOST: mailpit
+      MAIL_PORT: '1025'
+      MAIL_MAILER: smtp
       DOCKER_ROLE: scheduler
     depends_on:
       postgres:

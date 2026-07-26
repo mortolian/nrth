@@ -2,9 +2,11 @@
 
 namespace App\Actions\Jetstream;
 
+use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\User;
 use App\Rules\TeamRoleKey;
+use App\Support\MailDelivery;
 use Closure;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Gate;
@@ -14,7 +16,6 @@ use Illuminate\Validation\Rule;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
 use Laravel\Jetstream\Events\InvitingTeamMember;
 use Laravel\Jetstream\Jetstream;
-use Laravel\Jetstream\Mail\TeamInvitation;
 
 class InviteTeamMember implements InvitesTeamMembers
 {
@@ -34,7 +35,10 @@ class InviteTeamMember implements InvitesTeamMembers
             'role' => $role,
         ]);
 
-        Mail::to($email)->send(new TeamInvitation($invitation));
+        Mail::to($email)->send(new TeamInvitationMail($invitation));
+
+        [$flashKey, $flashMessage] = MailDelivery::invitationSentFlash($email);
+        session()->flash($flashKey, $flashMessage);
     }
 
     /**
