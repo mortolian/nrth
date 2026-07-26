@@ -19,6 +19,8 @@ const props = withDefaults(defineProps<{
     tableClass?: string;
     /** When false, hides the page footer (e.g. embedded lists with a single page). */
     showPagination?: boolean;
+    /** Drop outer border/radius when nested inside an AppCard (or similar) that already frames the list. */
+    embedded?: boolean;
     /** Called with the data `<tbody>` when the slot body is mounted (or `null` when unmounted). For row Sortable. */
     tbodyRefFn?: (el: HTMLTableSectionElement | null) => void;
 }>(), {
@@ -29,6 +31,7 @@ const props = withDefaults(defineProps<{
     clickableRows: false,
     tableClass: '',
     showPagination: true,
+    embedded: false,
 });
 
 function setDataTbodyRef(el: unknown) {
@@ -73,7 +76,12 @@ const prevPage = () => {
 </script>
 
 <template>
-    <div class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div
+        :class="[
+            'overflow-hidden bg-white',
+            embedded ? '' : 'rounded-lg border border-slate-200',
+        ]"
+    >
         <div class="overflow-x-auto">
             <table :class="['min-w-full divide-y divide-slate-200', tableClass]">
                 <thead v-if="normalizedColumns.length" class="bg-slate-50">

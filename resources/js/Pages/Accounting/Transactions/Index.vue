@@ -393,6 +393,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
             <!-- Desktop: wide table scrolls horizontally instead of squashing -->
             <div class="hidden md:block">
                 <AppTable
+                    embedded
                     table-class="min-w-[1120px] text-sm"
                     :show-pagination="false"
                     :columns="[
