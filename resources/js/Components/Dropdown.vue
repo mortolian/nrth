@@ -16,7 +16,8 @@ const props = defineProps({
     },
 });
 
-let open = ref(false);
+const open = ref(false);
+const root = ref(null);
 
 const closeOnEscape = (e) => {
     if (open.value && e.key === 'Escape') {
@@ -24,8 +25,26 @@ const closeOnEscape = (e) => {
     }
 };
 
-onMounted(() => document.addEventListener('keydown', closeOnEscape));
-onUnmounted(() => document.removeEventListener('keydown', closeOnEscape));
+/** Header uses backdrop-blur, so a fixed overlay only covers the bar — listen on the document instead. */
+const closeOnOutsidePointer = (e) => {
+    if (!open.value || !root.value) {
+        return;
+    }
+
+    if (!root.value.contains(e.target)) {
+        open.value = false;
+    }
+};
+
+onMounted(() => {
+    document.addEventListener('keydown', closeOnEscape);
+    document.addEventListener('pointerdown', closeOnOutsidePointer, true);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('keydown', closeOnEscape);
+    document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
+});
 
 const widthClass = computed(() => {
     return {
@@ -48,13 +67,10 @@ const alignmentClasses = computed(() => {
 </script>
 
 <template>
-    <div class="relative">
+    <div ref="root" class="relative">
         <div @click="open = ! open">
             <slot name="trigger" />
         </div>
-
-        <!-- Full Screen Dropdown Overlay -->
-        <div v-show="open" class="fixed inset-0 z-40" @click="open = false" />
 
         <transition
             enter-active-class="transition ease-out duration-200"
