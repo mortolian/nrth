@@ -9,6 +9,7 @@ import {
     Building2,
     Calculator,
     ChartColumnBig,
+    ChevronDown,
     ChevronRight,
     CreditCard,
     FileText,
@@ -18,6 +19,7 @@ import {
     LogOut,
     Menu,
     MoreHorizontal,
+    PanelLeft,
     Plus,
     Receipt,
     Search,
@@ -63,6 +65,7 @@ const appDisplayName = useAppDisplayName();
 
 const currentTeam = computed(() => page.props.auth?.user?.current_team);
 const teams = computed(() => page.props.auth?.user?.all_teams ?? []);
+const authUser = computed(() => page.props.auth?.user);
 const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeatures));
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
@@ -283,76 +286,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <ApplicationMark class="h-10 w-10 shrink-0 text-brand-700" />
                         <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
                     </Link>
-
-                    <div v-if="hasTeamFeatures && !collapsed" class="mt-4">
-                        <Dropdown align="left" width="60">
-                            <template #trigger>
-                                <button class="flex w-full items-center justify-between gap-2 rounded-md bg-white/50 px-3 py-2 text-sm hover:bg-white/70">
-                                    <span class="flex min-w-0 items-center gap-2">
-                                        <span
-                                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
-                                            aria-hidden="true"
-                                        >
-                                            <Building2 class="h-3.5 w-3.5" />
-                                        </span>
-                                        <span class="truncate">{{ currentTeam?.name ?? 'Business' }}</span>
-                                    </span>
-                                    <ChevronRight class="h-4 w-4 shrink-0" />
-                                </button>
-                            </template>
-                            <template #content>
-                                <div class="w-60">
-                                    <template v-for="team in teams" :key="team.id">
-                                        <form @submit.prevent="switchTeam(team)">
-                                            <DropdownLink as="button">
-                                                <span class="flex min-w-0 items-center gap-2">
-                                                    <span
-                                                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
-                                                        aria-hidden="true"
-                                                    >
-                                                        <Building2 class="h-3.5 w-3.5" />
-                                                    </span>
-                                                    <span class="truncate">{{ team.name }}</span>
-                                                </span>
-                                            </DropdownLink>
-                                        </form>
-                                    </template>
-                                    <template v-if="$page.props.jetstream.canCreateTeams">
-                                        <div class="my-2 border-t border-slate-200" />
-                                        <DropdownLink :href="route('teams.create')">
-                                            <span class="flex min-w-0 items-center gap-2">
-                                                <span
-                                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-slate-500"
-                                                    aria-hidden="true"
-                                                >
-                                                    <Plus class="h-3.5 w-3.5" />
-                                                </span>
-                                                <span class="truncate">Create business</span>
-                                            </span>
-                                        </DropdownLink>
-                                    </template>
-                                    <template v-if="canLeaveCurrentTeam">
-                                        <div class="my-2 border-t border-slate-200" />
-                                        <button
-                                            type="button"
-                                            class="block w-full px-4 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
-                                            @click="leaveTeamModalOpen = true"
-                                        >
-                                            <span class="flex min-w-0 items-center gap-2">
-                                                <span
-                                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-600"
-                                                    aria-hidden="true"
-                                                >
-                                                    <LogOut class="h-3.5 w-3.5" />
-                                                </span>
-                                                <span class="truncate">Leave {{ currentTeam?.name ?? 'business' }}</span>
-                                            </span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </template>
-                        </Dropdown>
-                    </div>
                 </div>
 
                 <nav class="flex-1 overflow-y-auto px-2 py-3">
@@ -400,7 +333,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 <Menu class="h-5 w-5" />
                             </button>
                             <button class="hidden rounded-md p-2 hover:bg-slate-100 lg:inline-flex" @click="collapsed = !collapsed">
-                                <Building2 class="h-5 w-5" />
+                                <PanelLeft class="h-5 w-5" />
                             </button>
 
                             <nav v-if="breadcrumbs?.length" class="hidden items-center gap-2 text-sm text-slate-500 md:flex">
@@ -412,41 +345,140 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             </nav>
                         </div>
 
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 sm:gap-3">
                             <button
-                                class="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                                class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm text-slate-600 hover:bg-slate-50"
                                 @click="commandPaletteOpen = true"
                             >
                                 <Search class="h-4 w-4" />
                                 <span class="hidden sm:inline">Search</span>
                                 <kbd class="hidden rounded border border-slate-300 px-1 text-[11px] text-slate-500 sm:inline">⌘K</kbd>
                             </button>
-                            <button class="rounded-md p-2 text-slate-600 hover:bg-slate-100">
-                                <Bell class="h-5 w-5" />
-                            </button>
-                            <Dropdown align="right" width="48">
+
+                            <Dropdown v-if="hasTeamFeatures" align="right" width="60">
                                 <template #trigger>
-                                    <button class="rounded-full border border-slate-200 p-1.5 hover:bg-slate-50">
-                                        <img
-                                            v-if="$page.props.jetstream.managesProfilePhotos"
-                                            class="h-7 w-7 rounded-full object-cover"
-                                            :src="$page.props.auth.user.profile_photo_url"
-                                            :alt="$page.props.auth.user.name"
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-9 max-w-[11rem] items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 hover:bg-slate-50 sm:max-w-[14rem]"
+                                        :aria-label="`Current business: ${currentTeam?.name ?? 'Business'}`"
+                                    >
+                                        <span
+                                            class="flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500"
+                                            aria-hidden="true"
                                         >
-                                        <span v-else class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
-                                            {{ ($page.props.auth.user.name || 'U').slice(0, 1).toUpperCase() }}
+                                            <Building2 class="h-3.5 w-3.5" />
                                         </span>
+                                        <span class="min-w-0 truncate font-medium">{{ currentTeam?.name ?? 'Business' }}</span>
+                                        <ChevronDown class="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                     </button>
                                 </template>
                                 <template #content>
-                                    <DropdownLink :href="route('settings.index')">Settings</DropdownLink>
-                                    <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">API Tokens</DropdownLink>
-                                    <div class="my-2 border-t border-slate-200" />
-                                    <form @submit.prevent="logout">
-                                        <DropdownLink as="button">Log Out</DropdownLink>
-                                    </form>
+                                    <div class="w-60 py-1">
+                                        <p class="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                            Switch business
+                                        </p>
+                                        <template v-for="team in teams" :key="team.id">
+                                            <form @submit.prevent="switchTeam(team)">
+                                                <DropdownLink as="button">
+                                                    <span class="flex min-w-0 items-center gap-2">
+                                                        <span
+                                                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
+                                                            aria-hidden="true"
+                                                        >
+                                                            <Building2 class="h-3.5 w-3.5" />
+                                                        </span>
+                                                        <span
+                                                            class="min-w-0 truncate"
+                                                            :class="team.id === currentTeam?.id ? 'font-semibold text-slate-900' : ''"
+                                                        >
+                                                            {{ team.name }}
+                                                        </span>
+                                                    </span>
+                                                </DropdownLink>
+                                            </form>
+                                        </template>
+                                        <template v-if="$page.props.jetstream.canCreateTeams">
+                                            <div class="my-2 border-t border-slate-200" />
+                                            <DropdownLink :href="route('teams.create')">
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <span
+                                                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-dashed border-slate-300 bg-white text-slate-500"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <Plus class="h-3.5 w-3.5" />
+                                                    </span>
+                                                    <span class="truncate">Create business</span>
+                                                </span>
+                                            </DropdownLink>
+                                        </template>
+                                        <template v-if="canLeaveCurrentTeam">
+                                            <div class="my-2 border-t border-slate-200" />
+                                            <button
+                                                type="button"
+                                                class="block w-full px-4 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
+                                                @click="leaveTeamModalOpen = true"
+                                            >
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <span
+                                                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-600"
+                                                        aria-hidden="true"
+                                                    >
+                                                        <LogOut class="h-3.5 w-3.5" />
+                                                    </span>
+                                                    <span class="truncate">Leave {{ currentTeam?.name ?? 'business' }}</span>
+                                                </span>
+                                            </button>
+                                        </template>
+                                    </div>
                                 </template>
                             </Dropdown>
+
+                            <Dropdown align="right" width="60">
+                                <template #trigger>
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 py-0 pl-1 pr-2 hover:bg-slate-50 sm:pr-2.5"
+                                        :aria-label="`Account menu for ${authUser?.name ?? 'user'}`"
+                                    >
+                                        <img
+                                            v-if="$page.props.jetstream.managesProfilePhotos"
+                                            class="h-7 w-7 rounded-full object-cover"
+                                            :src="authUser?.profile_photo_url"
+                                            :alt="authUser?.name"
+                                        >
+                                        <span
+                                            v-else
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800"
+                                        >
+                                            {{ (authUser?.name || 'U').slice(0, 1).toUpperCase() }}
+                                        </span>
+                                        <span class="hidden max-w-[9rem] truncate text-sm font-medium text-slate-900 sm:inline">
+                                            {{ authUser?.name }}
+                                        </span>
+                                        <ChevronDown class="hidden h-3.5 w-3.5 shrink-0 text-slate-400 sm:block" />
+                                    </button>
+                                </template>
+                                <template #content>
+                                    <div class="w-60">
+                                        <div class="border-b border-slate-200 px-4 py-3">
+                                            <p class="truncate text-sm font-semibold text-slate-900">{{ authUser?.name }}</p>
+                                            <p class="truncate text-xs text-slate-500">{{ authUser?.email }}</p>
+                                        </div>
+                                        <div class="py-1">
+                                            <DropdownLink :href="route('settings.index')">Settings</DropdownLink>
+                                            <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">API Tokens</DropdownLink>
+                                            <div class="my-1 border-t border-slate-200" />
+                                            <form @submit.prevent="logout">
+                                                <DropdownLink as="button">Log Out</DropdownLink>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </template>
+                            </Dropdown>
+
+                            <button class="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100">
+                                <Bell class="h-5 w-5" />
+                            </button>
                         </div>
                     </div>
                 </header>
@@ -473,18 +505,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <div class="flex items-center gap-2">
                             <ApplicationMark class="h-8 w-8 shrink-0 text-brand-700" />
                             <span class="font-semibold">{{ appDisplayName }}</span>
-                        </div>
-                        <div
-                            v-if="currentTeam?.name"
-                            class="mt-3 flex items-center gap-2 rounded-md bg-white/50 px-2.5 py-1.5"
-                        >
-                            <span
-                                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
-                                aria-hidden="true"
-                            >
-                                <Building2 class="h-3.5 w-3.5" />
-                            </span>
-                            <span class="truncate text-sm text-slate-700">{{ currentTeam.name }}</span>
                         </div>
                     </div>
                     <button class="rounded-md p-2 hover:bg-white/40" @click="mobileOpen = false">
