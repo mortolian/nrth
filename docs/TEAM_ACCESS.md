@@ -37,6 +37,16 @@ Owner-only product areas that stay outside (or beside) the matrix: tax takeout, 
 
 **Settings navigation:** Profile is always available. Business and Team members tabs appear only when the signed-in user has `settings.business` / `settings.team` respectively — viewers and accountants should not see those links (and get 403 if they hit the URLs directly).
 
+## Leaving a business
+
+Non-owners who were invited into a business can leave it at any time:
+
+1. **Settings → Profile** — “Leave business” (available without `settings.team`).
+2. **Business switcher** (sidebar) — “Leave {business}” when the current business is not owned by the user.
+3. **Team members** (owners / `settings.team`) — each non-owner row still has “Leave team” for themselves.
+
+Leaving uses Jetstream `DELETE /teams/{team}/members/{user}` (self). Owners cannot leave a business they created. After leave, the member is switched to another owned/member business when one exists; otherwise they are sent to create a business.
+
 ## Invitations
 
 Invited people should **join the existing business**, not create a new one:

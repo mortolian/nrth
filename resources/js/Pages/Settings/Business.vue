@@ -1198,7 +1198,7 @@ const removeBankAccount = (index: number) => {
 
         </div>
 
-        <div class="mt-8 flex items-center justify-end border-t border-slate-200 pt-6">
+        <div class="mt-8 flex items-center justify-end pt-6">
             <ActionMessage :on="form.recentlySuccessful" class="me-3">
                 Saved.
             </ActionMessage>

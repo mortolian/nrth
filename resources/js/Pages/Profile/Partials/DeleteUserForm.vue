@@ -1,10 +1,9 @@
 <script setup>
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import DangerButton from '@/Components/DangerButton.vue';
+import AppButton from '@/Components/AppButton.vue';
 import DialogModal from '@/Components/DialogModal.vue';
 import InputError from '@/Components/InputError.vue';
-import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 
 const confirmingUserDeletion = ref(false);
@@ -37,7 +36,7 @@ const closeModal = () => {
 </script>
 
 <template>
-    <section class="rounded-xl border border-rose-200 bg-rose-50/50 p-4 md:p-5">
+    <section class="rounded-xl border border-rose-200 bg-rose-50/40 p-4 md:p-5">
         <h4 class="text-sm font-semibold text-slate-900">
             Delete account
         </h4>
@@ -51,9 +50,9 @@ const closeModal = () => {
         </div>
 
         <div class="mt-4">
-            <DangerButton @click="confirmUserDeletion">
+            <AppButton variant="secondary" class="!border-rose-300 !text-rose-700 hover:!bg-rose-50" @click="confirmUserDeletion">
                 Delete account
-            </DangerButton>
+            </AppButton>
         </div>
 
         <DialogModal :show="confirmingUserDeletion" @close="closeModal">
@@ -82,18 +81,18 @@ const closeModal = () => {
             </template>
 
             <template #footer>
-                <SecondaryButton @click="closeModal">
+                <AppButton variant="ghost" @click="closeModal">
                     Cancel
-                </SecondaryButton>
+                </AppButton>
 
-                <DangerButton
-                    class="ms-3"
-                    :class="{ 'opacity-25': form.processing }"
+                <AppButton
+                    variant="primary"
+                    class="ms-3 !bg-rose-600"
                     :disabled="form.processing"
                     @click="deleteUser"
                 >
                     Delete account
-                </DangerButton>
+                </AppButton>
             </template>
         </DialogModal>
     </section>

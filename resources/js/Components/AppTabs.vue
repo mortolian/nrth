@@ -27,8 +27,8 @@ const tabClass = (active: boolean) =>
 </script>
 
 <template>
-    <nav class="border-b border-slate-200" :aria-label="ariaLabel">
-        <div class="-mb-px flex gap-6 overflow-x-auto" role="tablist">
+    <nav :aria-label="ariaLabel">
+        <div class="flex gap-6 overflow-x-auto" role="tablist">
             <template v-for="tab in tabs" :key="tab.id">
                 <Link
                     v-if="tab.href"

@@ -51,7 +51,7 @@ const headerSubtitle = computed(() => {
 
     switch (props.section) {
         case 'profile':
-            return 'Your account, password, two-factor authentication, and preferences.';
+            return undefined;
         case 'business':
             return 'Profile, invoicing, tax, banking, and online payments for the current business.';
         case 'team':

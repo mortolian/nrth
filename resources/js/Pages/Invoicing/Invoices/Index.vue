@@ -114,6 +114,32 @@ const statusOptions = [
 const formatRowCents = (cents: number, currency: string) =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
 
+const businessCurrency = computed(() => {
+    const fromPage = page.props.business_currency;
+    return typeof fromPage === 'string' && fromPage.trim() !== '' ? fromPage : 'ZAR';
+});
+
+const overdueTotalsValue = computed(() => {
+    const rows = props.summary.overdue_totals_by_currency ?? [];
+    if (rows.length === 0) {
+        return formatRowCents(0, businessCurrency.value);
+    }
+    if (rows.length === 1) {
+        return formatRowCents(rows[0].total_cents, rows[0].currency);
+    }
+
+    return rows.map((t) => formatRowCents(t.total_cents, t.currency)).join(' · ');
+});
+
+const overdueTotalsHint = computed(() => {
+    const rows = props.summary.overdue_totals_by_currency ?? [];
+    if (rows.length > 1) {
+        return `${rows.length} currencies past due`;
+    }
+
+    return 'Amount past due';
+});
+
 const applyFilters = () => {
     router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery(), {
         preserveState: true,
@@ -313,26 +339,12 @@ const exportSelectedPdfZip = async () => {
                     class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
                     @click="applyStatFilter('overdue')"
                 >
-                    <AppCard class="h-full">
-                        <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue totals</p>
-                        <template v-if="summary.overdue_totals_by_currency.length === 1">
-                            <p class="mt-1 text-2xl font-semibold text-rose-600">
-                                {{ formatRowCents(summary.overdue_totals_by_currency[0].total_cents, summary.overdue_totals_by_currency[0].currency) }}
-                            </p>
-                        </template>
-                        <template v-else>
-                            <div class="mt-1 space-y-1">
-                                <div
-                                    v-for="t in summary.overdue_totals_by_currency"
-                                    :key="t.currency"
-                                    class="flex items-center justify-between gap-2"
-                                >
-                                    <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ t.currency }}</span>
-                                    <span class="text-sm font-semibold text-rose-600">{{ formatRowCents(t.total_cents, t.currency) }}</span>
-                                </div>
-                            </div>
-                        </template>
-                    </AppCard>
+                    <StatCard
+                        title="Overdue totals"
+                        :value="overdueTotalsValue"
+                        :hint="overdueTotalsHint"
+                        trend="down"
+                    />
                 </button>
             </div>
 

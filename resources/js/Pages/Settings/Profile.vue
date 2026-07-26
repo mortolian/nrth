@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import SectionBorder from '@/Components/SectionBorder.vue';
 import SettingsShell from '@/Components/SettingsShell.vue';
 import DeleteUserForm from '@/Pages/Profile/Partials/DeleteUserForm.vue';
 import LogoutOtherBrowserSessionsForm from '@/Pages/Profile/Partials/LogoutOtherBrowserSessionsForm.vue';
@@ -7,6 +6,7 @@ import TwoFactorAuthenticationForm from '@/Pages/Profile/Partials/TwoFactorAuthe
 import UpdatePasswordForm from '@/Pages/Profile/Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from '@/Pages/Profile/Partials/UpdateProfileInformationForm.vue';
 import ProfilePreferencesForm from '@/Pages/Settings/Partials/ProfilePreferencesForm.vue';
+import LeaveCurrentBusinessForm from '@/Pages/Settings/Partials/LeaveCurrentBusinessForm.vue';
 
 type Preferences = {
     notify_invoice_overdue: boolean;
@@ -28,30 +28,27 @@ defineProps<{
         <div class="space-y-6">
             <div v-if="$page.props.jetstream.canUpdateProfileInformation">
                 <UpdateProfileInformationForm :user="$page.props.auth.user" />
-                <SectionBorder />
             </div>
 
             <ProfilePreferencesForm :preferences="preferences" />
 
             <div v-if="$page.props.jetstream.canUpdatePassword">
-                <SectionBorder />
                 <UpdatePasswordForm />
-                <SectionBorder />
             </div>
 
             <div v-if="$page.props.jetstream.canManageTwoFactorAuthentication">
                 <TwoFactorAuthenticationForm
                     :requires-confirmation="confirmsTwoFactorAuthentication"
                 />
-                <SectionBorder />
             </div>
 
             <LogoutOtherBrowserSessionsForm :sessions="sessions" />
 
-            <template v-if="$page.props.jetstream.hasAccountDeletionFeatures">
-                <SectionBorder />
+            <LeaveCurrentBusinessForm />
+
+            <div v-if="$page.props.jetstream.hasAccountDeletionFeatures">
                 <DeleteUserForm />
-            </template>
+            </div>
         </div>
     </SettingsShell>
 </template>

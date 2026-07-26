@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Archive,
     Bell,
@@ -16,6 +16,7 @@ import {
     FolderKanban,
     Home,
     Landmark,
+    LogOut,
     Menu,
     MoreHorizontal,
     Plus,
@@ -26,6 +27,7 @@ import {
     X,
 } from 'lucide-vue-next';
 import ApplicationMark from '@/Components/ApplicationMark.vue';
+import AppButton from '@/Components/AppButton.vue';
 import ToastHost from '@/Components/ToastHost.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
@@ -91,15 +93,12 @@ const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeat
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
+const canLeaveCurrentTeam = computed(() => Boolean(page.props.can_leave_current_team));
 const teamPermissions = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) ? (perms as string[]) : [];
 });
 const canTeam = (permission: string) => teamPermissions.value.includes(permission);
-const businessLogoUrl = computed(() => {
-    const url = page.props.business_logo_url;
-    return typeof url === 'string' && url.trim() !== '' ? url.trim() : null;
-});
 
 const navItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = [
@@ -337,6 +336,23 @@ const logout = () => router.post(route('logout'));
 const switchTeam = (team: { id: number }) => router.put(route('current-team.update'), { team_id: team.id }, { preserveState: false });
 const isActive = (href: string) => isActivePath(href);
 
+const leaveTeamForm = useForm({});
+const leaveTeamModalOpen = ref(false);
+const authUserId = computed(() => page.props.auth?.user?.id as number | undefined);
+
+const confirmLeaveCurrentTeam = () => {
+    if (!currentTeam.value?.id || !authUserId.value) {
+        return;
+    }
+
+    leaveTeamForm.delete(route('team-members.destroy', [currentTeam.value.id, authUserId.value]), {
+        errorBag: 'removeTeamMember',
+        onSuccess: () => {
+            leaveTeamModalOpen.value = false;
+        },
+    });
+};
+
 const onGlobalKey = (event: KeyboardEvent) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -368,12 +384,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                     >
                         <ApplicationMark class="h-10 w-10 shrink-0 text-brand-700" />
                         <span v-if="!collapsed" class="font-semibold">{{ appDisplayName }}</span>
-                        <img
-                            v-if="collapsed && businessLogoUrl"
-                            :src="businessLogoUrl"
-                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Business logo'"
-                            class="h-8 w-8 rounded-md border border-slate-200 bg-white object-contain"
-                        >
                     </Link>
 
                     <div v-if="hasTeamFeatures && !collapsed" class="mt-4">
@@ -381,14 +391,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <template #trigger>
                                 <button class="flex w-full items-center justify-between gap-2 rounded-md bg-white/50 px-3 py-2 text-sm hover:bg-white/70">
                                     <span class="flex min-w-0 items-center gap-2">
-                                        <img
-                                            v-if="businessLogoUrl"
-                                            :src="businessLogoUrl"
-                                            :alt="currentTeam?.name ? `${currentTeam.name} logo` : 'Business logo'"
-                                            class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
-                                        >
                                         <span
-                                            v-else
                                             class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
                                             aria-hidden="true"
                                         >
@@ -405,14 +408,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                         <form @submit.prevent="switchTeam(team)">
                                             <DropdownLink as="button">
                                                 <span class="flex min-w-0 items-center gap-2">
-                                                    <img
-                                                        v-if="team.logo_url"
-                                                        :src="team.logo_url"
-                                                        :alt="`${team.name} logo`"
-                                                        class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
-                                                    >
                                                     <span
-                                                        v-else
                                                         class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
                                                         aria-hidden="true"
                                                     >
@@ -436,6 +432,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                                 <span class="truncate">Create business</span>
                                             </span>
                                         </DropdownLink>
+                                    </template>
+                                    <template v-if="canLeaveCurrentTeam">
+                                        <div class="my-2 border-t border-slate-200" />
+                                        <button
+                                            type="button"
+                                            class="block w-full px-4 py-2 text-left text-sm text-rose-600 transition hover:bg-rose-50"
+                                            @click="leaveTeamModalOpen = true"
+                                        >
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <span
+                                                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-white text-rose-600"
+                                                    aria-hidden="true"
+                                                >
+                                                    <LogOut class="h-3.5 w-3.5" />
+                                                </span>
+                                                <span class="truncate">Leave {{ currentTeam?.name ?? 'business' }}</span>
+                                            </span>
+                                        </button>
                                     </template>
                                 </div>
                             </template>
@@ -610,14 +624,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             v-if="currentTeam?.name"
                             class="mt-3 flex items-center gap-2 rounded-md bg-white/50 px-2.5 py-1.5"
                         >
-                            <img
-                                v-if="businessLogoUrl"
-                                :src="businessLogoUrl"
-                                :alt="`${currentTeam.name} logo`"
-                                class="h-6 w-6 shrink-0 rounded-md border border-slate-200 bg-white object-contain"
-                            >
                             <span
-                                v-else
                                 class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400"
                                 aria-hidden="true"
                             >
@@ -810,5 +817,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
 
         <CommandPalette v-model:open="commandPaletteOpen" :data="commandPaletteData" />
         <SessionIdleWatcher />
+
+        <div
+            v-if="leaveTeamModalOpen && currentTeam"
+            class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4"
+            @click.self="leaveTeamModalOpen = false"
+        >
+            <div class="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
+                <h3 class="text-base font-semibold text-slate-900">Leave {{ currentTeam.name }}?</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    You will lose access to this business immediately. If you belong to another business, we will switch you there.
+                </p>
+                <div class="mt-5 flex justify-end gap-2">
+                    <AppButton variant="ghost" @click="leaveTeamModalOpen = false">Cancel</AppButton>
+                    <AppButton
+                        variant="primary"
+                        class="!bg-rose-600"
+                        :disabled="leaveTeamForm.processing"
+                        @click="confirmLeaveCurrentTeam"
+                    >
+                        Leave business
+                    </AppButton>
+                </div>
+            </div>
+        </div>
     </div>
 </template>

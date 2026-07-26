@@ -91,7 +91,7 @@ const submit = () => {
                 </div>
             </div>
 
-            <div class="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200/80 pt-4">
+            <div class="mt-6 flex flex-wrap items-center gap-3 pt-4">
                 <AppButton variant="primary" type="submit" :disabled="form.processing">Save preferences</AppButton>
             </div>
         </form>

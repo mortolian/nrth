@@ -16,6 +16,7 @@ use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\Jetstream\TeamInvitationController as AppTeamInvitationController;
+use App\Http\Controllers\Web\Jetstream\TeamMemberController as AppTeamMemberController;
 use App\Http\Controllers\Web\UserProfileController;
 use App\Models\User;
 use App\Policies\TakeoutRunPolicy;
@@ -29,6 +30,7 @@ use Inertia\Inertia;
 use Laravel\Fortify\Fortify;
 use Laravel\Jetstream\Actions\UpdateTeamMemberRole as JetstreamUpdateTeamMemberRole;
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamController;
+use Laravel\Jetstream\Http\Controllers\Inertia\TeamMemberController as JetstreamTeamMemberController;
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
 use Laravel\Jetstream\Http\Controllers\TeamInvitationController as JetstreamTeamInvitationController;
 
@@ -41,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(JetstreamUserProfileController::class, UserProfileController::class);
         $this->app->bind(JetstreamTeamController::class, AppTeamController::class);
+        $this->app->bind(JetstreamTeamMemberController::class, AppTeamMemberController::class);
         $this->app->bind(JetstreamTeamInvitationController::class, AppTeamInvitationController::class);
         $this->app->bind(JetstreamUpdateTeamMemberRole::class, AppUpdateTeamMemberRole::class);
 

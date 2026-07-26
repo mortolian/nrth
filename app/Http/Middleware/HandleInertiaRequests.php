@@ -100,6 +100,15 @@ class HandleInertiaRequests extends Middleware
 
                 return TeamAccess::permissionsFor($user, $user->currentTeam);
             },
+            'can_leave_current_team' => function () use ($request) {
+                $user = $request->user();
+                $team = $user?->currentTeam;
+
+                return $user !== null
+                    && $team !== null
+                    && $user->belongsToTeam($team)
+                    && ! $user->ownsTeam($team);
+            },
         ];
     }
 
