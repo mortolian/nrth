@@ -260,7 +260,7 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
                     </ul>
                 </div>
 
-                <div class="flex flex-wrap gap-3">
+                <FormActions>
                     <AppButton variant="primary" type="submit" :loading="form.processing">
                         {{
                             form.processing
@@ -270,10 +270,10 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
                                     : 'Create account'
                         }}
                     </AppButton>
-                    <AppButton variant="ghost" type="button" @click="router.visit(route('accounting.accounts.index'))">
+                    <AppButton variant="secondary" type="button" @click="router.visit(route('accounting.accounts.index'))">
                         Cancel
                     </AppButton>
-                </div>
+                </FormActions>
             </form>
         </AppCard>
     </AppLayout>

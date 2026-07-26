@@ -132,7 +132,7 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
                     <input v-model="vatRateForm.is_exempt" type="checkbox" class="rounded border-slate-300">
                     Exempt
                 </label>
-                <div class="mt-5 flex items-end justify-end">
+                <div class="mt-5 flex items-end justify-start">
                     <AppButton
                         type="button"
                         variant="primary"

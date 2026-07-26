@@ -101,11 +101,11 @@ const submit = () => {
                 </div>
             </div>
 
-            <div class="mt-6 flex flex-wrap items-center gap-3 pt-4">
+            <FormActions>
                 <AppButton variant="primary" type="submit" :loading="form.processing">
                     {{ form.processing ? 'Saving…' : 'Save preferences' }}
                 </AppButton>
-            </div>
+            </FormActions>
         </form>
     </section>
 </template>

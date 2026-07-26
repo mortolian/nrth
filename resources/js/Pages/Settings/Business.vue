@@ -1205,7 +1205,7 @@ const removeBankAccount = (index: number) => {
 
         </div>
 
-        <div class="mt-8 flex items-center justify-end pt-6">
+        <FormActions>
             <AppButton
                 variant="primary"
                 :loading="form.processing"
@@ -1213,6 +1213,6 @@ const removeBankAccount = (index: number) => {
             >
                 {{ form.processing ? 'Saving…' : 'Save' }}
             </AppButton>
-        </div>
+        </FormActions>
     </SettingsShell>
 </template>

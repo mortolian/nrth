@@ -468,12 +468,12 @@ const submit = () => {
                     <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
                     <textarea v-model="form.notes" class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2" />
                 </div>
-                <div class="flex justify-end pb-2">
+                <FormActions class="!mt-4 pb-2">
                     <AppButton variant="primary" :loading="saving" @click="submit">
                         <CalendarClock v-if="!saving" class="mr-1 h-4 w-4" />
                         {{ saving ? 'Recording…' : 'Record payment' }}
                     </AppButton>
-                </div>
+                </FormActions>
             </div>
         </aside>
     </div>

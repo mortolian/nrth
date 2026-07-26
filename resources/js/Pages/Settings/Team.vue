@@ -358,14 +358,16 @@ const deleteCustomRole = (summary: RoleSummary) => {
                                 {{ updateTeamNameForm.errors.name }}
                             </p>
                         </div>
-                        <div v-if="permissions.canUpdateTeam" class="mt-4 flex flex-wrap items-center gap-3">
-                            <AppButton
-                                variant="primary"
-                                :loading="updateTeamNameForm.processing"
-                                @click="submitTeamName"
-                            >
-                                {{ updateTeamNameForm.processing ? 'Saving…' : 'Save name' }}
-                            </AppButton>
+                        <div v-if="permissions.canUpdateTeam" class="mt-4">
+                            <FormActions class="!mt-0">
+                                <AppButton
+                                    variant="primary"
+                                    :loading="updateTeamNameForm.processing"
+                                    @click="submitTeamName"
+                                >
+                                    {{ updateTeamNameForm.processing ? 'Saving…' : 'Save name' }}
+                                </AppButton>
+                            </FormActions>
                         </div>
                     </section>
 
@@ -442,13 +444,15 @@ const deleteCustomRole = (summary: RoleSummary) => {
                             </div>
                         </div>
                         <div class="mt-4">
-                            <AppButton
-                                variant="primary"
-                                :loading="inviteForm.processing"
-                                @click="submitInvite"
-                            >
-                                {{ inviteForm.processing ? 'Sending…' : 'Send invitation' }}
-                            </AppButton>
+                            <FormActions class="!mt-0">
+                                <AppButton
+                                    variant="primary"
+                                    :loading="inviteForm.processing"
+                                    @click="submitInvite"
+                                >
+                                    {{ inviteForm.processing ? 'Sending…' : 'Send invitation' }}
+                                </AppButton>
+                            </FormActions>
                         </div>
                     </section>
 
@@ -567,14 +571,16 @@ const deleteCustomRole = (summary: RoleSummary) => {
                                 {{ idleTimeoutForm.errors.session_idle_timeout_minutes }}
                             </p>
                         </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
-                            <AppButton
-                                variant="primary"
-                                :loading="idleTimeoutForm.processing"
-                                @click="saveIdleTimeout"
-                            >
-                                {{ idleTimeoutForm.processing ? 'Saving…' : 'Save timeout' }}
-                            </AppButton>
+                        <div class="mt-4">
+                            <FormActions class="!mt-0">
+                                <AppButton
+                                    variant="primary"
+                                    :loading="idleTimeoutForm.processing"
+                                    @click="saveIdleTimeout"
+                                >
+                                    {{ idleTimeoutForm.processing ? 'Saving…' : 'Save timeout' }}
+                                </AppButton>
+                            </FormActions>
                         </div>
                     </section>
 

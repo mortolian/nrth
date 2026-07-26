@@ -277,7 +277,7 @@ const submit = () => {
                     <label for="banking-active" class="text-sm text-slate-700">Account is active</label>
                 </div>
 
-                <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+                <FormActions bordered>
                     <AppButton type="submit" variant="primary" :loading="form.processing">
                         {{
                             form.processing
@@ -287,10 +287,10 @@ const submit = () => {
                                     : 'Save account'
                         }}
                     </AppButton>
-                    <AppButton type="button" variant="ghost" :disabled="form.processing" @click="cancelForm">
+                    <AppButton type="button" variant="secondary" :disabled="form.processing" @click="cancelForm">
                         Cancel
                     </AppButton>
-                </div>
+                </FormActions>
             </form>
         </AppCard>
 

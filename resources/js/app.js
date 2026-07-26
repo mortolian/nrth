@@ -20,9 +20,9 @@ import DateDisplay from '@/Components/DateDisplay.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import ConfirmDialog from '@/Components/ConfirmDialog.vue';
+import FormActions from '@/Components/FormActions.vue';
 import { readAppNameFromMeta } from '@/lib/appNameCore';
 import { bindFlashToastBridge } from '@/lib/flashToasts';
-
 const appName = (import.meta.env.VITE_APP_NAME || readAppNameFromMeta() || 'Laravel').trim();
 
 createInertiaApp({
@@ -45,7 +45,8 @@ createInertiaApp({
             .component('DateDisplay', DateDisplay)
             .component('PageHeader', PageHeader)
             .component('EmptyState', EmptyState)
-            .component('ConfirmDialog', ConfirmDialog);
+            .component('ConfirmDialog', ConfirmDialog)
+            .component('FormActions', FormActions);
 
         const authStore = useAuthStore(pinia);
         const teamStore = useTeamStore(pinia);

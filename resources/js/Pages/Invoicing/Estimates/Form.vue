@@ -429,13 +429,13 @@ const submit = (submitAction: 'draft' | 'send') => {
                 </AppCard>
         </div>
 
-        <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
-            <div class="flex justify-end gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('invoicing.estimates.index'))">Cancel</AppButton>
-                <AppButton variant="primary" :loading="saving" @click="submit('draft')">
-                    {{ saving ? 'Saving…' : 'Save' }}
-                </AppButton>
-            </div>
-        </div>
+        <FormActions sticky>
+            <AppButton variant="primary" :loading="saving" @click="submit('draft')">
+                {{ saving ? 'Saving…' : 'Save' }}
+            </AppButton>
+            <AppButton variant="secondary" @click="router.visit(route('invoicing.estimates.index'))">
+                Cancel
+            </AppButton>
+        </FormActions>
     </AppLayout>
 </template>

@@ -92,11 +92,11 @@ const pageTitle = computed(() => `Map columns — ${props.bankImport.original_fi
 
             <p v-if="form.errors.mapping" class="mt-3 text-xs text-red-600">{{ form.errors.mapping }}</p>
 
-            <div class="mt-4">
+            <FormActions>
                 <AppButton variant="primary" :loading="form.processing" @click="submit">
                     {{ form.processing ? 'Working…' : 'Preview import' }}
                 </AppButton>
-            </div>
+            </FormActions>
         </AppCard>
 
         <AppCard class="mt-5 overflow-x-auto">

@@ -171,8 +171,7 @@ const submit = () => {
                     />
                 </div>
             </div>
-            <div class="mt-5 flex justify-end gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('suppliers.index'))">Cancel</AppButton>
+            <FormActions>
                 <AppButton variant="primary" :loading="saving" @click="submit">
                     {{
                         saving
@@ -182,7 +181,10 @@ const submit = () => {
                                 : 'Create Supplier'
                     }}
                 </AppButton>
-            </div>
+                <AppButton variant="secondary" @click="router.visit(route('suppliers.index'))">
+                    Cancel
+                </AppButton>
+            </FormActions>
         </AppCard>
     </AppLayout>
 </template>

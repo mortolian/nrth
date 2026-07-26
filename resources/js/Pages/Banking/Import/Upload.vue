@@ -81,7 +81,7 @@ const submit = () => {
                     <p v-if="form.errors.file" class="mt-1.5 text-xs text-red-600">{{ form.errors.file }}</p>
                 </div>
 
-                <div class="flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+                <FormActions bordered>
                     <AppButton
                         type="submit"
                         variant="primary"
@@ -92,13 +92,13 @@ const submit = () => {
                     </AppButton>
                     <AppButton
                         type="button"
-                        variant="ghost"
+                        variant="secondary"
                         :disabled="form.processing"
                         @click="router.visit(route('banking.accounts.index'))"
                     >
                         Cancel
                     </AppButton>
-                </div>
+                </FormActions>
             </form>
         </AppCard>
     </FeatureShell>

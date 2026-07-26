@@ -22,7 +22,7 @@ const hasActions = computed(() => !!useSlots().actions);
 
             <div
                 v-if="hasActions"
-                class="mt-6 flex flex-wrap items-center gap-3 pt-4"
+                class="mt-6 flex flex-wrap items-center justify-start gap-3 pt-4"
             >
                 <slot name="actions" />
             </div>

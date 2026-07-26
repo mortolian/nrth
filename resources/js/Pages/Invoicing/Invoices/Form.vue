@@ -621,18 +621,18 @@ const onSave = () => {
                 </AppCard>
         </div>
 
-        <div class="sticky bottom-0 mt-6 border-t border-slate-200 bg-white/95 px-2 py-3 backdrop-blur">
-            <div class="flex items-center justify-end gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('invoicing.invoices.index'))">Cancel</AppButton>
-                <AppButton
-                    variant="primary"
-                    :disabled="!canSaveInvoice"
-                    :loading="saving"
-                    @click="onSave"
-                >
-                    {{ saving ? 'Saving…' : 'Save' }}
-                </AppButton>
-            </div>
-        </div>
+        <FormActions sticky>
+            <AppButton
+                variant="primary"
+                :disabled="!canSaveInvoice"
+                :loading="saving"
+                @click="onSave"
+            >
+                {{ saving ? 'Saving…' : 'Save' }}
+            </AppButton>
+            <AppButton variant="secondary" @click="router.visit(route('invoicing.invoices.index'))">
+                Cancel
+            </AppButton>
+        </FormActions>
     </AppLayout>
 </template>

@@ -1144,16 +1144,7 @@ const submit = () => {
                 <p class="mt-2 text-xs text-amber-700">Keep logbook for SARS compliance.</p>
             </div>
 
-            <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                <AppButton
-                    variant="ghost"
-                    size="touch"
-                    class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
-                    :disabled="submitting"
-                    @click="router.visit(route('expenses.index'))"
-                >
-                    Cancel
-                </AppButton>
+            <FormActions>
                 <AppButton
                     variant="primary"
                     size="touch"
@@ -1163,7 +1154,16 @@ const submit = () => {
                 >
                     {{ submitting ? 'Saving…' : props.isEditing ? 'Update Expense' : 'Save Expense' }}
                 </AppButton>
-            </div>
+                <AppButton
+                    variant="secondary"
+                    size="touch"
+                    class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
+                    :disabled="submitting"
+                    @click="router.visit(route('expenses.index'))"
+                >
+                    Cancel
+                </AppButton>
+            </FormActions>
         </AppCard>
 
         <Teleport to="body">

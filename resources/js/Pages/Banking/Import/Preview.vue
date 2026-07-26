@@ -111,7 +111,7 @@ const confirmImport = (importId: number) => {
             <p v-if="!summary.preview.length" class="mt-4 text-sm text-slate-500">No transactions to preview.</p>
         </AppCard>
 
-        <div class="mt-5 flex flex-wrap gap-3">
+        <FormActions>
             <AppButton
                 v-if="canConfirm"
                 variant="primary"
@@ -131,6 +131,6 @@ const confirmImport = (importId: number) => {
             <AppButton variant="secondary" :disabled="confirming" @click="router.visit(route('banking.import.create'))">
                 Cancel
             </AppButton>
-        </div>
+        </FormActions>
     </AppLayout>
 </template>

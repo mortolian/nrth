@@ -1313,14 +1313,14 @@ const submit = () => {
             </div>
         </div>
 
-        <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-            <div class="flex gap-2">
-                <AppButton variant="ghost" @click="router.visit(route('budgeting.index'))">Back to budgets</AppButton>
-                <AppButton variant="primary" :loading="saving" @click="submit">
-                    {{ saving ? 'Saving…' : 'Save budget' }}
-                </AppButton>
-            </div>
-        </div>
+        <FormActions>
+            <AppButton variant="primary" :loading="saving" @click="submit">
+                {{ saving ? 'Saving…' : 'Save budget' }}
+            </AppButton>
+            <AppButton variant="secondary" @click="router.visit(route('budgeting.index'))">
+                Cancel
+            </AppButton>
+        </FormActions>
     </AppLayout>
 </template>
 
