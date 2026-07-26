@@ -1,13 +1,12 @@
 <script setup>
-import { useForm } from '@inertiajs/vue3';
+import { useForm, usePage, router } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import AppButton from '@/Components/AppButton.vue';
-import FormSection from '@/Components/FormSection.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import TextInput from '@/Components/TextInput.vue';
 import { useToast } from '@/Composables/useToast';
 
 const toast = useToast();
+const page = usePage();
+const authUser = computed(() => page.props.auth?.user);
 
 const form = useForm({
     name: '',
@@ -27,48 +26,56 @@ const createTeam = () => {
 </script>
 
 <template>
-    <FormSection @submitted="createTeam">
-        <template #title>
-            Business details
-        </template>
+    <AppCard>
+        <form class="max-w-xl space-y-5" @submit.prevent="createTeam">
+            <div>
+                <label for="business-name" class="mb-1.5 block text-xs font-medium text-slate-500">Business name</label>
+                <AppInput
+                    id="business-name"
+                    v-model="form.name"
+                    type="text"
+                    autofocus
+                    required
+                    placeholder="e.g. Acme Consulting"
+                />
+                <p v-if="form.errors.name" class="mt-1.5 text-xs text-rose-600">{{ form.errors.name }}</p>
+            </div>
 
-        <template #description>
-            Create another business with its own books, clients, and settings.
-        </template>
-
-        <template #form>
-            <div class="col-span-6">
-                <InputLabel value="Owner" />
-
-                <div class="flex items-center mt-2">
-                    <img class="object-cover size-12 rounded-full" :src="$page.props.auth.user.profile_photo_url" :alt="$page.props.auth.user.name">
-
-                    <div class="ms-4 leading-tight">
-                        <div class="text-gray-900">{{ $page.props.auth.user.name }}</div>
-                        <div class="text-sm text-gray-700">
-                            {{ $page.props.auth.user.email }}
-                        </div>
+            <div>
+                <p class="mb-1.5 block text-xs font-medium text-slate-500">Owner</p>
+                <div class="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <img
+                        v-if="authUser?.profile_photo_url"
+                        class="h-10 w-10 rounded-full object-cover"
+                        :src="authUser.profile_photo_url"
+                        :alt="authUser?.name"
+                    >
+                    <span
+                        v-else
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800"
+                    >
+                        {{ (authUser?.name || 'U').slice(0, 1).toUpperCase() }}
+                    </span>
+                    <div class="min-w-0 leading-tight">
+                        <p class="truncate text-sm font-medium text-slate-900">{{ authUser?.name }}</p>
+                        <p class="truncate text-xs text-slate-500">{{ authUser?.email }}</p>
                     </div>
                 </div>
             </div>
 
-            <div class="col-span-6 sm:col-span-4">
-                <InputLabel for="name" value="Business name" />
-                <TextInput
-                    id="name"
-                    v-model="form.name"
-                    type="text"
-                    class="block w-full mt-1"
-                    autofocus
-                />
-                <InputError :message="form.errors.name" class="mt-2" />
-            </div>
-        </template>
-
-        <template #actions>
-            <AppButton type="submit" variant="primary" :loading="form.processing">
-                {{ form.processing ? 'Creating…' : 'Create' }}
-            </AppButton>
-        </template>
-    </FormSection>
+            <FormActions class="!mt-2">
+                <AppButton type="submit" variant="primary" :loading="form.processing">
+                    {{ form.processing ? 'Creating…' : 'Create business' }}
+                </AppButton>
+                <AppButton
+                    type="button"
+                    variant="secondary"
+                    :disabled="form.processing"
+                    @click="router.visit(route('dashboard'))"
+                >
+                    Cancel
+                </AppButton>
+            </FormActions>
+        </form>
+    </AppCard>
 </template>
