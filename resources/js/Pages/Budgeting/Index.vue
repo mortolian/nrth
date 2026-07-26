@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import { ChevronDown, ChevronRight, FolderKanban } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
@@ -18,6 +18,9 @@ const props = defineProps({
     active_budget: { type: Object, default: null },
     business_currency: { type: String, default: 'ZAR' },
 });
+
+const page = usePage();
+const canManageBudgets = computed(() => (page.props.team_permissions ?? []).includes('budgets.manage'));
 
 const expandedBudgetId = ref(null);
 
@@ -185,7 +188,7 @@ function budgetVarianceChartOption(budget) {
         ]"
     >
         <PageHeader title="Budgets">
-            <template v-if="budgets.length" #actions>
+            <template v-if="budgets.length && canManageBudgets" #actions>
                 <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">New Budget</AppButton>
             </template>
         </PageHeader>
@@ -194,10 +197,12 @@ function budgetVarianceChartOption(budget) {
             v-if="!budgets.length"
             class="mt-5"
             title="No budgets yet"
-            description="Set spending limits by category and track how actuals compare to plan over the year."
+            :description="canManageBudgets
+                ? 'Set spending limits by category and track how actuals compare to plan over the year.'
+                : 'Budgets for this business will appear here once someone with access creates one.'"
             :icon="FolderKanban"
         >
-            <template #action>
+            <template v-if="canManageBudgets" #action>
                 <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">
                     Create your first budget
                 </AppButton>
@@ -246,7 +251,7 @@ function budgetVarianceChartOption(budget) {
                             <AppBadge :variant="budget.status === 'active' ? 'success' : 'neutral'">{{ budget.status }}</AppBadge>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <div class="flex justify-end gap-1">
+                            <div v-if="canManageBudgets" class="flex justify-end gap-1">
                                 <AppButton size="sm" variant="ghost" @click="router.visit(route('budgeting.edit', budget.id))">
                                     Edit
                                 </AppButton>
@@ -489,7 +494,7 @@ function budgetVarianceChartOption(budget) {
             </AppTable>
         </AppCard>
 
-        <AppCard v-if="(trashed_budgets ?? []).length" class="mt-5 border-dashed border-slate-300 bg-slate-50/50">
+        <AppCard v-if="canManageBudgets && (trashed_budgets ?? []).length" class="mt-5 border-dashed border-slate-300 bg-slate-50/50">
             <h3 class="text-lg font-semibold text-slate-900">Trash</h3>
             <p class="mt-1 text-sm text-slate-500">
                 Budgets you moved to trash can be restored or permanently deleted. Permanent deletion removes all categories and

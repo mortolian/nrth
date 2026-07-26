@@ -75,6 +75,28 @@ class TeamPermissionsTest extends TestCase
             ->assertOk();
     }
 
+    public function test_inertia_forbidden_visit_redirects_with_error_flash_instead_of_modal(): void
+    {
+        [, $viewer] = $this->ownerAndMember(RolePresets::VIEWER);
+
+        // Non-Inertia clients still receive a real 403.
+        $this->actingAs($viewer)
+            ->get(route('budgeting.create'))
+            ->assertForbidden();
+
+        // Inertia visits get a hard location response + flash (avoids a stuck SPA visit).
+        $this->actingAs($viewer)
+            ->withHeaders([
+                'X-Inertia' => 'true',
+                'X-Requested-With' => 'XMLHttpRequest',
+            ])
+            ->from(route('dashboard'))
+            ->post(route('invoicing.invoices.store'), [])
+            ->assertStatus(409)
+            ->assertHeader('X-Inertia-Location', route('dashboard'))
+            ->assertSessionHas('error', 'You do not have permission to do that.');
+    }
+
     public function test_custom_role_with_settings_permissions_can_open_settings_pages(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();
