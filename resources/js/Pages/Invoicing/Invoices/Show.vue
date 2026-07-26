@@ -260,7 +260,7 @@ const undoPayment = (paymentId: number) => {
     <AppLayout
         :title="invoice.number"
         :breadcrumbs="[
-            { label: 'Invoicing' },
+            { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Invoices', href: route('invoicing.invoices.index') },
             { label: invoice.number },
         ]"

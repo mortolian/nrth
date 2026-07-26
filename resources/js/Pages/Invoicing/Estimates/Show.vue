@@ -84,7 +84,7 @@ const deleteEstimate = () => {
     <AppLayout
         :title="estimate.number"
         :breadcrumbs="[
-            { label: 'Money In' },
+            { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Estimates', href: route('invoicing.estimates.index') },
             { label: estimate.number },
         ]"

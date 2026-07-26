@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useBankingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const bankingTabs = useBankingTabs();
 
 type TransactionRow = {
     id: number;
@@ -85,26 +88,17 @@ const clearFilters = () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Imported transactions"
-        :breadcrumbs="[
-            { label: 'Banking' },
-            { label: 'Transactions' },
-        ]"
+    <FeatureShell
+        title="Banking"
+        section="transactions"
+        :tabs="bankingTabs"
+        document-title="Imported transactions"
     >
-        <PageHeader title="Banking transactions">
-            <template #actions>
-                <AppButton variant="secondary" @click="router.visit(route('banking.accounts.index'))">
-                    Accounts
-                </AppButton>
-                <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
-                    Import history
-                </AppButton>
-                <AppButton variant="primary" @click="router.visit(route('banking.import.create'))">
-                    Import statement
-                </AppButton>
-            </template>
-        </PageHeader>
+        <template #actions>
+            <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
+                Import history
+            </AppButton>
+        </template>
 
         <AppCard class="mt-5">
             <form @submit.prevent="applyFilters()">
@@ -236,5 +230,5 @@ const clearFilters = () => {
                 </AppButton>
             </div>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

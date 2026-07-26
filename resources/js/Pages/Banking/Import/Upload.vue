@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useBankingTabs } from '@/Composables/useFeatureTabs';
+
+const bankingTabs = useBankingTabs();
 
 type AccountOption = {
     id: number;
@@ -42,19 +45,13 @@ const submit = () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Import bank statement"
-        :breadcrumbs="[
-            { label: 'Banking' },
-            { label: 'Accounts', href: route('banking.accounts.index') },
-            { label: 'Import statement' },
-        ]"
+    <FeatureShell
+        title="Banking"
+        section="import"
+        :tabs="bankingTabs"
+        document-title="Import bank statement"
+        subtitle="Upload a CSV, TXT, or OFX statement for a banking account."
     >
-        <PageHeader
-            title="Import bank statement"
-            subtitle="Upload a CSV, TXT, or OFX statement for a banking account."
-        />
-
         <AppCard class="mt-5">
             <form class="grid max-w-xl gap-5" @submit.prevent="submit">
                 <div>
@@ -99,5 +96,5 @@ const submit = () => {
                 </div>
             </form>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

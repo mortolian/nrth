@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useTaxTabs } from '@/Composables/useFeatureTabs';
+
+const taxTabs = useTaxTabs();
 
 const props = defineProps<{
     tax_rates: Array<{
@@ -100,15 +103,13 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
 </script>
 
 <template>
-    <AppLayout
-        title="VAT rates"
-        :breadcrumbs="[
-            { label: 'Tax' },
-            { label: 'VAT rates' },
-        ]"
+    <FeatureShell
+        title="Tax"
+        section="vat-rates"
+        :tabs="taxTabs"
+        document-title="VAT rates"
+        subtitle="Create and maintain VAT options used across invoices and expenses"
     >
-        <PageHeader title="VAT rates" subtitle="Create and maintain VAT options used across invoices and expenses" />
-
         <AppCard class="mt-5">
             <div class="grid gap-3 md:grid-cols-6">
                 <div class="md:col-span-2">
@@ -214,6 +215,6 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
                 Please fix the VAT rate form errors and try again.
             </p>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>
 

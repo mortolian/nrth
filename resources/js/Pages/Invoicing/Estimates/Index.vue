@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Head, router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
-import PageHeader from '@/Components/PageHeader.vue';
+import { router } from '@inertiajs/vue3';
+import FeatureShell from '@/Components/FeatureShell.vue';
 import AppCard from '@/Components/AppCard.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import { useMoneyInTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const moneyInTabs = useMoneyInTabs();
 
 type EstimateRow = {
     id: number;
@@ -103,14 +105,15 @@ const onAction = (estimate: EstimateRow, actionId: string) => {
 </script>
 
 <template>
-    <AppLayout title="Estimates" :breadcrumbs="[{ label: 'Money In' }, { label: 'Estimates' }]">
-        <Head title="Estimates" />
-
-        <PageHeader title="Estimates">
-            <template #actions>
-                <AppButton variant="primary" @click="router.visit(route('invoicing.estimates.create'))">New Estimate</AppButton>
-            </template>
-        </PageHeader>
+    <FeatureShell
+        title="Money In"
+        section="estimates"
+        :tabs="moneyInTabs"
+        document-title="Estimates"
+    >
+        <template #actions>
+            <AppButton variant="primary" @click="router.visit(route('invoicing.estimates.create'))">New Estimate</AppButton>
+        </template>
 
         <div class="space-y-6">
             <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -197,5 +200,5 @@ const onAction = (estimate: EstimateRow, actionId: string) => {
                 </AppTable>
             </AppCard>
         </div>
-    </AppLayout>
+    </FeatureShell>
 </template>

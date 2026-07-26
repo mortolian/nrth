@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useTaxTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
+
+const taxTabs = useTaxTabs();
 
 const props = defineProps<{
     current_period: null | {
@@ -62,15 +65,13 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
 </script>
 
 <template>
-    <AppLayout
-        title="VAT Returns"
-        :breadcrumbs="[
-            { label: 'Tax' },
-            { label: 'VAT Returns' },
-        ]"
+    <FeatureShell
+        title="Tax"
+        section="vat"
+        :tabs="taxTabs"
+        document-title="VAT Returns"
+        subtitle="Manage VAT201 periods and supporting transactions"
     >
-        <PageHeader title="VAT Returns" subtitle="Manage VAT201 periods and supporting transactions" />
-
         <AppCard class="mt-5" v-if="current_period">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -206,5 +207,5 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
                 </tr>
             </AppTable>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

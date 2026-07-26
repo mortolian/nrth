@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useTaxTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
+
+const taxTabs = useTaxTabs();
 
 const props = defineProps<{
     tax_year: {
@@ -47,18 +50,13 @@ const applyManualEstimate = () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Provisional Tax"
-        :breadcrumbs="[
-            { label: 'Tax' },
-            { label: 'Provisional Tax' },
-        ]"
+    <FeatureShell
+        title="Tax"
+        section="provisional"
+        :tabs="taxTabs"
+        document-title="Provisional Tax"
+        :subtitle="`${tax_year.label} Tax Year · ${tax_year.start} — ${tax_year.end}`"
     >
-        <PageHeader
-            :title="`${tax_year.label} Tax Year`"
-            :subtitle="`${tax_year.start} — ${tax_year.end}`"
-        />
-
         <div class="mt-5 grid gap-4 xl:grid-cols-2">
             <AppCard v-for="period in periods" :key="period.id">
                 <div class="flex items-start justify-between">
@@ -135,5 +133,5 @@ const applyManualEstimate = () => {
                 </tr>
             </AppTable>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

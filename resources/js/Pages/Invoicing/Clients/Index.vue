@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useMoneyInTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const moneyInTabs = useMoneyInTabs();
 
 type ClientRow = {
     id: number;
@@ -42,18 +45,15 @@ const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 
 </script>
 
 <template>
-    <AppLayout
-        title="Clients"
-        :breadcrumbs="[
-            { label: 'Invoicing' },
-            { label: 'Clients' },
-        ]"
+    <FeatureShell
+        title="Money In"
+        section="clients"
+        :tabs="moneyInTabs"
+        document-title="Clients"
     >
-        <PageHeader title="Clients">
-            <template #actions>
-                <AppButton variant="primary" @click="router.visit(route('invoicing.clients.create'))">New Client</AppButton>
-            </template>
-        </PageHeader>
+        <template #actions>
+            <AppButton variant="primary" @click="router.visit(route('invoicing.clients.create'))">New Client</AppButton>
+        </template>
 
         <AppCard class="mt-5">
             <div class="grid gap-3 md:grid-cols-4">
@@ -135,5 +135,5 @@ const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 
                 </tr>
             </AppTable>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

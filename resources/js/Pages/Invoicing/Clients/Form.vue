@@ -107,7 +107,7 @@ const submit = () => {
     <AppLayout
         :title="isEditing ? 'Edit Client' : 'New Client'"
         :breadcrumbs="[
-            { label: 'Invoicing' },
+            { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Clients', href: route('invoicing.clients.index') },
             { label: isEditing ? 'Edit' : 'Create' },
         ]"

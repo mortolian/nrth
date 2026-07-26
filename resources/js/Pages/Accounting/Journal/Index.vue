@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useAccountingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const accountingTabs = useAccountingTabs();
 
 type LedgerAccount = {
     id: number;
@@ -81,15 +84,13 @@ const navigateTo = (url: string) => router.get(url, { from: period.value.from, t
 </script>
 
 <template>
-    <AppLayout
-        title="General Ledger"
-        :breadcrumbs="[{ label: 'Accounting' }, { label: 'General Ledger' }]"
+    <FeatureShell
+        title="Accounting"
+        section="journal"
+        :tabs="accountingTabs"
+        document-title="General Ledger"
+        subtitle="Account-by-account activity and running balances for the selected period"
     >
-        <PageHeader
-            title="General Ledger"
-            subtitle="Account-by-account activity and running balances for the selected period"
-        />
-
         <AppCard class="mt-5">
             <div class="flex flex-wrap items-end gap-3">
                 <div>
@@ -177,5 +178,5 @@ const navigateTo = (url: string) => router.get(url, { from: period.value.from, t
                 </AppTable>
             </AppCard>
         </div>
-    </AppLayout>
+    </FeatureShell>
 </template>

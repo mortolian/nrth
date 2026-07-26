@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Archive,
@@ -9,7 +9,6 @@ import {
     Building2,
     Calculator,
     ChartColumnBig,
-    ChevronDown,
     ChevronRight,
     CreditCard,
     FileText,
@@ -35,35 +34,10 @@ import CommandPalette from '@/Components/layout/CommandPalette.vue';
 import SessionIdleWatcher from '@/Components/layout/SessionIdleWatcher.vue';
 import { useAppDisplayName } from '@/lib/appName';
 
-const NAV_SECTIONS_EXPANDED_KEY = 'nrth:nav-sections-expanded:v1';
 const SETTINGS_SECTION_LABEL = 'Settings';
 
-function loadNavSectionsExpanded(): Record<string, boolean> {
-    if (typeof window === 'undefined') return {};
-    try {
-        const raw = localStorage.getItem(NAV_SECTIONS_EXPANDED_KEY);
-        if (!raw) return {};
-        const parsed = JSON.parse(raw) as unknown;
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-        return parsed as Record<string, boolean>;
-    } catch {
-        return {};
-    }
-}
-
-function persistNavSectionsExpanded(state: Record<string, boolean>): void {
-    if (typeof window === 'undefined') return;
-    try {
-        localStorage.setItem(NAV_SECTIONS_EXPANDED_KEY, JSON.stringify(state));
-    } catch {
-        /* quota / private mode */
-    }
-}
-
 type Breadcrumb = { label: string; href?: string };
-type NavChild = { label: string; href: string };
-type NavGroup = { title: string; items: NavChild[] };
-type MenuItem = { label: string; href: string; icon: unknown; group?: NavGroup[] };
+type MenuItem = { label: string; href: string; icon: unknown; matchPrefixes?: string[] };
 type PaletteData = {
     quickActions?: Array<{ id: string; label: string; href?: string; icon?: 'invoice' | 'expense' | 'payment' | 'client' }>;
     navigation?: Array<{ id: string; label: string; href?: string }>;
@@ -105,30 +79,33 @@ const navItems = computed<MenuItem[]>(() => {
         { label: 'Dashboard', href: route('dashboard'), icon: Home },
     ];
 
-    const moneyInChildren = [
-        canTeam('invoices.view') ? { label: 'Invoices', href: route('invoicing.invoices.index') } : null,
-        canTeam('estimates.view') ? { label: 'Estimates', href: route('invoicing.estimates.index') } : null,
-        canTeam('clients.view') ? { label: 'Clients', href: route('invoicing.clients.index') } : null,
-    ].filter(Boolean) as NavChild[];
-    if (moneyInChildren.length > 0) {
+    const moneyInLanding = canTeam('invoices.view')
+        ? route('invoicing.invoices.index')
+        : canTeam('estimates.view')
+            ? route('invoicing.estimates.index')
+            : canTeam('clients.view')
+                ? route('invoicing.clients.index')
+                : null;
+    if (moneyInLanding) {
         items.push({
             label: 'Money In',
-            href: moneyInChildren[0].href,
+            href: moneyInLanding,
             icon: Wallet,
-            group: [{ title: 'Money In', items: moneyInChildren }],
+            matchPrefixes: ['/invoicing'],
         });
     }
 
-    const moneyOutChildren = [
-        canTeam('expenses.view') ? { label: 'Expenses', href: route('expenses.index') } : null,
-        canTeam('suppliers.view') ? { label: 'Suppliers', href: route('suppliers.index') } : null,
-    ].filter(Boolean) as NavChild[];
-    if (moneyOutChildren.length > 0) {
+    const moneyOutLanding = canTeam('expenses.view')
+        ? route('expenses.index')
+        : canTeam('suppliers.view')
+            ? route('suppliers.index')
+            : null;
+    if (moneyOutLanding) {
         items.push({
             label: 'Money Out',
-            href: moneyOutChildren[0].href,
+            href: moneyOutLanding,
             icon: Landmark,
-            group: [{ title: 'Money Out', items: moneyOutChildren }],
+            matchPrefixes: ['/expenses', '/suppliers'],
         });
     }
 
@@ -137,16 +114,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Banking',
             href: route('banking.transactions.index'),
             icon: Building2,
-            group: [{
-                title: 'Banking',
-                items: [
-                    { label: 'Transactions', href: route('banking.transactions.index') },
-                    ...(canTeam('banking.manage')
-                        ? [{ label: 'Import statement', href: route('banking.import.create') }]
-                        : []),
-                    { label: 'Accounts', href: route('banking.accounts.index') },
-                ],
-            }],
+            matchPrefixes: ['/banking'],
         });
     }
 
@@ -155,14 +123,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Accounting',
             href: route('accounting.transactions.index'),
             icon: BookOpen,
-            group: [{
-                title: 'Accounting',
-                items: [
-                    { label: 'Transactions', href: route('accounting.transactions.index') },
-                    { label: 'General Ledger', href: route('accounting.journal.index') },
-                    { label: 'Chart of Accounts', href: route('accounting.accounts.index') },
-                ],
-            }],
+            matchPrefixes: ['/accounting'],
         });
     }
 
@@ -171,7 +132,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Planning',
             href: route('budgeting.index'),
             icon: FolderKanban,
-            group: [{ title: 'Planning', items: [{ label: 'Budgets', href: route('budgeting.index') }] }],
+            matchPrefixes: ['/budgeting'],
         });
     }
 
@@ -180,7 +141,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Contracting',
             href: route('contracting.contracts.index'),
             icon: Briefcase,
-            group: [{ title: 'Contracting', items: [{ label: 'Contracts', href: route('contracting.contracts.index') }] }],
+            matchPrefixes: ['/contracting'],
         });
     }
 
@@ -189,19 +150,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Tax',
             href: route('tax.vat.index'),
             icon: Calculator,
-            group: [{
-                title: 'Tax',
-                items: [
-                    { label: 'VAT Returns', href: route('tax.vat.index') },
-                    ...(canTeam('tax.manage')
-                        ? [{ label: 'VAT rates', href: route('tax.vat-rates.index') }]
-                        : []),
-                    { label: 'Tax Periods', href: route('tax.provisional.index') },
-                    ...(canTeam('tax.manage')
-                        ? [{ label: 'Documents', href: route('tax.documents.index') }]
-                        : []),
-                ],
-            }],
+            matchPrefixes: ['/tax'],
         });
     }
 
@@ -210,15 +159,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Reports',
             href: route('reports.profit-loss'),
             icon: ChartColumnBig,
-            group: [{
-                title: 'Reports',
-                items: [
-                    { label: 'Profit And Loss', href: route('reports.profit-loss') },
-                    { label: 'Balance Sheet', href: route('reports.balance-sheet') },
-                    { label: 'Cash Flow', href: route('reports.cash-flow') },
-                    { label: 'Trial Balance', href: route('reports.trial-balance') },
-                ],
-            }],
+            matchPrefixes: ['/reports'],
         });
     }
 
@@ -227,6 +168,7 @@ const navItems = computed<MenuItem[]>(() => {
             label: 'Backups & exports',
             href: route('backups-exports.index'),
             icon: Archive,
+            matchPrefixes: ['/backups-exports'],
         });
     }
 
@@ -235,59 +177,16 @@ const navItems = computed<MenuItem[]>(() => {
 
 const isActivePath = (href: string) => href !== '#' && currentPath.value === href.split('?')[0];
 
-/** User expand/collapse for nav groups; persisted in localStorage. */
-const navManualOverride = ref<Record<string, boolean>>(loadNavSectionsExpanded());
-
-watch(
-    navManualOverride,
-    (val) => persistNavSectionsExpanded(val),
-    { deep: true },
-);
-
-function sectionHasActiveChild(item: MenuItem): boolean {
-    const items = item.group?.[0]?.items;
-    if (!items) return false;
-    return items.some((sub) => sub.href !== '#' && isActivePath(sub.href));
+function pathMatchesPrefix(prefix: string): boolean {
+    const path = currentPath.value;
+    return path === prefix || path.startsWith(`${prefix}/`);
 }
 
-function sectionDefaultExpanded(item: MenuItem): boolean {
-    return isActive(item.href) || sectionHasActiveChild(item);
-}
-
-function isNavItemOrChildActive(item: MenuItem): boolean {
-    return isActive(item.href) || sectionHasActiveChild(item);
-}
-
-function isNavSectionExpanded(item: MenuItem): boolean {
-    if (!item.group?.length) return false;
-    const o = navManualOverride.value[item.label];
-    const active = sectionDefaultExpanded(item);
-    if (active) {
-        return o !== false;
+function isNavItemActive(item: MenuItem): boolean {
+    if (item.matchPrefixes?.length) {
+        return item.matchPrefixes.some(pathMatchesPrefix);
     }
-    return o === true;
-}
-
-function toggleNavSection(label: string): void {
-    const item = navItems.value.find((i) => i.label === label);
-    if (!item?.group) return;
-    const next = !isNavSectionExpanded(item);
-    navManualOverride.value = { ...navManualOverride.value, [label]: next };
-}
-
-/** Group parents navigate only via children; the row expands/collapses (or expands the sidebar when icon-only). */
-function onNavGroupRowClick(item: MenuItem): void {
-    if (!item.group) return;
-    if (collapsed.value) {
-        collapsed.value = false;
-        navManualOverride.value = { ...navManualOverride.value, [item.label]: true };
-        return;
-    }
-    toggleNavSection(item.label);
-}
-
-function navSectionDomId(label: string): string {
-    return 'nav-section-' + label.toLowerCase().replace(/\s+/g, '-');
+    return isActivePath(item.href);
 }
 
 /** Team settings use `Settings/Team` for both `/settings/team` and `/teams/{id}`. */
@@ -334,7 +233,6 @@ const commandPaletteData = computed<PaletteData>(() => ({
 
 const logout = () => router.post(route('logout'));
 const switchTeam = (team: { id: number }) => router.put(route('current-team.update'), { team_id: team.id }, { preserveState: false });
-const isActive = (href: string) => isActivePath(href);
 
 const leaveTeamForm = useForm({});
 const leaveTeamModalOpen = ref(false);
@@ -459,13 +357,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
 
                 <nav class="flex-1 overflow-y-auto px-2 py-3">
                     <template v-for="item in navItems" :key="item.label">
-                        <div v-if="!item.group" class="mb-1">
+                        <div class="mb-1">
                             <Link
                                 :href="item.href"
                                 :class="[
                                     'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
                                     collapsed ? 'justify-center' : '',
-                                    isActive(item.href)
+                                    isNavItemActive(item)
                                         ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
                                         : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
                                 ]"
@@ -473,50 +371,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 <component :is="item.icon" class="h-4 w-4 shrink-0" />
                                 <span v-if="!collapsed" class="ml-3">{{ item.label }}</span>
                             </Link>
-                        </div>
-
-                        <div v-else class="mb-1">
-                            <button
-                                type="button"
-                                :class="[
-                                    'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
-                                    collapsed ? 'justify-center' : '',
-                                    isNavItemOrChildActive(item)
-                                        ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
-                                        : 'border-l-transparent text-slate-700 hover:bg-white/30 hover:text-slate-900',
-                                ]"
-                                :aria-expanded="!collapsed && isNavSectionExpanded(item)"
-                                :aria-controls="navSectionDomId(item.label)"
-                                @click="onNavGroupRowClick(item)"
-                            >
-                                <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                                <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ item.label }}</span>
-                                <ChevronDown
-                                    v-if="!collapsed"
-                                    class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
-                                    :class="isNavSectionExpanded(item) ? 'rotate-180' : ''"
-                                />
-                            </button>
-
-                            <div
-                                :id="navSectionDomId(item.label)"
-                                v-show="isNavSectionExpanded(item) && !collapsed"
-                                class="ml-9 mt-1 space-y-1 border-l border-slate-900/20 pl-2"
-                            >
-                                <Link
-                                    v-for="sub in item.group[0].items"
-                                    :key="`${item.label}-${sub.label}`"
-                                    :href="sub.href"
-                                    :class="[
-                                        'block rounded px-2 py-1 text-xs transition',
-                                        isActivePath(sub.href)
-                                            ? 'bg-brand-500/30 font-medium text-brand-800'
-                                            : 'text-slate-700 hover:bg-white/40 hover:text-slate-900',
-                                    ]"
-                                >
-                                    {{ sub.label }}
-                                </Link>
-                            </div>
                         </div>
                     </template>
                 </nav>
@@ -639,45 +493,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                 </div>
                 <div class="space-y-1">
                     <template v-for="item in navItems" :key="`m-${item.label}`">
-                        <div v-if="!item.group">
-                            <Link
-                                :href="item.href"
-                                class="block rounded-md px-3 py-2 text-sm hover:bg-white/40"
-                                @click="mobileOpen = false"
-                            >
-                                {{ item.label }}
-                            </Link>
-                        </div>
-                        <div v-else>
-                            <button
-                                type="button"
-                                class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-white/30"
-                                :aria-expanded="isNavSectionExpanded(item)"
-                                :aria-controls="'m-' + navSectionDomId(item.label)"
-                                @click="toggleNavSection(item.label)"
-                            >
-                                <span class="min-w-0 flex-1">{{ item.label }}</span>
-                                <ChevronDown
-                                    class="h-4 w-4 shrink-0 text-slate-700 transition-transform duration-200"
-                                    :class="isNavSectionExpanded(item) ? 'rotate-180' : ''"
-                                />
-                            </button>
-                            <div
-                                :id="'m-' + navSectionDomId(item.label)"
-                                v-show="isNavSectionExpanded(item)"
-                                class="ml-3 mt-1 space-y-0.5 border-l border-slate-900/20 pl-2"
-                            >
-                                <Link
-                                    v-for="sub in item.group[0].items"
-                                    :key="`m-${item.label}-${sub.label}`"
-                                    :href="sub.href"
-                                    class="block rounded px-2 py-1.5 text-xs text-slate-700 hover:bg-white/40 hover:text-slate-900"
-                                    @click="mobileOpen = false"
-                                >
-                                    {{ sub.label }}
-                                </Link>
-                            </div>
-                        </div>
+                        <Link
+                            :href="item.href"
+                            :class="[
+                                'block rounded-md px-3 py-2 text-sm',
+                                isNavItemActive(item) ? 'bg-brand-500/25 font-medium text-brand-800' : 'hover:bg-white/40',
+                            ]"
+                            @click="mobileOpen = false"
+                        >
+                            {{ item.label }}
+                        </Link>
                     </template>
                     <Link
                         :href="route('settings.index')"

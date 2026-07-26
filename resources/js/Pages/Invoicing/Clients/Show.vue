@@ -88,7 +88,7 @@ const goHistoryPage = (page: number) => {
     <AppLayout
         :title="client.name"
         :breadcrumbs="[
-            { label: 'Invoicing' },
+            { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Clients', href: route('invoicing.clients.index') },
             { label: client.name },
         ]"

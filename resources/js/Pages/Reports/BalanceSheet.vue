@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useReportsTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
+
+const reportsTabs = useReportsTabs();
 
 type Line = { account_id: number; code: string; name: string; amount: number };
 
@@ -32,19 +35,17 @@ const openStatement = (line: Line) => {
 </script>
 
 <template>
-    <AppLayout
-        title="Balance Sheet"
-        :breadcrumbs="[
-            { label: 'Reports' },
-            { label: 'Balance Sheet' },
-        ]"
+    <FeatureShell
+        title="Reports"
+        section="balance-sheet"
+        :tabs="reportsTabs"
+        document-title="Balance Sheet"
+        subtitle="Statement of financial position"
     >
-        <PageHeader title="Balance Sheet" subtitle="Statement of financial position">
-            <template #actions>
-                <AppButton variant="secondary">Export PDF</AppButton>
-                <AppButton variant="secondary">Export Excel</AppButton>
-            </template>
-        </PageHeader>
+        <template #actions>
+            <AppButton variant="secondary">Export PDF</AppButton>
+            <AppButton variant="secondary">Export Excel</AppButton>
+        </template>
 
         <AppCard v-if="!vatEnabled" class="mt-5">
             <h3 class="text-lg font-semibold text-slate-900">Reports are unavailable</h3>
@@ -144,5 +145,5 @@ const openStatement = (line: Line) => {
             </div>
         </AppCard>
         </template>
-    </AppLayout>
+    </FeatureShell>
 </template>

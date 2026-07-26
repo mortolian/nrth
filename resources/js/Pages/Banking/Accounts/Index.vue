@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useBankingTabs } from '@/Composables/useFeatureTabs';
+
+const bankingTabs = useBankingTabs();
 
 type GlOption = { id: number; code: string; name: string; label: string };
 
@@ -209,33 +212,21 @@ const submit = () => {
 </script>
 
 <template>
-    <AppLayout
-        :title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
-        :breadcrumbs="[
-            { label: 'Banking' },
-            { label: 'Accounts', href: showForm ? route('banking.accounts.index') : undefined },
-            ...(showForm ? [{ label: editingId ? 'Edit' : 'Create' }] : []),
-        ]"
+    <FeatureShell
+        title="Banking"
+        section="accounts"
+        :tabs="bankingTabs"
+        :document-title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
+        :subtitle="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Used for statement import and for posting expenses and invoice payments once linked to a ledger account.'"
     >
-        <PageHeader
-            :title="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Banking accounts'"
-            :subtitle="showForm ? undefined : 'Used for statement import and for posting expenses and invoice payments once linked to a ledger account.'"
-        >
-            <template v-if="!showForm" #actions>
-                <AppButton variant="secondary" @click="router.visit(route('banking.transactions.index'))">
-                    View transactions
-                </AppButton>
-                <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
-                    Import history
-                </AppButton>
-                <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
-                    Import statement
-                </AppButton>
-                <AppButton variant="primary" @click="openCreate()">
-                    New account
-                </AppButton>
-            </template>
-        </PageHeader>
+        <template v-if="!showForm" #actions>
+            <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
+                Import history
+            </AppButton>
+            <AppButton variant="primary" @click="openCreate()">
+                New account
+            </AppButton>
+        </template>
 
         <AppCard v-if="showForm" class="mt-5">
             <form class="grid max-w-xl gap-5" @submit.prevent="submit">
@@ -330,5 +321,5 @@ const submit = () => {
                 No banking accounts yet. Create one and link it to a ledger account to post expenses and invoice payments.
             </p>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

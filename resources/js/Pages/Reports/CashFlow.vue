@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useReportsTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const reportsTabs = useReportsTabs();
 
 type OperatingLine = {
     key: string;
@@ -57,19 +60,17 @@ const reconVisible = Math.abs(props.report.summary.reconciliation_difference) > 
 </script>
 
 <template>
-    <AppLayout
-        title="Cash Flow"
-        :breadcrumbs="[
-            { label: 'Reports' },
-            { label: 'Cash Flow' },
-        ]"
+    <FeatureShell
+        title="Reports"
+        section="cash-flow"
+        :tabs="reportsTabs"
+        document-title="Cash Flow"
+        subtitle="Indirect method — operating, investing, and financing activities"
     >
-        <PageHeader title="Cash Flow Statement" subtitle="Indirect method — operating, investing, and financing activities">
-            <template #actions>
-                <AppButton variant="secondary">Export PDF</AppButton>
-                <AppButton variant="secondary">Export Excel</AppButton>
-            </template>
-        </PageHeader>
+        <template #actions>
+            <AppButton variant="secondary">Export PDF</AppButton>
+            <AppButton variant="secondary">Export Excel</AppButton>
+        </template>
 
         <AppCard v-if="!vatEnabled" class="mt-5">
             <h3 class="text-lg font-semibold text-slate-900">Reports are unavailable</h3>
@@ -215,5 +216,5 @@ const reconVisible = Math.abs(props.report.summary.reconciliation_difference) > 
             </div>
         </AppCard>
         </template>
-    </AppLayout>
+    </FeatureShell>
 </template>

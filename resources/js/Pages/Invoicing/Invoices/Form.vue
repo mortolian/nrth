@@ -357,7 +357,7 @@ const onSave = () => {
     <AppLayout
         :title="isEditing ? `Edit ${invoice?.number}` : 'New Invoice'"
         :breadcrumbs="[
-            { label: 'Invoicing' },
+            { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Invoices', href: route('invoicing.invoices.index') },
             { label: isEditing ? 'Edit' : 'Create' },
         ]"

@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import { useMoneyOutTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { Paperclip, TriangleAlert } from 'lucide-vue-next';
+
+const moneyOutTabs = useMoneyOutTabs();
 
 type ExpenseRow = {
     id: number;
@@ -189,18 +192,15 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
 </script>
 
 <template>
-    <AppLayout
-        title="Expenses"
-        :breadcrumbs="[
-            { label: 'Money Out' },
-            { label: 'Expenses' },
-        ]"
+    <FeatureShell
+        title="Money Out"
+        section="expenses"
+        :tabs="moneyOutTabs"
+        document-title="Expenses"
     >
-        <PageHeader title="Expenses">
-            <template #actions>
-                <AppButton variant="primary" @click="router.visit(route('expenses.create'))">New Expense</AppButton>
-            </template>
-        </PageHeader>
+        <template #actions>
+            <AppButton variant="primary" @click="router.visit(route('expenses.create'))">New Expense</AppButton>
+        </template>
 
         <input
             ref="receiptAttachInput"
@@ -386,5 +386,5 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 </tr>
             </AppTable>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

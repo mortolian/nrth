@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import { useAccountingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const accountingTabs = useAccountingTabs();
 
 type LedgerRow = {
     id: number;
@@ -195,15 +198,12 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
 </script>
 
 <template>
-    <AppLayout
-        title="Transactions"
-        :breadcrumbs="[
-            { label: 'Accounting' },
-            { label: 'Transactions' },
-        ]"
+    <FeatureShell
+        title="Accounting"
+        section="transactions"
+        :tabs="accountingTabs"
+        document-title="Transactions"
     >
-        <PageHeader title="Transactions" />
-
         <div
             v-if="transactionDeleteError"
             class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
@@ -531,5 +531,5 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                 </div>
             </div>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

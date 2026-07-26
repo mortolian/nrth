@@ -256,7 +256,7 @@ const submit = (submitAction: 'draft' | 'send') => {
     <AppLayout
         :title="isEditing ? 'Edit Estimate' : 'Create Estimate'"
         :breadcrumbs="[
-            { label: 'Money In' },
+            { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Estimates', href: route('invoicing.estimates.index') },
             { label: isEditing ? 'Edit' : 'Create' },
         ]"

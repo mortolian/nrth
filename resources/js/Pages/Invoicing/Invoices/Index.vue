@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
+import { useMoneyInTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { Filter, X } from 'lucide-vue-next';
+
+const moneyInTabs = useMoneyInTabs();
 
 type InvoiceRow = {
     id: number;
@@ -277,23 +280,20 @@ const exportSelectedPdfZip = async () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Invoices"
-        :breadcrumbs="[
-            { label: 'Invoicing' },
-            { label: 'Invoices' },
-        ]"
+    <FeatureShell
+        title="Money In"
+        section="invoices"
+        :tabs="moneyInTabs"
+        document-title="Invoices"
     >
-        <PageHeader title="Invoices">
-            <template v-if="canManageInvoices" #actions>
-                <Link
-                    :href="route('invoicing.invoices.create')"
-                    class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400"
-                >
-                    New Invoice
-                </Link>
-            </template>
-        </PageHeader>
+        <template v-if="canManageInvoices" #actions>
+            <Link
+                :href="route('invoicing.invoices.create')"
+                class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-400"
+            >
+                New Invoice
+            </Link>
+        </template>
 
         <div
             v-if="filter_client"
@@ -573,5 +573,5 @@ const exportSelectedPdfZip = async () => {
             :charges-vat="chargesVatForPayment"
             @update:open="paymentDrawerOpen = $event"
         />
-    </AppLayout>
+    </FeatureShell>
 </template>

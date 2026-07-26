@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import { useMoneyOutTabs } from '@/Composables/useFeatureTabs';
+
+const moneyOutTabs = useMoneyOutTabs();
 
 type SupplierRow = {
     id: number;
@@ -40,19 +43,15 @@ const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
 </script>
 
 <template>
-    <AppLayout
-        title="Suppliers"
-        :breadcrumbs="[
-            { label: 'Money Out' },
-            { label: 'Suppliers' },
-        ]"
+    <FeatureShell
+        title="Money Out"
+        section="suppliers"
+        :tabs="moneyOutTabs"
+        document-title="Suppliers"
     >
-        <PageHeader title="Suppliers">
-            <template #actions>
-                <AppButton variant="secondary" @click="router.visit(route('expenses.index'))">Expenses</AppButton>
-                <AppButton variant="primary" @click="router.visit(route('suppliers.create'))">New Supplier</AppButton>
-            </template>
-        </PageHeader>
+        <template #actions>
+            <AppButton variant="primary" @click="router.visit(route('suppliers.create'))">New Supplier</AppButton>
+        </template>
 
         <AppCard class="mt-5">
             <div class="grid gap-3 md:grid-cols-4">
@@ -134,5 +133,5 @@ const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
                 </tr>
             </AppTable>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

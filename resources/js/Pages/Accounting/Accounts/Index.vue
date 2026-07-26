@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import { useAccountingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
+const accountingTabs = useAccountingTabs();
 
 type AccountRow = {
     id: number;
@@ -144,15 +147,13 @@ const accountColumns = [
 </script>
 
 <template>
-    <AppLayout
-        title="Chart of Accounts"
-        :breadcrumbs="[{ label: 'Accounting' }, { label: 'Chart of Accounts' }]"
+    <FeatureShell
+        title="Accounting"
+        section="accounts"
+        :tabs="accountingTabs"
+        document-title="Chart of Accounts"
+        subtitle="All accounts used in your double-entry bookkeeping"
     >
-        <PageHeader
-            title="Chart of Accounts"
-            subtitle="All accounts used in your double-entry bookkeeping"
-        />
-
         <div
             v-if="pageErrors?.account"
             class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
@@ -267,5 +268,5 @@ const accountColumns = [
                 </AppTable>
             </AppCard>
         </div>
-    </AppLayout>
+    </FeatureShell>
 </template>
