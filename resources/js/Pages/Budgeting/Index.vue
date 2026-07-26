@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { ChevronDown, ChevronRight } from 'lucide-vue-next';
+import { ChevronDown, ChevronRight, FolderKanban } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { LineChart } from 'echarts/charts';
@@ -185,23 +185,26 @@ function budgetVarianceChartOption(budget) {
         ]"
     >
         <PageHeader title="Budgets">
-            <template #actions>
+            <template v-if="budgets.length" #actions>
                 <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">New Budget</AppButton>
             </template>
         </PageHeader>
 
-        <AppCard v-if="!budgets.length" class="mt-5">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h3 class="text-lg font-semibold text-slate-900">No budgets yet</h3>
-                    <p class="mt-1 text-sm text-slate-500">Create a budget to plan expense categories and track variance.</p>
-                </div>
-                <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">New Budget</AppButton>
-            </div>
-        </AppCard>
+        <EmptyState
+            v-if="!budgets.length"
+            class="mt-5"
+            title="No budgets yet"
+            description="Set spending limits by category and track how actuals compare to plan over the year."
+            :icon="FolderKanban"
+        >
+            <template #action>
+                <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">
+                    Create your first budget
+                </AppButton>
+            </template>
+        </EmptyState>
 
         <AppCard v-else class="mt-5">
-            <h3 class="mb-3 text-lg font-semibold text-slate-900">Budgets</h3>
             <AppTable
                 :columns="[
                     { key: 'expand', label: '', widthClass: 'w-10 px-2' },

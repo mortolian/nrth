@@ -2,11 +2,18 @@
 defineProps<{
     title: string;
     subtitle?: string;
+    /** Drop bottom margin when tabs (or other chrome) sit directly under the header. */
+    flush?: boolean;
 }>();
 </script>
 
 <template>
-    <div class="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+    <div
+        :class="[
+            'flex flex-col justify-between gap-3 sm:flex-row sm:items-center',
+            flush ? 'mb-0' : 'mb-6',
+        ]"
+    >
         <div class="min-w-0 flex-1">
             <h1 class="truncate text-2xl font-semibold tracking-tight text-slate-900" :title="title">{{ title }}</h1>
             <p v-if="subtitle" class="mt-1 text-sm text-slate-500">{{ subtitle }}</p>

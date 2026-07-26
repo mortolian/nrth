@@ -67,14 +67,17 @@ const headerSubtitle = computed(() => {
         :title="pageTitle"
         :breadcrumbs="[{ label: 'Settings' }]"
     >
-        <PageHeader title="Settings" :subtitle="headerSubtitle" />
+        <div class="border-b border-slate-200">
+            <PageHeader title="Settings" :subtitle="headerSubtitle" flush />
 
-        <AppTabs
-            class="mt-5"
-            :tabs="sections"
-            :model-value="section"
-            aria-label="Settings sections"
-        />
+            <div class="mt-6">
+                <AppTabs
+                    :tabs="sections"
+                    :model-value="section"
+                    aria-label="Settings sections"
+                />
+            </div>
+        </div>
 
         <div class="mt-6">
             <slot />

@@ -19,18 +19,21 @@ defineProps<{
         :title="documentTitle ?? title"
         :breadcrumbs="[{ label: title }]"
     >
-        <PageHeader :title="title" :subtitle="subtitle">
-            <template v-if="$slots.actions" #actions>
-                <slot name="actions" />
-            </template>
-        </PageHeader>
+        <div class="border-b border-slate-200">
+            <PageHeader :title="title" :subtitle="subtitle" flush>
+                <template v-if="$slots.actions" #actions>
+                    <slot name="actions" />
+                </template>
+            </PageHeader>
 
-        <AppTabs
-            class="mt-5"
-            :tabs="tabs"
-            :model-value="section"
-            :aria-label="ariaLabel ?? `${title} sections`"
-        />
+            <div class="mt-6">
+                <AppTabs
+                    :tabs="tabs"
+                    :model-value="section"
+                    :aria-label="ariaLabel ?? `${title} sections`"
+                />
+            </div>
+        </div>
 
         <div class="mt-6">
             <slot />

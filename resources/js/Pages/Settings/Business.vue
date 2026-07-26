@@ -474,12 +474,14 @@ const removeBankAccount = (index: number) => {
 
 <template>
     <SettingsShell section="business">
-        <AppTabs
-            :model-value="tab"
-            :tabs="businessTabs"
-            aria-label="Business settings"
-            @update:model-value="(id) => (tab = id as BusinessTab)"
-        />
+        <div class="border-b border-slate-200">
+            <AppTabs
+                :model-value="tab"
+                :tabs="businessTabs"
+                aria-label="Business settings"
+                @update:model-value="(id) => (tab = id as BusinessTab)"
+            />
+        </div>
 
         <div class="mt-6 space-y-6">
             <div v-if="Object.keys(form.errors).length" class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">

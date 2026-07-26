@@ -19,15 +19,15 @@ const emit = defineEmits<{
 
 const tabClass = (active: boolean) =>
     [
-        'shrink-0 border-b-2 px-0.5 pb-3 text-sm font-medium transition whitespace-nowrap',
+        'shrink-0 border-b-2 px-1 pb-3 text-sm transition whitespace-nowrap',
         active
-            ? 'border-brand-600 text-brand-800'
-            : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800',
+            ? 'border-brand-600 font-semibold text-brand-800'
+            : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:text-slate-800',
     ].join(' ');
 </script>
 
 <template>
-    <nav :aria-label="ariaLabel">
+    <nav :aria-label="ariaLabel" class="-mb-px">
         <div class="flex gap-6 overflow-x-auto" role="tablist">
             <template v-for="tab in tabs" :key="tab.id">
                 <Link
