@@ -109,6 +109,19 @@ class HandleInertiaRequests extends Middleware
                     && $user->belongsToTeam($team)
                     && ! $user->ownsTeam($team);
             },
+            'current_team_role' => function () use ($request) {
+                $user = $request->user();
+                $team = $user?->currentTeam;
+
+                if ($user === null || $team === null || ! $user->belongsToTeam($team)) {
+                    return null;
+                }
+
+                return [
+                    'key' => TeamAccess::membershipRoleKey($user, $team),
+                    'label' => TeamAccess::membershipRoleLabel($user, $team),
+                ];
+            },
         ];
     }
 

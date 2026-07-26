@@ -76,6 +76,8 @@ class LeaveTeamTest extends TestCase
             ->get(route('profile.show'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('can_leave_current_team', true));
+                ->where('can_leave_current_team', true)
+                ->where('current_team_role.key', RolePresets::VIEWER)
+                ->where('current_team_role.label', 'Viewer'));
     }
 }

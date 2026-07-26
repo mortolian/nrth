@@ -76,4 +76,27 @@ final class TeamAccess
 
         return is_string($role) && $role !== '' ? $role : RolePresets::VIEWER;
     }
+
+    /**
+     * Display label for the user's role on a team (Owner, Accountant, custom role name, etc.).
+     */
+    public static function membershipRoleLabel(User $user, Team $team): string
+    {
+        $roleKey = self::membershipRoleKey($user, $team);
+
+        $teamRole = TeamRole::query()
+            ->where('team_id', $team->id)
+            ->where('key', $roleKey)
+            ->first();
+
+        if ($teamRole !== null && is_string($teamRole->name) && $teamRole->name !== '') {
+            return $teamRole->name;
+        }
+
+        if ($roleKey === 'owner') {
+            return 'Owner';
+        }
+
+        return ucfirst($roleKey);
+    }
 }

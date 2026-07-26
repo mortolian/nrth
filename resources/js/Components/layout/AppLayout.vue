@@ -66,6 +66,10 @@ const appDisplayName = useAppDisplayName();
 const currentTeam = computed(() => page.props.auth?.user?.current_team);
 const teams = computed(() => page.props.auth?.user?.all_teams ?? []);
 const authUser = computed(() => page.props.auth?.user);
+const currentTeamRoleLabel = computed(() => {
+    const role = page.props.current_team_role as { key?: string; label?: string } | null | undefined;
+    return typeof role?.label === 'string' && role.label.trim() !== '' ? role.label : null;
+});
 const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeatures));
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
@@ -327,22 +331,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         </div>
                     </template>
                 </nav>
-
-                <div class="border-t border-slate-900/10 p-2">
-                    <Link
-                        :href="route('settings.index')"
-                        :class="[
-                            'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
-                            collapsed ? 'justify-center' : '',
-                            isSettingsSectionActive
-                                ? 'border-l-brand-700 bg-brand-500/25 text-brand-800'
-                                : 'border-l-transparent text-slate-700 hover:bg-white/40 hover:text-slate-900',
-                        ]"
-                    >
-                        <Settings class="h-4 w-4 shrink-0" />
-                        <span v-if="!collapsed" class="ml-3 min-w-0 flex-1 truncate">{{ SETTINGS_SECTION_LABEL }}</span>
-                    </Link>
-                </div>
             </aside>
 
             <div :class="[collapsed ? 'lg:pl-20' : 'lg:pl-[260px]']" class="transition-all">
@@ -483,11 +471,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                         <div class="border-b border-slate-200 px-4 py-3">
                                             <p class="truncate text-sm font-semibold text-slate-900">{{ authUser?.name }}</p>
                                             <p class="truncate text-xs text-slate-500">{{ authUser?.email }}</p>
+                                            <p
+                                                v-if="currentTeamRoleLabel"
+                                                class="mt-1.5 truncate text-xs font-medium text-slate-700"
+                                            >
+                                                {{ currentTeamRoleLabel }}
+                                            </p>
                                         </div>
                                         <div class="py-1">
-                                            <DropdownLink :href="route('settings.index')">Settings</DropdownLink>
                                             <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">API Tokens</DropdownLink>
-                                            <div class="my-1 border-t border-slate-200" />
+                                            <div v-if="$page.props.jetstream.hasApiFeatures" class="my-1 border-t border-slate-200" />
                                             <form @submit.prevent="logout">
                                                 <DropdownLink as="button">Log Out</DropdownLink>
                                             </form>
@@ -495,6 +488,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     </div>
                                 </template>
                             </Dropdown>
+
+                            <Link
+                                :href="route('settings.index')"
+                                :aria-label="SETTINGS_SECTION_LABEL"
+                                :title="SETTINGS_SECTION_LABEL"
+                                :class="[
+                                    'inline-flex h-9 w-9 items-center justify-center rounded-md border transition',
+                                    isSettingsSectionActive
+                                        ? 'border-brand-200 bg-brand-50 text-brand-700'
+                                        : 'border-slate-200 text-slate-600 hover:bg-slate-50',
+                                ]"
+                            >
+                                <Settings class="h-4 w-4" />
+                            </Link>
 
                             <button class="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100">
                                 <Bell class="h-5 w-5" />
@@ -544,16 +551,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             {{ item.label }}
                         </Link>
                     </template>
-                    <Link
-                        :href="route('settings.index')"
-                        :class="[
-                            'block rounded-md px-3 py-2 text-sm',
-                            isSettingsSectionActive ? 'bg-brand-500/25 font-medium text-brand-800' : 'hover:bg-white/40',
-                        ]"
-                        @click="mobileOpen = false"
-                    >
-                        {{ SETTINGS_SECTION_LABEL }}
-                    </Link>
                 </div>
             </aside>
 
