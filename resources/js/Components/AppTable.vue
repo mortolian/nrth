@@ -79,7 +79,7 @@ const prevPage = () => {
     <div
         :class="[
             'overflow-hidden bg-white',
-            embedded ? '' : 'rounded-lg border border-slate-200',
+            embedded ? '' : 'rounded-lg border border-canvas-200 shadow-sm',
         ]"
     >
         <div class="overflow-x-auto">

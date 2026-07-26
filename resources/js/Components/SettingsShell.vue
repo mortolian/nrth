@@ -67,7 +67,7 @@ const headerSubtitle = computed(() => {
         :title="pageTitle"
         :breadcrumbs="[{ label: 'Settings' }]"
     >
-        <div class="border-b border-slate-200">
+        <div class="border-b border-canvas-200">
             <PageHeader title="Settings" :subtitle="headerSubtitle" flush />
 
             <div class="mt-6">

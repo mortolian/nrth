@@ -294,14 +294,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
         <Head :title="title" />
         <ToastHost />
 
-        <div class="min-h-screen bg-white text-slate-900 lg:pl-0">
+        <div class="min-h-screen bg-canvas-50 text-slate-900 lg:pl-0">
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-40 hidden border-r border-slate-300/80 bg-[#F1F5FA] text-slate-900 lg:flex lg:flex-col transition-all',
+                    'fixed inset-y-0 left-0 z-40 hidden border-r border-canvas-200 bg-canvas-100 text-slate-900 lg:flex lg:flex-col transition-all',
                     collapsed ? 'w-20' : 'w-[260px]',
                 ]"
             >
-                <div class="border-b border-slate-300/70 px-4 py-4">
+                <div class="border-b border-canvas-200 px-4 py-4">
                     <Link
                         :href="route('dashboard')"
                         class="flex items-center gap-3"
@@ -321,8 +321,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     'flex w-full min-h-[2.5rem] items-center rounded-md border-l-2 px-3 py-2 text-left text-sm transition',
                                     collapsed ? 'justify-center' : '',
                                     isNavItemActive(item)
-                                        ? 'border-l-brand-700 bg-brand-500/20 text-brand-800'
-                                        : 'border-l-transparent text-slate-700 hover:bg-white/70 hover:text-slate-900',
+                                        ? 'border-l-brand-700 bg-brand-500/15 text-brand-800'
+                                        : 'border-l-transparent text-slate-700 hover:bg-white/55 hover:text-slate-900',
                                 ]"
                             >
                                 <component :is="item.icon" class="h-4 w-4 shrink-0" />
@@ -334,13 +334,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             </aside>
 
             <div :class="[collapsed ? 'lg:pl-20' : 'lg:pl-[260px]']" class="transition-all">
-                <header class="sticky top-0 z-30 border-b border-slate-300/80 bg-white/95 backdrop-blur">
+                <header class="sticky top-0 z-30 border-b border-canvas-200 bg-canvas-50/95 backdrop-blur">
                     <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                         <div class="flex items-center gap-2">
-                            <button class="rounded-md p-2 hover:bg-slate-100 lg:hidden" @click="mobileOpen = true">
+                            <button class="rounded-md p-2 hover:bg-canvas-100 lg:hidden" @click="mobileOpen = true">
                                 <Menu class="h-5 w-5" />
                             </button>
-                            <button class="hidden rounded-md p-2 hover:bg-slate-100 lg:inline-flex" @click="collapsed = !collapsed">
+                            <button class="hidden rounded-md p-2 hover:bg-canvas-100 lg:inline-flex" @click="collapsed = !collapsed">
                                 <PanelLeft class="h-5 w-5" />
                             </button>
 
@@ -355,7 +355,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
 
                         <div class="flex items-center gap-2 sm:gap-3">
                             <button
-                                class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm text-slate-600 hover:bg-slate-50"
+                                class="inline-flex h-9 items-center gap-2 rounded-md border border-canvas-200 bg-white/80 px-3 text-sm text-slate-600 hover:bg-white"
                                 @click="commandPaletteOpen = true"
                             >
                                 <Search class="h-4 w-4" />
@@ -367,7 +367,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 <template #trigger>
                                     <button
                                         type="button"
-                                        class="inline-flex h-9 max-w-[11rem] items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 text-sm text-slate-700 hover:bg-slate-50 sm:max-w-[14rem]"
+                                        class="inline-flex h-9 max-w-[11rem] items-center gap-2 rounded-md border border-canvas-200 bg-white/90 px-2.5 text-sm text-slate-700 hover:bg-white sm:max-w-[14rem]"
                                         :aria-label="`Current business: ${currentTeam?.name ?? 'Business'}`"
                                     >
                                         <span
@@ -445,7 +445,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                 <template #trigger>
                                     <button
                                         type="button"
-                                        class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 py-0 pl-1 pr-2 hover:bg-slate-50 sm:pr-2.5"
+                                        class="inline-flex h-9 items-center gap-2 rounded-md border border-canvas-200 bg-white/90 py-0 pl-1 pr-2 hover:bg-white sm:pr-2.5"
                                         :aria-label="`Account menu for ${authUser?.name ?? 'user'}`"
                                     >
                                         <img
@@ -497,13 +497,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                     'inline-flex h-9 w-9 items-center justify-center rounded-md border transition',
                                     isSettingsSectionActive
                                         ? 'border-brand-200 bg-brand-50 text-brand-700'
-                                        : 'border-slate-200 text-slate-600 hover:bg-slate-50',
+                                        : 'border-canvas-200 bg-white/80 text-slate-600 hover:bg-white',
                                 ]"
                             >
                                 <Settings class="h-4 w-4" />
                             </Link>
 
-                            <button class="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100">
+                            <button class="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-canvas-100">
                                 <Bell class="h-5 w-5" />
                             </button>
                         </div>
@@ -523,7 +523,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             <div v-if="mobileOpen" class="fixed inset-0 z-50 bg-black/50 lg:hidden" @click="mobileOpen = false" />
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-[#F1F5FA] p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
+                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-canvas-100 p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
                     mobileOpen ? 'translate-x-0' : '-translate-x-full',
                 ]"
             >
@@ -534,7 +534,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <span class="font-semibold">{{ appDisplayName }}</span>
                         </div>
                     </div>
-                    <button class="rounded-md p-2 hover:bg-white/40" @click="mobileOpen = false">
+                    <button class="rounded-md p-2 hover:bg-white/55" @click="mobileOpen = false">
                         <X class="h-4 w-4" />
                     </button>
                 </div>
@@ -544,7 +544,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             :href="item.href"
                             :class="[
                                 'block rounded-md px-3 py-2 text-sm',
-                                isNavItemActive(item) ? 'bg-brand-500/20 font-medium text-brand-800' : 'hover:bg-white/70',
+                                isNavItemActive(item) ? 'bg-brand-500/15 font-medium text-brand-800' : 'hover:bg-white/55',
                             ]"
                             @click="mobileOpen = false"
                         >
@@ -555,7 +555,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             </aside>
 
             <nav
-                class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+                class="fixed inset-x-0 bottom-0 z-40 border-t border-canvas-200 bg-canvas-50 pb-[env(safe-area-inset-bottom)] lg:hidden"
             >
                 <div class="relative grid min-h-[3.5rem] grid-cols-5 items-end">
                     <Link

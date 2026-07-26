@@ -22,7 +22,7 @@ const tabClass = (active: boolean) =>
         'shrink-0 border-b-2 px-1 pb-3 text-sm transition whitespace-nowrap',
         active
             ? 'border-brand-600 font-semibold text-brand-800'
-            : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:text-slate-800',
+            : 'border-transparent font-medium text-slate-500 hover:border-canvas-300 hover:text-slate-800',
     ].join(' ');
 </script>
 

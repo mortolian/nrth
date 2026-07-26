@@ -534,6 +534,41 @@ const deleteTakeout = (run: TakeoutRunRow) => {
     });
 };
 
+const takeoutRowActions = (run: TakeoutRunRow) => {
+    const actions: Array<{ id: string; label: string }> = [];
+    if (run.download_url) {
+        actions.push({ id: 'download', label: 'Download' });
+    }
+    if (run.can_retry) {
+        actions.push({ id: 'retry', label: 'Retry' });
+    }
+    actions.push({ id: 'delete', label: 'Delete' });
+    return actions;
+};
+
+const onTakeoutAction = (run: TakeoutRunRow, actionId: string) => {
+    if (actionId === 'download') {
+        if (!run.download_url) {
+            return;
+        }
+        const anchor = document.createElement('a');
+        anchor.href = run.download_url;
+        anchor.download = '';
+        anchor.setAttribute('data-inertia', 'false');
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        return;
+    }
+    if (actionId === 'retry') {
+        retryTakeout(run);
+        return;
+    }
+    if (actionId === 'delete') {
+        deleteTakeout(run);
+    }
+};
+
 const runBackup = () => {
     backupForm.post(route('backups-exports.backups.store'), { preserveScroll: true });
 };
@@ -783,31 +818,12 @@ onBeforeUnmount(() => {
                                 <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
                                 <td class="px-2 py-2">{{ run.expires_at ? run.expires_at.slice(0, 10) : '—' }}</td>
                                 <td class="px-2 py-2 text-right">
-                                    <div class="flex flex-wrap items-center justify-end gap-2">
-                                        <a
-                                            v-if="run.download_url"
-                                            :href="run.download_url"
-                                            class="text-brand-700 hover:underline"
-                                            download
-                                            data-inertia="false"
-                                        >
-                                            Download
-                                        </a>
-                                        <button
-                                            v-if="run.can_retry"
-                                            type="button"
-                                            class="text-slate-700 hover:underline"
-                                            @click="retryTakeout(run)"
-                                        >
-                                            Retry
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="text-rose-600 hover:underline"
-                                            @click="deleteTakeout(run)"
-                                        >
-                                            Delete
-                                        </button>
+                                    <div class="inline-flex justify-end">
+                                        <InvoiceRowActionsMenu
+                                            :actions="takeoutRowActions(run)"
+                                            :aria-label="`Actions for takeout ${run.from_date} to ${run.to_date}`"
+                                            @select="(id) => onTakeoutAction(run, id)"
+                                        />
                                     </div>
                                 </td>
                             </tr>

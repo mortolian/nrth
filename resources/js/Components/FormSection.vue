@@ -7,7 +7,7 @@ const hasActions = computed(() => !!useSlots().actions);
 </script>
 
 <template>
-    <section class="rounded-xl border border-slate-300/70 bg-slate-50/80 p-4 md:p-5">
+    <section class="rounded-xl border border-canvas-200 bg-white p-4 shadow-sm md:p-5">
         <h4 class="text-sm font-semibold text-slate-900">
             <slot name="title" />
         </h4>

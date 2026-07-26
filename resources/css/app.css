@@ -29,8 +29,18 @@
     --color-brand-900: #003524;
 
     /*
-     * Soft slate contrast lift — keep the cool professional feel, but darken
-     * borders and muted text enough for easier scanning on white.
+     * Soft stone canvas — cool-neutral gray with a slight warm undertone.
+     * Cards stay white so content lifts cleanly off the canvas.
+     */
+    --color-canvas-50: #ffffff;
+    --color-canvas-100: #f7f6f5;
+    --color-canvas-200: #e8e6e3;
+    --color-canvas-300: #d4d1cd;
+    --color-canvas-400: #a8a29e;
+    --color-canvas-500: #78716c;
+
+    /*
+     * Soft slate contrast lift — cooler text/UI neutrals against the stone canvas.
      */
     --color-slate-50: #f7f9fc;
     --color-slate-100: #eef2f7;
@@ -50,11 +60,10 @@
 }
 
 /*
- * Base surface — a touch cooler than pure white so cards and borders separate
- * without looking heavy.
+ * App canvas. White cards / tables sit on top for clear separation.
  */
 html,
 body {
-    background-color: var(--color-slate-50);
+    background-color: var(--color-canvas-50);
     color: var(--color-slate-900);
 }
