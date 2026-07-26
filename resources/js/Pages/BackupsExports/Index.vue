@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-
 type TakeoutRunRow = {
     id: number;
     download_token: string;
@@ -183,6 +183,93 @@ const readyBackups = computed(() =>
     props.recent_backups.filter((run) => run.status === 'ready' && !!run.filename),
 );
 
+type RetentionBand = 'all' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+const retentionBandLabel: Record<RetentionBand, string> = {
+    all: 'Recent',
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    yearly: 'Yearly',
+};
+
+const retentionBandVariant: Record<RetentionBand, 'success' | 'info' | 'neutral' | 'warning' | 'default'> = {
+    all: 'success',
+    daily: 'info',
+    weekly: 'neutral',
+    monthly: 'warning',
+    yearly: 'default',
+};
+
+const retentionBandFor = (createdAt: string | null): RetentionBand | null => {
+    if (!createdAt || !props.backup_retention) {
+        return null;
+    }
+
+    const created = new Date(createdAt);
+    if (Number.isNaN(created.getTime())) {
+        return null;
+    }
+
+    const ageDays = Math.max(0, (Date.now() - created.getTime()) / 86_400_000);
+    const r = props.backup_retention;
+
+    let end = Number(r.keep_all_backups_for_days) || 0;
+    if (ageDays <= end) {
+        return 'all';
+    }
+
+    end += Number(r.keep_daily_backups_for_days) || 0;
+    if (ageDays <= end) {
+        return 'daily';
+    }
+
+    end += (Number(r.keep_weekly_backups_for_weeks) || 0) * 7;
+    if (ageDays <= end) {
+        return 'weekly';
+    }
+
+    end += (Number(r.keep_monthly_backups_for_months) || 0) * 30;
+    if (ageDays <= end) {
+        return 'monthly';
+    }
+
+    return 'yearly';
+};
+
+const backupMonthGroups = computed(() => {
+    const groups: Array<{
+        key: string;
+        label: string;
+        runs: Array<BackupRunRow & { retention_band: RetentionBand | null }>;
+    }> = [];
+    const indexByKey = new Map<string, number>();
+
+    for (const run of props.recent_backups) {
+        const created = run.created_at ? new Date(run.created_at) : null;
+        const valid = created && !Number.isNaN(created.getTime());
+        const key = valid
+            ? `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
+            : 'unknown';
+        const label = valid
+            ? created.toLocaleString(undefined, { month: 'long', year: 'numeric' })
+            : 'Unknown date';
+
+        let idx = indexByKey.get(key);
+        if (idx === undefined) {
+            idx = groups.length;
+            indexByKey.set(key, idx);
+            groups.push({ key, label, runs: [] });
+        }
+        groups[idx].runs.push({
+            ...run,
+            retention_band: retentionBandFor(run.created_at),
+        });
+    }
+
+    return groups;
+});
+
 const restoreFilename = ref(readyBackups.value[0]?.filename ?? '');
 const restoreRuntime = ref<'compose' | 'sail'>('compose');
 const restoreCopied = ref(false);
@@ -285,6 +372,48 @@ const useBackupForRestore = (run: BackupRunRow) => {
     window.requestAnimationFrame(() => {
         document.getElementById('instance-restore-guide')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
+};
+
+const backupRowActions = (run: BackupRunRow) => {
+    const actions: Array<{ id: string; label: string }> = [];
+    if (run.download_url) {
+        actions.push({ id: 'download', label: 'Download' });
+    }
+    if (run.status === 'ready' && run.filename) {
+        actions.push({ id: 'restore_guide', label: 'Restore guide' });
+    }
+    if (run.can_retry) {
+        actions.push({ id: 'retry', label: 'Retry' });
+    }
+    actions.push({ id: 'delete', label: 'Delete' });
+    return actions;
+};
+
+const onBackupAction = (run: BackupRunRow, actionId: string) => {
+    if (actionId === 'download') {
+        if (!run.download_url) {
+            return;
+        }
+        const anchor = document.createElement('a');
+        anchor.href = run.download_url;
+        anchor.download = run.filename ?? '';
+        anchor.setAttribute('data-inertia', 'false');
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        return;
+    }
+    if (actionId === 'restore_guide') {
+        useBackupForRestore(run);
+        return;
+    }
+    if (actionId === 'retry') {
+        retryBackup(run);
+        return;
+    }
+    if (actionId === 'delete') {
+        deleteBackup(run);
+    }
 };
 
 const copyRestoreScript = async () => {
@@ -814,7 +943,12 @@ onBeforeUnmount(() => {
 
             <AppCard class="mt-5">
                 <div class="mb-3 flex items-center justify-between gap-2">
-                    <h3 class="text-base font-semibold text-slate-900">Recent backups</h3>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Recent backups</h3>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Grouped by month. Retention labels estimate the cleanup window by age (not separate backup jobs).
+                        </p>
+                    </div>
                     <p v-if="backupBusy" class="text-xs text-slate-500">Refreshing status…</p>
                 </div>
                 <p v-if="recent_backups.length === 0" class="text-sm text-slate-500">No backups yet.</p>
@@ -823,6 +957,7 @@ onBeforeUnmount(() => {
                         <thead>
                             <tr class="border-b border-slate-200 text-left text-slate-600">
                                 <th class="px-2 py-2 font-medium">File</th>
+                                <th class="px-2 py-2 font-medium">Retention</th>
                                 <th class="px-2 py-2 font-medium">Status</th>
                                 <th class="px-2 py-2 font-medium">Size</th>
                                 <th class="px-2 py-2 font-medium">Created</th>
@@ -830,55 +965,51 @@ onBeforeUnmount(() => {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="run in recent_backups" :key="run.id" class="border-b border-slate-100">
-                                <td class="px-2 py-2 font-mono text-xs">{{ run.filename ?? '—' }}</td>
-                                <td class="px-2 py-2">
-                                    <span
-                                        :class="run.status === 'failed' ? 'text-rose-600' : run.status === 'ready' ? 'text-brand-700' : 'text-slate-600'"
-                                    >
-                                        {{ statusLabel(run.status) }}
-                                    </span>
-                                    <p v-if="run.error_message" class="mt-0.5 text-xs text-rose-600">{{ run.error_message }}</p>
-                                </td>
-                                <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
-                                <td class="px-2 py-2">{{ run.created_at ? run.created_at.slice(0, 19).replace('T', ' ') : '—' }}</td>
-                                <td class="px-2 py-2 text-right">
-                                    <div class="flex flex-wrap items-center justify-end gap-2">
-                                        <a
-                                            v-if="run.download_url"
-                                            :href="run.download_url"
-                                            class="text-brand-700 hover:underline"
-                                            download
-                                            data-inertia="false"
+                            <template v-for="group in backupMonthGroups" :key="group.key">
+                                <tr class="bg-slate-50/90">
+                                    <td colspan="6" class="px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                        {{ group.label }}
+                                        <span class="ml-1 font-normal normal-case text-slate-500">
+                                            · {{ group.runs.length }} {{ group.runs.length === 1 ? 'backup' : 'backups' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr
+                                    v-for="run in group.runs"
+                                    :key="run.id"
+                                    class="border-b border-slate-100"
+                                >
+                                    <td class="px-2 py-2 font-mono text-xs">{{ run.filename ?? '—' }}</td>
+                                    <td class="px-2 py-2">
+                                        <AppBadge
+                                            v-if="run.retention_band"
+                                            :variant="retentionBandVariant[run.retention_band]"
                                         >
-                                            Download
-                                        </a>
-                                        <button
-                                            v-if="run.status === 'ready' && run.filename"
-                                            type="button"
-                                            class="text-slate-700 hover:underline"
-                                            @click="useBackupForRestore(run)"
+                                            {{ retentionBandLabel[run.retention_band] }}
+                                        </AppBadge>
+                                        <span v-else class="text-xs text-slate-400">—</span>
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        <span
+                                            :class="run.status === 'failed' ? 'text-rose-600' : run.status === 'ready' ? 'text-brand-700' : 'text-slate-600'"
                                         >
-                                            Restore guide
-                                        </button>
-                                        <button
-                                            v-if="run.can_retry"
-                                            type="button"
-                                            class="text-slate-700 hover:underline"
-                                            @click="retryBackup(run)"
-                                        >
-                                            Retry
-                                        </button>
-                                        <button
-                                            type="button"
-                                            class="text-rose-600 hover:underline"
-                                            @click="deleteBackup(run)"
-                                        >
-                                            Delete
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                                            {{ statusLabel(run.status) }}
+                                        </span>
+                                        <p v-if="run.error_message" class="mt-0.5 text-xs text-rose-600">{{ run.error_message }}</p>
+                                    </td>
+                                    <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
+                                    <td class="px-2 py-2">{{ run.created_at ? run.created_at.slice(0, 19).replace('T', ' ') : '—' }}</td>
+                                    <td class="px-2 py-2 text-right">
+                                        <div class="inline-flex justify-end">
+                                            <InvoiceRowActionsMenu
+                                                :actions="backupRowActions(run)"
+                                                :aria-label="`Actions for ${run.filename ?? `backup #${run.id}`}`"
+                                                @select="(id) => onBackupAction(run, id)"
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
                 </div>
