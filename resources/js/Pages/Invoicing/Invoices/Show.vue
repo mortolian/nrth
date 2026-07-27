@@ -176,6 +176,19 @@ const timeline = computed(() => ([
     { label: 'Paid', at: props.invoice.paid_at, done: Boolean(props.invoice.paid_at) },
 ]));
 
+const ACTIVITY_PREVIEW_COUNT = 5;
+const activityLogExpanded = ref(false);
+const visibleActivityLog = computed(() => {
+    const entries = props.invoice.activity_log ?? [];
+    if (activityLogExpanded.value || entries.length <= ACTIVITY_PREVIEW_COUNT) {
+        return entries;
+    }
+    return entries.slice(0, ACTIVITY_PREVIEW_COUNT);
+});
+const hiddenActivityCount = computed(() =>
+    Math.max(0, (props.invoice.activity_log?.length ?? 0) - ACTIVITY_PREVIEW_COUNT),
+);
+
 const firstErrorMessage = (errors: Record<string, string>) => {
     const first = Object.values(errors)[0];
     return first || 'Something went wrong.';
@@ -404,7 +417,7 @@ const undoPayment = (paymentId: number) => {
                 >
                     Duplicate
                 </AppButton>
-                <AppButton v-if="can.delete" class="shrink-0" variant="primary" @click="deleteInvoice">
+                <AppButton v-if="can.delete" class="shrink-0" variant="danger" @click="deleteInvoice">
                     <Trash2 class="mr-1 h-4 w-4 shrink-0" /> Delete
                 </AppButton>
             </div>
@@ -585,10 +598,18 @@ const undoPayment = (paymentId: number) => {
                 <AppCard>
                     <h3 class="text-base font-semibold text-slate-900">Activity log</h3>
                     <div v-if="invoice.activity_log.length" class="mt-3 space-y-2">
-                        <div v-for="entry in invoice.activity_log" :key="entry.id" class="rounded-md border border-slate-200 p-2 text-sm">
+                        <div v-for="entry in visibleActivityLog" :key="entry.id" class="rounded-md border border-slate-200 p-2 text-sm">
                             <p class="text-slate-800">{{ entry.description }}</p>
                             <p class="text-xs text-slate-500">{{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '-' }}</p>
                         </div>
+                        <button
+                            v-if="hiddenActivityCount > 0"
+                            type="button"
+                            class="w-full rounded-md px-2 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                            @click="activityLogExpanded = !activityLogExpanded"
+                        >
+                            {{ activityLogExpanded ? 'Show less' : `Show ${hiddenActivityCount} more` }}
+                        </button>
                     </div>
                     <p v-else class="mt-3 text-sm text-slate-500">No activity logged yet.</p>
                 </AppCard>
