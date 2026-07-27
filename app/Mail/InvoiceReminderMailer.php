@@ -13,7 +13,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class InvoiceMailer extends Mailable implements ShouldQueue
+class InvoiceReminderMailer extends Mailable implements ShouldQueue
 {
     use Queueable;
     use SerializesModels;
@@ -26,39 +26,36 @@ class InvoiceMailer extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         $this->invoice->loadMissing(['team', 'client']);
+        $issuer = $this->issuerName();
 
         return new Envelope(
-            subject: $this->renderTemplate(
-                (string) ($this->settings()['invoice_email_subject_template']
-                    ?? 'Invoice {{number}} from {{business}}'),
-            ),
+            subject: 'Payment reminder: invoice '.$this->invoice->number.' from '.$issuer,
         );
     }
 
     public function content(): Content
     {
         $this->invoice->loadMissing(['team', 'client']);
-        $issuer = $this->issuerName();
         $isTax = $this->invoice->team?->chargesVat() ?? false;
-        $docLabel = $isTax ? 'tax invoice' : 'invoice';
-
-        $body = $this->renderTemplate(
-            (string) ($this->settings()['invoice_email_body_template']
-                ?? "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{business}}"),
-        );
+        $total = (int) $this->invoice->getRawOriginal('total_cents');
+        $paid = (int) $this->invoice->getRawOriginal('amount_paid_cents');
+        $amountDueCents = max(0, $total - $paid);
+        $clientName = (string) ($this->invoice->client?->contact_name
+            ?: $this->invoice->client?->name
+            ?: 'there');
 
         return new Content(
-            markdown: 'emails.invoice',
+            markdown: 'emails.invoice-reminder',
             with: [
                 'invoice' => $this->invoice,
                 'is_tax_invoice' => $isTax,
-                'doc_label' => $docLabel,
-                'issuer_name' => $issuer,
-                'body_lines' => $this->bodyLines($body),
+                'doc_label' => $isTax ? 'tax invoice' : 'invoice',
+                'issuer_name' => $this->issuerName(),
+                'client_name' => $clientName,
                 'issue_date' => optional($this->invoice->issue_date)->format('d M Y') ?? '—',
                 'due_date' => optional($this->invoice->due_date)->format('d M Y') ?? '—',
                 'amount_due' => FormatMoney::minorUnits(
-                    (int) $this->invoice->getRawOriginal('total_cents'),
+                    $amountDueCents,
                     (string) ($this->invoice->currency ?? 'ZAR'),
                 ),
                 'has_attachment' => $this->pdfAttachmentPath() !== null,
@@ -107,50 +104,10 @@ class InvoiceMailer extends Mailable implements ShouldQueue
         return $path;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function settings(): array
-    {
-        return $this->invoice->team?->mergedBusinessSettings() ?? [];
-    }
-
     private function issuerName(): string
     {
         return $this->invoice->team !== null
             ? $this->invoice->team->issuerForInvoicingDocuments()['name']
             : (string) config('app.name');
-    }
-
-    private function renderTemplate(string $template): string
-    {
-        $clientName = (string) ($this->invoice->client?->contact_name
-            ?: $this->invoice->client?->name
-            ?: 'there');
-
-        return strtr($template, [
-            '{{number}}' => (string) $this->invoice->number,
-            '{{business}}' => $this->issuerName(),
-            '{{client_name}}' => $clientName,
-            '{{due_date}}' => optional($this->invoice->due_date)->format('d M Y') ?? '',
-            '{{issue_date}}' => optional($this->invoice->issue_date)->format('d M Y') ?? '',
-            '{{total}}' => FormatMoney::minorUnits(
-                (int) $this->invoice->getRawOriginal('total_cents'),
-                (string) ($this->invoice->currency ?? 'ZAR'),
-            ),
-        ]);
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function bodyLines(string $body): array
-    {
-        $lines = preg_split('/\R/', $body) ?: [];
-
-        return array_values(array_map(
-            static fn (string $line): string => rtrim($line),
-            $lines,
-        ));
     }
 }

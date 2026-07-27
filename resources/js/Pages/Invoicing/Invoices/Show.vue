@@ -7,6 +7,7 @@ import RecordInvoicePaymentDrawer, {
     type RecordPaymentInvoiceInput,
 } from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 import { CheckCircle2, CircleDot, Download, Edit3, Mail, QrCode, Trash2, Wallet } from 'lucide-vue-next';
 
 type Issuer = {
@@ -84,6 +85,7 @@ const props = defineProps<{
     can: {
         edit: boolean;
         send: boolean;
+        remind: boolean;
         mark_sent: boolean;
         void: boolean;
         unvoid: boolean;
@@ -121,6 +123,10 @@ const bookCurrencySnapshot = computed(() => {
 });
 
 const paymentDrawerOpen = ref(false);
+const toast = useToast();
+const sendingInvoice = ref(false);
+const sendingReminder = ref(false);
+const markingSent = ref(false);
 
 const recordPaymentInvoice = computed((): RecordPaymentInvoiceInput => ({
     id: props.invoice.id,
@@ -170,8 +176,58 @@ const timeline = computed(() => ([
     { label: 'Paid', at: props.invoice.paid_at, done: Boolean(props.invoice.paid_at) },
 ]));
 
-const sendInvoice = () => router.post(route('invoicing.invoices.send', props.invoice.id));
-const markAsSent = () => router.post(route('invoicing.invoices.mark-sent', props.invoice.id));
+const firstErrorMessage = (errors: Record<string, string>) => {
+    const first = Object.values(errors)[0];
+    return first || 'Something went wrong.';
+};
+
+const sendInvoice = () => {
+    if (sendingInvoice.value) return;
+    router.post(route('invoicing.invoices.send', props.invoice.id), {}, {
+        preserveScroll: true,
+        onStart: () => {
+            sendingInvoice.value = true;
+        },
+        onError: (errors) => {
+            toast.error(firstErrorMessage(errors));
+        },
+        onFinish: () => {
+            sendingInvoice.value = false;
+        },
+    });
+};
+
+const sendReminder = () => {
+    if (sendingReminder.value) return;
+    router.post(route('invoicing.invoices.remind', props.invoice.id), {}, {
+        preserveScroll: true,
+        onStart: () => {
+            sendingReminder.value = true;
+        },
+        onError: (errors) => {
+            toast.error(firstErrorMessage(errors));
+        },
+        onFinish: () => {
+            sendingReminder.value = false;
+        },
+    });
+};
+
+const markAsSent = () => {
+    if (markingSent.value) return;
+    router.post(route('invoicing.invoices.mark-sent', props.invoice.id), {}, {
+        preserveScroll: true,
+        onStart: () => {
+            markingSent.value = true;
+        },
+        onError: (errors) => {
+            toast.error(firstErrorMessage(errors));
+        },
+        onFinish: () => {
+            markingSent.value = false;
+        },
+    });
+};
 const voidInvoice = () => router.post(route('invoicing.invoices.void', props.invoice.id));
 const unvoidInvoice = () => router.post(route('invoicing.invoices.unvoid', props.invoice.id));
 
@@ -282,10 +338,10 @@ const undoPayment = (paymentId: number) => {
                 >
                     <Edit3 class="mr-1 h-4 w-4 shrink-0" /> Edit
                 </AppButton>
-                <AppButton v-if="can.send" class="shrink-0" variant="primary" @click="sendInvoice">
+                <AppButton v-if="can.send" class="shrink-0" variant="primary" :loading="sendingInvoice" @click="sendInvoice">
                     <Mail class="mr-1 h-4 w-4 shrink-0" /> {{ invoice.status === 'draft' ? 'Send invoice' : 'Resend invoice' }}
                 </AppButton>
-                <AppButton v-if="can.mark_sent" class="shrink-0" variant="primary" @click="markAsSent">
+                <AppButton v-if="can.mark_sent" class="shrink-0" variant="primary" :loading="markingSent" @click="markAsSent">
                     <CheckCircle2 class="mr-1 h-4 w-4 shrink-0" /> Mark as sent
                 </AppButton>
                 <AppButton
@@ -324,7 +380,14 @@ const undoPayment = (paymentId: number) => {
                 >
                     Pay with PayFast
                 </AppButton>
-                <AppButton v-if="['sent', 'partial'].includes(invoice.status)" class="shrink-0" variant="primary" type="button">
+                <AppButton
+                    v-if="can.remind"
+                    class="shrink-0"
+                    variant="primary"
+                    type="button"
+                    :loading="sendingReminder"
+                    @click="sendReminder"
+                >
                     Send reminder
                 </AppButton>
                 <AppButton v-if="invoice.status === 'sent' && can.void" class="shrink-0" variant="primary" @click="voidInvoice">

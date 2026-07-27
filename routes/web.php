@@ -207,6 +207,7 @@ Route::middleware([
         Route::get('/invoices/{invoice}/edit', [InvoiceController::class, 'edit'])->name('invoices.edit');
         Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])->name('invoices.update');
         Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
+        Route::post('/invoices/{invoice}/remind', [InvoiceController::class, 'remind'])->name('invoices.remind');
         Route::post('/invoices/{invoice}/mark-sent', [InvoiceController::class, 'markSent'])->name('invoices.mark-sent');
         Route::post('/invoices/{invoice}/void', [InvoiceController::class, 'void'])->name('invoices.void');
         Route::post('/invoices/{invoice}/unvoid', [InvoiceController::class, 'unvoid'])->name('invoices.unvoid');

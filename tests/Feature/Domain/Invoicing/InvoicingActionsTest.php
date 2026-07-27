@@ -147,7 +147,9 @@ class InvoicingActionsTest extends TestCase
 
         $this->assertSame(InvoiceStatus::Sent, $sent->status);
         $this->assertNotNull($sent->sent_at);
-        Mail::assertQueued(InvoiceMailer::class);
+        Mail::assertQueued(InvoiceMailer::class, function (InvoiceMailer $mail) use ($media): bool {
+            return $mail->pdfMediaId === $media->id;
+        });
     }
 
     public function test_record_payment_seeds_default_chart_when_bank_account_missing(): void

@@ -1,24 +1,21 @@
 @component('mail::message')
-@foreach ($body_lines as $line)
-@if ($line === '')
+# Payment reminder
 
-@else
-{{ $line }}
+Hi {{ $client_name }},
 
-@endif
-@endforeach
+This is a friendly reminder that **{{ $doc_label }} {{ $invoice->number }}** still has an outstanding balance.
 
 @component('mail::panel')
 **{{ ucfirst($doc_label) }}:** {{ $invoice->number }}  
 **Issue date:** {{ $issue_date }}  
 **Due date:** {{ $due_date }}  
-**Total:** {{ $amount_due }}
+**Amount due:** {{ $amount_due }}
 @endcomponent
+
+Please use your invoice number as the payment reference. If you have already paid, you can ignore this message.
 
 @if ($has_attachment)
 A PDF copy of this {{ $doc_label }} is attached to this email.
-@else
-Please contact us if you need a PDF copy of this {{ $doc_label }}.
 @endif
 
 Thanks,<br>

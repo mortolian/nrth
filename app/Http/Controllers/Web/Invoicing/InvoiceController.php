@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Actions\CreateInvoiceAction;
 use App\Domain\Invoicing\Actions\MarkInvoiceSentAction;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\SendInvoiceAction;
+use App\Domain\Invoicing\Actions\SendInvoiceReminderAction;
 use App\Domain\Invoicing\Actions\UndoInvoicePaymentAction;
 use App\Domain\Invoicing\Actions\UnvoidInvoiceAction;
 use App\Domain\Invoicing\Actions\VoidInvoiceAction;
@@ -28,6 +29,7 @@ use App\Http\Controllers\Controller;
 use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\InvoicePayQrCode;
 use App\Support\Iso4217Currencies;
+use App\Support\MailDelivery;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -225,9 +227,29 @@ class InvoiceController extends Controller
     {
         $this->authorizeTeam('invoices.manage', $request);
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
-        $sendInvoiceAction->execute($invoice);
 
-        return to_route('invoicing.invoices.show', $invoice->fresh());
+        $wasDraft = $invoice->status === InvoiceStatus::Draft;
+        $sendInvoiceAction->execute($invoice);
+        $invoice->loadMissing('client');
+        $email = trim((string) ($invoice->client?->email ?? ''));
+        [$flashKey, $flashMessage] = \App\Support\MailDelivery::invoiceEmailedFlash($email, reminder: false, resent: ! $wasDraft);
+
+        return to_route('invoicing.invoices.show', $invoice->fresh())
+            ->with($flashKey, $flashMessage);
+    }
+
+    public function remind(Request $request, Invoice $invoice, SendInvoiceReminderAction $sendInvoiceReminderAction): RedirectResponse
+    {
+        $this->authorizeTeam('invoices.manage', $request);
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
+
+        $sendInvoiceReminderAction->execute($invoice);
+        $invoice->loadMissing('client');
+        $email = trim((string) ($invoice->client?->email ?? ''));
+        [$flashKey, $flashMessage] = \App\Support\MailDelivery::invoiceEmailedFlash($email, reminder: true);
+
+        return to_route('invoicing.invoices.show', $invoice->fresh())
+            ->with($flashKey, $flashMessage);
     }
 
     public function markSent(Request $request, Invoice $invoice, MarkInvoiceSentAction $markInvoiceSentAction): RedirectResponse
@@ -236,7 +258,8 @@ class InvoiceController extends Controller
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $markInvoiceSentAction->execute($invoice);
 
-        return to_route('invoicing.invoices.show', $invoice->fresh());
+        return to_route('invoicing.invoices.show', $invoice->fresh())
+            ->with('success', __('Invoice marked as sent.'));
     }
 
     public function void(Request $request, Invoice $invoice, VoidInvoiceAction $voidInvoiceAction): RedirectResponse
@@ -557,7 +580,22 @@ class InvoiceController extends Controller
             ],
             'can' => [
                 'edit' => $invoice->status !== InvoiceStatus::Void,
-                'send' => in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Sent, InvoiceStatus::Partial], true),
+                'send' => in_array($invoice->status, [
+                    InvoiceStatus::Draft,
+                    InvoiceStatus::Sent,
+                    InvoiceStatus::Viewed,
+                    InvoiceStatus::Partial,
+                    InvoiceStatus::Overdue,
+                ], true),
+                'remind' => in_array($invoice->status, [
+                    InvoiceStatus::Sent,
+                    InvoiceStatus::Viewed,
+                    InvoiceStatus::Partial,
+                    InvoiceStatus::Overdue,
+                ], true) && max(
+                    0,
+                    (int) $invoice->getRawOriginal('total_cents') - (int) $invoice->getRawOriginal('amount_paid_cents')
+                ) > 0,
                 'mark_sent' => $invoice->status === InvoiceStatus::Draft,
                 'void' => $invoice->status === InvoiceStatus::Sent,
                 'unvoid' => $invoice->status === InvoiceStatus::Void,

@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -13,6 +14,8 @@ import VChart from 'vue-echarts';
 import { CircleDollarSign, HandCoins, Landmark, TrendingUp } from 'lucide-vue-next';
 
 use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+
+const toast = useToast();
 
 const props = defineProps({
     kpis: { type: Object, default: () => ({}) },
@@ -137,6 +140,10 @@ const rowActionItems = (invoice) => {
         actions.push({ id: 'send', label: 'Send' });
         actions.push({ id: 'mark_sent', label: 'Mark as sent' });
     }
+    if (['sent', 'viewed', 'partial', 'overdue'].includes(invoice.status)) {
+        actions.push({ id: 'resend', label: 'Resend' });
+        actions.push({ id: 'remind', label: 'Send reminder' });
+    }
     if (invoice.status !== 'paid' && invoice.status !== 'void') {
         actions.push({ id: 'record_payment', label: 'Record Payment' });
     }
@@ -168,8 +175,20 @@ const onInvoiceAction = (invoice, actionId) => {
         router.visit(route('invoicing.invoices.show', invoice.id));
     } else if (actionId === 'download_pdf') {
         window.location.assign(route('invoices.pdf.download', invoice.id));
-    } else if (actionId === 'send') {
-        router.post(route('invoicing.invoices.send', invoice.id));
+    } else if (actionId === 'send' || actionId === 'resend') {
+        router.post(route('invoicing.invoices.send', invoice.id), {}, {
+            onError: (errors) => {
+                const first = Object.values(errors)[0];
+                toast.error(first ? String(first) : 'Could not send this invoice.');
+            },
+        });
+    } else if (actionId === 'remind') {
+        router.post(route('invoicing.invoices.remind', invoice.id), {}, {
+            onError: (errors) => {
+                const first = Object.values(errors)[0];
+                toast.error(first ? String(first) : 'Could not send reminder.');
+            },
+        });
     } else if (actionId === 'mark_sent') {
         router.post(route('invoicing.invoices.mark-sent', invoice.id));
     } else if (actionId === 'void') {
