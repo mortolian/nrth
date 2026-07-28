@@ -24,6 +24,12 @@ export function useMoneyInTabs() {
             canTeam('clients.view')
                 ? { id: 'clients', label: 'Clients', href: route('invoicing.clients.index') }
                 : null,
+            canTeam('items.view')
+                ? { id: 'items', label: 'Items', href: route('invoicing.items.index') }
+                : null,
+            canTeam('invoices.view')
+                ? { id: 'recurring', label: 'Recurring', href: route('invoicing.recurring.index') }
+                : null,
         ].filter(Boolean) as AppTabItem[],
     );
 }

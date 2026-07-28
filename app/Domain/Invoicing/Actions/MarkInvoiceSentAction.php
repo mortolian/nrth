@@ -9,6 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class MarkInvoiceSentAction
 {
+    public function __construct(
+        private readonly PostInvoiceAccrualAction $postInvoiceAccrualAction,
+    ) {}
+
     public function execute(Invoice $invoice): Invoice
     {
         if ($invoice->status !== InvoiceStatus::Draft) {
@@ -21,6 +25,8 @@ class MarkInvoiceSentAction
             $invoice->status = InvoiceStatus::Sent;
             $invoice->sent_at = now();
             $invoice->save();
+
+            $this->postInvoiceAccrualAction->execute($invoice->fresh());
 
             if (function_exists('activity')) {
                 activity()

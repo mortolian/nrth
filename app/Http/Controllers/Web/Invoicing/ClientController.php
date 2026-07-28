@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Invoicing;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
@@ -86,10 +87,12 @@ class ClientController extends Controller
         $this->authorizeTeam('clients.manage', $request);
 
         $returnQuery = $request->query('return');
+        $teamId = (int) $request->user()->current_team_id;
 
         return Inertia::render('Invoicing/Clients/Form', [
             'isEditing' => false,
             'client' => null,
+            'note_templates' => $this->noteTemplatesForForm($teamId),
             'return_to' => $this->safeInternalReturn(is_string($returnQuery) ? $returnQuery : null),
         ]);
     }
@@ -100,6 +103,7 @@ class ClientController extends Controller
 
         $payload = $this->validateClient($request);
         $teamId = (int) $request->user()->current_team_id;
+        $noteTemplateIds = $this->extractNoteTemplateIds($payload);
         $returnTo = $this->safeInternalReturn(
             is_string($request->input('return')) ? (string) $request->input('return') : null
         );
@@ -108,6 +112,8 @@ class ClientController extends Controller
             'team_id' => $teamId,
             ...$payload,
         ]);
+
+        $this->syncClientNoteTemplates($client, $noteTemplateIds);
 
         if ($returnTo !== null) {
             return redirect($returnTo);
@@ -211,7 +217,8 @@ class ClientController extends Controller
 
         return Inertia::render('Invoicing/Clients/Form', [
             'isEditing' => true,
-            'client' => $this->serializeClient($client),
+            'client' => $this->serializeClient($client->loadMissing('noteTemplates')),
+            'note_templates' => $this->noteTemplatesForForm((int) $client->team_id),
         ]);
     }
 
@@ -220,7 +227,11 @@ class ClientController extends Controller
         $this->authorizeTeam('clients.manage', $request);
         abort_unless($client->team_id === $request->user()->current_team_id, 403);
 
-        $client->update($this->validateClient($request));
+        $payload = $this->validateClient($request);
+        $noteTemplateIds = $this->extractNoteTemplateIds($payload);
+
+        $client->update($payload);
+        $this->syncClientNoteTemplates($client, $noteTemplateIds);
 
         return to_route('invoicing.clients.show', $client);
     }
@@ -230,6 +241,8 @@ class ClientController extends Controller
      */
     private function validateClient(Request $request): array
     {
+        $teamId = (int) $request->user()->current_team_id;
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'contact_name' => ['nullable', 'string', 'max:255'],
@@ -247,6 +260,11 @@ class ClientController extends Controller
             'payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
+            'note_template_ids' => ['nullable', 'array'],
+            'note_template_ids.*' => [
+                'integer',
+                Rule::exists('note_templates', 'id')->where(fn ($q) => $q->where('team_id', $teamId)),
+            ],
         ]);
 
         if (! empty($validated['phone'])) {
@@ -256,6 +274,49 @@ class ClientController extends Controller
         }
 
         return $validated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<int>
+     */
+    private function extractNoteTemplateIds(array &$payload): array
+    {
+        $ids = array_values(array_map('intval', $payload['note_template_ids'] ?? []));
+        unset($payload['note_template_ids']);
+
+        return $ids;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    private function syncClientNoteTemplates(Client $client, array $ids): void
+    {
+        $sync = [];
+        foreach ($ids as $i => $id) {
+            $sync[$id] = ['sort_order' => $i];
+        }
+        $client->noteTemplates()->sync($sync);
+    }
+
+    /**
+     * @return list<array{id: int, name: string, target: string}>
+     */
+    private function noteTemplatesForForm(int $teamId): array
+    {
+        return NoteTemplate::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'target'])
+            ->map(fn (NoteTemplate $template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'target' => $template->target,
+            ])
+            ->all();
     }
 
     /**
@@ -300,6 +361,9 @@ class ClientController extends Controller
             'payment_terms_days' => (int) $client->payment_terms_days,
             'notes' => $client->notes,
             'is_active' => (bool) $client->is_active,
+            'note_template_ids' => $client->relationLoaded('noteTemplates')
+                ? $client->noteTemplates->pluck('id')->values()->all()
+                : [],
         ];
     }
 }

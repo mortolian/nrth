@@ -6,7 +6,7 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'profile' | 'business' | 'team';
+    section: 'profile' | 'business' | 'team' | 'note-templates';
     title?: string;
     subtitle?: string;
 }>();
@@ -25,6 +25,7 @@ const sections = computed((): AppTabItem[] => {
 
     if (canTeam('settings.business')) {
         tabs.push({ id: 'business', label: 'Business', href: route('settings.business') });
+        tabs.push({ id: 'note-templates', label: 'Note templates', href: route('settings.note-templates.index') });
     }
 
     if (canTeam('settings.team')) {

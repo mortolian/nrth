@@ -178,6 +178,25 @@
         margin: 0;
         page-break-inside: avoid;
     }
+    .section.section-prose .pdf-markdown p,
+    .section.section-prose .pdf-markdown ul,
+    .section.section-prose .pdf-markdown ol,
+    .section.section-prose .pdf-markdown h2,
+    .section.section-prose .pdf-markdown h3 {
+        margin: 0 0 4px;
+        color: #334155;
+        font-size: 10px;
+        line-height: 1.5;
+    }
+    .section.section-prose .pdf-markdown h2,
+    .section.section-prose .pdf-markdown h3 {
+        font-size: 11px;
+        color: #0f172a;
+    }
+    .section.section-prose .pdf-markdown ul,
+    .section.section-prose .pdf-markdown ol {
+        padding-left: 16px;
+    }
 
     .section.section-pay-online {
         margin-top: 20px;

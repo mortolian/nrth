@@ -14,6 +14,7 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\LedgerService;
 use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
 use App\Domain\Invoicing\Actions\CreateInvoiceAction;
+use App\Domain\Invoicing\Actions\PostInvoiceAccrualAction;
 use App\Domain\Invoicing\Actions\RecordPaymentAction;
 use App\Domain\Invoicing\Actions\SendInvoiceAction;
 use App\Domain\Invoicing\Actions\VoidInvoiceAction;
@@ -143,7 +144,10 @@ class InvoicingActionsTest extends TestCase
         $pdfService = Mockery::mock(InvoicePdfService::class);
         $pdfService->shouldReceive('generate')->once()->andReturn($media);
 
-        $sent = (new SendInvoiceAction($pdfService))->execute($invoice);
+        $sent = (new SendInvoiceAction(
+            $pdfService,
+            app(PostInvoiceAccrualAction::class),
+        ))->execute($invoice);
 
         $this->assertSame(InvoiceStatus::Sent, $sent->status);
         $this->assertNotNull($sent->sent_at);

@@ -5,7 +5,7 @@ namespace App\Domain\Invoicing\DTOs;
 readonly class CreateInvoiceDTO
 {
     /**
-     * @param  array<int, array{description: string, quantity: float|int|string, unit_price_cents: int, vat_rate?: float|int|string}>  $lineItems
+     * @param  array<int, array{description: string, quantity: float|int|string, unit_price_cents: int, vat_rate?: float|int|string, item_id?: int|null, discount_type?: string|null, discount_percent?: float|int|string|null, discount_cents?: int|string|null, income_account_id?: int|null}>  $lineItems
      */
     public function __construct(
         public int $teamId,
@@ -17,5 +17,9 @@ readonly class CreateInvoiceDTO
         public ?string $notes = null,
         public ?string $footer = null,
         public array $lineItems = [],
+        public ?string $discountType = null,
+        public float|int|string|null $discountPercent = null,
+        public int|string|null $discountCents = null,
+        public ?int $incomeAccountId = null,
     ) {}
 }

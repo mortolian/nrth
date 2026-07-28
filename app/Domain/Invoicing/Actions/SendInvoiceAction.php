@@ -17,6 +17,7 @@ class SendInvoiceAction
 {
     public function __construct(
         private readonly InvoicePdfService $invoicePdfService,
+        private readonly PostInvoiceAccrualAction $postInvoiceAccrualAction,
     ) {}
 
     public function execute(Invoice $invoice): Invoice
@@ -50,6 +51,7 @@ class SendInvoiceAction
                 $invoice->status = InvoiceStatus::Sent;
                 $invoice->sent_at = now();
                 $invoice->save();
+                $this->postInvoiceAccrualAction->execute($invoice->fresh());
             } elseif ($invoice->sent_at === null) {
                 $invoice->sent_at = now();
                 $invoice->save();

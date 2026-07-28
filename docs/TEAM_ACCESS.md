@@ -64,8 +64,10 @@ See [AGENTS.md](../AGENTS.md) for the agent checklist (permissions **and** docum
 ## Built-in presets (intent)
 
 - **Owner** — all catalog permissions
-- **Accountant** — view and manage operational data, export reports; cannot delete records or change business/team settings
-- **Viewer** — read-only across domains that have `*.view`
+- **Accountant** — view and manage operational data (including `items.*` manage, not delete), export reports; cannot delete records or change business/team settings
+- **Viewer** — read-only across domains that have `*.view` (including items)
+
+Money In catalog keys include `invoices.*`, `estimates.*`, `clients.*`, and `items.*` (products/services catalog). Invoice note templates are managed under Settings (`settings.business`), not a separate permission key.
 
 ## Tests
 

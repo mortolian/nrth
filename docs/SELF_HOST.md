@@ -53,7 +53,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 ## Backups
 
-Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30). The first admin is an **instance operator** — manage operators and runs under **Backups & exports → Instance backup**.
+Laravel schedules `backup:run` (03:00) and `backup:clean` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage operators and runs under **Backups & exports → Instance backup**.
 
 Retention (how long daily backups are kept as daily / weekly / monthly / yearly copies, plus an optional size cap) is editable on that same screen under **Backup retention**. Defaults match `config/backup.php` until changed.
 

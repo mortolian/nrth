@@ -51,20 +51,29 @@
     $subtotal = (int) ($estimate->getRawOriginal('subtotal_cents') ?? 0);
     $vatTotal = (int) ($estimate->getRawOriginal('vat_amount_cents') ?? 0);
     $total = (int) ($estimate->getRawOriginal('total_cents') ?? 0);
+    $discountTotal = (int) ($estimate->getRawOriginal('discount_total_cents') ?? 0);
+    $markdown = app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class);
 
     $lines = collect((array) $estimate->line_items)->map(function ($line) {
         $qty = (float) ($line['quantity'] ?? 1);
         $unit = (int) ($line['unit_price_cents'] ?? 0);
         $rate = (float) ($line['vat_rate'] ?? 0);
-        $sub = (int) round($qty * $unit);
-        $vat = (int) round($sub * $rate);
+        $lineDiscount = (int) ($line['discount_amount_cents'] ?? 0);
+        $vat = array_key_exists('vat_amount_cents', $line)
+            ? (int) $line['vat_amount_cents']
+            : (int) round(((int) round($qty * $unit) - $lineDiscount) * $rate);
+        $lineTotal = array_key_exists('total_cents', $line)
+            ? (int) $line['total_cents']
+            : ((int) round($qty * $unit) - $lineDiscount + $vat);
+
         return [
             'description' => $line['description'] ?? '',
             'quantity' => $qty,
             'unit' => $unit,
             'rate' => $rate,
             'vat' => $vat,
-            'total' => $sub + $vat,
+            'total' => $lineTotal,
+            'discount' => $lineDiscount,
         ];
     });
 
@@ -141,7 +150,12 @@
     <tbody>
         @foreach($lines as $i => $line)
             <tr @if($i % 2 === 1) class="zebra" @endif>
-                <td>{{ $line['description'] }}</td>
+                <td>
+                    {{ $line['description'] }}
+                    @if(($line['discount'] ?? 0) > 0)
+                        <div class="small muted">Discount: {{ $fmtMoney($line['discount']) }}</div>
+                    @endif
+                </td>
                 <td class="num">{{ rtrim(rtrim(number_format($line['quantity'], 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="num">{{ $fmtMoney($line['unit']) }}</td>
                 @if($chargesVat)
@@ -159,6 +173,12 @@
         <td class="label">{{ $chargesVat ? 'Subtotal (excl. VAT)' : 'Subtotal' }}</td>
         <td class="value">{{ $fmtMoney($subtotal) }}</td>
     </tr>
+    @if($discountTotal > 0)
+    <tr>
+        <td class="label">Discounts applied</td>
+        <td class="value">{{ $fmtMoney($discountTotal) }}</td>
+    </tr>
+    @endif
     @if($chargesVat)
     <tr>
         <td class="label">VAT</td>
@@ -171,8 +191,8 @@
     </tr>
 </table>
 
-@include('pdf._prose-section', ['title' => 'Notes', 'content' => $estimate->notes])
-@include('pdf._prose-section', ['title' => 'Terms & conditions', 'content' => $estimate->terms])
+@include('pdf._markdown-section', ['title' => 'Notes', 'html' => $markdown->toHtml($estimate->notes)])
+@include('pdf._markdown-section', ['title' => 'Terms & conditions', 'html' => $markdown->toHtml($estimate->terms)])
 
 <div class="footer">
     {{ $businessName }} &middot; Estimate {{ $estimate->number }} &middot; Generated {{ now()->format('d M Y') }}

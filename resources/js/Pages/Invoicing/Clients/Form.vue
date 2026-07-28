@@ -11,6 +11,7 @@ const props = defineProps<{
     isEditing: boolean;
     /** When set (e.g. from invoice create), redirect here after successful create. */
     return_to?: string | null;
+    note_templates: Array<{ id: number; name: string; target: 'notes' | 'footer' }>;
     client: null | {
         id: number;
         name: string;
@@ -30,6 +31,7 @@ const props = defineProps<{
         payment_terms_days: number;
         notes: string | null;
         is_active: boolean;
+        note_template_ids: number[];
     };
 }>();
 
@@ -60,6 +62,7 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         payment_terms_days: props.client?.payment_terms_days ?? 30,
         notes: props.client?.notes ?? '',
         is_active: props.client?.is_active ?? true,
+        note_template_ids: [...(props.client?.note_template_ids ?? [])],
     },
 });
 
@@ -73,6 +76,24 @@ const setFieldValue = (path: string, value: unknown) => {
  * Normalize access so submit works reliably across both shapes.
  */
 const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
+
+const noteTemplatesByTarget = computed(() => ({
+    notes: props.note_templates.filter((template) => template.target === 'notes'),
+    footer: props.note_templates.filter((template) => template.target === 'footer'),
+}));
+
+const isNoteTemplateSelected = (id: number) => (formValues.value.note_template_ids ?? []).includes(id);
+
+const toggleNoteTemplate = (id: number) => {
+    const current = [...(formValues.value.note_template_ids ?? [])];
+    const index = current.indexOf(id);
+    if (index >= 0) {
+        current.splice(index, 1);
+    } else {
+        current.push(id);
+    }
+    setFieldValue('note_template_ids', current);
+};
 
 const schema = z.object({
     name: z.string().trim().min(1, 'Company name is required'),
@@ -95,6 +116,7 @@ const schema = z.object({
     payment_terms_days: z.coerce.number().int().min(0, 'Must be 0–365').max(365, 'Must be 0–365'),
     notes: z.string().optional(),
     is_active: z.boolean(),
+    note_template_ids: z.array(z.coerce.number().int()).optional(),
 });
 
 const submit = () => {
@@ -212,6 +234,51 @@ const submit = () => {
                             class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                             @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
                         />
+                    </div>
+                    <div v-if="note_templates.length" class="md:col-span-2">
+                        <h3 class="mb-2 text-sm font-semibold text-slate-800">Note templates</h3>
+                        <p class="mb-3 text-xs text-slate-500">
+                            Attach reusable snippets from Settings. Notes templates apply to invoice notes; footer templates apply to footers and estimate terms.
+                        </p>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div v-if="noteTemplatesByTarget.notes.length">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Notes</p>
+                                <div class="space-y-2">
+                                    <label
+                                        v-for="template in noteTemplatesByTarget.notes"
+                                        :key="template.id"
+                                        class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="rounded border-slate-300"
+                                            :checked="isNoteTemplateSelected(template.id)"
+                                            @change="toggleNoteTemplate(template.id)"
+                                        />
+                                        <span>{{ template.name }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div v-if="noteTemplatesByTarget.footer.length">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Footer / terms</p>
+                                <div class="space-y-2">
+                                    <label
+                                        v-for="template in noteTemplatesByTarget.footer"
+                                        :key="template.id"
+                                        class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            class="rounded border-slate-300"
+                                            :checked="isNoteTemplateSelected(template.id)"
+                                            @change="toggleNoteTemplate(template.id)"
+                                        />
+                                        <span>{{ template.name }}</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <p v-if="fieldErrors.note_template_ids" class="mt-1 text-xs text-rose-600">{{ fieldErrors.note_template_ids }}</p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>

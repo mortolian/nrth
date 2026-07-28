@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\Invoicing\Actions\MarkInvoiceViewedAction;
 use App\Domain\Invoicing\Actions\StartInvoiceOnlinePaymentSessionAction;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
@@ -32,9 +33,8 @@ class PublicInvoicePayController extends Controller
 
         $this->abortUnlessPaymentPagesEnabled($invoice);
 
-        if ($invoice->viewed_at === null && ! in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Void], true)) {
-            $invoice->forceFill(['viewed_at' => now()])->save();
-        }
+        app(MarkInvoiceViewedAction::class)->execute($invoice);
+        $invoice->refresh();
 
         $invoice->loadMissing(['team', 'client', 'lineItems']);
         $team = $invoice->team;
@@ -147,6 +147,8 @@ class PublicInvoicePayController extends Controller
         }
 
         $this->abortUnlessPaymentPagesEnabled($invoice);
+
+        app(MarkInvoiceViewedAction::class)->execute($invoice);
 
         try {
             $media = $invoicePdfService->generate($invoice->fresh());

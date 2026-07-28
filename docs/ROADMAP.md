@@ -12,7 +12,7 @@ These areas exist and are usable, but expect rough edges and breaking changes:
 
 | Area | Notes |
 |------|-------|
-| **Invoicing & estimates** | Clients, PDFs, email, payments, Stripe/PayFast pay links, multi-currency |
+| **Invoicing & estimates** | Clients, items catalog, recurring invoices, discounts, note templates, income accounts on send, PDFs, email, payments, Stripe/PayFast pay links, multi-currency |
 | **Expenses & suppliers** | Receipts, VAT on purchases, categories, supplier records |
 | **Accounting** | Chart of accounts, journal, general ledger, account statements |
 | **Banking** | CSV/OFX import, duplicate detection, transaction list |
@@ -47,7 +47,7 @@ Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and
 Ideas under consideration, not scheduled:
 
 - Additional bank statement formats and bank-specific CSV presets
-- Recurring invoices and expense rules
+- Expense rules (recurring expenses)
 - Deeper SARS reporting (beyond current VAT scaffolding)
 - Mobile-friendly UI improvements
 - Published Docker image (GHCR) for simpler pulls

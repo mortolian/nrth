@@ -8,20 +8,43 @@ import AppCard from '@/Components/AppCard.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { calculateInvoiceTotals, type DiscountType } from '@/Composables/useInvoiceTotals';
 import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 import { z } from 'zod';
 
 type ClientOption = { id: number; name: string; currency: string };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
-type EstimateLineApi = { description: string; quantity: number; unit_price_cents: number; vat_rate: number };
+type CatalogItemOption = {
+    id: number;
+    name: string;
+    description: string | null;
+    unit: string | null;
+    unit_price_cents: number;
+    default_vat_rate: number | null;
+};
+type EstimateLineApi = {
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+    vat_rate: number;
+    item_id?: number | null;
+    discount_type?: DiscountType;
+    discount_percent?: number | null;
+    discount_cents?: number | null;
+};
 type EstimateLineForm = {
     row_key: string;
+    item_id?: number | null;
     description: string;
     quantity: number;
     /** Major units (e.g. rands) for inputs; converted to cents on save. */
     unit_price: string;
     vat_rate: number;
+    discount_type: DiscountType;
+    discount_percent: number | null;
+    /** Major units for fixed line discount; converted to cents on save. */
+    discount_amount: string;
 };
 type EstimatePayload = {
     id: number;
@@ -32,6 +55,10 @@ type EstimatePayload = {
     currency: string;
     notes: string | null;
     terms: string | null;
+    discount_type?: DiscountType;
+    discount_percent?: number | null;
+    discount_cents?: number | null;
+    discount_total_cents?: number;
     line_items: EstimateLineApi[];
 };
 
@@ -39,6 +66,7 @@ const props = defineProps<{
     isEditing: boolean;
     estimate: EstimatePayload | null;
     clients: ClientOption[];
+    items?: CatalogItemOption[];
     tax_rates: TaxRateOption[];
     charges_vat: boolean;
     next_number: string;
@@ -91,12 +119,43 @@ const form = ref({
     currency: initialEstimateCurrency,
     notes: props.estimate?.notes ?? (props.default_notes ?? ''),
     terms: props.estimate?.terms ?? (props.default_terms ?? ''),
+    discount_type: (props.estimate?.discount_type ?? null) as DiscountType,
+    discount_percent: props.estimate?.discount_percent ?? null,
+    discount_amount: props.estimate?.discount_cents != null
+        ? (props.estimate.discount_cents / 100).toFixed(2)
+        : '0.00',
+});
+
+const discountTypeOptions = [
+    { label: 'None', value: '' },
+    { label: '%', value: 'percent' },
+    { label: 'Fixed', value: 'fixed' },
+];
+
+const emptyLineDiscount = () => ({
+    discount_type: null as DiscountType,
+    discount_percent: null as number | null,
+    discount_amount: '0.00',
 });
 
 const saving = ref(false);
 const toast = useToast();
 const { fieldErrors, setFromZod, setFromServer, clear, clearField, messages: clientErrorMessages } = useFieldErrors();
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+
+const mapApiLineToForm = (row: EstimateLineApi): EstimateLineForm => ({
+    row_key: makeRowKey(),
+    item_id: row.item_id ?? null,
+    description: row.description ?? '',
+    quantity: Number(row.quantity) || 1,
+    unit_price: (((Number(row.unit_price_cents) || 0) / 100)).toFixed(2),
+    vat_rate: Number(row.vat_rate) || 0,
+    discount_type: row.discount_type ?? null,
+    discount_percent: row.discount_percent ?? null,
+    discount_amount: row.discount_cents != null
+        ? (row.discount_cents / 100).toFixed(2)
+        : '0.00',
+});
 
 const estimateSchema = z.object({
     client_id: z.coerce.number().int().positive('Select a client'),
@@ -114,24 +173,23 @@ const estimateSchema = z.object({
         quantity: z.coerce.number().positive('Qty must be greater than 0'),
         unit_price: z.coerce.number().min(0, 'Unit price cannot be negative'),
         vat_rate: z.coerce.number().min(0).max(1),
+        item_id: z.coerce.number().nullable().optional(),
     })).min(1, 'Add at least one line item'),
 });
 
+const catalogItems = computed(() => props.items ?? []);
+
 const lineItems = ref<EstimateLineForm[]>(
     props.estimate?.line_items?.length
-        ? props.estimate.line_items.map((row) => ({
-            row_key: makeRowKey(),
-            description: row.description ?? '',
-            quantity: Number(row.quantity) || 1,
-            unit_price: (((Number(row.unit_price_cents) || 0) / 100)).toFixed(2),
-            vat_rate: Number(row.vat_rate) || 0,
-        }))
+        ? props.estimate.line_items.map((row) => mapApiLineToForm(row))
         : [{
             row_key: makeRowKey(),
+            item_id: null,
             description: '',
             quantity: 1,
             unit_price: '0.00',
             vat_rate: defaultLineVat.value,
+            ...emptyLineDiscount(),
         }],
 );
 
@@ -197,21 +255,78 @@ watch(
     },
 );
 
-const lineSubtotalCents = (row: EstimateLineForm) =>
-    Math.round((Number(row.quantity) || 0) * (Number(row.unit_price) || 0) * 100);
+const documentDiscountCents = computed(() => {
+    if (form.value.discount_type !== 'fixed') {
+        return null;
+    }
+    return Math.round(Number(form.value.discount_amount || 0) * 100);
+});
 
-const lineVatCents = (row: EstimateLineForm) => Math.round(lineSubtotalCents(row) * (Number(row.vat_rate) || 0));
+const totals = computed(() => calculateInvoiceTotals(
+    lineItems.value.map((line) => ({
+        quantity: Number(line.quantity) || 0,
+        unit_price: line.unit_price,
+        vat_rate: Number(line.vat_rate) || 0,
+        discount_type: line.discount_type,
+        discount_percent: line.discount_percent,
+        discount_amount: line.discount_amount,
+    })),
+    form.value.discount_type,
+    form.value.discount_type === 'percent' ? form.value.discount_percent : null,
+    documentDiscountCents.value,
+));
 
-const lineTotalCents = (row: EstimateLineForm) => lineSubtotalCents(row) + lineVatCents(row);
-
-const totals = computed(() => {
-    const subtotal = lineItems.value.reduce((acc, row) => acc + lineSubtotalCents(row), 0);
-    const vat = lineItems.value.reduce((acc, row) => acc + lineVatCents(row), 0);
-    return { subtotal, vat, total: subtotal + vat };
+const vatBreakdown = computed(() => {
+    const breakdown: Record<string, number> = {};
+    lineItems.value.forEach((line, index) => {
+        const vatCents = totals.value.lines[index]?.vat_amount_cents ?? 0;
+        if (vatCents <= 0) {
+            return;
+        }
+        const key = `${Math.round((Number(line.vat_rate) || 0) * 100)}%`;
+        breakdown[key] = (breakdown[key] ?? 0) + vatCents;
+    });
+    return breakdown;
 });
 
 const money = (cents: number) => useFormatCurrency(cents / 100, form.value.currency || 'ZAR');
 
+const onDiscountAmountBlur = (index: number | 'document') => {
+    if (index === 'document') {
+        form.value.discount_amount = normalizeMoneyInput(form.value.discount_amount);
+        return;
+    }
+    const line = lineItems.value[index];
+    if (!line) {
+        return;
+    }
+    updateLine(index, 'discount_amount', normalizeMoneyInput(line.discount_amount));
+};
+
+const setLineDiscountType = (index: number, raw: string) => {
+    const discountType = (raw === '' ? null : raw) as DiscountType;
+    lineItems.value = lineItems.value.map((line, i) => (
+        i === index
+            ? {
+                ...line,
+                discount_type: discountType,
+                discount_percent: discountType === 'percent' ? (line.discount_percent ?? 0) : null,
+                discount_amount: discountType === 'fixed' ? line.discount_amount : '0.00',
+            }
+            : line
+    ));
+};
+
+const setDocumentDiscountType = (raw: string) => {
+    const discountType = (raw === '' ? null : raw) as DiscountType;
+    form.value.discount_type = discountType;
+    if (discountType !== 'percent') {
+        form.value.discount_percent = null;
+    }
+    if (discountType !== 'fixed') {
+        form.value.discount_amount = '0.00';
+    }
+};
 const updateLine = (index: number, field: keyof EstimateLineForm, value: string | number) => {
     if (field === 'row_key') {
         return;
@@ -233,13 +348,44 @@ const onUnitPriceBlur = (index: number) => {
     updateLine(index, 'unit_price', normalizeMoneyInput(line.unit_price));
 };
 
+const applyCatalogItem = (index: number, itemIdRaw: string) => {
+    if (!itemIdRaw) {
+        updateLine(index, 'item_id', null);
+        return;
+    }
+    const itemId = Number(itemIdRaw);
+    const item = catalogItems.value.find((entry) => entry.id === itemId);
+    if (!item) {
+        return;
+    }
+    const description = (item.description && item.description.trim() !== '')
+        ? item.description
+        : item.name;
+    const vatRate = chargesVat.value
+        ? (item.default_vat_rate ?? defaultLineVat.value)
+        : 0;
+    lineItems.value = lineItems.value.map((line, i) => (
+        i === index
+            ? {
+                ...line,
+                item_id: item.id,
+                description,
+                unit_price: (item.unit_price_cents / 100).toFixed(2),
+                vat_rate: vatRate,
+            }
+            : line
+    ));
+};
+
 const addLine = () => {
     lineItems.value = [...lineItems.value, {
         row_key: makeRowKey(),
+        item_id: null,
         description: '',
         quantity: 1,
         unit_price: '0.00',
         vat_rate: defaultLineVat.value,
+        ...emptyLineDiscount(),
     }];
 };
 
@@ -251,10 +397,12 @@ const removeLine = (index: number) => {
     next.splice(index, 1);
     lineItems.value = next.length ? next : [{
         row_key: makeRowKey(),
+        item_id: null,
         description: '',
         quantity: 1,
         unit_price: '0.00',
         vat_rate: defaultLineVat.value,
+        ...emptyLineDiscount(),
     }];
 };
 
@@ -275,12 +423,26 @@ const submit = (submitAction: 'draft' | 'send') => {
     const payload = {
         ...result.data,
         submit_action: submitAction,
-        line_items: result.data.line_items.map((line) => ({
-            description: line.description,
-            quantity: Number(line.quantity),
-            unit_price_cents: Math.round(Number(line.unit_price) * 100),
-            vat_rate: Number(line.vat_rate),
-        })),
+        discount_type: form.value.discount_type ?? null,
+        discount_percent: form.value.discount_type === 'percent' ? form.value.discount_percent : null,
+        discount_cents: form.value.discount_type === 'fixed'
+            ? Math.round(Number(form.value.discount_amount || 0) * 100)
+            : null,
+        line_items: result.data.line_items.map((line, index) => {
+            const source = lineItems.value[index];
+            return {
+                description: line.description,
+                quantity: Number(line.quantity),
+                unit_price_cents: Math.round(Number(line.unit_price) * 100),
+                vat_rate: Number(line.vat_rate),
+                item_id: line.item_id ?? null,
+                discount_type: source?.discount_type ?? null,
+                discount_percent: source?.discount_type === 'percent' ? source.discount_percent : null,
+                discount_cents: source?.discount_type === 'fixed'
+                    ? Math.round(Number(source.discount_amount || 0) * 100)
+                    : null,
+            };
+        }),
     };
 
     const visitOptions = {
@@ -388,13 +550,14 @@ const submit = (submitAction: 'draft' | 'send') => {
                     <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>
 
                     <div class="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]">
-                        <table class="w-full min-w-[52rem] table-fixed divide-y divide-slate-200 text-sm">
+                        <table class="w-full min-w-[60rem] table-fixed divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                 <tr>
                                     <th class="w-10 px-1 py-2.5 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
-                                    <th class="w-[40%] min-w-[12rem] px-3 py-2.5 text-left font-medium">Description</th>
+                                    <th class="w-[34%] min-w-[12rem] px-3 py-2.5 text-left font-medium">Description</th>
                                     <th class="w-16 px-2 py-2.5 text-right font-medium">Qty</th>
                                     <th class="w-28 px-2 py-2.5 text-right font-medium">Unit price</th>
+                                    <th class="w-28 px-2 py-2.5 text-left font-medium">Discount</th>
                                     <th v-if="chargesVat" class="w-32 px-2 py-2.5 text-left font-medium">VAT</th>
                                     <th v-if="chargesVat" class="w-24 px-2 py-2.5 text-right font-medium">VAT amt</th>
                                     <th class="w-28 px-2 py-2.5 text-right font-medium">Line total</th>
@@ -414,13 +577,28 @@ const submit = (submitAction: 'draft' | 'send') => {
                                         </span>
                                     </td>
                                     <td class="px-3 py-3 align-top">
-                                        <textarea
-                                            :value="line.description"
-                                            rows="3"
-                                            placeholder="Line item description"
-                                            class="min-h-[4.5rem] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                                            @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
-                                        />
+                                        <div class="space-y-2">
+                                            <AppSelect
+                                                v-if="catalogItems.length"
+                                                :model-value="line.item_id ? String(line.item_id) : ''"
+                                                :options="[
+                                                    { label: 'Catalog item…', value: '' },
+                                                    ...catalogItems.map((item) => ({
+                                                        label: item.name,
+                                                        value: String(item.id),
+                                                    })),
+                                                ]"
+                                                placeholder="Add from catalog"
+                                                @update:model-value="applyCatalogItem(index, String($event ?? ''))"
+                                            />
+                                            <textarea
+                                                :value="line.description"
+                                                rows="3"
+                                                placeholder="Line item description"
+                                                class="min-h-[4.5rem] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                                @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
+                                            />
+                                        </div>
                                     </td>
                                     <td class="px-2 py-3 align-top">
                                         <AppInput
@@ -443,6 +621,38 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             @blur="onUnitPriceBlur(index)"
                                         />
                                     </td>
+                                    <td class="px-2 py-3 align-top">
+                                        <div class="space-y-1">
+                                            <AppSelect
+                                                class="text-xs"
+                                                :model-value="line.discount_type ?? ''"
+                                                :options="discountTypeOptions"
+                                                @update:model-value="setLineDiscountType(index, String($event ?? ''))"
+                                            />
+                                            <AppInput
+                                                v-if="line.discount_type === 'percent'"
+                                                class="text-right tabular-nums"
+                                                :model-value="line.discount_percent ?? 0"
+                                                type="number"
+                                                inputmode="decimal"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                placeholder="%"
+                                                @update:model-value="updateLine(index, 'discount_percent', Number($event))"
+                                            />
+                                            <AppInput
+                                                v-else-if="line.discount_type === 'fixed'"
+                                                class="text-right tabular-nums"
+                                                :model-value="line.discount_amount"
+                                                type="text"
+                                                inputmode="decimal"
+                                                placeholder="0.00"
+                                                @update:model-value="updateLine(index, 'discount_amount', $event)"
+                                                @blur="onDiscountAmountBlur(index)"
+                                            />
+                                        </div>
+                                    </td>
                                     <td v-if="chargesVat" class="px-2 py-3 align-top">
                                         <AppSelect
                                             :model-value="String(line.vat_rate)"
@@ -451,10 +661,10 @@ const submit = (submitAction: 'draft' | 'send') => {
                                         />
                                     </td>
                                     <td v-if="chargesVat" class="px-2 py-3 align-top text-right tabular-nums text-slate-700">
-                                        {{ money(lineVatCents(line)) }}
+                                        {{ money(totals.lines[index]?.vat_amount_cents ?? 0) }}
                                     </td>
                                     <td class="px-2 py-3 align-top text-right text-base font-semibold tabular-nums text-slate-900">
-                                        {{ money(lineTotalCents(line)) }}
+                                        {{ money(totals.lines[index]?.total_cents ?? 0) }}
                                     </td>
                                     <td class="px-1 py-3 align-top text-center">
                                         <button
@@ -480,10 +690,65 @@ const submit = (submitAction: 'draft' | 'send') => {
 
                 <AppCard>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Totals</h3>
+                    <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+                        <p class="mb-2 text-xs font-medium text-slate-600">Document discount</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <AppSelect
+                                class="w-28"
+                                :model-value="form.discount_type ?? ''"
+                                :options="discountTypeOptions"
+                                @update:model-value="setDocumentDiscountType(String($event ?? ''))"
+                            />
+                            <AppInput
+                                v-if="form.discount_type === 'percent'"
+                                class="w-24 text-right tabular-nums"
+                                :model-value="form.discount_percent ?? 0"
+                                type="number"
+                                inputmode="decimal"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="%"
+                                @update:model-value="form.discount_percent = Number($event)"
+                            />
+                            <AppInput
+                                v-else-if="form.discount_type === 'fixed'"
+                                class="w-28 text-right tabular-nums"
+                                :model-value="form.discount_amount"
+                                type="text"
+                                inputmode="decimal"
+                                placeholder="0.00"
+                                @update:model-value="form.discount_amount = String($event)"
+                                @blur="onDiscountAmountBlur('document')"
+                            />
+                        </div>
+                    </div>
                     <div class="space-y-2 text-sm">
-                        <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span>{{ money(totals.subtotal) }}</span></div>
-                        <div v-if="chargesVat" class="flex justify-between"><span class="text-slate-500">VAT</span><span>{{ money(totals.vat) }}</span></div>
-                        <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ money(totals.total) }}</span></div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">{{ chargesVat ? 'Subtotal (excl VAT)' : 'Subtotal' }}</span>
+                            <span>{{ money(totals.subtotal_cents) }}</span>
+                        </div>
+                        <div
+                            v-if="totals.discount_total_cents > 0"
+                            class="flex justify-between text-rose-700"
+                        >
+                            <span>Discounts</span>
+                            <span>-{{ money(totals.discount_total_cents) }}</span>
+                        </div>
+                        <template v-if="chargesVat">
+                            <div
+                                v-for="(amount, key) in vatBreakdown"
+                                :key="key"
+                                class="flex justify-between"
+                            >
+                                <span class="text-slate-500">VAT {{ key }}</span>
+                                <span>{{ money(amount) }}</span>
+                            </div>
+                        </template>
+                        <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold">
+                            <span>{{ chargesVat ? 'Total (incl VAT)' : 'Total' }}</span>
+                            <span>{{ money(totals.total_cents) }}</span>
+                        </div>
                     </div>
                 </AppCard>
 

@@ -6,23 +6,45 @@ import { z } from 'zod';
 import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
+import FieldHelp from '@/Components/FieldHelp.vue';
 import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { calculateInvoiceTotals, type DiscountType } from '@/Composables/useInvoiceTotals';
 import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 
-type ClientOption = { id: number; name: string; payment_terms_days: number; currency: string };
+type ClientOption = {
+    id: number;
+    name: string;
+    payment_terms_days: number;
+    currency: string;
+    default_notes?: string;
+    default_footer?: string;
+};
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
 type AccountOption = { id: number; name: string };
+type NoteTemplateOption = { id: number; name: string; body: string; target: 'notes' | 'footer' };
+type CatalogItemOption = {
+    id: number;
+    name: string;
+    description: string | null;
+    unit: string | null;
+    unit_price_cents: number;
+    default_vat_rate: number | null;
+};
 type InvoiceLine = {
     id?: number;
     row_key: string;
+    item_id?: number | null;
     description: string;
     quantity: number;
     unit_price: string;
     vat_rate: number;
-    account_id?: number | null;
+    income_account_id?: number | null;
+    discount_type?: 'percent' | 'fixed' | null;
+    discount_percent?: number | null;
+    discount_amount?: string;
 };
 
 const props = defineProps<{
@@ -45,11 +67,18 @@ const props = defineProps<{
         fx_rate_invoice_to_business?: string | null;
         fx_rate_date?: string | null;
         total_business_currency_cents?: number | null;
-        line_items: InvoiceLine[];
+        discount_type?: 'percent' | 'fixed' | null;
+        discount_percent?: number | null;
+        discount_cents?: number | null;
+        income_account_id?: number | null;
+        line_items: Array<InvoiceLine & { discount_cents?: number | null }>;
     };
     clients: ClientOption[];
+    items?: CatalogItemOption[];
     tax_rates: TaxRateOption[];
     accounts: AccountOption[];
+    default_income_account_id?: number | null;
+    note_templates?: NoteTemplateOption[];
     next_number: string;
     /** Business default when no client or before client selection. */
     default_currency: string;
@@ -69,6 +98,44 @@ const defaultVatRate = computed(() => {
     return props.tax_rates.find((rate) => rate.is_default)?.rate ?? props.tax_rates[0]?.rate ?? 0;
 });
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+
+const discountTypeOptions = [
+    { label: 'None', value: '' },
+    { label: '%', value: 'percent' },
+    { label: 'Fixed', value: 'fixed' },
+];
+
+const fixedDiscountFromCents = (cents: number | null | undefined): string =>
+    cents != null ? (Number(cents) / 100).toFixed(2) : '0.00';
+
+const mapLineFromInvoice = (line: InvoiceLine & { discount_cents?: number | null }): InvoiceLine => ({
+    row_key: makeRowKey(),
+    id: line.id,
+    item_id: line.item_id ?? null,
+    description: line.description,
+    quantity: Number(line.quantity) || 1,
+    unit_price: (Number(line.unit_price) || 0).toFixed(2),
+    vat_rate: Number(line.vat_rate) || defaultVatRate.value,
+    income_account_id: line.income_account_id ?? null,
+    discount_type: line.discount_type ?? null,
+    discount_percent: line.discount_percent ?? null,
+    discount_amount: line.discount_type === 'fixed'
+        ? fixedDiscountFromCents(line.discount_cents)
+        : '0.00',
+});
+
+const emptyLine = (): InvoiceLine => ({
+    row_key: makeRowKey(),
+    item_id: null,
+    description: '',
+    quantity: 1,
+    unit_price: '0.00',
+    vat_rate: defaultVatRate.value,
+    income_account_id: null,
+    discount_type: null,
+    discount_percent: null,
+    discount_amount: '0.00',
+});
 
 const newClientHref = computed(() => route('invoicing.clients.create', {
     return: '/invoicing/invoices/create',
@@ -93,6 +160,11 @@ const initialInvoiceCurrency =
     ?? props.default_currency
     ?? 'ZAR';
 
+const initialIncomeAccountId =
+    props.invoice?.income_account_id
+    ?? props.default_income_account_id
+    ?? null;
+
 const invoiceSchema = z.object({
     client_id: z.coerce.number().int().positive('Client is required'),
     number: z.string().min(1, 'Invoice number is required'),
@@ -105,12 +177,20 @@ const invoiceSchema = z.object({
         .regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
     notes: z.string().optional(),
     footer: z.string().optional(),
+    discount_type: z.enum(['percent', 'fixed']).nullable().optional(),
+    discount_percent: z.coerce.number().min(0).max(100).nullable().optional(),
+    discount_amount: z.coerce.number().min(0).optional(),
+    income_account_id: z.coerce.number().nullable().optional(),
     line_items: z.array(z.object({
         description: z.string().min(1, 'Description is required'),
         quantity: z.coerce.number().positive('Qty must be greater than 0'),
         unit_price: z.coerce.number().min(0, 'Unit price cannot be negative'),
         vat_rate: z.coerce.number().min(0).max(1),
-        account_id: z.coerce.number().nullable().optional(),
+        income_account_id: z.coerce.number().nullable().optional(),
+        item_id: z.coerce.number().nullable().optional(),
+        discount_type: z.enum(['percent', 'fixed']).nullable().optional(),
+        discount_percent: z.coerce.number().min(0).max(100).nullable().optional(),
+        discount_amount: z.coerce.number().min(0).optional(),
     })).min(1, 'Add at least one line item'),
 });
 
@@ -148,6 +228,27 @@ const taxRateSelectOptions = computed(() => {
     return [{ label: 'No VAT', value: '0' }];
 });
 
+const accountSelectOptions = computed(() =>
+    props.accounts.map((account) => ({ label: account.name, value: String(account.id) }),
+));
+
+const lineAccountSelectOptions = computed(() => [
+    { label: 'Use invoice default', value: '' },
+    ...accountSelectOptions.value,
+]);
+
+const notesTemplateOptions = computed(() =>
+    (props.note_templates ?? [])
+        .filter((template) => template.target === 'notes')
+        .map((template) => ({ label: template.name, value: String(template.id) })),
+);
+
+const footerTemplateOptions = computed(() =>
+    (props.note_templates ?? [])
+        .filter((template) => template.target === 'footer')
+        .map((template) => ({ label: template.name, value: String(template.id) })),
+);
+
 const { values, setFieldValue: setVeeFieldValue } = useForm({
     initialValues: {
         client_id: initialClientId,
@@ -158,16 +259,15 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         currency: initialInvoiceCurrency,
         notes: props.invoice?.notes ?? props.defaults?.notes ?? '',
         footer: props.invoice?.footer ?? props.defaults?.footer ?? '',
+        discount_type: props.invoice?.discount_type ?? null,
+        discount_percent: props.invoice?.discount_percent ?? null,
+        discount_amount: props.invoice?.discount_type === 'fixed'
+            ? fixedDiscountFromCents(props.invoice?.discount_cents)
+            : '0.00',
+        income_account_id: initialIncomeAccountId,
         line_items: props.invoice?.line_items?.length
-            ? props.invoice.line_items.map((line) => ({
-                row_key: makeRowKey(),
-                description: line.description,
-                quantity: Number(line.quantity) || 1,
-                unit_price: (Number(line.unit_price) || 0).toFixed(2),
-                vat_rate: Number(line.vat_rate) || defaultVatRate.value,
-                account_id: line.account_id ?? null,
-            }))
-            : [{ row_key: makeRowKey(), description: '', quantity: 1, unit_price: '0.00', vat_rate: defaultVatRate.value, account_id: null }],
+            ? props.invoice.line_items.map(mapLineFromInvoice)
+            : [emptyLine()],
     },
 });
 
@@ -233,6 +333,15 @@ const clientMap = computed<Record<number, ClientOption>>(() => (
     }, {} as Record<number, ClientOption>)
 ));
 
+const clientNotesFooterDefaults = (client: ClientOption | undefined) => ({
+    notes: (client?.default_notes?.trim() ? client.default_notes : props.defaults?.notes) ?? '',
+    footer: (client?.default_footer?.trim() ? client.default_footer : props.defaults?.footer) ?? '',
+});
+
+const previousClientDefaults = ref(clientNotesFooterDefaults(
+    initialClientId ? clientMap.value[initialClientId] : undefined,
+));
+
 watch(
     () => [formValues.value?.client_id, formValues.value?.issue_date],
     ([clientId, issueDate]) => {
@@ -257,42 +366,132 @@ watch(
     },
 );
 
-const lineSubtotal = (line: InvoiceLine) => Math.round((Number(line.quantity) || 0) * (Number(line.unit_price) || 0) * 100);
-const lineVat = (line: InvoiceLine) => Math.round(lineSubtotal(line) * (Number(line.vat_rate) || 0));
-const lineTotal = (line: InvoiceLine) => lineSubtotal(line) + lineVat(line);
+watch(
+    () => formValues.value?.client_id,
+    (clientId) => {
+        if (props.isEditing || clientId == null) return;
+        const client = clientMap.value[Number(clientId)];
+        if (!client) return;
+
+        const businessNotes = props.defaults?.notes ?? '';
+        const businessFooter = props.defaults?.footer ?? '';
+        const currentNotes = String(formValues.value.notes ?? '');
+        const currentFooter = String(formValues.value.footer ?? '');
+        const prevNotes = previousClientDefaults.value.notes;
+        const prevFooter = previousClientDefaults.value.footer;
+
+        const notesUnchanged = currentNotes === '' || currentNotes === prevNotes || currentNotes === businessNotes;
+        const footerUnchanged = currentFooter === '' || currentFooter === prevFooter || currentFooter === businessFooter;
+
+        const nextDefaults = clientNotesFooterDefaults(client);
+
+        if (notesUnchanged) {
+            setFieldValue('notes', nextDefaults.notes);
+        }
+        if (footerUnchanged) {
+            setFieldValue('footer', nextDefaults.footer);
+        }
+
+        previousClientDefaults.value = nextDefaults;
+    },
+);
+
+const selectedClient = computed(() => {
+    const clientId = formValues.value?.client_id;
+    if (clientId == null) return null;
+    return clientMap.value[Number(clientId)] ?? null;
+});
+
+const notesPrefilledFromClient = computed(() =>
+    !props.isEditing && Boolean(selectedClient.value?.default_notes?.trim()),
+);
+
+const documentDiscountCents = computed(() => {
+    if (formValues.value.discount_type !== 'fixed') {
+        return null;
+    }
+    return Math.round(Number(formValues.value.discount_amount || 0) * 100);
+});
 
 const totals = computed(() => {
-    const lines = formValues.value.line_items ?? [];
-    const subtotal = lines.reduce((sum, line) => sum + lineSubtotal(line as InvoiceLine), 0);
-    const vat = lines.reduce((sum, line) => sum + lineVat(line as InvoiceLine), 0);
-    const total = subtotal + vat;
-    const amountPaid = props.invoice?.amount_paid_cents ?? 0;
-    const amountDue = Math.max(0, total - amountPaid);
+    const lines = (formValues.value.line_items ?? []) as InvoiceLine[];
+    const calc = calculateInvoiceTotals(
+        lines.map((line) => ({
+            quantity: Number(line.quantity) || 0,
+            unit_price: line.unit_price,
+            vat_rate: Number(line.vat_rate) || 0,
+            discount_type: line.discount_type ?? null,
+            discount_percent: line.discount_percent ?? null,
+            discount_amount: line.discount_type === 'fixed' ? line.discount_amount : null,
+        })),
+        (formValues.value.discount_type as DiscountType) ?? null,
+        formValues.value.discount_percent ?? null,
+        documentDiscountCents.value,
+    );
 
-    const vatBreakdown = lines.reduce((acc, rawLine) => {
+    const vatBreakdown = lines.reduce((acc, rawLine, index) => {
         const line = rawLine as InvoiceLine;
         const key = `${Math.round((line.vat_rate ?? 0) * 100)}%`;
-        const current = acc[key] ?? 0;
-        acc[key] = current + lineVat(line);
+        const vatAmount = calc.lines[index]?.vat_amount_cents ?? 0;
+        acc[key] = (acc[key] ?? 0) + vatAmount;
         return acc;
     }, {} as Record<string, number>);
 
-    return { subtotal, vat, total, amountPaid, amountDue, vatBreakdown };
+    const amountPaid = props.invoice?.amount_paid_cents ?? 0;
+    const amountDue = Math.max(0, calc.total_cents - amountPaid);
+
+    return {
+        ...calc,
+        subtotal: calc.subtotal_cents,
+        vat: calc.vat_amount_cents,
+        total: calc.total_cents,
+        amountPaid,
+        amountDue,
+        vatBreakdown,
+    };
 });
+
+const lineVat = (index: number) => totals.value.lines[index]?.vat_amount_cents ?? 0;
+const lineTotal = (index: number) => totals.value.lines[index]?.total_cents ?? 0;
 
 const displayCurrency = computed(() => (formValues.value.currency as string) || 'ZAR');
 const formatCents = (cents: number) =>
     useFormatCurrency((Number(cents) || 0) / 100, displayCurrency.value);
 
+const catalogItems = computed(() => props.items ?? []);
+
+const applyCatalogItem = (index: number, itemIdRaw: string) => {
+    if (!itemIdRaw) {
+        updateLine(index, 'item_id', null);
+        return;
+    }
+    const itemId = Number(itemIdRaw);
+    const item = catalogItems.value.find((entry) => entry.id === itemId);
+    if (!item) {
+        return;
+    }
+    const description = (item.description && item.description.trim() !== '')
+        ? item.description
+        : item.name;
+    const vatRate = chargesVat.value
+        ? (item.default_vat_rate ?? defaultVatRate.value)
+        : 0;
+    const next = (formValues.value.line_items ?? []).map((line: InvoiceLine, i: number) => (
+        i === index
+            ? {
+                ...line,
+                item_id: item.id,
+                description,
+                unit_price: (item.unit_price_cents / 100).toFixed(2),
+                vat_rate: vatRate,
+            }
+            : line
+    ));
+    setFieldValue('line_items', next);
+};
+
 const addLine = () => {
-    const next = [...(formValues.value.line_items ?? []), {
-        row_key: makeRowKey(),
-        description: '',
-        quantity: 1,
-        unit_price: '0.00',
-        vat_rate: defaultVatRate.value,
-        account_id: null,
-    }];
+    const next = [...(formValues.value.line_items ?? []), emptyLine()];
     setFieldValue('line_items', next);
 };
 
@@ -301,6 +500,31 @@ const updateLine = (index: number, field: keyof InvoiceLine, value: any) => {
         i === index ? { ...line, [field]: value } : line
     ));
     setFieldValue('line_items', next);
+};
+
+const setLineDiscountType = (index: number, raw: string) => {
+    const type: 'percent' | 'fixed' | null = raw === 'percent' || raw === 'fixed' ? raw : null;
+    const next = (formValues.value.line_items ?? []).map((line: InvoiceLine, i: number) => {
+        if (i !== index) return line;
+        return {
+            ...line,
+            discount_type: type,
+            discount_percent: type === 'percent' ? (line.discount_percent ?? 0) : null,
+            discount_amount: type === 'fixed' ? (line.discount_amount ?? '0.00') : '0.00',
+        };
+    });
+    setFieldValue('line_items', next);
+};
+
+const setDocumentDiscountType = (raw: string) => {
+    const type: 'percent' | 'fixed' | null = raw === 'percent' || raw === 'fixed' ? raw : null;
+    setFieldValue('discount_type', type);
+    if (type !== 'percent') {
+        setFieldValue('discount_percent', null);
+    }
+    if (type !== 'fixed') {
+        setFieldValue('discount_amount', '0.00');
+    }
 };
 
 const normalizeMoneyInput = (raw: unknown): string => {
@@ -317,20 +541,42 @@ const onUnitPriceBlur = (index: number) => {
     updateLine(index, 'unit_price', normalizeMoneyInput(line.unit_price));
 };
 
+const onLineDiscountAmountBlur = (index: number) => {
+    const line = (formValues.value.line_items ?? [])[index] as InvoiceLine | undefined;
+    if (!line) return;
+    updateLine(index, 'discount_amount', normalizeMoneyInput(line.discount_amount));
+};
+
+const onDocumentDiscountAmountBlur = () => {
+    setFieldValue('discount_amount', normalizeMoneyInput(formValues.value.discount_amount));
+};
+
 const removeLine = (index: number) => {
     if (!window.confirm('Remove this line item?')) {
         return;
     }
     const next = [...(formValues.value.line_items ?? [])];
     next.splice(index, 1);
-    setFieldValue('line_items', next.length ? next : [{
-        row_key: makeRowKey(),
-        description: '',
-        quantity: 1,
-        unit_price: '0.00',
-        vat_rate: defaultVatRate.value,
-        account_id: null,
-    }]);
+    setFieldValue('line_items', next.length ? next : [emptyLine()]);
+};
+
+const buildDiscountPayload = (
+    type: 'percent' | 'fixed' | null | undefined,
+    percent: number | null | undefined,
+    amount: string | number | null | undefined,
+) => ({
+    discount_type: type ?? null,
+    discount_percent: type === 'percent' ? (percent ?? null) : null,
+    discount_cents: type === 'fixed' ? Math.round(Number(amount || 0) * 100) : null,
+});
+
+const insertTemplate = (target: 'notes' | 'footer', templateId: string) => {
+    if (!templateId) return;
+    const template = (props.note_templates ?? []).find((entry) => String(entry.id) === templateId);
+    if (!template) return;
+    const current = String(formValues.value[target] ?? '');
+    const next = current.trim() ? `${current.trim()}\n\n${template.body}` : template.body;
+    setFieldValue(target, next);
 };
 
 const onSave = () => {
@@ -346,14 +592,19 @@ const onSave = () => {
 
     clear();
 
-    const { line_items: lineItems, ...rest } = result.data;
+    const { line_items: lineItems, discount_amount: _docAmount, ...rest } = result.data;
     const payload = {
         ...rest,
+        ...buildDiscountPayload(rest.discount_type, rest.discount_percent, formValues.value.discount_amount),
+        income_account_id: rest.income_account_id ?? null,
         line_items: lineItems.map((line) => ({
             description: line.description,
             quantity: Number(line.quantity),
             unit_price_cents: Math.round(Number(line.unit_price) * 100),
             vat_rate: Number(line.vat_rate),
+            item_id: line.item_id ?? null,
+            income_account_id: line.income_account_id ?? null,
+            ...buildDiscountPayload(line.discount_type, line.discount_percent, line.discount_amount),
         })),
     };
 
@@ -458,7 +709,7 @@ const onSave = () => {
                                 <p v-if="fieldErrors.due_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.due_date }}</p>
                             </div>
                         </div>
-                        <div class="md:col-span-2">
+                        <div :class="accounts.length ? '' : 'md:col-span-2'">
                             <label class="mb-1 block text-xs font-medium text-slate-500">Invoice currency</label>
                             <AppSelect
                                 :model-value="values.currency as string"
@@ -469,6 +720,18 @@ const onSave = () => {
                             <p class="mt-1 text-xs text-slate-500">
                                 Defaults to the selected client&rsquo;s currency; change here to override for this invoice only.
                             </p>
+                        </div>
+                        <div v-if="accounts.length">
+                            <FieldHelp
+                                label="Income account"
+                                text="Applies to all lines unless a line overrides it."
+                            />
+                            <AppSelect
+                                :model-value="values.income_account_id ? String(values.income_account_id) : ''"
+                                :options="accountSelectOptions"
+                                placeholder="Select income account"
+                                @update:model-value="setFieldValue('income_account_id', $event ? Number($event) : null)"
+                            />
                         </div>
                     </div>
                 </AppCard>
@@ -508,6 +771,19 @@ const onSave = () => {
                                     </td>
                                     <td class="px-3 py-3 align-top">
                                         <div class="space-y-2">
+                                            <AppSelect
+                                                v-if="catalogItems.length"
+                                                :model-value="line.item_id ? String(line.item_id) : ''"
+                                                :options="[
+                                                    { label: 'Catalog item…', value: '' },
+                                                    ...catalogItems.map((item) => ({
+                                                        label: item.name,
+                                                        value: String(item.id),
+                                                    })),
+                                                ]"
+                                                placeholder="Add from catalog"
+                                                @update:model-value="applyCatalogItem(index, String($event ?? ''))"
+                                            />
                                             <textarea
                                                 :value="line.description"
                                                 rows="3"
@@ -515,12 +791,40 @@ const onSave = () => {
                                                 class="min-h-[4.5rem] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                                 @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
                                             />
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="text-xs text-slate-500">Discount</span>
+                                                <AppSelect
+                                                    class="min-w-[5.5rem]"
+                                                    :model-value="line.discount_type ?? ''"
+                                                    :options="discountTypeOptions"
+                                                    @update:model-value="setLineDiscountType(index, String($event ?? ''))"
+                                                />
+                                                <AppInput
+                                                    v-if="line.discount_type === 'percent'"
+                                                    class="w-20 text-right tabular-nums"
+                                                    :model-value="line.discount_percent ?? 0"
+                                                    type="number"
+                                                    inputmode="decimal"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                    @update:model-value="updateLine(index, 'discount_percent', Number($event))"
+                                                />
+                                                <AppInput
+                                                    v-if="line.discount_type === 'fixed'"
+                                                    class="w-24 text-right tabular-nums"
+                                                    :model-value="line.discount_amount ?? '0.00'"
+                                                    type="text"
+                                                    inputmode="decimal"
+                                                    @update:model-value="updateLine(index, 'discount_amount', $event)"
+                                                    @blur="onLineDiscountAmountBlur(index)"
+                                                />
+                                            </div>
                                             <AppSelect
                                                 v-if="accounts.length"
-                                                :model-value="line.account_id ? String(line.account_id) : ''"
-                                                :options="accounts.map((account) => ({ label: account.name, value: String(account.id) }))"
-                                                placeholder="Income account"
-                                                @update:model-value="updateLine(index, 'account_id', Number($event))"
+                                                :model-value="line.income_account_id ? String(line.income_account_id) : ''"
+                                                :options="lineAccountSelectOptions"
+                                                @update:model-value="updateLine(index, 'income_account_id', $event ? Number($event) : null)"
                                             />
                                         </div>
                                     </td>
@@ -553,10 +857,10 @@ const onSave = () => {
                                         />
                                     </td>
                                     <td v-if="chargesVat" class="px-2 py-3 align-top text-right tabular-nums text-slate-700">
-                                        {{ formatCents(lineVat(line)) }}
+                                        {{ formatCents(lineVat(index)) }}
                                     </td>
                                     <td class="px-2 py-3 align-top text-right text-base font-semibold tabular-nums text-slate-900">
-                                        {{ formatCents(lineTotal(line)) }}
+                                        {{ formatCents(lineTotal(index)) }}
                                     </td>
                                     <td class="px-1 py-3 align-top text-center">
                                         <button
@@ -587,6 +891,10 @@ const onSave = () => {
                             <span>{{ chargesVat ? 'Subtotal (excl VAT)' : 'Subtotal' }}</span>
                             <span>{{ formatCents(totals.subtotal) }}</span>
                         </div>
+                        <div v-if="totals.discount_total_cents > 0" class="flex items-center justify-between text-rose-700">
+                            <span>Discounts applied</span>
+                            <span>&minus;{{ formatCents(totals.discount_total_cents) }}</span>
+                        </div>
                         <template v-if="chargesVat">
                             <div v-for="(amount, key) in totals.vatBreakdown" :key="key" class="flex items-center justify-between">
                                 <span>VAT {{ key }}</span>
@@ -600,6 +908,39 @@ const onSave = () => {
                         <div v-if="isEditing" class="flex items-center justify-between"><span>Amount paid</span><span>{{ formatCents(totals.amountPaid) }}</span></div>
                         <div class="flex items-center justify-between text-base font-bold text-slate-900"><span>Amount due</span><span>{{ formatCents(totals.amountDue) }}</span></div>
                     </div>
+
+                    <div class="mt-4 border-t border-slate-200 pt-4">
+                        <p class="mb-2 text-xs font-medium text-slate-500">Document discount</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <AppSelect
+                                class="min-w-[5.5rem]"
+                                :model-value="(values.discount_type as string | null) ?? ''"
+                                :options="discountTypeOptions"
+                                @update:model-value="setDocumentDiscountType(String($event ?? ''))"
+                            />
+                            <AppInput
+                                v-if="values.discount_type === 'percent'"
+                                class="w-24 text-right tabular-nums"
+                                :model-value="values.discount_percent ?? 0"
+                                type="number"
+                                inputmode="decimal"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                @update:model-value="setFieldValue('discount_percent', Number($event))"
+                            />
+                            <AppInput
+                                v-if="values.discount_type === 'fixed'"
+                                class="w-28 text-right tabular-nums"
+                                :model-value="values.discount_amount as string"
+                                type="text"
+                                inputmode="decimal"
+                                @update:model-value="setFieldValue('discount_amount', $event)"
+                                @blur="onDocumentDiscountAmountBlur"
+                            />
+                        </div>
+                    </div>
+
                     <InvoiceInternalCurrencyApprox
                         class="mt-3"
                         :invoice-currency="displayCurrency"
@@ -613,15 +954,35 @@ const onSave = () => {
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Details</h3>
                     <div class="grid gap-6 md:grid-cols-2">
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
+                            <FieldHelp
+                                label="Notes"
+                                text="Shown on the invoice before line items. Use templates to insert reusable text."
+                            />
+                            <AppSelect
+                                v-if="notesTemplateOptions.length"
+                                class="mb-2"
+                                :model-value="''"
+                                :options="[{ label: 'Insert template…', value: '' }, ...notesTemplateOptions]"
+                                @update:model-value="insertTemplate('notes', String($event ?? ''))"
+                            />
                             <textarea
                                 :value="values.notes as string"
                                 class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                                 @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
                             />
+                            <p v-if="notesPrefilledFromClient" class="mt-1 text-xs text-slate-500">
+                                Notes prefilled from this client&rsquo;s templates.
+                            </p>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Footer</label>
+                            <AppSelect
+                                v-if="footerTemplateOptions.length"
+                                class="mb-2"
+                                :model-value="''"
+                                :options="[{ label: 'Insert template…', value: '' }, ...footerTemplateOptions]"
+                                @update:model-value="insertTemplate('footer', String($event ?? ''))"
+                            />
                             <textarea
                                 :value="values.footer as string"
                                 class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"

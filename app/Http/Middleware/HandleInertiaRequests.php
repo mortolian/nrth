@@ -150,6 +150,9 @@ class HandleInertiaRequests extends Middleware
             $can('clients.manage')
                 ? ['id' => 'new-client', 'label' => 'New Client', 'href' => route('invoicing.clients.create'), 'icon' => 'client']
                 : null,
+            $can('items.manage')
+                ? ['id' => 'new-item', 'label' => 'New Item', 'href' => route('invoicing.items.create'), 'icon' => 'invoice']
+                : null,
         ]));
 
         $navigation = array_values(array_filter([
@@ -157,6 +160,7 @@ class HandleInertiaRequests extends Middleware
             $can('invoices.view') ? ['id' => 'invoices', 'label' => 'Invoices', 'href' => route('invoicing.invoices.index')] : null,
             $can('estimates.view') ? ['id' => 'estimates', 'label' => 'Estimates', 'href' => route('invoicing.estimates.index')] : null,
             $can('clients.view') ? ['id' => 'clients', 'label' => 'Clients', 'href' => route('invoicing.clients.index')] : null,
+            $can('items.view') ? ['id' => 'items', 'label' => 'Items', 'href' => route('invoicing.items.index')] : null,
             $can('expenses.view') ? ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')] : null,
             $can('suppliers.view') ? ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')] : null,
             $can('banking.view') ? ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')] : null,

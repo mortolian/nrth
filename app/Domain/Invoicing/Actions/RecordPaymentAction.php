@@ -109,6 +109,31 @@ class RecordPaymentAction
         ]);
 
         $amountCents = $dto->amountCents;
+
+        if ($invoice->accrual_transaction_id !== null) {
+            JournalEntry::query()->create([
+                'transaction_id' => $transaction->id,
+                'account_id' => $bankAccount->id,
+                'type' => EntryType::Debit,
+                'amount_cents' => $amountCents,
+                'currency' => $dto->currency,
+                'description' => 'Payment received for '.$invoice->number,
+            ]);
+
+            JournalEntry::query()->create([
+                'transaction_id' => $transaction->id,
+                'account_id' => $receivableAccount->id,
+                'type' => EntryType::Credit,
+                'amount_cents' => $amountCents,
+                'currency' => $dto->currency,
+                'description' => 'Clear accounts receivable for '.$invoice->number,
+            ]);
+
+            $this->postTransactionAction->execute($transaction->fresh());
+
+            return $this->finalizePayment($dto, $invoice, $transaction->id, null);
+        }
+
         $vatPart = $this->calculateVatPart($invoice, $amountCents);
         $receivablePart = max(0, $amountCents - $vatPart);
 
@@ -183,19 +208,22 @@ class RecordPaymentAction
             ]);
         }
 
-        $vatPartInvoice = $this->calculateVatPart($invoice, $paymentInvoiceCents);
+        $hasAccrual = $invoice->accrual_transaction_id !== null;
+        $vatPartBusiness = 0;
+        $arPartBusiness = $bookClearingBusiness;
 
-        if ($vatPartInvoice > 0 && $vatOutputAccount !== null) {
-            $vatPartBusiness = $paymentInvoiceCents > 0
-                ? (int) round(($vatPartInvoice * $bookClearingBusiness) / $paymentInvoiceCents)
-                : 0;
-            $arPartBusiness = max(0, $bookClearingBusiness - $vatPartBusiness);
-        } elseif ($vatPartInvoice > 0) {
-            $vatPartBusiness = 0;
-            $arPartBusiness = $bookClearingBusiness;
-        } else {
-            $vatPartBusiness = 0;
-            $arPartBusiness = $bookClearingBusiness;
+        if (! $hasAccrual) {
+            $vatPartInvoice = $this->calculateVatPart($invoice, $paymentInvoiceCents);
+
+            if ($vatPartInvoice > 0 && $vatOutputAccount !== null) {
+                $vatPartBusiness = $paymentInvoiceCents > 0
+                    ? (int) round(($vatPartInvoice * $bookClearingBusiness) / $paymentInvoiceCents)
+                    : 0;
+                $arPartBusiness = max(0, $bookClearingBusiness - $vatPartBusiness);
+            } elseif ($vatPartInvoice > 0) {
+                $vatPartBusiness = 0;
+                $arPartBusiness = $bookClearingBusiness;
+            }
         }
 
         $transaction = Transaction::query()->create([
@@ -223,10 +251,12 @@ class RecordPaymentAction
             'type' => EntryType::Credit,
             'amount_cents' => $arPartBusiness,
             'currency' => $bookCurrency,
-            'description' => 'Reduce accounts receivable for '.$invoice->number,
+            'description' => $hasAccrual
+                ? 'Clear accounts receivable for '.$invoice->number
+                : 'Reduce accounts receivable for '.$invoice->number,
         ]);
 
-        if ($vatPartBusiness > 0 && $vatOutputAccount !== null) {
+        if (! $hasAccrual && $vatPartBusiness > 0 && $vatOutputAccount !== null) {
             JournalEntry::query()->create([
                 'transaction_id' => $transaction->id,
                 'account_id' => $vatOutputAccount->id,

@@ -20,12 +20,15 @@ use App\Http\Controllers\Web\Invoicing\EstimatePdfController;
 use App\Http\Controllers\Web\Invoicing\ExchangeRateController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\Invoicing\InvoiceOnlinePaymentController;
+use App\Http\Controllers\Web\Invoicing\ItemController;
+use App\Http\Controllers\Web\Invoicing\RecurringInvoiceController;
 use App\Http\Controllers\Web\JoinTeamInvitationController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\PublicInvoicePayController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
 use App\Http\Controllers\Web\Settings\InstanceSettingsController;
+use App\Http\Controllers\Web\Settings\NoteTemplateController;
 use App\Http\Controllers\Web\Settings\TeamInvitationController;
 use App\Http\Controllers\Web\Settings\TeamRoleController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
@@ -72,6 +75,10 @@ Route::middleware([
     Route::get('/settings', fn () => redirect()->route('profile.show'))->name('settings.index');
     Route::get('/settings/business', [BusinessSettingsController::class, 'edit'])->name('settings.business');
     Route::post('/settings/business', [BusinessSettingsController::class, 'update'])->name('settings.business.update');
+    Route::get('/settings/note-templates', [NoteTemplateController::class, 'index'])->name('settings.note-templates.index');
+    Route::post('/settings/note-templates', [NoteTemplateController::class, 'store'])->name('settings.note-templates.store');
+    Route::put('/settings/note-templates/{noteTemplate}', [NoteTemplateController::class, 'update'])->name('settings.note-templates.update');
+    Route::delete('/settings/note-templates/{noteTemplate}', [NoteTemplateController::class, 'destroy'])->name('settings.note-templates.destroy');
     Route::get('/settings/company', fn () => redirect()->route('settings.business'));
     Route::post('/settings/company', [BusinessSettingsController::class, 'update']);
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
@@ -196,6 +203,26 @@ Route::middleware([
         Route::get('/clients/{client}', [ClientController::class, 'show'])->name('clients.show');
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+
+        Route::get('/items', [ItemController::class, 'index'])->name('items.index');
+        Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
+        Route::post('/items', [ItemController::class, 'store'])->name('items.store');
+        Route::get('/items/{item}', [ItemController::class, 'show'])->name('items.show');
+        Route::get('/items/{item}/edit', [ItemController::class, 'edit'])->name('items.edit');
+        Route::put('/items/{item}', [ItemController::class, 'update'])->name('items.update');
+        Route::delete('/items/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
+
+        Route::get('/recurring', [RecurringInvoiceController::class, 'index'])->name('recurring.index');
+        Route::get('/recurring/create', [RecurringInvoiceController::class, 'create'])->name('recurring.create');
+        Route::post('/recurring', [RecurringInvoiceController::class, 'store'])->name('recurring.store');
+        Route::get('/recurring/{recurring}', [RecurringInvoiceController::class, 'show'])->name('recurring.show');
+        Route::get('/recurring/{recurring}/edit', [RecurringInvoiceController::class, 'edit'])->name('recurring.edit');
+        Route::put('/recurring/{recurring}', [RecurringInvoiceController::class, 'update'])->name('recurring.update');
+        Route::delete('/recurring/{recurring}', [RecurringInvoiceController::class, 'destroy'])->name('recurring.destroy');
+        Route::post('/recurring/{recurring}/pause', [RecurringInvoiceController::class, 'pause'])->name('recurring.pause');
+        Route::post('/recurring/{recurring}/resume', [RecurringInvoiceController::class, 'resume'])->name('recurring.resume');
+        Route::post('/recurring/{recurring}/complete', [RecurringInvoiceController::class, 'complete'])->name('recurring.complete');
+        Route::post('/recurring/{recurring}/generate', [RecurringInvoiceController::class, 'generateNow'])->name('recurring.generate');
 
         Route::get('/exchange-rate', ExchangeRateController::class)->name('exchange-rate');
         Route::post('/invoices/export-pdf-zip', [InvoicePdfController::class, 'downloadZip'])->name('invoices.export-pdf-zip');

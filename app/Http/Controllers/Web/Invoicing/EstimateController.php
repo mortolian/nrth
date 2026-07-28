@@ -8,8 +8,10 @@ use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Estimate;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\Item;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
+use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
@@ -98,6 +100,7 @@ class EstimateController extends Controller
                 ])
                 ->values()
                 ->all(),
+            'items' => $this->catalogItemsForForm($teamId),
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
@@ -130,6 +133,7 @@ class EstimateController extends Controller
                 ])
                 ->values()
                 ->all(),
+            'items' => $this->catalogItemsForForm($teamId),
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
@@ -164,7 +168,12 @@ class EstimateController extends Controller
         $teamId = (int) $request->user()->current_team_id;
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
         $lineItems = $this->normalizeEstimateLineItemsVat($payload['line_items'], $chargesVat);
-        [$subtotal, $vat, $total] = $this->calculateTotals($lineItems);
+        [$lineItems, $subtotal, $vat, $total, $discountTotal] = $this->calculateTotalsWithDiscounts(
+            $lineItems,
+            $payload['discount_type'] ?? null,
+            $payload['discount_percent'] ?? null,
+            $payload['discount_cents'] ?? null,
+        );
 
         $submitAction = (string) ($payload['submit_action'] ?? 'draft');
         $estimate = Estimate::query()->create([
@@ -177,6 +186,10 @@ class EstimateController extends Controller
             'subtotal_cents' => $subtotal,
             'vat_amount_cents' => $vat,
             'total_cents' => $total,
+            'discount_type' => $payload['discount_type'] ?? null,
+            'discount_percent' => ($payload['discount_type'] ?? null) === 'percent' ? ($payload['discount_percent'] ?? null) : null,
+            'discount_cents' => ($payload['discount_type'] ?? null) === 'fixed' ? ($payload['discount_cents'] ?? null) : null,
+            'discount_total_cents' => $discountTotal,
             'currency' => Iso4217Currencies::normalize((string) $payload['currency']),
             'line_items' => $lineItems,
             'notes' => $payload['notes'] ?? null,
@@ -198,7 +211,12 @@ class EstimateController extends Controller
         $payload = $this->validateEstimate($request, $estimate);
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
         $lineItems = $this->normalizeEstimateLineItemsVat($payload['line_items'], $chargesVat);
-        [$subtotal, $vat, $total] = $this->calculateTotals($lineItems);
+        [$lineItems, $subtotal, $vat, $total, $discountTotal] = $this->calculateTotalsWithDiscounts(
+            $lineItems,
+            $payload['discount_type'] ?? null,
+            $payload['discount_percent'] ?? null,
+            $payload['discount_cents'] ?? null,
+        );
 
         $estimate->update([
             'client_id' => (int) $payload['client_id'],
@@ -208,6 +226,10 @@ class EstimateController extends Controller
             'subtotal_cents' => $subtotal,
             'vat_amount_cents' => $vat,
             'total_cents' => $total,
+            'discount_type' => $payload['discount_type'] ?? null,
+            'discount_percent' => ($payload['discount_type'] ?? null) === 'percent' ? ($payload['discount_percent'] ?? null) : null,
+            'discount_cents' => ($payload['discount_type'] ?? null) === 'fixed' ? ($payload['discount_cents'] ?? null) : null,
+            'discount_total_cents' => $discountTotal,
             'currency' => Iso4217Currencies::normalize((string) $payload['currency']),
             'line_items' => $lineItems,
             'notes' => $payload['notes'] ?? null,
@@ -272,6 +294,30 @@ class EstimateController extends Controller
             $team = Team::query()->findOrFail((int) $estimate->team_id);
             $chargesVat = $team->chargesVat();
             $defaultVatRate = $team->defaultVatRateForInvoicing();
+            $calculator = app(InvoiceTotalsCalculator::class);
+
+            $sourceLines = [];
+            foreach ((array) $estimate->line_items as $line) {
+                $sourceLines[] = [
+                    'description' => (string) ($line['description'] ?? ''),
+                    'quantity' => (float) ($line['quantity'] ?? 1),
+                    'unit_price_cents' => (int) ($line['unit_price_cents'] ?? 0),
+                    'vat_rate' => $chargesVat
+                        ? (float) ($line['vat_rate'] ?? $defaultVatRate)
+                        : 0.0,
+                    'item_id' => isset($line['item_id']) ? (int) $line['item_id'] : null,
+                    'discount_type' => $line['discount_type'] ?? null,
+                    'discount_percent' => $line['discount_percent'] ?? null,
+                    'discount_cents' => $line['discount_cents'] ?? null,
+                ];
+            }
+
+            $totals = $calculator->calculate(
+                $sourceLines,
+                $estimate->discount_type,
+                $estimate->discount_percent,
+                $estimate->discount_cents,
+            );
 
             $invoice = Invoice::query()->create([
                 'team_id' => $estimate->team_id,
@@ -281,46 +327,37 @@ class EstimateController extends Controller
                 'reference' => 'Converted from '.$estimate->number,
                 'issue_date' => now()->toDateString(),
                 'due_date' => (string) $payload['invoice_due_date'],
-                'subtotal_cents' => 0,
-                'vat_amount_cents' => 0,
-                'total_cents' => 0,
+                'subtotal_cents' => $totals['subtotal_cents'],
+                'vat_amount_cents' => $totals['vat_amount_cents'],
+                'total_cents' => $totals['total_cents'],
                 'amount_paid_cents' => 0,
+                'discount_type' => $estimate->discount_type,
+                'discount_percent' => $estimate->discount_type === 'percent' ? $estimate->discount_percent : null,
+                'discount_cents' => $estimate->discount_type === 'fixed' ? $estimate->discount_cents : null,
+                'discount_total_cents' => $totals['discount_total_cents'],
                 'currency' => $estimate->currency ?? 'ZAR',
                 'notes' => $payload['invoice_notes'] ?? null,
                 'footer' => $payload['invoice_footer'] ?? null,
             ]);
 
-            $subtotalCents = 0;
-            $vatCents = 0;
-
-            foreach ((array) $estimate->line_items as $index => $line) {
-                $quantity = (float) ($line['quantity'] ?? 1);
-                $unitPriceCents = (int) ($line['unit_price_cents'] ?? 0);
-                $vatRate = $chargesVat
-                    ? (float) ($line['vat_rate'] ?? $defaultVatRate)
-                    : 0.0;
-                $lineSubtotal = (int) round($quantity * $unitPriceCents);
-                $lineVat = (int) round($lineSubtotal * $vatRate);
-
+            foreach ($sourceLines as $index => $line) {
+                $computed = $totals['lines'][$index];
                 $invoice->lineItems()->create([
-                    'description' => (string) ($line['description'] ?? ''),
-                    'quantity' => $quantity,
-                    'unit_price_cents' => $unitPriceCents,
-                    'vat_rate' => $vatRate,
-                    'vat_amount_cents' => $lineVat,
-                    'total_cents' => $lineSubtotal + $lineVat,
+                    'item_id' => $line['item_id'],
+                    'description' => $line['description'],
+                    'quantity' => $line['quantity'],
+                    'unit_price_cents' => $line['unit_price_cents'],
+                    'vat_rate' => $line['vat_rate'],
+                    'discount_type' => $line['discount_type'] ?? null,
+                    'discount_percent' => ($line['discount_type'] ?? null) === 'percent' ? ($line['discount_percent'] ?? null) : null,
+                    'discount_cents' => ($line['discount_type'] ?? null) === 'fixed' ? ($line['discount_cents'] ?? null) : null,
+                    'discount_amount_cents' => $computed['line_discount_cents'],
+                    'vat_amount_cents' => $computed['vat_amount_cents'],
+                    'total_cents' => $computed['total_cents'],
                     'sort_order' => $index,
                 ]);
-
-                $subtotalCents += $lineSubtotal;
-                $vatCents += $lineVat;
             }
 
-            $invoice->update([
-                'subtotal_cents' => $subtotalCents,
-                'vat_amount_cents' => $vatCents,
-                'total_cents' => $subtotalCents + $vatCents,
-            ]);
             $invoice->refresh();
             app(InvoiceBusinessCurrencySnapshot::class)->sync($invoice);
 
@@ -371,33 +408,60 @@ class EstimateController extends Controller
             'notes' => ['nullable', 'string'],
             'terms' => ['nullable', 'string'],
             'submit_action' => ['nullable', Rule::in(['draft', 'send'])],
+            'discount_type' => ['nullable', Rule::in(['percent', 'fixed'])],
+            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'discount_cents' => ['nullable', 'integer', 'min:0'],
             'line_items' => ['required', 'array', 'min:1'],
             'line_items.*.description' => ['required', 'string', 'max:65535'],
             'line_items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'line_items.*.unit_price_cents' => ['required', 'integer', 'min:0'],
             'line_items.*.vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'line_items.*.item_id' => ['nullable', 'integer', Rule::exists('items', 'id')->where('team_id', $teamId)],
+            'line_items.*.discount_type' => ['nullable', Rule::in(['percent', 'fixed'])],
+            'line_items.*.discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'line_items.*.discount_cents' => ['nullable', 'integer', 'min:0'],
         ]);
     }
 
     /**
      * @param  array<int, array<string, mixed>>  $lineItems
-     * @return array<int, int>
+     * @return array{0: array<int, array<string, mixed>>, 1: int, 2: int, 3: int, 4: int}
      */
-    private function calculateTotals(array $lineItems): array
-    {
-        $subtotal = 0;
-        $vat = 0;
-        foreach ($lineItems as $line) {
-            $quantity = (float) ($line['quantity'] ?? 0);
-            $unitPriceCents = (int) ($line['unit_price_cents'] ?? 0);
-            $vatRate = (float) ($line['vat_rate'] ?? 0);
-            $lineSubtotal = (int) round($quantity * $unitPriceCents);
-            $lineVat = (int) round($lineSubtotal * $vatRate);
-            $subtotal += $lineSubtotal;
-            $vat += $lineVat;
+    private function calculateTotalsWithDiscounts(
+        array $lineItems,
+        ?string $documentDiscountType,
+        float|int|string|null $documentDiscountPercent,
+        int|string|null $documentDiscountCents,
+    ): array {
+        $calculator = app(InvoiceTotalsCalculator::class);
+        $totals = $calculator->calculate(
+            $lineItems,
+            $documentDiscountType,
+            $documentDiscountPercent,
+            $documentDiscountCents,
+        );
+
+        $enriched = [];
+        foreach ($lineItems as $index => $line) {
+            $computed = $totals['lines'][$index];
+            $enriched[] = [
+                ...$line,
+                'discount_type' => $line['discount_type'] ?? null,
+                'discount_percent' => ($line['discount_type'] ?? null) === 'percent' ? ($line['discount_percent'] ?? null) : null,
+                'discount_cents' => ($line['discount_type'] ?? null) === 'fixed' ? ($line['discount_cents'] ?? null) : null,
+                'discount_amount_cents' => $computed['line_discount_cents'],
+                'vat_amount_cents' => $computed['vat_amount_cents'],
+                'total_cents' => $computed['total_cents'],
+            ];
         }
 
-        return [$subtotal, $vat, $subtotal + $vat];
+        return [
+            $enriched,
+            $totals['subtotal_cents'],
+            $totals['vat_amount_cents'],
+            $totals['total_cents'],
+            $totals['discount_total_cents'],
+        ];
     }
 
     /**
@@ -413,6 +477,27 @@ class EstimateController extends Controller
                 return $line;
             })
             ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, name: string, description: string|null, unit: string|null, unit_price_cents: int, default_vat_rate: float|null}>
+     */
+    private function catalogItemsForForm(int $teamId): array
+    {
+        return Item::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'unit', 'unit_price_cents', 'default_vat_rate'])
+            ->map(fn (Item $item) => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'description' => $item->description,
+                'unit' => $item->unit,
+                'unit_price_cents' => (int) $item->unit_price_cents,
+                'default_vat_rate' => $item->default_vat_rate !== null ? (float) $item->default_vat_rate : null,
+            ])
             ->all();
     }
 
@@ -464,6 +549,10 @@ class EstimateController extends Controller
             'total_cents' => (int) $estimate->getRawOriginal('total_cents'),
             'subtotal_cents' => (int) $estimate->getRawOriginal('subtotal_cents'),
             'vat_amount_cents' => (int) $estimate->getRawOriginal('vat_amount_cents'),
+            'discount_type' => $estimate->discount_type,
+            'discount_percent' => $estimate->discount_percent !== null ? (float) $estimate->discount_percent : null,
+            'discount_cents' => $estimate->discount_cents !== null ? (int) $estimate->discount_cents : null,
+            'discount_total_cents' => (int) ($estimate->getRawOriginal('discount_total_cents') ?? 0),
             'status' => $estimate->status->value,
             'line_items' => $lines,
             'notes' => $estimate->notes,

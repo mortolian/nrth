@@ -84,6 +84,7 @@ const props = defineProps<{
     invoice: InvoicePayload;
     can: {
         edit: boolean;
+        duplicate: boolean;
         send: boolean;
         remind: boolean;
         mark_sent: boolean;
@@ -410,10 +411,10 @@ const undoPayment = (paymentId: number) => {
                     Restore
                 </AppButton>
                 <AppButton
-                    v-if="['paid', 'void'].includes(invoice.status)"
+                    v-if="can.duplicate"
                     class="shrink-0"
                     variant="primary"
-                    @click="router.visit(route('invoicing.invoices.create'))"
+                    @click="router.visit(route('invoicing.invoices.create', { from: invoice.id }))"
                 >
                     Duplicate
                 </AppButton>

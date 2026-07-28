@@ -8,6 +8,7 @@ use Database\Factories\ClientFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Client extends Model
@@ -74,6 +75,17 @@ class Client extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);
+    }
+
+    /**
+     * @return BelongsToMany<NoteTemplate, $this>
+     */
+    public function noteTemplates(): BelongsToMany
+    {
+        return $this->belongsToMany(NoteTemplate::class, 'client_note_template')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderByPivot('sort_order');
     }
 
     protected static function newFactory(): ClientFactory

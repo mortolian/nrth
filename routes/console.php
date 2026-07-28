@@ -12,6 +12,10 @@ Schedule::command('estimates:expire')
     ->dailyAt('01:00')
     ->withoutOverlapping();
 
+Schedule::command('invoices:generate-recurring')
+    ->dailyAt('01:30')
+    ->withoutOverlapping();
+
 Schedule::command('takeouts:prune')
     ->dailyAt('02:00')
     ->withoutOverlapping();

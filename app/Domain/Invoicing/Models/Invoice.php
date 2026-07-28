@@ -30,6 +30,7 @@ class Invoice extends Model implements HasMedia
     protected $fillable = [
         'team_id',
         'client_id',
+        'recurring_invoice_id',
         'status',
         'number',
         'reference',
@@ -39,6 +40,12 @@ class Invoice extends Model implements HasMedia
         'vat_amount_cents',
         'total_cents',
         'amount_paid_cents',
+        'discount_type',
+        'discount_percent',
+        'discount_cents',
+        'discount_total_cents',
+        'income_account_id',
+        'accrual_transaction_id',
         'currency',
         'business_currency_code',
         'fx_rate_invoice_to_business',
@@ -72,6 +79,7 @@ class Invoice extends Model implements HasMedia
             'vat_amount_cents' => MoneyCast::class,
             'total_cents' => MoneyCast::class,
             'amount_paid_cents' => MoneyCast::class,
+            'discount_percent' => 'decimal:2',
         ];
     }
 
@@ -89,6 +97,14 @@ class Invoice extends Model implements HasMedia
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    /**
+     * @return BelongsTo<RecurringInvoice, $this>
+     */
+    public function recurringInvoice(): BelongsTo
+    {
+        return $this->belongsTo(RecurringInvoice::class);
     }
 
     /**

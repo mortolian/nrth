@@ -109,6 +109,8 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 - Controllers stay thin; call actions/services from `app/Http/Controllers/Web/`.
 - UI: Inertia + Vue 3 in `resources/js/Pages/`.
 - Ledger amounts use `brick/money` and cents; bank import lines use decimal columns separately.
+- Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
+- Sending or marking an invoice as sent posts an accrual journal (Dr AR, Cr income accounts + VAT). Subsequent payments clear AR only when that accrual exists.
 
 Internal AI/editor conventions may live in `.cursor/rules` — optional for human contributors.
 

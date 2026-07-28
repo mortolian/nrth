@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceLineItem;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
+use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
 use App\Models\Team;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ class CreateInvoiceAction
     public function __construct(
         private readonly InvoiceNumberService $numberService,
         private readonly InvoiceBusinessCurrencySnapshot $businessCurrencySnapshot,
+        private readonly InvoiceTotalsCalculator $totalsCalculator,
     ) {}
 
     public function execute(CreateInvoiceDTO $dto): Invoice
@@ -47,45 +49,68 @@ class CreateInvoiceAction
                 'currency' => $dto->currency,
                 'notes' => $dto->notes,
                 'footer' => $dto->footer,
+                'discount_type' => $dto->discountType,
+                'discount_percent' => $dto->discountType === 'percent' ? $dto->discountPercent : null,
+                'discount_cents' => $dto->discountType === 'fixed' ? $dto->discountCents : null,
+                'income_account_id' => $dto->incomeAccountId,
             ]);
 
             $team = Team::query()->findOrFail($dto->teamId);
             $chargesVat = $team->chargesVat();
             $defaultLineVatRate = $team->defaultVatRateForInvoicing();
 
-            $subtotalCents = 0;
-            $vatAmountCents = 0;
-
-            foreach ($dto->lineItems as $index => $line) {
-                $quantity = (float) $line['quantity'];
-                $unitPriceCents = (int) $line['unit_price_cents'];
+            $calculatorLines = [];
+            foreach ($dto->lineItems as $line) {
                 $vatRate = $chargesVat
                     ? (array_key_exists('vat_rate', $line) ? (float) $line['vat_rate'] : $defaultLineVatRate)
                     : 0.0;
 
-                $lineSubtotal = (int) round($quantity * $unitPriceCents);
-                $lineVat = (int) round($lineSubtotal * $vatRate);
-                $lineTotal = $lineSubtotal + $lineVat;
+                $calculatorLines[] = [
+                    'quantity' => $line['quantity'],
+                    'unit_price_cents' => $line['unit_price_cents'],
+                    'vat_rate' => $vatRate,
+                    'discount_type' => $line['discount_type'] ?? null,
+                    'discount_percent' => $line['discount_percent'] ?? null,
+                    'discount_cents' => $line['discount_cents'] ?? null,
+                ];
+            }
+
+            $totals = $this->totalsCalculator->calculate(
+                $calculatorLines,
+                $dto->discountType,
+                $dto->discountPercent,
+                $dto->discountCents,
+            );
+
+            foreach ($dto->lineItems as $index => $line) {
+                $computed = $totals['lines'][$index];
+                $vatRate = $chargesVat
+                    ? (array_key_exists('vat_rate', $line) ? (float) $line['vat_rate'] : $defaultLineVatRate)
+                    : 0.0;
 
                 InvoiceLineItem::query()->create([
                     'invoice_id' => $invoice->id,
+                    'item_id' => isset($line['item_id']) ? (int) $line['item_id'] : null,
+                    'income_account_id' => isset($line['income_account_id']) ? (int) $line['income_account_id'] : null,
                     'description' => $line['description'],
-                    'quantity' => $quantity,
-                    'unit_price_cents' => $unitPriceCents,
+                    'quantity' => $line['quantity'],
+                    'unit_price_cents' => (int) $line['unit_price_cents'],
                     'vat_rate' => $vatRate,
-                    'vat_amount_cents' => $lineVat,
-                    'total_cents' => $lineTotal,
+                    'discount_type' => $line['discount_type'] ?? null,
+                    'discount_percent' => ($line['discount_type'] ?? null) === 'percent' ? ($line['discount_percent'] ?? null) : null,
+                    'discount_cents' => ($line['discount_type'] ?? null) === 'fixed' ? ($line['discount_cents'] ?? null) : null,
+                    'discount_amount_cents' => $computed['line_discount_cents'],
+                    'vat_amount_cents' => $computed['vat_amount_cents'],
+                    'total_cents' => $computed['total_cents'],
                     'sort_order' => $index,
                 ]);
-
-                $subtotalCents += $lineSubtotal;
-                $vatAmountCents += $lineVat;
             }
 
             $invoice->update([
-                'subtotal_cents' => $subtotalCents,
-                'vat_amount_cents' => $vatAmountCents,
-                'total_cents' => $subtotalCents + $vatAmountCents,
+                'subtotal_cents' => $totals['subtotal_cents'],
+                'vat_amount_cents' => $totals['vat_amount_cents'],
+                'total_cents' => $totals['total_cents'],
+                'discount_total_cents' => $totals['discount_total_cents'],
             ]);
 
             $invoice->refresh();

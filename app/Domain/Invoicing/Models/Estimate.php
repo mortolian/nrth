@@ -29,6 +29,10 @@ class Estimate extends Model implements HasMedia
         'subtotal_cents',
         'vat_amount_cents',
         'total_cents',
+        'discount_type',
+        'discount_percent',
+        'discount_cents',
+        'discount_total_cents',
         'currency',
         'line_items',
         'notes',
@@ -52,6 +56,7 @@ class Estimate extends Model implements HasMedia
             'sent_at' => 'datetime',
             'accepted_at' => 'datetime',
             'declined_at' => 'datetime',
+            'discount_percent' => 'decimal:2',
         ];
     }
 

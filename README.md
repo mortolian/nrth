@@ -21,7 +21,7 @@
 
 ## Features
 
-- **Invoicing & estimates** — clients, PDFs, payments, online pay links
+- **Invoicing & estimates** — clients, items catalog, recurring invoices, discounts, note templates, PDFs, payments, online pay links
 - **Expenses & suppliers** — receipts, categories, VAT on purchases
 - **Accounting** — chart of accounts, journal, general ledger, account statements
 - **Banking** — import CSV/OFX statements, duplicate detection, transaction list

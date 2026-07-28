@@ -45,6 +45,8 @@
     $total = (int) ($invoice->getRawOriginal('total_cents') ?? 0);
     $paid = (int) ($invoice->getRawOriginal('amount_paid_cents') ?? 0);
     $due = max(0, $total - $paid);
+    $discountTotal = (int) ($invoice->getRawOriginal('discount_total_cents') ?? 0);
+    $markdown = app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class);
 
     $chargesVat = $team && method_exists($team, 'chargesVat') ? $team->chargesVat() : false;
     $documentTitle = $chargesVat ? 'Tax Invoice' : 'Invoice';
@@ -132,9 +134,15 @@
                 $rate = (float) $line->vat_rate;
                 $lineVat = (int) $line->vat_amount_cents;
                 $lineTotal = (int) $line->total_cents;
+                $lineDiscount = (int) ($line->discount_amount_cents ?? 0);
             @endphp
             <tr @if($i % 2 === 1) class="zebra" @endif>
-                <td>{{ $line->description }}</td>
+                <td>
+                    {{ $line->description }}
+                    @if($lineDiscount > 0)
+                        <div class="small muted">Discount: {{ $fmtMoney($lineDiscount) }}</div>
+                    @endif
+                </td>
                 <td class="num">{{ rtrim(rtrim(number_format($qty, 2, '.', ''), '0'), '.') ?: '0' }}</td>
                 <td class="num">{{ $fmtMoney($unit) }}</td>
                 @if($chargesVat)
@@ -152,6 +160,12 @@
         <td class="label">{{ $chargesVat ? 'Subtotal (excl. VAT)' : 'Subtotal' }}</td>
         <td class="value">{{ $fmtMoney($subtotal) }}</td>
     </tr>
+    @if($discountTotal > 0)
+    <tr>
+        <td class="label">Discounts applied</td>
+        <td class="value">{{ $fmtMoney($discountTotal) }}</td>
+    </tr>
+    @endif
     @if($chargesVat)
     <tr>
         <td class="label">VAT</td>
@@ -259,8 +273,8 @@
     </div>
 @endif
 
-@include('pdf._prose-section', ['title' => 'Notes', 'content' => $invoice->notes])
-@include('pdf._prose-section', ['title' => 'Terms & conditions', 'content' => $invoice->footer])
+@include('pdf._markdown-section', ['title' => 'Notes', 'html' => $markdown->toHtml($invoice->notes)])
+@include('pdf._markdown-section', ['title' => 'Terms & conditions', 'html' => $markdown->toHtml($invoice->footer)])
 
 @if($public_pay_qr_data_uri && $public_pay_url)
     <div class="section section-pay-online pay-online-qr">

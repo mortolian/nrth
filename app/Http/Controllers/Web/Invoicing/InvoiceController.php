@@ -21,9 +21,12 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceLineItem;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
+use App\Domain\Invoicing\Models\Item;
+use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
+use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Support\InvoiceOnlinePaymentProviders;
@@ -50,9 +53,58 @@ class InvoiceController extends Controller
     {
         $this->authorizeTeam('invoices.manage', $request);
 
+        $invoicePayload = null;
+        $fromId = $request->integer('from');
+        if ($fromId > 0) {
+            $source = Invoice::queryWithoutTeamScope()
+                ->where('team_id', (int) $request->user()->current_team_id)
+                ->with('lineItems')
+                ->find($fromId);
+
+            if ($source !== null) {
+                $team = $request->user()->currentTeam;
+                $chargesVat = $team?->chargesVat() ?? false;
+                $meta = $this->formMeta($request);
+                $client = Client::queryWithoutTeamScope()
+                    ->where('team_id', $source->team_id)
+                    ->find($source->client_id);
+                $issueDate = now()->toDateString();
+                $dueDate = now()->addDays((int) ($client?->payment_terms_days ?? ($meta['defaults']['payment_terms_days'] ?? 30)))->toDateString();
+
+                $invoicePayload = [
+                    'id' => null,
+                    'number' => $meta['next_number'],
+                    'client_id' => $source->client_id,
+                    'reference' => $source->reference,
+                    'issue_date' => $issueDate,
+                    'due_date' => $dueDate,
+                    'notes' => $source->notes,
+                    'footer' => $source->footer,
+                    'amount_paid_cents' => 0,
+                    'amount_due_cents' => (int) $source->getRawOriginal('total_cents'),
+                    'currency' => Iso4217Currencies::normalize((string) ($source->currency ?? 'ZAR')),
+                    'discount_type' => $source->discount_type,
+                    'discount_percent' => $source->discount_percent !== null ? (float) $source->discount_percent : null,
+                    'discount_cents' => $source->discount_cents !== null ? (int) $source->discount_cents : null,
+                    'income_account_id' => $source->income_account_id,
+                    'line_items' => $source->lineItems->map(fn (InvoiceLineItem $item) => [
+                        'item_id' => $item->item_id,
+                        'income_account_id' => $item->income_account_id,
+                        'description' => $item->description,
+                        'quantity' => (float) $item->quantity,
+                        'unit_price' => round(((int) $item->unit_price_cents) / 100, 2),
+                        'vat_rate' => $chargesVat ? (float) $item->vat_rate : 0.0,
+                        'discount_type' => $item->discount_type,
+                        'discount_percent' => $item->discount_percent !== null ? (float) $item->discount_percent : null,
+                        'discount_cents' => $item->discount_cents !== null ? (int) $item->discount_cents : null,
+                    ])->values()->all(),
+                ];
+            }
+        }
+
         return Inertia::render('Invoicing/Invoices/Form', [
             'isEditing' => false,
-            'invoice' => null,
+            'invoice' => $invoicePayload,
             ...$this->formMeta($request),
         ]);
     }
@@ -85,12 +137,21 @@ class InvoiceController extends Controller
                 'total_cents' => (int) $invoice->getRawOriginal('total_cents'),
                 'amount_paid_cents' => $amountPaid,
                 'amount_due_cents' => $amountDue,
+                'discount_type' => $invoice->discount_type,
+                'discount_percent' => $invoice->discount_percent !== null ? (float) $invoice->discount_percent : null,
+                'discount_cents' => $invoice->discount_cents !== null ? (int) $invoice->discount_cents : null,
+                'income_account_id' => $invoice->income_account_id,
                 'line_items' => $invoice->lineItems->map(fn (InvoiceLineItem $item) => [
                     'id' => $item->id,
+                    'item_id' => $item->item_id,
+                    'income_account_id' => $item->income_account_id,
                     'description' => $item->description,
                     'quantity' => (float) $item->quantity,
                     'unit_price' => round(((int) $item->unit_price_cents) / 100, 2),
                     'vat_rate' => $chargesVat ? (float) $item->vat_rate : 0.0,
+                    'discount_type' => $item->discount_type,
+                    'discount_percent' => $item->discount_percent !== null ? (float) $item->discount_percent : null,
+                    'discount_cents' => $item->discount_cents !== null ? (int) $item->discount_cents : null,
                 ])->values()->all(),
                 'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
                 'business_currency_code' => $invoice->business_currency_code !== null
@@ -124,6 +185,10 @@ class InvoiceController extends Controller
             notes: $payload['notes'] ?? null,
             footer: $payload['footer'] ?? null,
             lineItems: $payload['line_items'],
+            discountType: $payload['discount_type'] ?? null,
+            discountPercent: $payload['discount_percent'] ?? null,
+            discountCents: $payload['discount_cents'] ?? null,
+            incomeAccountId: isset($payload['income_account_id']) ? (int) $payload['income_account_id'] : null,
         ));
 
         if (($payload['number'] ?? null) !== null && $payload['number'] !== $invoice->number) {
@@ -158,43 +223,65 @@ class InvoiceController extends Controller
                 'notes' => $payload['notes'] ?? null,
                 'footer' => $payload['footer'] ?? null,
                 'currency' => Iso4217Currencies::normalize((string) $payload['currency']),
+                'discount_type' => $payload['discount_type'] ?? null,
+                'discount_percent' => ($payload['discount_type'] ?? null) === 'percent' ? ($payload['discount_percent'] ?? null) : null,
+                'discount_cents' => ($payload['discount_type'] ?? null) === 'fixed' ? ($payload['discount_cents'] ?? null) : null,
+                'income_account_id' => isset($payload['income_account_id']) ? (int) $payload['income_account_id'] : null,
             ]);
             $invoice->save();
 
             $invoice->lineItems()->delete();
 
-            $subtotalCents = 0;
-            $vatAmountCents = 0;
+            $calculatorLines = [];
+            foreach ($payload['line_items'] as $line) {
+                $vatRate = $chargesVat
+                    ? (float) ($line['vat_rate'] ?? $defaultVatRate)
+                    : 0.0;
+                $calculatorLines[] = [
+                    'quantity' => $line['quantity'],
+                    'unit_price_cents' => $line['unit_price_cents'],
+                    'vat_rate' => $vatRate,
+                    'discount_type' => $line['discount_type'] ?? null,
+                    'discount_percent' => $line['discount_percent'] ?? null,
+                    'discount_cents' => $line['discount_cents'] ?? null,
+                ];
+            }
+
+            $totals = app(InvoiceTotalsCalculator::class)->calculate(
+                $calculatorLines,
+                $payload['discount_type'] ?? null,
+                $payload['discount_percent'] ?? null,
+                $payload['discount_cents'] ?? null,
+            );
 
             foreach ($payload['line_items'] as $index => $line) {
-                $quantity = (float) $line['quantity'];
-                $unitPriceCents = (int) $line['unit_price_cents'];
+                $computed = $totals['lines'][$index];
                 $vatRate = $chargesVat
                     ? (float) ($line['vat_rate'] ?? $defaultVatRate)
                     : 0.0;
 
-                $lineSubtotal = (int) round($quantity * $unitPriceCents);
-                $lineVat = (int) round($lineSubtotal * $vatRate);
-                $lineTotal = $lineSubtotal + $lineVat;
-
                 $invoice->lineItems()->create([
+                    'item_id' => isset($line['item_id']) ? (int) $line['item_id'] : null,
+                    'income_account_id' => isset($line['income_account_id']) ? (int) $line['income_account_id'] : null,
                     'description' => $line['description'],
-                    'quantity' => $quantity,
-                    'unit_price_cents' => $unitPriceCents,
+                    'quantity' => $line['quantity'],
+                    'unit_price_cents' => (int) $line['unit_price_cents'],
                     'vat_rate' => $vatRate,
-                    'vat_amount_cents' => $lineVat,
-                    'total_cents' => $lineTotal,
+                    'discount_type' => $line['discount_type'] ?? null,
+                    'discount_percent' => ($line['discount_type'] ?? null) === 'percent' ? ($line['discount_percent'] ?? null) : null,
+                    'discount_cents' => ($line['discount_type'] ?? null) === 'fixed' ? ($line['discount_cents'] ?? null) : null,
+                    'discount_amount_cents' => $computed['line_discount_cents'],
+                    'vat_amount_cents' => $computed['vat_amount_cents'],
+                    'total_cents' => $computed['total_cents'],
                     'sort_order' => $index,
                 ]);
-
-                $subtotalCents += $lineSubtotal;
-                $vatAmountCents += $lineVat;
             }
 
             $invoice->update([
-                'subtotal_cents' => $subtotalCents,
-                'vat_amount_cents' => $vatAmountCents,
-                'total_cents' => $subtotalCents + $vatAmountCents,
+                'subtotal_cents' => $totals['subtotal_cents'],
+                'vat_amount_cents' => $totals['vat_amount_cents'],
+                'total_cents' => $totals['total_cents'],
+                'discount_total_cents' => $totals['discount_total_cents'],
             ]);
             $invoice->refresh();
             app(InvoiceBusinessCurrencySnapshot::class)->sync($invoice);
@@ -232,7 +319,7 @@ class InvoiceController extends Controller
         $sendInvoiceAction->execute($invoice);
         $invoice->loadMissing('client');
         $email = trim((string) ($invoice->client?->email ?? ''));
-        [$flashKey, $flashMessage] = \App\Support\MailDelivery::invoiceEmailedFlash($email, reminder: false, resent: ! $wasDraft);
+        [$flashKey, $flashMessage] = MailDelivery::invoiceEmailedFlash($email, reminder: false, resent: ! $wasDraft);
 
         return to_route('invoicing.invoices.show', $invoice->fresh())
             ->with($flashKey, $flashMessage);
@@ -246,7 +333,7 @@ class InvoiceController extends Controller
         $sendInvoiceReminderAction->execute($invoice);
         $invoice->loadMissing('client');
         $email = trim((string) ($invoice->client?->email ?? ''));
-        [$flashKey, $flashMessage] = \App\Support\MailDelivery::invoiceEmailedFlash($email, reminder: true);
+        [$flashKey, $flashMessage] = MailDelivery::invoiceEmailedFlash($email, reminder: true);
 
         return to_route('invoicing.invoices.show', $invoice->fresh())
             ->with($flashKey, $flashMessage);
@@ -580,6 +667,7 @@ class InvoiceController extends Controller
             ],
             'can' => [
                 'edit' => $invoice->status !== InvoiceStatus::Void,
+                'duplicate' => true,
                 'send' => in_array($invoice->status, [
                     InvoiceStatus::Draft,
                     InvoiceStatus::Sent,
@@ -749,6 +837,7 @@ class InvoiceController extends Controller
         if ($teamId <= 0 || $team === null) {
             return [
                 'clients' => [],
+                'items' => [],
                 'tax_rates' => [],
                 'accounts' => [],
                 'charges_vat' => false,
@@ -776,6 +865,7 @@ class InvoiceController extends Controller
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
+                ->with(['noteTemplates' => fn ($q) => $q->orderByPivot('sort_order')])
                 ->orderBy('name')
                 ->get(['id', 'name', 'payment_terms_days', 'currency'])
                 ->map(fn (Client $client) => [
@@ -783,6 +873,31 @@ class InvoiceController extends Controller
                     'name' => $client->name,
                     'payment_terms_days' => (int) $client->payment_terms_days,
                     'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
+                    'note_template_ids' => $client->noteTemplates->pluck('id')->values()->all(),
+                    'default_notes' => $client->noteTemplates
+                        ->where('target', 'notes')
+                        ->pluck('body')
+                        ->filter()
+                        ->implode("\n\n"),
+                    'default_footer' => $client->noteTemplates
+                        ->where('target', 'footer')
+                        ->pluck('body')
+                        ->filter()
+                        ->implode("\n\n"),
+                ])
+                ->all(),
+            'items' => Item::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'description', 'unit', 'unit_price_cents', 'default_vat_rate'])
+                ->map(fn (Item $item) => [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'description' => $item->description,
+                    'unit' => $item->unit,
+                    'unit_price_cents' => (int) $item->unit_price_cents,
+                    'default_vat_rate' => $item->default_vat_rate !== null ? (float) $item->default_vat_rate : null,
                 ])
                 ->all(),
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
@@ -811,6 +926,25 @@ class InvoiceController extends Controller
                 ->map(fn (Account $account) => [
                     'id' => $account->id,
                     'name' => trim($account->code.' - '.$account->name),
+                ])
+                ->all(),
+            'default_income_account_id' => Account::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('type', AccountType::Income->value)
+                ->where('is_active', true)
+                ->where('code', '4000')
+                ->value('id'),
+            'note_templates' => NoteTemplate::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'body', 'target'])
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'body' => $t->body,
+                    'target' => $t->target,
                 ])
                 ->all(),
             'next_number' => $nextNumber,
@@ -845,11 +979,28 @@ class InvoiceController extends Controller
             'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'notes' => ['nullable', 'string'],
             'footer' => ['nullable', 'string'],
+            'discount_type' => ['nullable', Rule::in(['percent', 'fixed'])],
+            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'discount_cents' => ['nullable', 'integer', 'min:0'],
+            'income_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(fn ($q) => $q->where('team_id', $teamId)->where('type', AccountType::Income->value)),
+            ],
             'line_items' => ['required', 'array', 'min:1'],
             'line_items.*.description' => ['required', 'string', 'max:65535'],
             'line_items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'line_items.*.unit_price_cents' => ['required', 'integer', 'min:0'],
             'line_items.*.vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'line_items.*.item_id' => ['nullable', 'integer', Rule::exists('items', 'id')->where('team_id', $teamId)],
+            'line_items.*.discount_type' => ['nullable', Rule::in(['percent', 'fixed'])],
+            'line_items.*.discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'line_items.*.discount_cents' => ['nullable', 'integer', 'min:0'],
+            'line_items.*.income_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(fn ($q) => $q->where('team_id', $teamId)->where('type', AccountType::Income->value)),
+            ],
         ]);
 
         if (empty($validated['line_items'])) {
