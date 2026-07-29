@@ -152,9 +152,9 @@ const form = ref({
 const previousClientDefaults = ref({ ...initialClientDefaults });
 
 const discountTypeOptions = [
-    { label: 'None', value: '' },
-    { label: '%', value: 'percent' },
-    { label: 'Fixed', value: 'fixed' },
+    { label: 'No discount', value: '' },
+    { label: 'Percent %', value: 'percent' },
+    { label: 'Fixed amount', value: 'fixed' },
 ];
 
 const emptyLineDiscount = () => ({
@@ -218,7 +218,7 @@ const lineItems = ref<EstimateLineForm[]>(
         }],
 );
 
-const lineItemsTbodyRef = ref<HTMLTableSectionElement | null>(null);
+const lineItemsListRef = ref<HTMLElement | null>(null);
 let lineItemSortable: ReturnType<typeof Sortable.create> | null = null;
 
 const lineItemsOrderSignature = computed(() => lineItems.value.map((l) => l.row_key).join('|'));
@@ -226,14 +226,14 @@ const lineItemsOrderSignature = computed(() => lineItems.value.map((l) => l.row_
 const initLineItemSortable = () => {
     lineItemSortable?.destroy();
     lineItemSortable = null;
-    const el = lineItemsTbodyRef.value;
-    if (!el || el.querySelectorAll('tr').length === 0) {
+    const el = lineItemsListRef.value;
+    if (!el || el.querySelectorAll('.estimate-line-item').length === 0) {
         return;
     }
     lineItemSortable = Sortable.create(el, {
         animation: 150,
         handle: '.estimate-line-drag-handle',
-        draggable: 'tr',
+        draggable: '.estimate-line-item',
         onEnd(evt) {
             const { oldIndex, newIndex } = evt;
             if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) {
@@ -553,7 +553,7 @@ const submit = (submitAction: 'draft' | 'send') => {
         />
 
         <div class="mt-5 space-y-6">
-                <AppCard>
+                <AppCard class="border-slate-200/90 bg-slate-50">
                     <div class="grid gap-3 md:grid-cols-2">
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Client</label>
@@ -612,33 +612,99 @@ const submit = (submitAction: 'draft' | 'send') => {
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
                     <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>
 
-                    <div class="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]">
-                        <table class="w-full min-w-[48rem] table-fixed divide-y divide-slate-200 text-sm">
-                            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                                <tr>
-                                    <th class="w-8 px-1 py-2 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
-                                    <th class="min-w-[14rem] px-2 py-2 text-left font-medium">Description</th>
-                                    <th class="w-16 px-1.5 py-2 text-right font-medium">Qty</th>
-                                    <th class="w-24 px-1.5 py-2 text-right font-medium">Price</th>
-                                    <th v-if="chargesVat" class="w-28 px-1.5 py-2 text-left font-medium">VAT</th>
-                                    <th v-if="chargesVat" class="w-20 px-1.5 py-2 text-right font-medium">VAT amt</th>
-                                    <th class="w-24 px-1.5 py-2 text-right font-medium">Total</th>
-                                    <th class="w-9 px-1 py-2 text-center font-medium"><span class="sr-only">Remove</span></th>
-                                </tr>
-                            </thead>
-                            <tbody ref="lineItemsTbodyRef" class="divide-y divide-slate-100">
-                                <tr v-for="(line, index) in lineItems" :key="line.row_key">
-                                    <td class="w-8 px-1 py-1.5 align-middle">
-                                        <span
-                                            class="estimate-line-drag-handle inline-flex cursor-grab touch-manipulation rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
-                                            role="button"
-                                            tabindex="0"
-                                            aria-label="Drag to reorder line"
-                                        >
-                                            <GripVertical class="h-4 w-4 shrink-0" />
-                                        </span>
-                                    </td>
-                                    <td class="px-2 py-1.5 align-top">
+                    <div ref="lineItemsListRef" class="space-y-3">
+                        <div
+                            v-for="(line, index) in lineItems"
+                            :key="line.row_key"
+                            class="estimate-line-item rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
+                        >
+                            <div class="flex gap-2">
+                                <span
+                                    class="estimate-line-drag-handle mt-5 inline-flex h-8 w-6 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-label="Drag to reorder line"
+                                >
+                                    <GripVertical class="h-4 w-4 shrink-0" />
+                                </span>
+
+                                <div class="min-w-0 flex-1 space-y-3">
+                                    <div class="flex flex-wrap items-end gap-2">
+                                        <div v-if="catalogItems.length" class="min-w-[12rem] flex-[2]">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Item</label>
+                                            <AppSelect
+                                                size="sm"
+                                                :model-value="line.item_id ? String(line.item_id) : ''"
+                                                :options="[
+                                                    { label: 'Select item…', value: '' },
+                                                    ...catalogItems.map((item) => ({
+                                                        label: item.name,
+                                                        value: String(item.id),
+                                                    })),
+                                                ]"
+                                                placeholder="Select item…"
+                                                @update:model-value="applyCatalogItem(index, String($event ?? ''))"
+                                            />
+                                        </div>
+                                        <div class="w-[4.5rem] shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Qty</label>
+                                            <AppInput
+                                                class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
+                                                :model-value="line.quantity"
+                                                type="number"
+                                                inputmode="decimal"
+                                                @update:model-value="updateLine(index, 'quantity', Number($event))"
+                                            />
+                                        </div>
+                                        <div class="w-[6.5rem] shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Unit price</label>
+                                            <AppInput
+                                                class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
+                                                :model-value="line.unit_price"
+                                                type="text"
+                                                inputmode="decimal"
+                                                step="0.01"
+                                                pattern="^\\d*(\\.\\d{0,2})?$"
+                                                @update:model-value="updateLine(index, 'unit_price', $event)"
+                                                @blur="onUnitPriceBlur(index)"
+                                            />
+                                        </div>
+                                        <div v-if="chargesVat" class="w-[7.5rem] shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">VAT</label>
+                                            <AppSelect
+                                                size="sm"
+                                                :model-value="String(line.vat_rate)"
+                                                :options="vatSelectOptions"
+                                                @update:model-value="updateLine(index, 'vat_rate', Number($event))"
+                                            />
+                                        </div>
+                                        <div v-if="chargesVat" class="w-[5rem] shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">VAT amt</label>
+                                            <div class="flex h-8 items-center justify-end text-xs tabular-nums text-slate-600">
+                                                {{ money(totals.lines[index]?.vat_amount_cents ?? 0) }}
+                                            </div>
+                                        </div>
+                                        <div class="min-w-[5.5rem] shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Total</label>
+                                            <div class="flex h-8 items-center justify-end text-sm font-semibold tabular-nums text-slate-900">
+                                                {{ money(totals.lines[index]?.total_cents ?? 0) }}
+                                            </div>
+                                        </div>
+                                        <div class="shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-transparent select-none" aria-hidden="true">Del</label>
+                                            <button
+                                                class="inline-flex h-8 w-8 items-center justify-center rounded text-rose-600 hover:bg-rose-50"
+                                                type="button"
+                                                :aria-label="`Remove line ${index + 1}`"
+                                                @click="removeLine(index)"
+                                            >
+                                                <Trash2 class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Description</label>
                                         <textarea
                                             :value="line.description"
                                             rows="2"
@@ -646,33 +712,22 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             class="block w-full resize-y rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                             @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
                                         />
-                                        <div class="mt-1 flex flex-wrap items-center gap-1.5">
-                                            <div v-if="catalogItems.length" class="min-w-[8.5rem] max-w-[12rem] flex-1">
-                                                <AppSelect
-                                                    size="sm"
-                                                    :model-value="line.item_id ? String(line.item_id) : ''"
-                                                    :options="[
-                                                        { label: 'From catalog…', value: '' },
-                                                        ...catalogItems.map((item) => ({
-                                                            label: item.name,
-                                                            value: String(item.id),
-                                                        })),
-                                                    ]"
-                                                    placeholder="From catalog…"
-                                                    @update:model-value="applyCatalogItem(index, String($event ?? ''))"
-                                                />
-                                            </div>
-                                            <div class="w-[6.5rem] shrink-0">
-                                                <AppSelect
-                                                    size="sm"
-                                                    :model-value="line.discount_type ?? ''"
-                                                    :options="discountTypeOptions"
-                                                    @update:model-value="setLineDiscountType(index, String($event ?? ''))"
-                                                />
-                                            </div>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-end gap-2">
+                                        <div class="min-w-[8rem] shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Discount</label>
+                                            <AppSelect
+                                                size="sm"
+                                                :model-value="line.discount_type ?? ''"
+                                                :options="discountTypeOptions"
+                                                @update:model-value="setLineDiscountType(index, String($event ?? ''))"
+                                            />
+                                        </div>
+                                        <div v-if="line.discount_type === 'percent'" class="w-16 shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Rate</label>
                                             <AppInput
-                                                v-if="line.discount_type === 'percent'"
-                                                class="!h-8 w-16 !px-2 !py-1 text-right text-xs tabular-nums"
+                                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
                                                 :model-value="line.discount_percent ?? 0"
                                                 type="number"
                                                 inputmode="decimal"
@@ -682,10 +737,12 @@ const submit = (submitAction: 'draft' | 'send') => {
                                                 placeholder="%"
                                                 @update:model-value="updateLine(index, 'discount_percent', Number($event))"
                                             />
+                                        </div>
+                                        <div v-if="line.discount_type === 'fixed'" class="w-20 shrink-0">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Amount</label>
                                             <AppInput
-                                                v-if="line.discount_type === 'fixed'"
-                                                class="!h-8 w-20 !px-2 !py-1 text-right text-xs tabular-nums"
-                                                :model-value="line.discount_amount"
+                                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
+                                                :model-value="line.discount_amount ?? '0.00'"
                                                 type="text"
                                                 inputmode="decimal"
                                                 placeholder="0.00"
@@ -693,55 +750,10 @@ const submit = (submitAction: 'draft' | 'send') => {
                                                 @blur="onDiscountAmountBlur(index)"
                                             />
                                         </div>
-                                    </td>
-                                    <td class="px-1.5 py-1.5 align-top">
-                                        <AppInput
-                                            class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
-                                            :model-value="line.quantity"
-                                            type="number"
-                                            inputmode="decimal"
-                                            @update:model-value="updateLine(index, 'quantity', Number($event))"
-                                        />
-                                    </td>
-                                    <td class="px-1.5 py-1.5 align-top">
-                                        <AppInput
-                                            class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
-                                            :model-value="line.unit_price"
-                                            type="text"
-                                            inputmode="decimal"
-                                            step="0.01"
-                                            pattern="^\\d*(\\.\\d{0,2})?$"
-                                            @update:model-value="updateLine(index, 'unit_price', $event)"
-                                            @blur="onUnitPriceBlur(index)"
-                                        />
-                                    </td>
-                                    <td v-if="chargesVat" class="px-1.5 py-1.5 align-top">
-                                        <AppSelect
-                                            size="sm"
-                                            :model-value="String(line.vat_rate)"
-                                            :options="vatSelectOptions"
-                                            @update:model-value="updateLine(index, 'vat_rate', Number($event))"
-                                        />
-                                    </td>
-                                    <td v-if="chargesVat" class="whitespace-nowrap px-1.5 py-1.5 align-middle text-right text-xs tabular-nums text-slate-600">
-                                        {{ money(totals.lines[index]?.vat_amount_cents ?? 0) }}
-                                    </td>
-                                    <td class="whitespace-nowrap px-1.5 py-1.5 align-middle text-right text-sm font-semibold tabular-nums text-slate-900">
-                                        {{ money(totals.lines[index]?.total_cents ?? 0) }}
-                                    </td>
-                                    <td class="px-1 py-1.5 align-middle text-center">
-                                        <button
-                                            class="rounded p-1 text-rose-600 hover:bg-rose-50"
-                                            type="button"
-                                            :aria-label="`Remove line ${index + 1}`"
-                                            @click="removeLine(index)"
-                                        >
-                                            <Trash2 class="h-4 w-4" />
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mt-3 flex justify-center border-t border-slate-200 pt-3">
                         <AppButton size="sm" variant="secondary" @click="addLine">
@@ -751,8 +763,46 @@ const submit = (submitAction: 'draft' | 'send') => {
                     </div>
                 </AppCard>
 
-                <AppCard>
+                <AppCard class="border-slate-200/90 bg-slate-50">
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Totals</h3>
+
+                    <div class="mb-4 border-b border-slate-200 pb-4">
+                        <p class="mb-2 text-xs font-medium text-slate-500">Document discount</p>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="min-w-[8rem]">
+                                <AppSelect
+                                    :model-value="form.discount_type ?? ''"
+                                    :options="discountTypeOptions"
+                                    @update:model-value="setDocumentDiscountType(String($event ?? ''))"
+                                />
+                            </div>
+                            <AppInput
+                                v-if="form.discount_type === 'percent'"
+                                class="w-24 text-right tabular-nums"
+                                :model-value="form.discount_percent ?? 0"
+                                type="number"
+                                inputmode="decimal"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="%"
+                                aria-label="Document discount percent"
+                                @update:model-value="form.discount_percent = Number($event)"
+                            />
+                            <AppInput
+                                v-if="form.discount_type === 'fixed'"
+                                class="w-28 text-right tabular-nums"
+                                :model-value="form.discount_amount"
+                                type="text"
+                                inputmode="decimal"
+                                placeholder="0.00"
+                                aria-label="Document discount amount"
+                                @update:model-value="form.discount_amount = String($event)"
+                                @blur="onDiscountAmountBlur('document')"
+                            />
+                        </div>
+                    </div>
+
                     <div class="space-y-2 text-sm text-slate-700">
                         <div class="flex items-center justify-between">
                             <span>{{ chargesVat ? 'Subtotal (excl VAT)' : 'Subtotal' }}</span>
@@ -778,41 +828,6 @@ const submit = (submitAction: 'draft' | 'send') => {
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold">
                             <span>{{ chargesVat ? 'Total (incl VAT)' : 'Total' }}</span>
                             <span>{{ money(totals.total_cents) }}</span>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 border-t border-slate-200 pt-4">
-                        <p class="mb-2 text-xs font-medium text-slate-500">Document discount</p>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <div class="min-w-[5.5rem]">
-                                <AppSelect
-                                    :model-value="form.discount_type ?? ''"
-                                    :options="discountTypeOptions"
-                                    @update:model-value="setDocumentDiscountType(String($event ?? ''))"
-                                />
-                            </div>
-                            <AppInput
-                                v-if="form.discount_type === 'percent'"
-                                class="w-24 text-right tabular-nums"
-                                :model-value="form.discount_percent ?? 0"
-                                type="number"
-                                inputmode="decimal"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                placeholder="%"
-                                @update:model-value="form.discount_percent = Number($event)"
-                            />
-                            <AppInput
-                                v-if="form.discount_type === 'fixed'"
-                                class="w-28 text-right tabular-nums"
-                                :model-value="form.discount_amount"
-                                type="text"
-                                inputmode="decimal"
-                                placeholder="0.00"
-                                @update:model-value="form.discount_amount = String($event)"
-                                @blur="onDiscountAmountBlur('document')"
-                            />
                         </div>
                     </div>
                 </AppCard>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
+import { Trash2 } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
@@ -471,37 +472,34 @@ const submit = () => {
                 <div
                     v-for="(line, index) in form.line_items"
                     :key="index"
-                    class="mb-3 space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-3"
+                    class="mb-3 space-y-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm"
                 >
-                    <AppSelect
-                        v-if="items.length"
-                        :model-value="line.item_id ? String(line.item_id) : ''"
-                        :options="[{ label: 'Catalog item…', value: '' }, ...items.map((i) => ({ label: i.name, value: String(i.id) }))]"
-                        @update:model-value="applyItem(index, String($event ?? ''))"
-                    />
-                    <textarea
-                        v-model="line.description"
-                        rows="2"
-                        placeholder="Description (placeholders allowed)"
-                        class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                    />
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="mb-1 block text-[11px] font-medium text-slate-500">Qty</label>
-                            <AppInput v-model="line.quantity" type="number" step="0.01" min="0" />
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div v-if="items.length" class="min-w-[12rem] flex-[2]">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Item</label>
+                            <AppSelect
+                                :model-value="line.item_id ? String(line.item_id) : ''"
+                                :options="[{ label: 'Select item…', value: '' }, ...items.map((i) => ({ label: i.name, value: String(i.id) }))]"
+                                placeholder="Select item…"
+                                @update:model-value="applyItem(index, String($event ?? ''))"
+                            />
                         </div>
-                        <div>
-                            <label class="mb-1 block text-[11px] font-medium text-slate-500">Unit price</label>
+                        <div class="w-[4.5rem] shrink-0">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Qty</label>
+                            <AppInput v-model="line.quantity" type="number" step="0.01" min="0" class="!h-8 !px-2 !py-1 text-right tabular-nums" />
+                        </div>
+                        <div class="w-[6.5rem] shrink-0">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Unit price</label>
                             <AppInput
                                 v-model="line.unit_price"
                                 type="text"
                                 inputmode="decimal"
-                                class="tabular-nums"
+                                class="!h-8 !px-2 !py-1 text-right tabular-nums"
                                 @blur="onUnitPriceBlur(index)"
                             />
                         </div>
-                        <div v-if="charges_vat">
-                            <label class="mb-1 block text-[11px] font-medium text-slate-500">VAT rate</label>
+                        <div v-if="charges_vat" class="min-w-[7rem] flex-1">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">VAT rate</label>
                             <AppSelect
                                 :model-value="String(line.vat_rate)"
                                 :options="tax_rates.length
@@ -510,17 +508,27 @@ const submit = () => {
                                 @update:model-value="line.vat_rate = Number($event)"
                             />
                         </div>
+                        <div class="shrink-0">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-transparent select-none" aria-hidden="true">Del</label>
+                            <button
+                                v-if="form.line_items.length > 1"
+                                type="button"
+                                class="inline-flex h-8 w-8 items-center justify-center rounded text-rose-600 hover:bg-rose-50"
+                                :aria-label="`Remove line ${index + 1}`"
+                                @click="removeLine(index)"
+                            >
+                                <Trash2 class="h-4 w-4" />
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex justify-end">
-                        <AppButton
-                            v-if="form.line_items.length > 1"
-                            size="sm"
-                            variant="ghost"
-                            type="button"
-                            @click="removeLine(index)"
-                        >
-                            Remove line
-                        </AppButton>
+                    <div>
+                        <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Description</label>
+                        <textarea
+                            v-model="line.description"
+                            rows="2"
+                            placeholder="Description (placeholders allowed)"
+                            class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                        />
                     </div>
                 </div>
                 <AppButton size="sm" variant="secondary" type="button" @click="addLine">Add line</AppButton>

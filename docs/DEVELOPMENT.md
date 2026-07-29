@@ -129,7 +129,7 @@ Internal AI/editor conventions may live in `.cursor/rules` — optional for huma
 - Inertia.js v2, Vue 3, Pinia, Ziggy
 - Tailwind CSS v4 via `@tailwindcss/vite`
 - shadcn-vue (`components.json`) — add components with `npx shadcn-vue@latest add <name>`
-- Charts: vue-echarts; forms: vee-validate + zod; dates: dayjs; markdown fields: [md-editor-v3](https://github.com/imzbf/md-editor-v3)
+- Charts: vue-echarts; forms: vee-validate + zod; dates: dayjs; markdown fields: [Tiptap](https://tiptap.dev/) (`@tiptap/vue-3` + `@tiptap/markdown`)
 
 ## Backend packages (high level)
 
