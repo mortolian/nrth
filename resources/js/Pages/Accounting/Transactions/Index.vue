@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
+import HelpTip from '@/Components/HelpTip.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useAccountingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
@@ -314,7 +315,14 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                             <div class="min-w-0 flex-1 space-y-2">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="text-sm font-semibold text-slate-900">{{ transaction.date || '—' }}</span>
-                                    <AppBadge variant="info" class="shrink-0">{{ typeLabel(transaction) }}</AppBadge>
+                                    <span class="inline-flex shrink-0 items-center gap-1">
+                                        <AppBadge variant="info">{{ typeLabel(transaction) }}</AppBadge>
+                                        <HelpTip
+                                            v-if="transaction.type_description"
+                                            :text="transaction.type_description"
+                                            :label="`About ${typeLabel(transaction)}`"
+                                        />
+                                    </span>
                                     <AppBadge
                                         :variant="statusBadgeVariant(transaction.status)"
                                         class="shrink-0"
@@ -323,12 +331,6 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                                         {{ transaction.status }}
                                     </AppBadge>
                                 </div>
-                                <p
-                                    v-if="transaction.type_description"
-                                    class="text-xs leading-snug text-slate-500"
-                                >
-                                    {{ transaction.type_description }}
-                                </p>
                                 <p class="text-sm text-slate-800">
                                     <span class="text-slate-500">Ref:</span>
                                     {{ transaction.reference || '—' }}
@@ -444,17 +446,15 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                                 >
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">{{ transaction.date || '-' }}</td>
-                            <td class="px-3 py-2">
-                                <div class="space-y-1">
+                            <td class="px-3 py-2 whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1">
                                     <AppBadge variant="info">{{ typeLabel(transaction) }}</AppBadge>
-                                    <p
+                                    <HelpTip
                                         v-if="transaction.type_description"
-                                        class="max-w-[14rem] text-xs leading-snug text-slate-500 whitespace-normal"
-                                        :title="transaction.type_description"
-                                    >
-                                        {{ transaction.type_description }}
-                                    </p>
-                                </div>
+                                        :text="transaction.type_description"
+                                        :label="`About ${typeLabel(transaction)}`"
+                                    />
+                                </span>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">{{ transaction.reference || '—' }}</td>
                             <td class="px-3 py-2">
