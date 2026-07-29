@@ -178,6 +178,34 @@ class BackupsExportsControllerTest extends TestCase
         $this->assertNotNull($run->error_message);
     }
 
+    public function test_backup_job_does_not_record_failure_when_run_is_deleted_during_exception(): void
+    {
+        $run = InstanceBackupRun::factory()->create([
+            'status' => InstanceBackupRunStatus::Queued,
+        ]);
+
+        $backups = \Mockery::mock(InstanceBackupService::class);
+        $backups->shouldReceive('markRunning')->once();
+        $backups->shouldReceive('clearLastError')->once();
+        $backups->shouldReceive('backupFilenames')->once()->andReturn([]);
+        $backups->shouldReceive('recordFailure')->never();
+        $backups->shouldReceive('markFinished')->once();
+
+        Artisan::shouldReceive('call')->once()->with('backup:run')->andReturnUsing(function () use ($run): never {
+            $run->delete();
+
+            throw new \RuntimeException('Backup process crashed.');
+        });
+        Artisan::shouldReceive('output')->never();
+
+        try {
+            (new RunInstanceBackupJob($run->id))->handle($backups);
+            $this->fail('Expected backup job to throw.');
+        } catch (\RuntimeException) {
+            $this->assertDatabaseMissing('instance_backup_runs', ['id' => $run->id]);
+        }
+    }
+
     public function test_operator_can_download_ready_backup_run(): void
     {
         Config::set('nrth.operator_emails', []);

@@ -99,8 +99,9 @@ class RunInstanceBackupJob implements ShouldQueue
                 'completed_at' => now(),
             ])->save();
         } catch (Throwable $e) {
-            if ($run->fresh()?->status !== InstanceBackupRunStatus::Failed) {
-                $this->markFailed($run, $backups, $e->getMessage());
+            $freshRun = $run->fresh();
+            if ($freshRun !== null && $freshRun->status !== InstanceBackupRunStatus::Failed) {
+                $this->markFailed($freshRun, $backups, $e->getMessage());
             }
 
             Log::error('Instance backup job exception.', [
