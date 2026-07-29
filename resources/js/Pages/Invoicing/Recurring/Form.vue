@@ -4,10 +4,12 @@ import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
+import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useToast } from '@/Composables/useToast';
 
 type ClientOption = { id: number; name: string; currency: string; payment_terms_days: number };
+type NoteTemplateOption = { id: number; name: string; body: string; target: 'notes' | 'footer' };
 type CatalogItem = {
     id: number;
     name: string;
@@ -31,6 +33,7 @@ const props = defineProps<{
     charges_vat: boolean;
     default_currency: string;
     tax_rates: Array<{ id: number; name: string; rate: number; is_default: boolean }>;
+    note_templates?: NoteTemplateOption[];
 }>();
 
 const toast = useToast();
@@ -106,6 +109,20 @@ const form = ref({
 
 const saving = ref(false);
 const hasClients = computed(() => props.clients.length > 0);
+
+const notesTemplateOptions = computed(() =>
+    (props.note_templates ?? [])
+        .filter((template) => template.target === 'notes')
+        .map((template) => ({ label: template.name, value: String(template.id) })),
+);
+
+const insertTemplate = (templateId: string) => {
+    if (!templateId) return;
+    const template = (props.note_templates ?? []).find((entry) => String(entry.id) === templateId);
+    if (!template) return;
+    const current = String(form.value.notes ?? '');
+    form.value.notes = current.trim() ? `${current.trim()}\n\n${template.body}` : template.body;
+};
 
 const inertiaErrorMessages = computed(() => {
     const raw = page.props.errors as Record<string, string | string[] | undefined>;
@@ -531,20 +548,27 @@ const submit = () => {
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                    <textarea
+                    <MarkdownEditor
                         v-model="form.notes"
-                        rows="3"
-                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        :rows="5"
                         placeholder="Optional notes (placeholders ok)"
+                        aria-label="Recurring notes"
                     />
+                    <div v-if="notesTemplateOptions.length" class="mt-4">
+                        <AppSelect
+                            :model-value="''"
+                            :options="[{ label: 'Insert note template…', value: '' }, ...notesTemplateOptions]"
+                            @update:model-value="insertTemplate(String($event ?? ''))"
+                        />
+                    </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Footer</label>
-                    <textarea
+                    <MarkdownEditor
                         v-model="form.footer"
-                        rows="3"
-                        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                        placeholder="Optional footer / terms"
+                        :rows="5"
+                        placeholder="Optional footer / terms for generated invoices"
+                        aria-label="Recurring footer"
                     />
                 </div>
             </div>

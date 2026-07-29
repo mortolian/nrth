@@ -111,6 +111,16 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 - Ledger amounts use `brick/money` and cents; bank import lines use decimal columns separately.
 - Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
 - Sending or marking an invoice as sent posts an accrual journal (Dr AR, Cr income accounts + VAT). Subsequent payments clear AR only when that accrual exists.
+- **Note templates** (Settings → Note templates, or command palette “Note Templates”): create named markdown snippets such as “International Banking Details”. Attach them on a client to prefill new invoices/estimates, or insert them while editing a document. Footers/terms stay freeform per document (markdown editor, no shared templates). Example body:
+
+```markdown
+**Bank:** First National Bank  
+Account name: Acme (Pty) Ltd  
+Account: `62012345678`  
+Reference: invoice number
+```
+
+Copied text is stored on each document; editing a template later does not rewrite existing invoices.
 
 Internal AI/editor conventions may live in `.cursor/rules` — optional for human contributors.
 
@@ -119,7 +129,7 @@ Internal AI/editor conventions may live in `.cursor/rules` — optional for huma
 - Inertia.js v2, Vue 3, Pinia, Ziggy
 - Tailwind CSS v4 via `@tailwindcss/vite`
 - shadcn-vue (`components.json`) — add components with `npx shadcn-vue@latest add <name>`
-- Charts: vue-echarts; forms: vee-validate + zod; dates: dayjs
+- Charts: vue-echarts; forms: vee-validate + zod; dates: dayjs; markdown fields: [md-editor-v3](https://github.com/imzbf/md-editor-v3)
 
 ## Backend packages (high level)
 

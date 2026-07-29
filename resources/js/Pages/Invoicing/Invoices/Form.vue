@@ -8,6 +8,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
+import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { calculateInvoiceTotals, type DiscountType } from '@/Composables/useInvoiceTotals';
@@ -20,7 +21,6 @@ type ClientOption = {
     payment_terms_days: number;
     currency: string;
     default_notes?: string;
-    default_footer?: string;
 };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
 type AccountOption = { id: number; name: string };
@@ -243,10 +243,13 @@ const notesTemplateOptions = computed(() =>
         .map((template) => ({ label: template.name, value: String(template.id) })),
 );
 
-const footerTemplateOptions = computed(() =>
-    (props.note_templates ?? [])
-        .filter((template) => template.target === 'footer')
-        .map((template) => ({ label: template.name, value: String(template.id) })),
+const clientNotesFooterDefaults = (client: ClientOption | undefined) => ({
+    notes: (client?.default_notes?.trim() ? client.default_notes : props.defaults?.notes) ?? '',
+    footer: props.defaults?.footer ?? '',
+});
+
+const initialClientDefaults = clientNotesFooterDefaults(
+    initialClientId ? props.clients.find((c) => c.id === initialClientId) : undefined,
 );
 
 const { values, setFieldValue: setVeeFieldValue } = useForm({
@@ -257,8 +260,8 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         issue_date: props.invoice?.issue_date ?? new Date().toISOString().slice(0, 10),
         due_date: props.invoice?.due_date ?? new Date().toISOString().slice(0, 10),
         currency: initialInvoiceCurrency,
-        notes: props.invoice?.notes ?? props.defaults?.notes ?? '',
-        footer: props.invoice?.footer ?? props.defaults?.footer ?? '',
+        notes: props.invoice?.notes ?? initialClientDefaults.notes,
+        footer: props.invoice?.footer ?? initialClientDefaults.footer,
         discount_type: props.invoice?.discount_type ?? null,
         discount_percent: props.invoice?.discount_percent ?? null,
         discount_amount: props.invoice?.discount_type === 'fixed'
@@ -333,15 +336,7 @@ const clientMap = computed<Record<number, ClientOption>>(() => (
     }, {} as Record<number, ClientOption>)
 ));
 
-const clientNotesFooterDefaults = (client: ClientOption | undefined) => ({
-    notes: (client?.default_notes?.trim() ? client.default_notes : props.defaults?.notes) ?? '',
-    footer: (client?.default_footer?.trim() ? client.default_footer : props.defaults?.footer) ?? '',
-});
-
-const previousClientDefaults = ref(clientNotesFooterDefaults(
-    initialClientId ? clientMap.value[initialClientId] : undefined,
-));
-
+const previousClientDefaults = ref({ ...initialClientDefaults });
 watch(
     () => [formValues.value?.client_id, formValues.value?.issue_date],
     ([clientId, issueDate]) => {
@@ -388,6 +383,7 @@ watch(
         if (notesUnchanged) {
             setFieldValue('notes', nextDefaults.notes);
         }
+        // Footer is per-invoice (business default only); keep auto-fill when still on the shared default.
         if (footerUnchanged) {
             setFieldValue('footer', nextDefaults.footer);
         }
@@ -403,7 +399,9 @@ const selectedClient = computed(() => {
 });
 
 const notesPrefilledFromClient = computed(() =>
-    !props.isEditing && Boolean(selectedClient.value?.default_notes?.trim()),
+    !props.isEditing
+    && Boolean(selectedClient.value?.default_notes?.trim())
+    && String(formValues.value.notes ?? '') === String(selectedClient.value?.default_notes ?? ''),
 );
 
 const documentDiscountCents = computed(() => {
@@ -570,13 +568,13 @@ const buildDiscountPayload = (
     discount_cents: type === 'fixed' ? Math.round(Number(amount || 0) * 100) : null,
 });
 
-const insertTemplate = (target: 'notes' | 'footer', templateId: string) => {
+const insertTemplate = (templateId: string) => {
     if (!templateId) return;
     const template = (props.note_templates ?? []).find((entry) => String(entry.id) === templateId);
     if (!template) return;
-    const current = String(formValues.value[target] ?? '');
+    const current = String(formValues.value.notes ?? '');
     const next = current.trim() ? `${current.trim()}\n\n${template.body}` : template.body;
-    setFieldValue(target, next);
+    setFieldValue('notes', next);
 };
 
 const onSave = () => {
@@ -772,7 +770,7 @@ const onSave = () => {
                                     <td class="px-2 py-1.5 align-top">
                                         <textarea
                                             :value="line.description"
-                                            rows="1"
+                                            rows="2"
                                             placeholder="What you delivered or sold"
                                             class="block w-full resize-y rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                             @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
@@ -962,37 +960,37 @@ const onSave = () => {
                         <div>
                             <FieldHelp
                                 label="Notes"
-                                text="Shown on the invoice before line items. Use templates to insert reusable text."
+                                text="Shown on the invoice. Use markdown and insert named templates from Settings (or attach defaults on the client)."
                             />
-                            <AppSelect
-                                v-if="notesTemplateOptions.length"
-                                class="mb-2"
-                                :model-value="''"
-                                :options="[{ label: 'Insert template…', value: '' }, ...notesTemplateOptions]"
-                                @update:model-value="insertTemplate('notes', String($event ?? ''))"
+                            <MarkdownEditor
+                                :model-value="String(values.notes ?? '')"
+                                :rows="8"
+                                placeholder="Payment instructions, banking details…"
+                                aria-label="Invoice notes"
+                                @update:model-value="setFieldValue('notes', $event)"
                             />
-                            <textarea
-                                :value="values.notes as string"
-                                class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                                @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
-                            />
+                            <div v-if="notesTemplateOptions.length" class="mt-4">
+                                <AppSelect
+                                    :model-value="''"
+                                    :options="[{ label: 'Insert note template…', value: '' }, ...notesTemplateOptions]"
+                                    @update:model-value="insertTemplate(String($event ?? ''))"
+                                />
+                            </div>
                             <p v-if="notesPrefilledFromClient" class="mt-1 text-xs text-slate-500">
                                 Notes prefilled from this client&rsquo;s templates.
                             </p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Footer</label>
-                            <AppSelect
-                                v-if="footerTemplateOptions.length"
-                                class="mb-2"
-                                :model-value="''"
-                                :options="[{ label: 'Insert template…', value: '' }, ...footerTemplateOptions]"
-                                @update:model-value="insertTemplate('footer', String($event ?? ''))"
+                            <FieldHelp
+                                label="Footer"
+                                text="Shown at the bottom of the invoice PDF. Freeform markdown for this invoice only (not from shared templates)."
                             />
-                            <textarea
-                                :value="values.footer as string"
-                                class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                                @input="setFieldValue('footer', ($event.target as HTMLTextAreaElement).value)"
+                            <MarkdownEditor
+                                :model-value="String(values.footer ?? '')"
+                                :rows="8"
+                                placeholder="Optional footer / terms for this invoice…"
+                                aria-label="Invoice footer"
+                                @update:model-value="setFieldValue('footer', $event)"
                             />
                         </div>
                     </div>

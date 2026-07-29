@@ -600,6 +600,8 @@ class InvoiceController extends Controller
                 'due_date' => optional($invoice->due_date)->toDateString(),
                 'notes' => $invoice->notes,
                 'footer' => $invoice->footer,
+                'notes_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->notes),
+                'footer_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->footer),
                 'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
                 'business_currency_code' => $invoice->business_currency_code !== null
                     ? Iso4217Currencies::normalize((string) $invoice->business_currency_code)
@@ -833,6 +835,7 @@ class InvoiceController extends Controller
                 'tax_rates' => [],
                 'accounts' => [],
                 'charges_vat' => false,
+                'note_templates' => [],
                 'next_number' => 'INV-'.now()->format('Y').'-0001',
                 'default_currency' => 'ZAR',
                 'defaults' => [
@@ -857,7 +860,10 @@ class InvoiceController extends Controller
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
-                ->with(['noteTemplates' => fn ($q) => $q->orderByPivot('sort_order')])
+                ->with(['noteTemplates' => fn ($q) => $q
+                    ->where('note_templates.is_active', true)
+                    ->where('note_templates.target', 'notes')
+                    ->orderByPivot('sort_order')])
                 ->orderBy('name')
                 ->get(['id', 'name', 'payment_terms_days', 'currency'])
                 ->map(fn (Client $client) => [
@@ -868,11 +874,6 @@ class InvoiceController extends Controller
                     'note_template_ids' => $client->noteTemplates->pluck('id')->values()->all(),
                     'default_notes' => $client->noteTemplates
                         ->where('target', 'notes')
-                        ->pluck('body')
-                        ->filter()
-                        ->implode("\n\n"),
-                    'default_footer' => $client->noteTemplates
-                        ->where('target', 'footer')
                         ->pluck('body')
                         ->filter()
                         ->implode("\n\n"),
@@ -928,6 +929,7 @@ class InvoiceController extends Controller
                 ->value('id'),
             'note_templates' => NoteTemplate::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
+                ->where('target', 'notes')
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->orderBy('name')

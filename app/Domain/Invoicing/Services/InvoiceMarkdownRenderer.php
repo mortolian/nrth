@@ -17,6 +17,10 @@ class InvoiceMarkdownRenderer
         $environment = new Environment([
             'html_input' => 'strip',
             'allow_unsafe_links' => false,
+            // Single newlines in notes (banking lines, addresses) should show as line breaks.
+            'renderer' => [
+                'soft_break' => "<br />\n",
+            ],
         ]);
         $environment->addExtension(new CommonMarkCoreExtension);
 

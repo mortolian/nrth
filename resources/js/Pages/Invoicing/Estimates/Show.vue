@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
+import MarkdownProse from '@/Components/MarkdownProse.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
@@ -23,6 +24,8 @@ type EstimateDetail = {
     status: 'draft' | 'sent' | 'accepted' | 'declined' | 'expired' | 'converted';
     notes: string | null;
     terms: string | null;
+    notes_html?: string | null;
+    terms_html?: string | null;
     line_items: Array<{
         description: string;
         quantity: number;
@@ -203,13 +206,13 @@ const deleteEstimate = () => {
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ currency(estimate.total_cents) }}</span></div>
                     </div>
 
-                    <div v-if="estimate.notes" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+                    <div v-if="estimate.notes || estimate.notes_html" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Notes</p>
-                        {{ estimate.notes }}
+                        <MarkdownProse :html="estimate.notes_html" :text="estimate.notes" />
                     </div>
-                    <div v-if="estimate.terms" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+                    <div v-if="estimate.terms || estimate.terms_html" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Terms</p>
-                        {{ estimate.terms }}
+                        <MarkdownProse :html="estimate.terms_html" :text="estimate.terms" />
                     </div>
                 </AppCard>
             </section>

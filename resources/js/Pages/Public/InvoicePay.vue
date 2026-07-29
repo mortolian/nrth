@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppButton from '@/Components/AppButton.vue';
 import AppCard from '@/Components/AppCard.vue';
+import MarkdownProse from '@/Components/MarkdownProse.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { Download, ExternalLink } from 'lucide-vue-next';
 
@@ -33,6 +34,8 @@ const props = defineProps<{
         amount_due_cents: number;
         notes: string | null;
         footer: string | null;
+        notes_html?: string | null;
+        footer_html?: string | null;
         client: { name: string | null; email: string | null };
         line_items: Array<{
             description: string;
@@ -161,8 +164,17 @@ const startCheckout = (provider: string) => {
                     </div>
                 </div>
 
-                <div v-if="invoice.notes" class="rounded-md border border-slate-100 bg-slate-50/80 p-3 text-sm text-slate-700">
-                    {{ invoice.notes }}
+                <div
+                    v-if="invoice.notes || invoice.notes_html"
+                    class="rounded-md border border-slate-100 bg-slate-50/80 p-3 text-sm text-slate-700"
+                >
+                    <MarkdownProse :html="invoice.notes_html" :text="invoice.notes" />
+                </div>
+                <div
+                    v-if="invoice.footer || invoice.footer_html"
+                    class="rounded-md border border-slate-100 bg-slate-50/80 p-3 text-sm text-slate-700"
+                >
+                    <MarkdownProse :html="invoice.footer_html" :text="invoice.footer" />
                 </div>
             </AppCard>
 

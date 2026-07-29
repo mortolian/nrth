@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useForm, usePage } from '@inertiajs/vue3';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import SettingsShell from '@/Components/SettingsShell.vue';
 import AppTabs from '@/Components/AppTabs.vue';
 import AppButton from '@/Components/AppButton.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
+import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useToast } from '@/Composables/useToast';
 import { Building2, ImagePlus, Plus, Trash2 } from 'lucide-vue-next';
 
@@ -825,22 +826,30 @@ const resetItemUnits = () => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Default document text</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">Pre-filled on new invoices; you can edit per invoice.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Fallback text on new invoices when the client has no note templates attached.
+                            For reusable named snippets (e.g. banking details), use
+                            <Link :href="route('settings.note-templates.index')" class="font-medium text-brand-700 hover:underline">
+                                Note templates
+                            </Link>.
+                        </p>
                         <div class="mt-4 space-y-4">
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Default notes</label>
-                                <textarea
+                                <MarkdownEditor
                                     v-model="form.invoice_default_notes"
-                                    rows="3"
-                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    :rows="4"
+                                    placeholder="Optional fallback notes…"
+                                    aria-label="Default invoice notes"
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-xs font-medium text-slate-500">Default footer (e.g. banking)</label>
-                                <textarea
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Default footer</label>
+                                <MarkdownEditor
                                     v-model="form.invoice_default_footer"
-                                    rows="4"
-                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    :rows="4"
+                                    placeholder="Optional footer / terms for new invoices…"
+                                    aria-label="Default invoice footer"
                                 />
                             </div>
                         </div>
@@ -920,22 +929,24 @@ const resetItemUnits = () => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Default document text</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">Pre-filled on new estimates.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Fallback on new estimates when the client has no note templates.</p>
                         <div class="mt-4 space-y-4">
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Default notes</label>
-                                <textarea
+                                <MarkdownEditor
                                     v-model="form.estimate_default_notes"
-                                    rows="3"
-                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    :rows="4"
+                                    placeholder="Optional fallback notes…"
+                                    aria-label="Default estimate notes"
                                 />
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Default terms</label>
-                                <textarea
+                                <MarkdownEditor
                                     v-model="form.estimate_default_terms"
-                                    rows="4"
-                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    :rows="4"
+                                    placeholder="Optional terms for new estimates…"
+                                    aria-label="Default estimate terms"
                                 />
                             </div>
                         </div>

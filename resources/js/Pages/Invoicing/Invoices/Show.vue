@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
+import MarkdownProse from '@/Components/MarkdownProse.vue';
 import RecordInvoicePaymentDrawer, {
     type RecordPaymentInvoiceInput,
 } from '@/Components/RecordInvoicePaymentDrawer.vue';
@@ -30,6 +31,8 @@ type InvoicePayload = {
     due_date: string | null;
     notes: string | null;
     footer: string | null;
+    notes_html?: string | null;
+    footer_html?: string | null;
     subtotal_cents: number;
     vat_amount_cents: number;
     total_cents: number;
@@ -491,13 +494,13 @@ const undoPayment = (paymentId: number) => {
                         :book-snapshot="bookCurrencySnapshot"
                     />
 
-                    <div v-if="invoice.notes" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+                    <div v-if="invoice.notes || invoice.notes_html" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Notes</p>
-                        {{ invoice.notes }}
+                        <MarkdownProse :html="invoice.notes_html" :text="invoice.notes" />
                     </div>
-                    <div v-if="invoice.footer" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
+                    <div v-if="invoice.footer || invoice.footer_html" class="rounded-md border border-slate-200 p-3 text-sm text-slate-700">
                         <p class="mb-1 text-xs uppercase tracking-wide text-slate-500">Footer</p>
-                        {{ invoice.footer }}
+                        <MarkdownProse :html="invoice.footer_html" :text="invoice.footer" />
                     </div>
                 </AppCard>
             </section>

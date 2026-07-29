@@ -57,6 +57,8 @@ const headerSubtitle = computed(() => {
             return 'Profile, invoicing, tax, banking, and online payments for the current business.';
         case 'team':
             return 'People who can access the currently selected business.';
+        case 'note-templates':
+            return 'Named markdown snippets for invoice and estimate notes.';
         default:
             return 'Account, business, and access settings.';
     }

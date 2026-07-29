@@ -73,6 +73,8 @@ class PublicInvoicePayController extends Controller
                 'amount_due_cents' => $amountDueCents,
                 'notes' => $invoice->notes,
                 'footer' => $invoice->footer,
+                'notes_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->notes),
+                'footer_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->footer),
                 'client' => [
                     'name' => $invoice->client?->name,
                     'email' => $invoice->client?->email,

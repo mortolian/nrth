@@ -6,6 +6,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/PageHeader.vue';
 import AppCard from '@/Components/AppCard.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
+import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { calculateInvoiceTotals, type DiscountType } from '@/Composables/useInvoiceTotals';
@@ -13,7 +14,13 @@ import { useToast } from '@/Composables/useToast';
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 import { z } from 'zod';
 
-type ClientOption = { id: number; name: string; currency: string };
+type ClientOption = {
+    id: number;
+    name: string;
+    currency: string;
+    default_notes?: string;
+};
+type NoteTemplateOption = { id: number; name: string; body: string; target: 'notes' | 'footer' };
 type TaxRateOption = { id: number; name: string; rate: number; is_default: boolean };
 type CatalogItemOption = {
     id: number;
@@ -74,6 +81,7 @@ const props = defineProps<{
     /** Business settings: used when creating a new estimate only */
     default_notes?: string;
     default_terms?: string;
+    note_templates?: NoteTemplateOption[];
 }>();
 
 const page = usePage();
@@ -82,6 +90,17 @@ const currencyOptions = computed(
 );
 
 const chargesVat = computed(() => props.charges_vat);
+
+const clientNotesTermsDefaults = (client: ClientOption | undefined) => ({
+    notes: (client?.default_notes?.trim() ? client.default_notes : props.default_notes) ?? '',
+    terms: props.default_terms ?? '',
+});
+
+const notesTemplateOptions = computed(() =>
+    (props.note_templates ?? [])
+        .filter((template) => template.target === 'notes')
+        .map((template) => ({ label: template.name, value: String(template.id) })),
+);
 
 const defaultLineVat = computed(() => {
     if (!chargesVat.value) {
@@ -111,20 +130,26 @@ const initialEstimateCurrency =
     ?? props.default_currency
     ?? 'ZAR';
 
+const initialClientDefaults = clientNotesTermsDefaults(
+    props.clients.find((c) => c.id === initialEstimateClientId),
+);
+
 const form = ref({
     client_id: initialEstimateClientId,
     number: props.estimate?.number ?? props.next_number,
     issue_date: props.estimate?.issue_date ?? new Date().toISOString().slice(0, 10),
     expiry_date: props.estimate?.expiry_date ?? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
     currency: initialEstimateCurrency,
-    notes: props.estimate?.notes ?? (props.default_notes ?? ''),
-    terms: props.estimate?.terms ?? (props.default_terms ?? ''),
+    notes: props.estimate?.notes ?? initialClientDefaults.notes,
+    terms: props.estimate?.terms ?? initialClientDefaults.terms,
     discount_type: (props.estimate?.discount_type ?? null) as DiscountType,
     discount_percent: props.estimate?.discount_percent ?? null,
     discount_amount: props.estimate?.discount_cents != null
         ? (props.estimate.discount_cents / 100).toFixed(2)
         : '0.00',
 });
+
+const previousClientDefaults = ref({ ...initialClientDefaults });
 
 const discountTypeOptions = [
     { label: 'None', value: '' },
@@ -254,6 +279,44 @@ watch(
         }
     },
 );
+
+watch(
+    () => form.value.client_id,
+    (clientId) => {
+        if (props.isEditing || !clientId) return;
+        const client = props.clients.find((x) => x.id === clientId);
+        if (!client) return;
+
+        const businessNotes = props.default_notes ?? '';
+        const businessTerms = props.default_terms ?? '';
+        const currentNotes = String(form.value.notes ?? '');
+        const currentTerms = String(form.value.terms ?? '');
+        const prevNotes = previousClientDefaults.value.notes;
+        const prevTerms = previousClientDefaults.value.terms;
+
+        const notesUnchanged = currentNotes === '' || currentNotes === prevNotes || currentNotes === businessNotes;
+        const termsUnchanged = currentTerms === '' || currentTerms === prevTerms || currentTerms === businessTerms;
+
+        const nextDefaults = clientNotesTermsDefaults(client);
+
+        if (notesUnchanged) {
+            form.value.notes = nextDefaults.notes;
+        }
+        if (termsUnchanged) {
+            form.value.terms = nextDefaults.terms;
+        }
+
+        previousClientDefaults.value = nextDefaults;
+    },
+);
+
+const insertTemplate = (templateId: string) => {
+    if (!templateId) return;
+    const template = (props.note_templates ?? []).find((entry) => String(entry.id) === templateId);
+    if (!template) return;
+    const current = String(form.value.notes ?? '');
+    form.value.notes = current.trim() ? `${current.trim()}\n\n${template.body}` : template.body;
+};
 
 const documentDiscountCents = computed(() => {
     if (form.value.discount_type !== 'fixed') {
@@ -579,7 +642,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                     <td class="px-2 py-1.5 align-top">
                                         <textarea
                                             :value="line.description"
-                                            rows="1"
+                                            rows="2"
                                             placeholder="Line item description"
                                             class="block w-full resize-y rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                             @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
@@ -755,9 +818,26 @@ const submit = (submitAction: 'draft' | 'send') => {
 
                 <AppCard>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                    <textarea v-model="form.notes" class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+                    <MarkdownEditor
+                        v-model="form.notes"
+                        :rows="6"
+                        placeholder="Payment instructions, banking details…"
+                        aria-label="Estimate notes"
+                    />
+                    <div v-if="notesTemplateOptions.length" class="mt-4">
+                        <AppSelect
+                            :model-value="''"
+                            :options="[{ label: 'Insert note template…', value: '' }, ...notesTemplateOptions]"
+                            @update:model-value="insertTemplate(String($event ?? ''))"
+                        />
+                    </div>
                     <label class="mb-1 mt-3 block text-xs font-medium text-slate-500">Terms</label>
-                    <textarea v-model="form.terms" class="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+                    <MarkdownEditor
+                        v-model="form.terms"
+                        :rows="6"
+                        placeholder="Optional terms for this estimate…"
+                        aria-label="Estimate terms"
+                    />
                 </AppCard>
         </div>
 

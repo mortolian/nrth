@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import EmptyState from '@/Components/EmptyState.vue';
+import FieldHelp from '@/Components/FieldHelp.vue';
+import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import SettingsShell from '@/Components/SettingsShell.vue';
-import { useToast } from '@/Composables/useToast';
+import { FileText, Pencil, Trash2 } from 'lucide-vue-next';
 
 type Template = {
     id: number;
@@ -14,85 +17,210 @@ type Template = {
 };
 
 const props = defineProps<{ templates: Template[] }>();
-const toast = useToast();
 
-const form = ref({
+const blankForm = () => ({
     name: '',
     body: '',
-    target: 'notes' as 'notes' | 'footer',
     is_active: true,
     sort_order: 0,
 });
 
+const form = ref(blankForm());
+const editingId = ref<number | null>(null);
+const saving = ref(false);
+
+const isEditing = computed(() => editingId.value !== null);
+
+/** Notes-only library (footer stays freeform per document). */
+const noteTemplates = computed(() =>
+    props.templates.filter((template) => template.target === 'notes'),
+);
+
+const startEdit = (template: Template) => {
+    editingId.value = template.id;
+    form.value = {
+        name: template.name,
+        body: template.body,
+        is_active: template.is_active,
+        sort_order: template.sort_order,
+    };
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const cancelEdit = () => {
+    editingId.value = null;
+    form.value = blankForm();
+};
+
 const save = () => {
-    router.post(route('settings.note-templates.store'), form.value, {
-        onSuccess: () => {
-            toast.success('Note template created.');
-            form.value = { name: '', body: '', target: 'notes', is_active: true, sort_order: 0 };
+    if (saving.value) return;
+    saving.value = true;
+
+    const payload = {
+        name: form.value.name,
+        body: form.value.body,
+        target: 'notes',
+        is_active: form.value.is_active,
+        sort_order: form.value.sort_order,
+    };
+
+    const opts = {
+        onFinish: () => {
+            saving.value = false;
         },
-    });
+        onSuccess: () => {
+            cancelEdit();
+        },
+    };
+
+    if (editingId.value !== null) {
+        router.put(route('settings.note-templates.update', editingId.value), payload, opts);
+        return;
+    }
+
+    router.post(route('settings.note-templates.store'), payload, opts);
 };
 
 const destroy = (id: number) => {
-    if (!confirm('Delete this template?')) return;
+    if (!confirm('Delete this note template?')) return;
     router.delete(route('settings.note-templates.destroy', id), {
-        onSuccess: () => toast.success('Note template deleted.'),
+        onSuccess: () => {
+            if (editingId.value === id) {
+                cancelEdit();
+            }
+        },
     });
 };
 </script>
 
 <template>
-    <SettingsShell section="note-templates" title="Note templates" subtitle="Reusable markdown snippets for invoice notes and footers">
-        <AppCard class="mt-5 space-y-3">
-            <h3 class="text-sm font-semibold text-slate-900">New template</h3>
-            <AppInput v-model="form.name" placeholder="Name (e.g. Banking details)" />
-            <textarea v-model="form.body" rows="4" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Markdown body…" />
-            <div class="grid gap-3 sm:grid-cols-2">
-                <AppSelect
-                    :model-value="form.target"
-                    :options="[
-                        { label: 'Notes', value: 'notes' },
-                        { label: 'Footer / terms', value: 'footer' },
-                    ]"
-                    @update:model-value="form.target = $event as 'notes' | 'footer'"
-                />
-                <label class="flex items-center gap-2 text-sm text-slate-700">
-                    <input v-model="form.is_active" type="checkbox" class="rounded border-slate-300" />
-                    Active
-                </label>
+    <SettingsShell
+        section="note-templates"
+        title="Note templates"
+        subtitle="Named markdown snippets (e.g. banking details) you can attach to clients and insert on invoices and estimates."
+    >
+        <AppCard class="space-y-3">
+            <div>
+                <h3 class="text-sm font-semibold text-slate-900">
+                    {{ isEditing ? 'Edit note template' : 'Create note template' }}
+                </h3>
+                <p class="mt-1 text-xs text-slate-500">
+                    Give it a clear name such as &ldquo;International Banking Details&rdquo;, then attach it on clients
+                    or insert it while editing an invoice or estimate. Footers stay freeform on each document.
+                </p>
             </div>
+
+            <div>
+                <FieldHelp label="Name" text="Shown when picking a template on clients and documents." />
+                <AppInput v-model="form.name" placeholder="e.g. International Banking Details" />
+            </div>
+
+            <div>
+                <FieldHelp
+                    label="Body"
+                    text="Markdown supported. This text is copied onto the document when the template is used."
+                />
+                <MarkdownEditor
+                    v-model="form.body"
+                    :rows="8"
+                    placeholder="**Bank:** Example Bank&#10;Account name: Acme Ltd&#10;Account: `62012345678`&#10;Reference: invoice number"
+                    aria-label="Note template body"
+                />
+            </div>
+
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input v-model="form.is_active" type="checkbox" class="rounded border-slate-300" />
+                Active (inactive templates stay saved but are hidden on clients and documents)
+            </label>
+
             <FormActions>
-                <AppButton variant="primary" @click="save">Save template</AppButton>
+                <AppButton variant="primary" :loading="saving" @click="save">
+                    {{ isEditing ? 'Update template' : 'Save template' }}
+                </AppButton>
+                <AppButton v-if="isEditing" variant="secondary" @click="cancelEdit">Cancel</AppButton>
             </FormActions>
         </AppCard>
 
         <AppCard class="mt-5 overflow-hidden p-0">
-            <AppTable>
-                <thead>
-                    <tr class="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                        <th class="px-3 py-2">Name</th>
-                        <th class="px-3 py-2">Target</th>
-                        <th class="px-3 py-2">Status</th>
-                        <th class="px-3 py-2"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-if="templates.length === 0">
-                        <td colspan="4" class="px-3 py-6 text-sm text-slate-500">No templates yet.</td>
-                    </tr>
-                    <tr v-for="template in templates" :key="template.id" class="border-b border-slate-100">
-                        <td class="px-3 py-2">
-                            <div class="font-medium text-slate-900">{{ template.name }}</div>
-                            <div class="truncate text-xs text-slate-500">{{ template.body }}</div>
-                        </td>
-                        <td class="px-3 py-2 capitalize">{{ template.target }}</td>
-                        <td class="px-3 py-2">{{ template.is_active ? 'Active' : 'Inactive' }}</td>
-                        <td class="px-3 py-2 text-right">
-                            <AppButton size="sm" variant="danger" @click="destroy(template.id)">Delete</AppButton>
-                        </td>
-                    </tr>
-                </tbody>
-            </AppTable>
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900">Your templates</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">
+                        {{ noteTemplates.length === 0 ? 'None yet' : `${noteTemplates.length} template${noteTemplates.length === 1 ? '' : 's'}` }}
+                    </p>
+                </div>
+            </div>
+
+            <div v-if="noteTemplates.length === 0" class="p-4">
+                <EmptyState
+                    title="No note templates yet"
+                    description="Create reusable notes such as banking details, then select them on clients or insert them on invoices and estimates."
+                    :icon="FileText"
+                />
+            </div>
+
+            <ul v-else class="divide-y divide-slate-100" role="list">
+                <li
+                    v-for="template in noteTemplates"
+                    :key="template.id"
+                    class="px-4 py-4 transition-colors"
+                    :class="editingId === template.id ? 'bg-brand-50/60' : 'hover:bg-slate-50/80'"
+                >
+                    <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                        <div class="flex min-w-0 flex-1 gap-3">
+                            <div
+                                class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500"
+                            >
+                                <FileText class="h-4 w-4" />
+                            </div>
+
+                            <div class="min-w-0 flex-1 self-center">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h4 class="truncate text-sm font-semibold text-slate-900">
+                                        {{ template.name }}
+                                    </h4>
+                                    <AppBadge :variant="template.is_active ? 'success' : 'neutral'">
+                                        {{ template.is_active ? 'Active' : 'Inactive' }}
+                                    </AppBadge>
+                                    <span
+                                        v-if="editingId === template.id"
+                                        class="text-xs font-medium text-brand-700"
+                                    >
+                                        Editing
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex shrink-0 items-center gap-2 sm:items-start">
+                            <AppButton
+                                size="sm"
+                                variant="secondary"
+                                type="button"
+                                @click="startEdit(template)"
+                            >
+                                <Pencil class="mr-1.5 h-3.5 w-3.5" />
+                                Edit
+                            </AppButton>
+                            <AppButton
+                                size="sm"
+                                variant="danger"
+                                type="button"
+                                @click="destroy(template.id)"
+                            >
+                                <Trash2 class="mr-1.5 h-3.5 w-3.5" />
+                                Delete
+                            </AppButton>
+                        </div>
+                    </div>
+                </li>
+            </ul>
         </AppCard>
+
+        <p class="mt-4 text-xs text-slate-500">
+            Tip: after saving templates, open a
+            <Link :href="route('invoicing.clients.index')" class="font-medium text-brand-700 hover:underline">client</Link>
+            and tick the ones that should prefill new invoices and estimates.
+        </p>
     </SettingsShell>
 </template>

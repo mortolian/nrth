@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Estimate;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Item;
+use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
@@ -79,31 +80,13 @@ class EstimateController extends Controller
         $this->authorizeTeam('estimates.manage', $request);
 
         $teamId = (int) $request->user()->current_team_id;
-
         $chargesVat = $request->user()->currentTeam?->chargesVat() ?? false;
         $settings = $request->user()->currentTeam?->mergedBusinessSettings() ?? [];
 
         return Inertia::render('Invoicing/Estimates/Form', [
             'isEditing' => false,
             'estimate' => null,
-            'default_notes' => (string) ($settings['estimate_default_notes'] ?? ''),
-            'default_terms' => (string) ($settings['estimate_default_terms'] ?? ''),
-            'clients' => Client::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'currency'])
-                ->map(fn (Client $client) => [
-                    'id' => $client->id,
-                    'name' => $client->name,
-                    'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
-                ])
-                ->values()
-                ->all(),
-            'items' => $this->catalogItemsForForm($teamId),
-            'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
-            'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
-            'charges_vat' => $chargesVat,
+            ...$this->estimateFormMeta($teamId, $chargesVat, $settings),
             'next_number' => $this->nextEstimateNumber($teamId),
         ]);
     }
@@ -119,24 +102,7 @@ class EstimateController extends Controller
         return Inertia::render('Invoicing/Estimates/Form', [
             'isEditing' => true,
             'estimate' => $this->serializeEstimate($estimate->loadMissing('client'), $chargesVat),
-            'default_notes' => (string) ($settings['estimate_default_notes'] ?? ''),
-            'default_terms' => (string) ($settings['estimate_default_terms'] ?? ''),
-            'clients' => Client::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(['id', 'name', 'currency'])
-                ->map(fn (Client $client) => [
-                    'id' => $client->id,
-                    'name' => $client->name,
-                    'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
-                ])
-                ->values()
-                ->all(),
-            'items' => $this->catalogItemsForForm($teamId),
-            'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
-            'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
-            'charges_vat' => $chargesVat,
+            ...$this->estimateFormMeta($teamId, $chargesVat, $settings),
             'next_number' => $this->nextEstimateNumber($teamId),
         ]);
     }
@@ -146,8 +112,14 @@ class EstimateController extends Controller
         $this->authorizeTeam('estimates.view', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
 
+        $markdown = app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class);
+
         return Inertia::render('Invoicing/Estimates/Show', [
-            'estimate' => $this->serializeEstimate($estimate->loadMissing('client')),
+            'estimate' => [
+                ...$this->serializeEstimate($estimate->loadMissing('client')),
+                'notes_html' => $markdown->toHtml($estimate->notes),
+                'terms_html' => $markdown->toHtml($estimate->terms),
+            ],
             'can' => [
                 'delete' => true,
             ],
@@ -523,6 +495,57 @@ class EstimateController extends Controller
                 'is_default' => (bool) $taxRate->is_default,
             ])
             ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>
+     */
+    private function estimateFormMeta(int $teamId, bool $chargesVat, array $settings): array
+    {
+        return [
+            'default_notes' => (string) ($settings['estimate_default_notes'] ?? ''),
+            'default_terms' => (string) ($settings['estimate_default_terms'] ?? ''),
+            'clients' => Client::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('is_active', true)
+                ->with(['noteTemplates' => fn ($q) => $q
+                    ->where('note_templates.is_active', true)
+                    ->where('note_templates.target', 'notes')
+                    ->orderByPivot('sort_order')])
+                ->orderBy('name')
+                ->get(['id', 'name', 'currency'])
+                ->map(fn (Client $client) => [
+                    'id' => $client->id,
+                    'name' => $client->name,
+                    'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
+                    'default_notes' => $client->noteTemplates
+                        ->where('target', 'notes')
+                        ->pluck('body')
+                        ->filter()
+                        ->implode("\n\n"),
+                ])
+                ->values()
+                ->all(),
+            'items' => $this->catalogItemsForForm($teamId),
+            'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
+            'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
+            'charges_vat' => $chargesVat,
+            'note_templates' => NoteTemplate::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('target', 'notes')
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'body', 'target'])
+                ->map(fn (NoteTemplate $t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'body' => $t->body,
+                    'target' => $t->target,
+                ])
+                ->all(),
+        ];
     }
 
     /**

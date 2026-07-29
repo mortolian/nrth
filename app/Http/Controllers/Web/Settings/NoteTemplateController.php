@@ -6,7 +6,6 @@ use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -73,12 +72,16 @@ class NoteTemplateController extends Controller
      */
     private function validateTemplate(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string'],
-            'target' => ['required', Rule::in(['notes', 'footer'])],
             'is_active' => ['required', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        // Note templates are notes-only; footers stay freeform per document.
+        $validated['target'] = 'notes';
+
+        return $validated;
     }
 }

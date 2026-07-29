@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Enums\RecurringInvoiceStatus;
 use App\Domain\Invoicing\Enums\RecurringLimitType;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Item;
+use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Domain\Invoicing\Models\RecurringInvoice;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
@@ -285,6 +286,20 @@ class RecurringInvoiceController extends Controller
                         'is_default' => (bool) $r->is_default,
                     ])->all()
                 : [],
+            'note_templates' => NoteTemplate::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('target', 'notes')
+                ->where('is_active', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'body', 'target'])
+                ->map(fn ($t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'body' => $t->body,
+                    'target' => $t->target,
+                ])
+                ->all(),
         ];
     }
 

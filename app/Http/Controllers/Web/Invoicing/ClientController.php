@@ -306,6 +306,7 @@ class ClientController extends Controller
     {
         return NoteTemplate::queryWithoutTeamScope()
             ->where('team_id', $teamId)
+            ->where('target', 'notes')
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')

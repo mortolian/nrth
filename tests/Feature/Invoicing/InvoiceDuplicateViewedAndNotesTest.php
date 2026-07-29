@@ -102,7 +102,6 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
             ->post(route('settings.note-templates.store'), [
                 'name' => 'Banking',
                 'body' => '**Pay** to ABC Bank',
-                'target' => 'notes',
                 'is_active' => true,
                 'sort_order' => 0,
             ])
@@ -132,6 +131,104 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
                 ->component('Invoicing/Invoices/Form')
                 ->has('note_templates', 1)
                 ->where('clients.0.default_notes', '**Pay** to ABC Bank'));
+
+        $this->actingAs($owner)
+            ->get(route('invoicing.estimates.create'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Invoicing/Estimates/Form')
+                ->has('note_templates', 1)
+                ->where('clients.0.default_notes', '**Pay** to ABC Bank'));
+
+        $this->actingAs($owner)
+            ->get(route('invoicing.recurring.create'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Invoicing/Recurring/Form')
+                ->has('note_templates', 1));
+    }
+
+    public function test_inactive_note_templates_are_excluded_from_document_forms(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
+        $team = $owner->currentTeam;
+
+        $active = NoteTemplate::factory()->for($team)->create([
+            'name' => 'Active',
+            'body' => 'Active body',
+            'target' => 'notes',
+            'is_active' => true,
+        ]);
+        $inactive = NoteTemplate::factory()->for($team)->create([
+            'name' => 'Inactive',
+            'body' => 'Inactive body',
+            'target' => 'notes',
+            'is_active' => false,
+        ]);
+
+        $client = Client::factory()->for($team)->create();
+        $client->noteTemplates()->sync([
+            $active->id => ['sort_order' => 0],
+            $inactive->id => ['sort_order' => 1],
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('invoicing.invoices.create'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('note_templates', 1)
+                ->where('note_templates.0.id', $active->id)
+                ->where('clients.0.default_notes', 'Active body'));
+    }
+
+    public function test_note_template_can_be_updated_from_settings(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
+        $team = $owner->currentTeam;
+        $template = NoteTemplate::factory()->for($team)->create([
+            'name' => 'Banking',
+            'body' => 'Old body',
+            'target' => 'notes',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($owner)
+            ->put(route('settings.note-templates.update', $template), [
+                'name' => 'Banking details',
+                'body' => '**Pay** to XYZ Bank',
+                'is_active' => false,
+                'sort_order' => 2,
+            ])
+            ->assertRedirect();
+
+        $template->refresh();
+        $this->assertSame('Banking details', $template->name);
+        $this->assertSame('**Pay** to XYZ Bank', $template->body);
+        $this->assertSame('notes', $template->target);
+        $this->assertFalse($template->is_active);
+        $this->assertSame(2, (int) $template->sort_order);
+    }
+
+    public function test_invoice_show_renders_markdown_html_for_notes(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
+        $team = $owner->currentTeam;
+        $invoice = Invoice::factory()->for($team)->create([
+            'notes' => '**Bold** banking',
+            'footer' => 'Thanks',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('invoicing.invoices.show', $invoice))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Invoicing/Invoices/Show')
+                ->where('invoice.notes', '**Bold** banking')
+                ->where('invoice.notes_html', fn ($html) => is_string($html) && str_contains($html, '<strong>Bold</strong>'))
+                ->where('invoice.footer_html', fn ($html) => is_string($html) && str_contains($html, 'Thanks')));
     }
 
     public function test_viewer_cannot_manage_note_templates(): void
@@ -160,7 +257,6 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
             ->put(route('settings.note-templates.update', $template), [
                 'name' => $template->name,
                 'body' => 'Changed later',
-                'target' => 'notes',
                 'is_active' => true,
                 'sort_order' => 0,
             ])
