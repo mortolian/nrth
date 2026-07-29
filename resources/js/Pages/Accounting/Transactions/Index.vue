@@ -12,6 +12,8 @@ type LedgerRow = {
     id: number;
     date: string | null;
     type: string;
+    type_label: string;
+    type_description: string | null;
     reference: string | null;
     supplier: string | null;
     description: string | null;
@@ -189,6 +191,8 @@ const statusBadgeVariant = (status: string) => {
     return 'neutral';
 };
 
+const typeLabel = (transaction: LedgerRow) => transaction.type_label || transaction.type;
+
 const goTransactionsPage = (page: number) => {
     if (page < 1 || page > props.transactions.last_page) return;
     applyFilters(page);
@@ -310,7 +314,7 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                             <div class="min-w-0 flex-1 space-y-2">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="text-sm font-semibold text-slate-900">{{ transaction.date || '—' }}</span>
-                                    <AppBadge variant="info" class="shrink-0">{{ transaction.type }}</AppBadge>
+                                    <AppBadge variant="info" class="shrink-0">{{ typeLabel(transaction) }}</AppBadge>
                                     <AppBadge
                                         :variant="statusBadgeVariant(transaction.status)"
                                         class="shrink-0"
@@ -319,6 +323,12 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                                         {{ transaction.status }}
                                     </AppBadge>
                                 </div>
+                                <p
+                                    v-if="transaction.type_description"
+                                    class="text-xs leading-snug text-slate-500"
+                                >
+                                    {{ transaction.type_description }}
+                                </p>
                                 <p class="text-sm text-slate-800">
                                     <span class="text-slate-500">Ref:</span>
                                     {{ transaction.reference || '—' }}
@@ -434,8 +444,17 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                                 >
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">{{ transaction.date || '-' }}</td>
-                            <td class="px-3 py-2 whitespace-nowrap">
-                                <AppBadge variant="info">{{ transaction.type }}</AppBadge>
+                            <td class="px-3 py-2">
+                                <div class="space-y-1">
+                                    <AppBadge variant="info">{{ typeLabel(transaction) }}</AppBadge>
+                                    <p
+                                        v-if="transaction.type_description"
+                                        class="max-w-[14rem] text-xs leading-snug text-slate-500 whitespace-normal"
+                                        :title="transaction.type_description"
+                                    >
+                                        {{ transaction.type_description }}
+                                    </p>
+                                </div>
                             </td>
                             <td class="px-3 py-2 whitespace-nowrap">{{ transaction.reference || '—' }}</td>
                             <td class="px-3 py-2">

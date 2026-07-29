@@ -130,7 +130,56 @@ class TransactionIndexTest extends TestCase
                 ->where('transactions.data.0.id', $transaction->id)
                 ->where('transactions.data.0.reference', 'EFT-88')
                 ->where('transactions.data.0.supplier', null)
+                ->where('transactions.data.0.type_label', 'Payment')
+                ->where('transactions.data.0.type_description', null)
                 ->where('transactions.data.0.can_edit_expense', false));
+    }
+
+    public function test_index_humanizes_journal_adjustment_with_purpose_description(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $voidReversal = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'type' => TransactionType::JournalAdjustment,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'VOID-12',
+            'description' => 'Reversal of transaction #12: entered twice',
+            'transaction_date' => Carbon::parse('2026-07-04')->toDateString(),
+            'created_by' => $user->id,
+        ]);
+
+        $invoiceAccrual = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'type' => TransactionType::JournalAdjustment,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'INV-100',
+            'description' => 'Invoice accrual INV-100',
+            'transaction_date' => Carbon::parse('2026-07-05')->toDateString(),
+            'created_by' => $user->id,
+        ]);
+
+        $this->get(route('accounting.transactions.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Accounting/Transactions/Index')
+                ->has('transactions.data', 2)
+                ->where('transactions.data.0.id', $invoiceAccrual->id)
+                ->where('transactions.data.0.type', 'journal_adjustment')
+                ->where('transactions.data.0.type_label', 'Journal adjustment')
+                ->where(
+                    'transactions.data.0.type_description',
+                    'Records accounts receivable, revenue, and VAT when an invoice is issued.',
+                )
+                ->where('transactions.data.1.id', $voidReversal->id)
+                ->where('transactions.data.1.type_label', 'Journal adjustment')
+                ->where(
+                    'transactions.data.1.type_description',
+                    'Reverses a voided transaction so its ledger impact is undone.',
+                ));
     }
 
     public function test_index_search_matches_external_reference_and_supplier_name(): void

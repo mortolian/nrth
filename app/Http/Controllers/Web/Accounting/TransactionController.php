@@ -112,6 +112,11 @@ class TransactionController extends Controller
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
                     'type' => $transaction->type->value,
+                    'type_label' => $transaction->type->label(),
+                    'type_description' => $transaction->type->purposeDescription(
+                        $transaction->reference,
+                        $transaction->description,
+                    ),
                     'reference' => $transaction->displayReference(),
                     'supplier' => $transaction->displaySupplier(),
                     'description' => $transaction->description,
@@ -203,7 +208,7 @@ class TransactionController extends Controller
 
                 fputcsv($handle, [
                     optional($transaction->transaction_date)->toDateString() ?? '',
-                    $transaction->type->value,
+                    $transaction->type->label(),
                     (string) ($transaction->displayReference() ?? ''),
                     (string) ($transaction->displaySupplier() ?? ''),
                     (string) ($transaction->description ?? ''),

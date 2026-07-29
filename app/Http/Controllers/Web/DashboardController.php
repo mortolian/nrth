@@ -227,10 +227,10 @@ class DashboardController extends Controller
                 return [
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
-                    'description' => $transaction->description ?: (string) $transaction->type->value,
+                    'description' => $transaction->description ?: $transaction->type->label(),
                     'account' => $line?->account?->name ?? 'N/A',
                     'amount_cents' => $amount,
-                    'type' => $transaction->type->value,
+                    'type' => $transaction->type->label(),
                 ];
             })
             ->all();
