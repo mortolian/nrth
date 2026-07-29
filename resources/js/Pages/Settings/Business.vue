@@ -64,13 +64,13 @@ const props = defineProps<{
     ai_models_by_provider: Record<string, Array<{ value: string; label: string }>>;
 }>();
 
-type BusinessTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'payment_pages' | 'ai';
+type BusinessTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'items' | 'payment_pages' | 'ai';
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 
-const allowedTabs: BusinessTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'ai'];
+const allowedTabs: BusinessTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'items', 'payment_pages', 'ai'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<BusinessTab>(allowedTabs.includes(initialTab as BusinessTab) ? (initialTab as BusinessTab) : 'profile');
 
@@ -180,6 +180,9 @@ const form = useForm({
                   show_on_invoice: Boolean(r.show_on_invoice),
               }))
             : [emptyBankRow()],
+    item_units: Array.isArray(props.settings.item_units)
+        ? (props.settings.item_units as unknown[]).map((u) => String(u ?? ''))
+        : [],
 });
 
 const logoFile = ref<File | null>(null);
@@ -295,6 +298,7 @@ const tabs = [
     { id: 'estimate' as const, label: 'Estimates' },
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
+    { id: 'items' as const, label: 'Items' },
     { id: 'payment_pages' as const, label: 'Online payments' },
     { id: 'ai' as const, label: 'AI' },
 ];
@@ -438,6 +442,7 @@ const submit = () => {
             bank_account_type: r.bank_account_type,
             show_on_invoice: r.show_on_invoice,
         })),
+        item_units: form.item_units.map((unit) => String(unit ?? '').trim()).filter((unit) => unit !== ''),
         remove_logo: removeLogo.value ? 1 : 0,
     };
 
@@ -474,6 +479,35 @@ const removeBankAccount = (index: number) => {
         return;
     }
     form.bank_accounts.splice(index, 1);
+};
+
+const addItemUnit = () => {
+    form.item_units.push('');
+};
+
+const removeItemUnit = (index: number) => {
+    form.item_units.splice(index, 1);
+};
+
+const resetItemUnits = () => {
+    form.item_units = [
+        'each',
+        'hour',
+        'day',
+        'week',
+        'month',
+        'year',
+        'kg',
+        'g',
+        'L',
+        'm',
+        'm²',
+        'km',
+        'box',
+        'pack',
+        'set',
+        'service',
+    ];
 };
 </script>
 
@@ -1034,6 +1068,57 @@ const removeBankAccount = (index: number) => {
                         Add bank account
                     </button>
                 </div>
+            </AppCard>
+
+            <AppCard v-show="tab === 'items'">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Item units</h3>
+                        <p class="mt-1 text-sm text-slate-500">
+                            Units offered when creating catalog items (hour, each, kg, …). Order here is the order in the picker.
+                        </p>
+                    </div>
+                    <AppButton type="button" size="sm" variant="ghost" @click="resetItemUnits">
+                        Restore defaults
+                    </AppButton>
+                </div>
+
+                <div class="mt-4 space-y-2">
+                    <div
+                        v-for="(unit, idx) in form.item_units"
+                        :key="idx"
+                        class="flex items-center gap-2"
+                    >
+                        <AppInput
+                            v-model="form.item_units[idx]"
+                            class="max-w-xs"
+                            placeholder="e.g. hour"
+                            maxlength="32"
+                        />
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                            :aria-label="`Remove unit ${unit || idx + 1}`"
+                            @click="removeItemUnit(idx)"
+                        >
+                            <Trash2 class="h-3.5 w-3.5" aria-hidden="true" />
+                            Remove
+                        </button>
+                    </div>
+                    <p v-if="!form.item_units.length" class="text-sm text-slate-500">
+                        No units yet. Add some, or restore the defaults.
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    class="mt-4 inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                    @click="addItemUnit"
+                >
+                    <Plus class="h-4 w-4" aria-hidden="true" />
+                    Add unit
+                </button>
+                <p v-if="form.errors.item_units" class="mt-2 text-xs text-rose-600">{{ form.errors.item_units }}</p>
             </AppCard>
 
             <AppCard v-show="tab === 'payment_pages'">

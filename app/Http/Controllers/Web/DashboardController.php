@@ -9,7 +9,6 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Budgeting\Models\Budget;
 use App\Domain\Budgeting\Models\BudgetCategory;
-use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\Services\VATService;
 use App\Http\Controllers\Controller;
@@ -170,7 +169,7 @@ class DashboardController extends Controller
             ->with('client:id,name')
             ->withCount('payments')
             ->where('team_id', $team->id)
-            ->whereNotIn('status', [InvoiceStatus::Paid->value, InvoiceStatus::Void->value])
+            ->open()
             ->orderBy('due_date')
             ->paginate(5)
             ->through(function (Invoice $invoice) use ($asOf): array {

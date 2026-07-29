@@ -50,9 +50,8 @@ class ClientController extends Controller
             ->withQueryString()
             ->through(function (Client $client): array {
                 $invoices = $client->invoices;
-                $lastInvoiceDate = optional($invoices->first()?->issue_date)->toDateString();
                 $outstanding = $invoices->sum(function (Invoice $invoice): int {
-                    if (in_array($invoice->status, [InvoiceStatus::Paid, InvoiceStatus::Void], true)) {
+                    if (! $invoice->status->isOpen()) {
                         return 0;
                     }
                     $total = (int) $invoice->getRawOriginal('total_cents');
@@ -60,6 +59,9 @@ class ClientController extends Controller
 
                     return max(0, $total - $paid);
                 });
+
+                $issued = $invoices->filter(fn (Invoice $invoice): bool => $invoice->status->isIssued());
+                $lastInvoiceDate = optional($issued->sortByDesc(fn (Invoice $invoice) => optional($invoice->issue_date)?->toDateString())->first()?->issue_date)->toDateString();
 
                 return [
                     'id' => $client->id,
@@ -129,16 +131,12 @@ class ClientController extends Controller
 
         $teamId = (int) $client->team_id;
         $today = now()->toDateString();
-        $statusesWherePastDueMatters = [
-            InvoiceStatus::Sent,
-            InvoiceStatus::Viewed,
-            InvoiceStatus::Partial,
-            InvoiceStatus::Overdue,
-        ];
+        $statusesWherePastDueMatters = InvoiceStatus::openStatuses();
 
         $invoiceHistory = Invoice::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('client_id', $client->id)
+            ->issued()
             ->orderByDesc('issue_date')
             ->paginate(25)
             ->withQueryString()
@@ -171,6 +169,7 @@ class ClientController extends Controller
         $statsRows = Invoice::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('client_id', $client->id)
+            ->issued()
             ->get(['currency', 'status', 'total_cents', 'amount_paid_cents']);
 
         /** @var array<string, array{outstanding_cents: int, invoiced_cents: int, paid_cents: int}> $byCurrency */
@@ -188,7 +187,7 @@ class ClientController extends Controller
             $paid = (int) $inv->getRawOriginal('amount_paid_cents');
             $byCurrency[$code]['invoiced_cents'] += $total;
             $byCurrency[$code]['paid_cents'] += $paid;
-            if (! in_array($inv->status, [InvoiceStatus::Paid, InvoiceStatus::Void], true)) {
+            if ($inv->status->isOpen()) {
                 $byCurrency[$code]['outstanding_cents'] += max(0, $total - $paid);
             }
         }

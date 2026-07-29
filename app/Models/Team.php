@@ -241,6 +241,8 @@ class Team extends JetstreamTeam implements HasMedia
             'vat_registered' => false,
             'vat_period_type' => 'bi_monthly',
             'default_tax_rate_id' => null,
+            /** Labels offered when picking a unit on catalog items. */
+            'item_units' => self::defaultItemUnits(),
             /** Master switch: hosted checkout on invoice + public pay page (Stripe, PayFast, …). */
             'payment_pages_enabled' => false,
             /** 0 = off (Laravel SESSION_LIFETIME only). Cap at config('session.lifetime'). */
@@ -341,10 +343,90 @@ class Team extends JetstreamTeam implements HasMedia
             }
         }
 
-        return array_replace_recursive(
+        $merged = array_replace_recursive(
             self::defaultBusinessSettings(),
             $normalized
         );
+
+        // Indexed lists must replace wholesale — recursive merge keeps leftover default indices.
+        if (array_key_exists('item_units', $normalized)) {
+            $merged['item_units'] = self::normalizeItemUnits($normalized['item_units']);
+        } else {
+            $merged['item_units'] = self::defaultItemUnits();
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Default unit labels for the items catalog picker.
+     *
+     * @return list<string>
+     */
+    public static function defaultItemUnits(): array
+    {
+        return [
+            'each',
+            'hour',
+            'day',
+            'week',
+            'month',
+            'year',
+            'kg',
+            'g',
+            'L',
+            'm',
+            'm²',
+            'km',
+            'box',
+            'pack',
+            'set',
+            'service',
+        ];
+    }
+
+    /**
+     * @param  mixed  $units
+     * @return list<string>
+     */
+    public static function normalizeItemUnits(mixed $units): array
+    {
+        if (! is_array($units)) {
+            return self::defaultItemUnits();
+        }
+
+        $seen = [];
+        $out = [];
+
+        foreach ($units as $unit) {
+            $label = trim((string) $unit);
+            if ($label === '' || mb_strlen($label) > 32) {
+                continue;
+            }
+
+            $key = mb_strtolower($label);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $out[] = $label;
+        }
+
+        return array_values($out);
+    }
+
+    /**
+     * Item unit labels for this team (catalog settings), never empty of defaults unless explicitly cleared.
+     *
+     * @return list<string>
+     */
+    public function itemUnits(): array
+    {
+        $settings = $this->mergedBusinessSettings();
+        $units = self::normalizeItemUnits($settings['item_units'] ?? null);
+
+        return $units !== [] ? $units : self::defaultItemUnits();
     }
 
     /**

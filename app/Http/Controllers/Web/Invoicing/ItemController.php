@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Invoicing;
 use App\Domain\Invoicing\Models\Item;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -171,6 +172,7 @@ class ItemController extends Controller
                         'is_default' => (bool) $r->is_default,
                     ])->all()
                 : [],
+            'item_units' => $team?->itemUnits() ?? Team::defaultItemUnits(),
         ];
     }
 
@@ -195,12 +197,32 @@ class ItemController extends Controller
             'is_active' => ['required', 'boolean'],
         ]);
 
+        $team = $request->user()->currentTeam;
+        $allowedUnits = $team?->itemUnits() ?? [];
+        $unit = isset($validated['unit']) && trim((string) $validated['unit']) !== ''
+            ? trim((string) $validated['unit'])
+            : null;
+
+        if ($unit !== null) {
+            $allowedLower = array_map(fn (string $u) => mb_strtolower($u), $allowedUnits);
+            $currentUnit = $ignoreId !== null
+                ? Item::queryWithoutTeamScope()->where('id', $ignoreId)->value('unit')
+                : null;
+            if ($currentUnit !== null && $currentUnit !== '') {
+                $allowedLower[] = mb_strtolower((string) $currentUnit);
+            }
+
+            if (! in_array(mb_strtolower($unit), $allowedLower, true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'unit' => __('Choose a unit from Settings → Business → Items, or leave blank.'),
+                ]);
+            }
+        }
+
         $validated['description'] = isset($validated['description']) && trim((string) $validated['description']) !== ''
             ? trim((string) $validated['description'])
             : null;
-        $validated['unit'] = isset($validated['unit']) && trim((string) $validated['unit']) !== ''
-            ? trim((string) $validated['unit'])
-            : null;
+        $validated['unit'] = $unit;
         $validated['default_vat_rate'] = array_key_exists('default_vat_rate', $validated) && $validated['default_vat_rate'] !== null
             ? (float) $validated['default_vat_rate']
             : null;

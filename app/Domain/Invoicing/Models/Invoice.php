@@ -151,13 +151,15 @@ class Invoice extends Model implements HasMedia
 
     public function isOverdue(?Carbon $asOf = null): bool
     {
-        if ($this->status === InvoiceStatus::Paid || $this->status === InvoiceStatus::Void) {
+        if (! $this->status->isOpen()) {
             return false;
         }
 
         $checkDate = $asOf ?? now();
 
-        return $this->due_date->lessThan($checkDate);
+        return $this->due_date !== null
+            && $this->due_date->lessThan($checkDate->copy()->startOfDay())
+            && $this->amountDue()->isPositive();
     }
 
     public function vatRate(): float
@@ -170,6 +172,24 @@ class Invoice extends Model implements HasMedia
         $vat = (int) $this->vat_amount_cents->getMinorAmount()->toInt();
 
         return round($vat / $subtotal, 4);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public function scopeIssued($query)
+    {
+        return $query->whereIn('status', InvoiceStatus::issuedValues());
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    public function scopeOpen($query)
+    {
+        return $query->whereIn('status', InvoiceStatus::openValues());
     }
 
     protected static function newFactory(): InvoiceFactory

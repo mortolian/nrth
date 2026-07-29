@@ -26,6 +26,7 @@ const props = defineProps<{
     charges_vat: boolean;
     default_currency: string;
     tax_rates: TaxRateOption[];
+    item_units: string[];
 }>();
 
 const toast = useToast();
@@ -35,7 +36,7 @@ const { fieldErrors, setFromZod, setFromServer, clear, clearField, messages: cli
 const help = {
     name: 'Shown in the item picker and as the default line description if you leave description blank.',
     description: 'Copied onto the invoice or estimate line when you pick this item. You can still edit the line afterward.',
-    unit: 'Optional unit label (hour, day, each, month). Display only — quantity stays free on each line.',
+    unit: 'Optional unit from Settings → Business → Items. Display only — quantity stays free on each line.',
     unitPrice: 'Default unit price in your team currency. Snapshotted onto the line when picked.',
     vat: 'Default VAT for this item. Overridable per line on the invoice.',
     status: 'Inactive items stay in your catalog but are hidden from invoice and estimate pickers.',
@@ -69,6 +70,18 @@ const setFieldValue = (path: string, value: unknown) => {
 };
 
 const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
+
+const unitOptions = computed(() => {
+    const options = [
+        { label: 'No unit', value: '' },
+        ...props.item_units.map((unit) => ({ label: unit, value: unit })),
+    ];
+    const current = String(formValues.value.unit ?? '');
+    if (current !== '' && !options.some((o) => o.value === current)) {
+        options.splice(1, 0, { label: `${current} (current)`, value: current });
+    }
+    return options;
+});
 
 const vatOptions = computed(() => {
     const options = props.tax_rates.length
@@ -202,10 +215,10 @@ const submit = () => {
 
                         <div>
                             <FieldHelp label="Unit" :text="help.unit" />
-                            <AppInput
-                                :model-value="formValues.unit"
-                                placeholder="hour, each, month…"
-                                @update:model-value="setFieldValue('unit', $event)"
+                            <AppSelect
+                                :model-value="formValues.unit ?? ''"
+                                :options="unitOptions"
+                                @update:model-value="setFieldValue('unit', String($event ?? ''))"
                             />
                             <p v-if="fieldErrors.unit" class="mt-1 text-xs text-rose-600">{{ fieldErrors.unit }}</p>
                         </div>

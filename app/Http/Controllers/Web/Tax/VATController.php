@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Web\Tax;
 use App\Domain\Accounting\Enums\TaxLineType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Transaction;
-use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\Enums\TaxPeriodStatus;
 use App\Domain\Tax\Enums\TaxPeriodType;
@@ -83,7 +82,7 @@ class VATController extends Controller
         $outputTransactions = Invoice::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->whereBetween('issue_date', [$period->period_start->toDateString(), $period->period_end->toDateString()])
-            ->whereNotIn('status', [InvoiceStatus::Void->value])
+            ->issued()
             ->where('vat_amount_cents', '>', 0)
             ->get()
             ->map(fn (Invoice $invoice): array => [

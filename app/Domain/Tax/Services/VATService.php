@@ -5,7 +5,6 @@ namespace App\Domain\Tax\Services;
 use App\Domain\Accounting\Enums\TaxLineType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Transaction;
-use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\DTOs\VATSummaryDTO;
 use App\Domain\Tax\Models\TaxPeriod;
@@ -25,7 +24,7 @@ class VATService
         $cents = (int) Invoice::queryWithoutTeamScope()
             ->where('team_id', $team->id)
             ->whereBetween('issue_date', [$from->toDateString(), $to->toDateString()])
-            ->whereNotIn('status', [InvoiceStatus::Void->value])
+            ->issued()
             ->sum('vat_amount_cents');
 
         return Money::ofMinor($cents, 'ZAR');

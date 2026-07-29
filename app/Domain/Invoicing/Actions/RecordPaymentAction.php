@@ -36,9 +36,11 @@ class RecordPaymentAction
                 ->with('team')
                 ->findOrFail($dto->invoiceId);
 
-            if ($invoice->status === InvoiceStatus::Void) {
+            if (in_array($invoice->status, [InvoiceStatus::Void, InvoiceStatus::Draft], true)) {
                 throw ValidationException::withMessages([
-                    'invoice_id' => __('Cannot record payments against a void invoice.'),
+                    'invoice_id' => $invoice->status === InvoiceStatus::Draft
+                        ? __('Cannot record payments against a draft invoice. Send it first.')
+                        : __('Cannot record payments against a void invoice.'),
                 ]);
             }
 

@@ -220,6 +220,8 @@ class BusinessSettingsController extends Controller
             'bank_accounts.*.bank_account_type' => ['nullable', Rule::in(['current', 'savings'])],
             'bank_accounts.*.title' => ['nullable', 'string', 'max:128'],
             'bank_accounts.*.show_on_invoice' => ['required', 'boolean'],
+            'item_units' => ['sometimes', 'array', 'max:50'],
+            'item_units.*' => ['nullable', 'string', 'max:32'],
             'logo' => ['nullable', 'image', 'max:4096'],
             'remove_logo' => ['nullable', 'boolean'],
         ]);
@@ -261,6 +263,11 @@ class BusinessSettingsController extends Controller
             }
         }
 
+        if (array_key_exists('item_units', $validated)) {
+            $units = Team::normalizeItemUnits($validated['item_units']);
+            $newSettings['item_units'] = $units !== [] ? $units : Team::defaultItemUnits();
+        }
+
         if (isset($newSettings['ai']['api_key'])) {
             $key = trim((string) $newSettings['ai']['api_key']);
             $newSettings['ai']['api_key'] = $key !== '' ? $key : null;
@@ -296,6 +303,10 @@ class BusinessSettingsController extends Controller
             $team->mergedBusinessSettings(),
             $newSettings
         );
+        // Replace list wholesale after recursive merge.
+        if (array_key_exists('item_units', $newSettings)) {
+            $mergedSettings['item_units'] = $newSettings['item_units'];
+        }
         foreach (['quote_prefix', 'quote_number_include_month', 'quote_number_use_random_suffix', 'receipt_scan'] as $legacyKey) {
             unset($mergedSettings[$legacyKey]);
         }
@@ -324,7 +335,7 @@ class BusinessSettingsController extends Controller
         }
 
         $tab = (string) $request->input('tab', 'profile');
-        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'payment_pages', 'ai'], true)) {
+        if (! in_array($tab, ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'items', 'payment_pages', 'ai'], true)) {
             $tab = 'profile';
         }
 

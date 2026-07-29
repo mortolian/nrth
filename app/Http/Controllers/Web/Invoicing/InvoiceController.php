@@ -390,16 +390,8 @@ class InvoiceController extends Controller
         $today = now()->toDateString();
 
         /** Past-due only applies once an invoice is out of draft (issued / awaiting payment). */
-        $statusesWherePastDueMatters = [
-            InvoiceStatus::Sent,
-            InvoiceStatus::Viewed,
-            InvoiceStatus::Partial,
-            InvoiceStatus::Overdue,
-        ];
-        $statusValuesWherePastDueMatters = array_map(
-            static fn (InvoiceStatus $s): string => $s->value,
-            $statusesWherePastDueMatters
-        );
+        $statusesWherePastDueMatters = InvoiceStatus::openStatuses();
+        $statusValuesWherePastDueMatters = InvoiceStatus::openValues();
 
         $query = Invoice::queryWithoutTeamScope()
             ->with('client:id,name')
