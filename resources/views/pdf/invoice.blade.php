@@ -126,11 +126,13 @@
         </td>
         <td class="spacer"></td>
         <td>
-            <div class="label">Amount due</div>
-            <div class="name accent" style="font-size: 22px;">{{ $fmtMoney($due) }}</div>
-            <p class="small muted">Total invoiced: {{ $fmtMoney($total) }}</p>
+            <div class="label">Invoice total</div>
+            <div class="name accent" style="font-size: 22px;">{{ $fmtMoney($total) }}</div>
             @if($paid > 0)
                 <p class="small muted">Paid to date: {{ $fmtMoney($paid) }}</p>
+                <p class="small muted">Outstanding: {{ $fmtMoney($due) }}</p>
+            @else
+                <p class="small muted">Amount due: {{ $fmtMoney($due) }}</p>
             @endif
             <p class="small muted pad-top-12">Please use <span class="b">{{ $invoice->number }}</span> as your payment reference.</p>
         </td>
@@ -197,9 +199,19 @@
     </tr>
     @endif
     <tr class="grand">
-        <td class="label">Total due</td>
+        <td class="label">{{ $chargesVat ? 'Total (incl. VAT)' : 'Total' }}</td>
+        <td class="value">{{ $fmtMoney($total) }}</td>
+    </tr>
+    @if($paid > 0)
+    <tr>
+        <td class="label">Amount paid</td>
+        <td class="value">{{ $fmtMoney($paid) }}</td>
+    </tr>
+    <tr>
+        <td class="label">Outstanding</td>
         <td class="value">{{ $fmtMoney($due) }}</td>
     </tr>
+    @endif
 </table>
 
 @if($hasBankDetails)

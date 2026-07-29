@@ -21,6 +21,7 @@ use App\Http\Controllers\Web\Invoicing\ExchangeRateController;
 use App\Http\Controllers\Web\Invoicing\InvoiceController;
 use App\Http\Controllers\Web\Invoicing\InvoiceOnlinePaymentController;
 use App\Http\Controllers\Web\Invoicing\ItemController;
+use App\Http\Controllers\Web\Invoicing\PaymentReceiptController;
 use App\Http\Controllers\Web\Invoicing\RecurringInvoiceController;
 use App\Http\Controllers\Web\JoinTeamInvitationController;
 use App\Http\Controllers\Web\OnboardingController;
@@ -240,6 +241,9 @@ Route::middleware([
         Route::post('/invoices/{invoice}/unvoid', [InvoiceController::class, 'unvoid'])->name('invoices.unvoid');
         Route::post('/invoices/{invoice}/payments', [InvoiceController::class, 'recordPayment'])->name('invoices.payments.store');
         Route::post('/invoices/{invoice}/payments/{payment}/undo', [InvoiceController::class, 'undoPayment'])->name('invoices.payments.undo');
+        Route::get('/invoices/{invoice}/payments/{payment}/pdf', [PaymentReceiptController::class, 'download'])->name('invoices.payments.receipt.download');
+        Route::get('/invoices/{invoice}/payments/{payment}/pdf/preview', [PaymentReceiptController::class, 'preview'])->name('invoices.payments.receipt.preview');
+        Route::post('/invoices/{invoice}/payments/{payment}/send-receipt', [PaymentReceiptController::class, 'send'])->name('invoices.payments.receipt.send');
         Route::post('/invoices/{invoice}/online-payments', [InvoiceOnlinePaymentController::class, 'store'])->name('invoices.online-payments.store');
         Route::post('/invoices/{invoice}/public-pay-link', [InvoiceController::class, 'storePublicPayLink'])->name('invoices.public-pay-link.store');
         Route::get('/invoices/{invoice}/public-pay-qr', [InvoiceController::class, 'publicPayQr'])->name('invoices.public-pay-qr');

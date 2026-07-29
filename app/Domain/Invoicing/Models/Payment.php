@@ -12,13 +12,18 @@ use Database\Factories\PaymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Payment extends Model
+class Payment extends Model implements HasMedia
 {
     /** @use HasFactory<PaymentFactory> */
     use HasFactory;
 
     use HasTeamScope;
+    use InteractsWithMedia;
 
     protected $fillable = [
         'team_id',
@@ -76,6 +81,19 @@ class Payment extends Model
     public function bankingAccount(): BelongsTo
     {
         return $this->belongsTo(BankingAccount::class);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('payment-receipts')->singleFile();
+    }
+
+    /**
+     * @return Collection<int, Media>
+     */
+    public function receipts(): Collection
+    {
+        return $this->getMedia('payment-receipts');
     }
 
     protected static function newFactory(): PaymentFactory

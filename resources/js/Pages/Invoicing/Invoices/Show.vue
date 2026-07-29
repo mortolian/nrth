@@ -130,6 +130,9 @@ const bookCurrencySnapshot = computed(() => {
 
 const paymentDrawerOpen = ref(false);
 const pdfPreviewOpen = ref(false);
+const receiptPreviewOpen = ref(false);
+const receiptPreviewPaymentId = ref<number | null>(null);
+const sendingReceiptId = ref<number | null>(null);
 const toast = useToast();
 const sendingInvoice = ref(false);
 const sendingReminder = ref(false);
@@ -354,6 +357,55 @@ const undoPayment = (paymentId: number) => {
         { preserveScroll: true },
     );
 };
+
+const receiptPreviewUrl = computed(() => {
+    if (receiptPreviewPaymentId.value == null) {
+        return '';
+    }
+    return route('invoicing.invoices.payments.receipt.preview', [props.invoice.id, receiptPreviewPaymentId.value]);
+});
+
+const openReceiptPreview = (paymentId: number) => {
+    receiptPreviewPaymentId.value = paymentId;
+    receiptPreviewOpen.value = true;
+};
+
+const downloadReceipt = (paymentId: number) => {
+    window.location.assign(route('invoicing.invoices.payments.receipt.download', [props.invoice.id, paymentId]));
+};
+
+const openReceiptInNewTab = () => {
+    if (receiptPreviewPaymentId.value == null) {
+        return;
+    }
+    window.open(receiptPreviewUrl.value, '_blank', 'noopener,noreferrer');
+};
+
+const sendReceipt = (paymentId: number) => {
+    if (sendingReceiptId.value != null) {
+        return;
+    }
+    if (!props.invoice.client.email) {
+        toast.error('Add an email address on the client before sending this receipt.');
+        return;
+    }
+    router.post(
+        route('invoicing.invoices.payments.receipt.send', [props.invoice.id, paymentId]),
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => {
+                sendingReceiptId.value = paymentId;
+            },
+            onError: (errors) => {
+                toast.error(firstErrorMessage(errors));
+            },
+            onFinish: () => {
+                sendingReceiptId.value = null;
+            },
+        },
+    );
+};
 </script>
 
 <template>
@@ -519,6 +571,8 @@ const undoPayment = (paymentId: number) => {
                         <div class="flex items-center justify-between"><span class="text-slate-500">Subtotal</span><span>{{ formatCents(invoice.subtotal_cents) }}</span></div>
                         <div v-if="charges_vat" class="flex items-center justify-between"><span class="text-slate-500">VAT</span><span>{{ formatCents(invoice.vat_amount_cents) }}</span></div>
                         <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold"><span>Total</span><span>{{ formatCents(invoice.total_cents) }}</span></div>
+                        <div v-if="invoice.amount_paid_cents > 0" class="flex items-center justify-between text-slate-600"><span>Amount paid</span><span>{{ formatCents(invoice.amount_paid_cents) }}</span></div>
+                        <div v-if="invoice.amount_paid_cents > 0" class="flex items-center justify-between font-medium text-slate-900"><span>Outstanding</span><span>{{ formatCents(invoice.amount_due_cents) }}</span></div>
                     </div>
 
                     <InvoiceInternalCurrencyApprox
@@ -617,21 +671,40 @@ const undoPayment = (paymentId: number) => {
                         <div
                             v-for="payment in invoice.payments"
                             :key="payment.id"
-                            class="flex items-start justify-between gap-2 rounded-md border border-slate-200 p-2 text-sm"
+                            class="rounded-md border border-slate-200 p-2 text-sm"
                         >
-                            <div class="min-w-0">
-                                <p class="font-medium text-slate-900">{{ formatCents(payment.amount_cents) }}</p>
-                                <p class="text-xs text-slate-500">{{ payment.payment_date }} • {{ payment.method.toUpperCase() }}</p>
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="font-medium text-slate-900">{{ formatCents(payment.amount_cents) }}</p>
+                                    <p class="text-xs text-slate-500">{{ payment.payment_date }} • {{ payment.method.toUpperCase() }}</p>
+                                </div>
+                                <AppButton
+                                    v-if="payment.can_undo"
+                                    size="sm"
+                                    variant="ghost"
+                                    class="shrink-0 text-amber-900 hover:bg-amber-50"
+                                    @click="undoPayment(payment.id)"
+                                >
+                                    Undo
+                                </AppButton>
                             </div>
-                            <AppButton
-                                v-if="payment.can_undo"
-                                size="sm"
-                                variant="ghost"
-                                class="shrink-0 text-amber-900 hover:bg-amber-50"
-                                @click="undoPayment(payment.id)"
-                            >
-                                Undo
-                            </AppButton>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <AppButton size="sm" variant="secondary" type="button" @click="openReceiptPreview(payment.id)">
+                                    <Eye class="mr-1 h-3.5 w-3.5" /> Preview
+                                </AppButton>
+                                <AppButton size="sm" variant="secondary" type="button" @click="downloadReceipt(payment.id)">
+                                    <Download class="mr-1 h-3.5 w-3.5" /> Download
+                                </AppButton>
+                                <AppButton
+                                    size="sm"
+                                    variant="secondary"
+                                    type="button"
+                                    :loading="sendingReceiptId === payment.id"
+                                    @click="sendReceipt(payment.id)"
+                                >
+                                    <Mail class="mr-1 h-3.5 w-3.5" /> Send
+                                </AppButton>
+                            </div>
                         </div>
                     </div>
                     <p v-else class="mt-3 text-sm text-slate-500">No payments recorded yet.</p>
@@ -706,6 +779,45 @@ const undoPayment = (paymentId: number) => {
                     :src="pdfPreviewUrl"
                     class="h-full w-full flex-1 bg-slate-100"
                     title="Invoice PDF preview"
+                />
+            </div>
+        </div>
+
+        <div
+            v-if="receiptPreviewOpen && receiptPreviewPaymentId != null"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Payment receipt PDF preview"
+            @click.self="receiptPreviewOpen = false"
+        >
+            <div class="flex h-[min(92vh,56rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-slate-900">Receipt preview · {{ invoice.number }}</p>
+                        <p class="truncate text-xs text-slate-500">Payment receipt with invoice total and outstanding balance</p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <AppButton size="sm" variant="secondary" type="button" @click="openReceiptInNewTab">
+                            Open in new tab
+                        </AppButton>
+                        <AppButton size="sm" variant="primary" type="button" @click="downloadReceipt(receiptPreviewPaymentId)">
+                            <Download class="mr-1 h-4 w-4 shrink-0" /> Download
+                        </AppButton>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                            aria-label="Close receipt preview"
+                            @click="receiptPreviewOpen = false"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+                <iframe
+                    :src="receiptPreviewUrl"
+                    class="h-full w-full flex-1 bg-slate-100"
+                    title="Payment receipt PDF preview"
                 />
             </div>
         </div>
