@@ -56,6 +56,8 @@ class GenerateRecurringInvoiceAction
 
             $lineItems = collect((array) $recurring->line_items)
                 ->map(function (array $line) use ($issueDate, $dueDate, $recurring): array {
+                    $discountType = $line['discount_type'] ?? null;
+
                     return [
                         'description' => (string) RecurringPlaceholderResolver::replace(
                             (string) ($line['description'] ?? ''),
@@ -69,6 +71,10 @@ class GenerateRecurringInvoiceAction
                             ? (float) $line['vat_rate']
                             : null,
                         'item_id' => isset($line['item_id']) ? (int) $line['item_id'] : null,
+                        'discount_type' => $discountType,
+                        'discount_percent' => $discountType === 'percent' ? ($line['discount_percent'] ?? null) : null,
+                        'discount_cents' => $discountType === 'fixed' ? ($line['discount_cents'] ?? null) : null,
+                        'income_account_id' => isset($line['income_account_id']) ? (int) $line['income_account_id'] : null,
                     ];
                 })
                 ->values()

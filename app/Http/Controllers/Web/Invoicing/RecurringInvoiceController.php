@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Web\Invoicing;
 
+use App\Domain\Accounting\Enums\AccountType;
+use App\Domain\Accounting\Models\Account;
 use App\Domain\Invoicing\Actions\GenerateRecurringInvoiceAction;
 use App\Domain\Invoicing\Enums\RecurringDueDateRule;
 use App\Domain\Invoicing\Enums\RecurringFrequency;
@@ -227,13 +229,64 @@ class RecurringInvoiceController extends Controller
             'line_items.*.unit_price_cents' => ['required', 'integer', 'min:0'],
             'line_items.*.vat_rate' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'line_items.*.item_id' => ['nullable', 'integer', Rule::exists('items', 'id')->where('team_id', $teamId)],
+            'line_items.*.discount_type' => ['nullable', Rule::in(['percent', 'fixed'])],
+            'line_items.*.discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'line_items.*.discount_cents' => ['nullable', 'integer', 'min:0'],
+            'line_items.*.income_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(fn ($q) => $q->where('team_id', $teamId)->where('type', AccountType::Income->value)),
+            ],
         ]);
 
         $validated['currency'] = Iso4217Currencies::normalize((string) $validated['currency']);
         $validated['generate_on_last_day'] = (bool) $validated['generate_on_last_day'];
         $validated['auto_send'] = (bool) $validated['auto_send'];
+        $validated['line_items'] = $this->normalizeLineItems($validated['line_items']);
 
         return $validated;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $lineItems
+     * @return list<array{
+     *     description: string,
+     *     quantity: float|int|string,
+     *     unit_price_cents: int,
+     *     vat_rate: float|null,
+     *     item_id: int|null,
+     *     discount_type: string|null,
+     *     discount_percent: float|null,
+     *     discount_cents: int|null,
+     *     income_account_id: int|null
+     * }>
+     */
+    private function normalizeLineItems(array $lineItems): array
+    {
+        return collect($lineItems)
+            ->map(function (array $line): array {
+                $discountType = $line['discount_type'] ?? null;
+
+                return [
+                    'description' => (string) ($line['description'] ?? ''),
+                    'quantity' => $line['quantity'] ?? 1,
+                    'unit_price_cents' => (int) ($line['unit_price_cents'] ?? 0),
+                    'vat_rate' => array_key_exists('vat_rate', $line) && $line['vat_rate'] !== null
+                        ? (float) $line['vat_rate']
+                        : null,
+                    'item_id' => isset($line['item_id']) ? (int) $line['item_id'] : null,
+                    'discount_type' => $discountType,
+                    'discount_percent' => $discountType === 'percent'
+                        ? (isset($line['discount_percent']) ? (float) $line['discount_percent'] : null)
+                        : null,
+                    'discount_cents' => $discountType === 'fixed'
+                        ? (isset($line['discount_cents']) ? (int) $line['discount_cents'] : null)
+                        : null,
+                    'income_account_id' => isset($line['income_account_id']) ? (int) $line['income_account_id'] : null,
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -300,6 +353,22 @@ class RecurringInvoiceController extends Controller
                     'target' => $t->target,
                 ])
                 ->all(),
+            'accounts' => Account::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('type', AccountType::Income->value)
+                ->where('is_active', true)
+                ->orderBy('code')
+                ->get(['id', 'code', 'name'])
+                ->map(fn (Account $account) => [
+                    'id' => $account->id,
+                    'name' => trim($account->code.' - '.$account->name),
+                ])->all(),
+            'default_income_account_id' => Account::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('type', AccountType::Income->value)
+                ->where('is_active', true)
+                ->where('code', '4000')
+                ->value('id'),
         ];
     }
 

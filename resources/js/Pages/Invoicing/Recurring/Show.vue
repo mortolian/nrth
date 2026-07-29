@@ -4,6 +4,7 @@ import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { calculateInvoiceTotals } from '@/Composables/useInvoiceTotals';
 import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
 
@@ -12,6 +13,10 @@ type Line = {
     quantity?: number | string;
     unit_price_cents?: number;
     vat_rate?: number | null;
+    discount_type?: 'percent' | 'fixed' | null;
+    discount_percent?: number | null;
+    discount_cents?: number | null;
+    income_account_id?: number | null;
 };
 
 type GeneratedInvoice = {
@@ -130,13 +135,27 @@ const periodOffsetLabel = computed(() => {
     return `${n} months before issue`;
 });
 
-const templateTotalCents = computed(() =>
-    (props.recurring.line_items || []).reduce((sum, line) => {
-        const qty = Number(line.quantity) || 0;
-        const unit = Number(line.unit_price_cents) || 0;
-        return sum + Math.round(qty * unit);
-    }, 0),
+const templateTotals = computed(() =>
+    calculateInvoiceTotals(
+        (props.recurring.line_items || []).map((line) => ({
+            quantity: Number(line.quantity) || 0,
+            unit_price: (Number(line.unit_price_cents) || 0) / 100,
+            vat_rate: Number(line.vat_rate) || 0,
+            discount_type: line.discount_type ?? null,
+            discount_percent: line.discount_percent ?? null,
+            discount_cents: line.discount_cents ?? null,
+        })),
+    ),
 );
+
+const templateTotalCents = computed(() => templateTotals.value.total_cents);
+
+const lineAmountCents = (index: number): number =>
+    templateTotals.value.lines[index]?.total_cents
+    ?? Math.round(
+        (Number(props.recurring.line_items[index]?.quantity) || 0)
+        * (Number(props.recurring.line_items[index]?.unit_price_cents) || 0),
+    );
 
 const post = (name: string, success: string) => {
     router.post(route(name, props.recurring.id), {}, {
@@ -368,7 +387,7 @@ const onOverflow = (actionId: string) => {
                         <td class="whitespace-nowrap px-3 py-2 tabular-nums font-medium text-slate-900">
                             {{
                                 formatCents(
-                                    Math.round((Number(line.quantity) || 0) * (Number(line.unit_price_cents) || 0)),
+                                    lineAmountCents(i),
                                     recurring.currency,
                                 )
                             }}

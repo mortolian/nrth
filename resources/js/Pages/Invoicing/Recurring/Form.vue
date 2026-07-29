@@ -18,12 +18,17 @@ type CatalogItem = {
     unit_price_cents: number;
     default_vat_rate: number | null;
 };
+type AccountOption = { id: number; name: string };
 type Line = {
     description: string;
     quantity: number | string;
     unit_price: string;
     vat_rate: number | string;
     item_id?: number | null;
+    income_account_id?: number | null;
+    discount_type?: 'percent' | 'fixed' | null;
+    discount_percent?: number | null;
+    discount_amount?: string;
 };
 
 const props = defineProps<{
@@ -35,6 +40,8 @@ const props = defineProps<{
     default_currency: string;
     tax_rates: Array<{ id: number; name: string; rate: number; is_default: boolean }>;
     note_templates?: NoteTemplateOption[];
+    accounts?: AccountOption[];
+    default_income_account_id?: number | null;
 }>();
 
 const toast = useToast();
@@ -43,10 +50,25 @@ const { fieldErrors, setFromServer, clear, messages: clientErrorMessages } = use
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
+const accounts = computed(() => props.accounts ?? []);
 const defaultVat = computed(() => {
     if (!props.charges_vat) return 0;
     return props.tax_rates.find((r) => r.is_default)?.rate ?? props.tax_rates[0]?.rate ?? 0;
 });
+
+const discountTypeOptions = [
+    { label: 'No discount', value: '' },
+    { label: 'Percent %', value: 'percent' },
+    { label: 'Fixed amount', value: 'fixed' },
+];
+
+const lineAccountSelectOptions = computed(() => [
+    { label: 'Use team default', value: '' },
+    ...accounts.value.map((account) => ({ label: account.name, value: String(account.id) })),
+]);
+
+const fixedDiscountFromCents = (cents: number | null | undefined): string =>
+    cents != null ? (Number(cents) / 100).toFixed(2) : '0.00';
 
 const help = {
     client: 'Who this template bills each cycle.',
@@ -65,6 +87,18 @@ const help = {
         'Use tokens like {{month_year}}, {{month}}, {{year}}, {{issue_date}}, {{due_date}}, {{day}}. They resolve when each invoice is generated.',
 };
 
+const emptyLine = (): Line => ({
+    description: '',
+    quantity: 1,
+    unit_price: '0.00',
+    vat_rate: defaultVat.value,
+    item_id: null,
+    income_account_id: null,
+    discount_type: null,
+    discount_percent: null,
+    discount_amount: '0.00',
+});
+
 const mapLines = (raw: any[] | undefined): Line[] => {
     if (!raw?.length) {
         return [{
@@ -73,6 +107,10 @@ const mapLines = (raw: any[] | undefined): Line[] => {
             unit_price: '0.00',
             vat_rate: defaultVat.value,
             item_id: null,
+            income_account_id: null,
+            discount_type: null,
+            discount_percent: null,
+            discount_amount: '0.00',
         }];
     }
 
@@ -82,6 +120,12 @@ const mapLines = (raw: any[] | undefined): Line[] => {
         unit_price: ((Number(line.unit_price_cents) || 0) / 100).toFixed(2),
         vat_rate: Number(line.vat_rate) || defaultVat.value,
         item_id: line.item_id ?? null,
+        income_account_id: line.income_account_id ?? null,
+        discount_type: line.discount_type ?? null,
+        discount_percent: line.discount_percent != null ? Number(line.discount_percent) : null,
+        discount_amount: line.discount_type === 'fixed'
+            ? fixedDiscountFromCents(line.discount_cents)
+            : '0.00',
     }));
 };
 
@@ -157,18 +201,23 @@ const applyItem = (index: number, raw: string) => {
 };
 
 const addLine = () => {
-    form.value.line_items.push({
-        description: '',
-        quantity: 1,
-        unit_price: '0.00',
-        vat_rate: defaultVat.value,
-        item_id: null,
-    });
+    form.value.line_items.push(emptyLine());
 };
 
 const removeLine = (index: number) => {
     if (form.value.line_items.length <= 1) return;
     form.value.line_items.splice(index, 1);
+};
+
+const setLineDiscountType = (index: number, raw: string) => {
+    const line = form.value.line_items[index];
+    if (!line) return;
+    const type = raw === 'percent' || raw === 'fixed' ? raw : null;
+    line.discount_type = type;
+    line.discount_percent = type === 'percent' ? (line.discount_percent ?? 0) : null;
+    if (type !== 'fixed') {
+        line.discount_amount = '0.00';
+    }
 };
 
 const normalizeMoneyInput = (raw: unknown): string => {
@@ -183,6 +232,12 @@ const onUnitPriceBlur = (index: number) => {
     const line = form.value.line_items[index];
     if (!line) return;
     line.unit_price = normalizeMoneyInput(line.unit_price);
+};
+
+const onLineDiscountAmountBlur = (index: number) => {
+    const line = form.value.line_items[index];
+    if (!line) return;
+    line.discount_amount = normalizeMoneyInput(line.discount_amount);
 };
 
 const placeholderTokens = [
@@ -243,6 +298,12 @@ const submit = () => {
             unit_price_cents: Math.round(Number(normalizeMoneyInput(line.unit_price)) * 100),
             vat_rate: props.charges_vat ? Number(line.vat_rate) : 0,
             item_id: line.item_id ?? null,
+            income_account_id: line.income_account_id ?? null,
+            discount_type: line.discount_type ?? null,
+            discount_percent: line.discount_type === 'percent' ? (line.discount_percent ?? null) : null,
+            discount_cents: line.discount_type === 'fixed'
+                ? Math.round(Number(normalizeMoneyInput(line.discount_amount)) * 100)
+                : null,
         })),
     };
 
@@ -529,6 +590,52 @@ const submit = () => {
                             placeholder="Description (placeholders allowed)"
                             class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
                         />
+                    </div>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <div class="min-w-[8rem] shrink-0">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Discount</label>
+                            <AppSelect
+                                size="sm"
+                                :model-value="line.discount_type ?? ''"
+                                :options="discountTypeOptions"
+                                @update:model-value="setLineDiscountType(index, String($event ?? ''))"
+                            />
+                        </div>
+                        <div v-if="line.discount_type === 'percent'" class="w-16 shrink-0">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Rate</label>
+                            <AppInput
+                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
+                                :model-value="line.discount_percent ?? 0"
+                                type="number"
+                                inputmode="decimal"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                placeholder="%"
+                                @update:model-value="line.discount_percent = Number($event)"
+                            />
+                        </div>
+                        <div v-if="line.discount_type === 'fixed'" class="w-20 shrink-0">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Amount</label>
+                            <AppInput
+                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
+                                :model-value="line.discount_amount ?? '0.00'"
+                                type="text"
+                                inputmode="decimal"
+                                placeholder="0.00"
+                                @update:model-value="line.discount_amount = String($event ?? '')"
+                                @blur="onLineDiscountAmountBlur(index)"
+                            />
+                        </div>
+                        <div v-if="accounts.length" class="min-w-[10rem] max-w-[14rem] flex-1">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Income account</label>
+                            <AppSelect
+                                size="sm"
+                                :model-value="line.income_account_id ? String(line.income_account_id) : ''"
+                                :options="lineAccountSelectOptions"
+                                @update:model-value="line.income_account_id = $event ? Number($event) : null"
+                            />
+                        </div>
                     </div>
                 </div>
                 <AppButton size="sm" variant="secondary" type="button" @click="addLine">Add line</AppButton>
