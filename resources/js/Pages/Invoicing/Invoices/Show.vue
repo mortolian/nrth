@@ -3,14 +3,16 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceInternalCurrencyApprox from '@/Components/InvoiceInternalCurrencyApprox.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import MarkdownProse from '@/Components/MarkdownProse.vue';
+import PageHeader from '@/Components/PageHeader.vue';
 import RecordInvoicePaymentDrawer, {
     type RecordPaymentInvoiceInput,
 } from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
-import { CheckCircle2, CircleDot, Download, Edit3, Eye, Mail, QrCode, Trash2, Wallet, X } from 'lucide-vue-next';
+import { CircleDot, Download, Edit3, Eye, Mail, QrCode, Wallet, X } from 'lucide-vue-next';
 
 type Issuer = {
     name: string;
@@ -160,6 +162,12 @@ const formatCents = (cents: number) =>
     useFormatCurrency((Number(cents) || 0) / 100, invoiceCurrency.value);
 
 const documentTitle = computed(() => (props.charges_vat ? 'Tax invoice' : 'Invoice'));
+
+const clientDisplayName = computed(() => props.invoice.client.name?.trim() || 'Unknown client');
+
+const headerSubtitle = computed(
+    () => `${clientDisplayName.value} · ${documentTitle.value} · Issued ${props.invoice.issue_date ?? '—'}`,
+);
 
 const issuerRegLine = computed(() => {
     const parts: string[] = [];
@@ -406,110 +414,124 @@ const sendReceipt = (paymentId: number) => {
         },
     );
 };
+
+const canRecordPayment = computed(
+    () => ['sent', 'partial', 'overdue'].includes(props.invoice.status) && props.can.record_payment,
+);
+
+const canPayOnline = computed(
+    () => canRecordPayment.value && props.invoice.amount_due_cents > 0,
+);
+
+/** Secondary / destructive actions — kept in a compact ⋮ menu on small screens. */
+const overflowActions = computed(() => {
+    const actions: Array<{ id: string; label: string }> = [];
+
+    if (props.can.mark_sent) {
+        actions.push({ id: 'mark_sent', label: 'Mark as sent' });
+    }
+    if (canPayOnline.value && onlinePaymentProviders.value.includes('stripe')) {
+        actions.push({ id: 'pay_stripe', label: 'Pay with Stripe' });
+    }
+    if (canPayOnline.value && onlinePaymentProviders.value.includes('payfast')) {
+        actions.push({ id: 'pay_payfast', label: 'Pay with PayFast' });
+    }
+    if (props.can.remind) {
+        actions.push({ id: 'remind', label: 'Send reminder' });
+    }
+    if (props.invoice.status === 'sent' && props.can.void) {
+        actions.push({ id: 'void', label: 'Void' });
+    }
+    if (props.invoice.status === 'void' && props.can.unvoid) {
+        actions.push({ id: 'unvoid', label: 'Restore' });
+    }
+    if (props.can.duplicate) {
+        actions.push({ id: 'duplicate', label: 'Duplicate' });
+    }
+    if (props.can.delete) {
+        actions.push({ id: 'delete', label: 'Delete' });
+    }
+
+    return actions;
+});
+
+const onOverflowAction = (actionId: string) => {
+    if (actionId === 'mark_sent') {
+        markAsSent();
+    } else if (actionId === 'pay_stripe') {
+        startOnlinePayment('stripe');
+    } else if (actionId === 'pay_payfast') {
+        startOnlinePayment('payfast');
+    } else if (actionId === 'remind') {
+        sendReminder();
+    } else if (actionId === 'void') {
+        voidInvoice();
+    } else if (actionId === 'unvoid') {
+        unvoidInvoice();
+    } else if (actionId === 'duplicate') {
+        router.visit(route('invoicing.invoices.create', { from: props.invoice.id }));
+    } else if (actionId === 'delete') {
+        deleteInvoice();
+    }
+};
 </script>
 
 <template>
     <AppLayout
-        :title="invoice.number"
+        :title="`${invoice.number} · ${clientDisplayName}`"
         :breadcrumbs="[
             { label: 'Money In', href: route('invoicing.invoices.index') },
             { label: 'Invoices', href: route('invoicing.invoices.index') },
             { label: invoice.number },
         ]"
     >
-        <header class="mb-6 min-w-0">
-            <h1 class="truncate whitespace-nowrap text-2xl font-semibold text-slate-900">{{ invoice.number }}</h1>
-            <p class="mt-1 truncate whitespace-nowrap text-base text-slate-500">
-                {{ documentTitle }} · Issued {{ invoice.issue_date ?? '—' }}
-            </p>
-            <div class="mt-4 flex min-w-0 flex-nowrap justify-end gap-2 overflow-x-auto pb-1">
-                <AppButton class="shrink-0" variant="secondary" @click="openPdfPreview">
-                    <Eye class="mr-1 h-4 w-4 shrink-0" /> Preview PDF
+        <PageHeader
+            :title="invoice.number"
+            :subtitle="headerSubtitle"
+        >
+            <template #actions>
+                <AppButton variant="secondary" size="sm" @click="openPdfPreview">
+                    <Eye class="mr-1 h-4 w-4 shrink-0" /> Preview
                 </AppButton>
-                <AppButton class="shrink-0" variant="primary" @click="downloadPdf">
-                    <Download class="mr-1 h-4 w-4 shrink-0" /> Download PDF
+                <AppButton variant="secondary" size="sm" @click="downloadPdf">
+                    <Download class="mr-1 h-4 w-4 shrink-0" /> Download
                 </AppButton>
                 <AppButton
                     v-if="can.edit"
-                    class="shrink-0"
-                    variant="primary"
+                    variant="secondary"
+                    size="sm"
                     @click="router.visit(route('invoicing.invoices.edit', invoice.id))"
                 >
                     <Edit3 class="mr-1 h-4 w-4 shrink-0" /> Edit
                 </AppButton>
-                <AppButton v-if="can.send" class="shrink-0" variant="primary" :loading="sendingInvoice" @click="sendInvoice">
-                    <Mail class="mr-1 h-4 w-4 shrink-0" /> {{ invoice.status === 'draft' ? 'Send invoice' : 'Resend invoice' }}
-                </AppButton>
-                <AppButton v-if="can.mark_sent" class="shrink-0" variant="primary" :loading="markingSent" @click="markAsSent">
-                    <CheckCircle2 class="mr-1 h-4 w-4 shrink-0" /> Mark as sent
+                <AppButton
+                    v-if="can.send"
+                    variant="primary"
+                    size="sm"
+                    :loading="sendingInvoice"
+                    @click="sendInvoice"
+                >
+                    <Mail class="mr-1 h-4 w-4 shrink-0" />
+                    {{ invoice.status === 'draft' ? 'Send' : 'Resend' }}
                 </AppButton>
                 <AppButton
-                    v-if="['sent', 'partial', 'overdue'].includes(invoice.status) && can.record_payment"
-                    class="shrink-0"
+                    v-if="canRecordPayment"
                     variant="primary"
+                    size="sm"
                     @click="openRecordPayment"
                 >
                     <Wallet class="mr-1 h-4 w-4 shrink-0" /> Record payment
                 </AppButton>
-                <AppButton
-                    v-if="
-                        ['sent', 'partial', 'overdue'].includes(invoice.status) &&
-                        can.record_payment &&
-                        invoice.amount_due_cents > 0 &&
-                        onlinePaymentProviders.includes('stripe')
-                    "
-                    class="shrink-0"
-                    variant="secondary"
-                    type="button"
-                    @click="startOnlinePayment('stripe')"
-                >
-                    Pay with Stripe
-                </AppButton>
-                <AppButton
-                    v-if="
-                        ['sent', 'partial', 'overdue'].includes(invoice.status) &&
-                        can.record_payment &&
-                        invoice.amount_due_cents > 0 &&
-                        onlinePaymentProviders.includes('payfast')
-                    "
-                    class="shrink-0"
-                    variant="secondary"
-                    type="button"
-                    @click="startOnlinePayment('payfast')"
-                >
-                    Pay with PayFast
-                </AppButton>
-                <AppButton
-                    v-if="can.remind"
-                    class="shrink-0"
-                    variant="primary"
-                    type="button"
-                    :loading="sendingReminder"
-                    @click="sendReminder"
-                >
-                    Send reminder
-                </AppButton>
-                <AppButton v-if="invoice.status === 'sent' && can.void" class="shrink-0" variant="primary" @click="voidInvoice">
-                    Void
-                </AppButton>
-                <AppButton v-if="invoice.status === 'void' && can.unvoid" class="shrink-0" variant="primary" @click="unvoidInvoice">
-                    Restore
-                </AppButton>
-                <AppButton
-                    v-if="can.duplicate"
-                    class="shrink-0"
-                    variant="primary"
-                    @click="router.visit(route('invoicing.invoices.create', { from: invoice.id }))"
-                >
-                    Duplicate
-                </AppButton>
-                <AppButton v-if="can.delete" class="shrink-0" variant="danger" @click="deleteInvoice">
-                    <Trash2 class="mr-1 h-4 w-4 shrink-0" /> Delete
-                </AppButton>
-            </div>
-        </header>
+                <InvoiceRowActionsMenu
+                    v-if="overflowActions.length"
+                    :actions="overflowActions"
+                    :aria-label="`More actions for ${invoice.number}`"
+                    @select="onOverflowAction"
+                />
+            </template>
+        </PageHeader>
 
-        <div class="mt-5 grid gap-6 xl:grid-cols-3">
+        <div class="grid gap-6 xl:grid-cols-3">
             <section class="xl:col-span-2">
                 <AppCard class="space-y-5">
                     <div class="grid gap-4 md:grid-cols-2">
