@@ -84,7 +84,7 @@ Full list: run `./scripts/install.sh --help`.
 | Want a clean wipe | `./scripts/reset.sh --force` (destroys volumes) |
 | Docker permission denied | Use `./scripts/compose.sh …`, or `newgrp docker` |
 | DB password mismatch after `.env` edit | `./scripts/repair.sh` |
-| Queues stuck | `./scripts/compose.sh restart worker` |
+| Queues stuck | `./scripts/compose.sh restart horizon` |
 
 More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
 

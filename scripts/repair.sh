@@ -384,8 +384,8 @@ main() {
 
     rebuild_assets_if_needed "$REBUILD_ASSETS"
 
-    log "Restarting app and workers to pick up .env changes"
-    $COMPOSE restart app worker scheduler 2>/dev/null || $COMPOSE restart app
+    log "Restarting app and services to pick up .env changes"
+    $COMPOSE restart app horizon scheduler vite 2>/dev/null || $COMPOSE restart app
 
     wait_for_app_health
     print_result "$ROOT_DIR/.env"

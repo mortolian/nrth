@@ -57,7 +57,7 @@ x-laravel-env: &laravel-env
   VITE_DEV_SERVER_USE_POLLING: "${VITE_DEV_SERVER_USE_POLLING:-false}"
 
 # Service names (postgres, redis, mailpit) only resolve inside the Compose network.
-# `.env` can use 127.0.0.1 + forwarded ports for `php artisan` on the host; app/worker/scheduler
+# `.env` can use 127.0.0.1 + forwarded ports for `php artisan` on the host; app/horizon/scheduler
 # override those keys below so containers always use in-network hosts.
 
 services:
@@ -108,7 +108,6 @@ services:
     image: nrth:local
     ports:
       - "${APP_PORT:-8000}:8000"
-      - "${VITE_PORT:-5173}:5173"
     environment:
       <<: *laravel-env
       DB_HOST: postgres
@@ -146,8 +145,29 @@ services:
       retries: 5
       start_period: 120s
 
-  worker:
+  vite:
     image: nrth:local
+    working_dir: /var/www/html
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    environment:
+      <<: *laravel-env
+      DOCKER_ROLE: vite
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - .:/var/www/html
+      - ./docker/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
+      - vendor_data:/var/www/html/vendor
+      - node_modules_data:/var/www/html/node_modules
+      - storage_data:/var/www/html/storage
+    entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
+    command: ['npm', 'run', 'dev']
+
+  horizon:
+    image: nrth:local
+    working_dir: /var/www/html
     environment:
       <<: *laravel-env
       DB_HOST: postgres
@@ -155,7 +175,7 @@ services:
       MAIL_HOST: mailpit
       MAIL_PORT: '1025'
       MAIL_MAILER: smtp
-      DOCKER_ROLE: worker
+      DOCKER_ROLE: horizon
     depends_on:
       postgres:
         condition: service_healthy
@@ -166,14 +186,13 @@ services:
     volumes:
       - .:/var/www/html
       - ./docker/entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
-      - ./docker/supervisord.conf:/etc/supervisor/conf.d/laravel.conf:ro
       - vendor_data:/var/www/html/vendor
       - node_modules_data:/var/www/html/node_modules
       - storage_data:/var/www/html/storage
     entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
-    command: ['/usr/bin/supervisord', '-n', '-c', '/etc/supervisor/supervisord.conf']
+    command: ['php', 'artisan', 'horizon']
     healthcheck:
-      test: ['CMD-SHELL', 'supervisorctl -c /etc/supervisor/supervisord.conf status horizon | grep -q RUNNING']
+      test: ['CMD-SHELL', 'pgrep -f "artisan horizon" >/dev/null']
       interval: 30s
       timeout: 10s
       retries: 5

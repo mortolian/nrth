@@ -65,18 +65,19 @@ cp .env.example .env
 docker compose up -d --build
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
-docker compose exec app npm run dev   # optional: Vite HMR inside container
 ```
 
 Sail wrapper (uses `compose.yaml`):
 
 ```bash
-composer sail -- up -d
-composer sail -- artisan migrate
-composer sail -- npm run dev
+./vendor/bin/sail up -d
+./vendor/bin/sail artisan migrate
 ```
 
-See `.env.example` for Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
+`vite` and `horizon` start automatically with the stack. Vite HMR is available at
+`http://localhost:5173`; use `./vendor/bin/sail logs -f vite` or
+`./vendor/bin/sail logs -f horizon` to inspect either service. See `.env.example` for
+Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
 
 ### Email (invitations, invoices, password reset)
 
@@ -100,7 +101,7 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 
 - Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).
 - The first user created is an instance operator. Manage operators under **Backups & exports → Instance backup**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
-- Takeout and instance backup jobs run on Horizon’s `long` queue (multi-minute). Restart the worker after pulling changes: `./vendor/bin/sail restart worker` (or `php artisan horizon:terminate`).
+- Takeout and instance backup jobs run on Horizon’s `long` queue (multi-minute). Restart Horizon after pulling changes: `./vendor/bin/sail restart horizon` (or `php artisan horizon:terminate`).
 - Instance backups need `pg_dump` matching Compose Postgres (**16**). After Dockerfile client changes: `./vendor/bin/sail build` then recreate containers.
 ## Architecture
 
