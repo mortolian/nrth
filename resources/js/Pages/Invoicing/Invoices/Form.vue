@@ -916,12 +916,13 @@ const onSave = () => {
                     <div class="mt-4 border-t border-slate-200 pt-4">
                         <p class="mb-2 text-xs font-medium text-slate-500">Document discount</p>
                         <div class="flex flex-wrap items-center gap-2">
-                            <AppSelect
-                                class="min-w-[5.5rem]"
-                                :model-value="(values.discount_type as string | null) ?? ''"
-                                :options="discountTypeOptions"
-                                @update:model-value="setDocumentDiscountType(String($event ?? ''))"
-                            />
+                            <div class="min-w-[5.5rem]">
+                                <AppSelect
+                                    :model-value="(values.discount_type as string | null) ?? ''"
+                                    :options="discountTypeOptions"
+                                    @update:model-value="setDocumentDiscountType(String($event ?? ''))"
+                                />
+                            </div>
                             <AppInput
                                 v-if="values.discount_type === 'percent'"
                                 class="w-24 text-right tabular-nums"
@@ -931,6 +932,7 @@ const onSave = () => {
                                 min="0"
                                 max="100"
                                 step="0.01"
+                                placeholder="%"
                                 @update:model-value="setFieldValue('discount_percent', Number($event))"
                             />
                             <AppInput
@@ -939,6 +941,7 @@ const onSave = () => {
                                 :model-value="values.discount_amount as string"
                                 type="text"
                                 inputmode="decimal"
+                                placeholder="0.00"
                                 @update:model-value="setFieldValue('discount_amount', $event)"
                                 @blur="onDocumentDiscountAmountBlur"
                             />

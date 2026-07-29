@@ -620,7 +620,6 @@ const submit = (submitAction: 'draft' | 'send') => {
                                     <th class="min-w-[14rem] px-2 py-2 text-left font-medium">Description</th>
                                     <th class="w-16 px-1.5 py-2 text-right font-medium">Qty</th>
                                     <th class="w-24 px-1.5 py-2 text-right font-medium">Price</th>
-                                    <th class="w-28 px-1.5 py-2 text-left font-medium">Discount</th>
                                     <th v-if="chargesVat" class="w-28 px-1.5 py-2 text-left font-medium">VAT</th>
                                     <th v-if="chargesVat" class="w-20 px-1.5 py-2 text-right font-medium">VAT amt</th>
                                     <th class="w-24 px-1.5 py-2 text-right font-medium">Total</th>
@@ -647,19 +646,51 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             class="block w-full resize-y rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
                                             @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
                                         />
-                                        <div v-if="catalogItems.length" class="mt-1">
-                                            <AppSelect
-                                                size="sm"
-                                                :model-value="line.item_id ? String(line.item_id) : ''"
-                                                :options="[
-                                                    { label: 'From catalog…', value: '' },
-                                                    ...catalogItems.map((item) => ({
-                                                        label: item.name,
-                                                        value: String(item.id),
-                                                    })),
-                                                ]"
-                                                placeholder="From catalog…"
-                                                @update:model-value="applyCatalogItem(index, String($event ?? ''))"
+                                        <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                            <div v-if="catalogItems.length" class="min-w-[8.5rem] max-w-[12rem] flex-1">
+                                                <AppSelect
+                                                    size="sm"
+                                                    :model-value="line.item_id ? String(line.item_id) : ''"
+                                                    :options="[
+                                                        { label: 'From catalog…', value: '' },
+                                                        ...catalogItems.map((item) => ({
+                                                            label: item.name,
+                                                            value: String(item.id),
+                                                        })),
+                                                    ]"
+                                                    placeholder="From catalog…"
+                                                    @update:model-value="applyCatalogItem(index, String($event ?? ''))"
+                                                />
+                                            </div>
+                                            <div class="w-[6.5rem] shrink-0">
+                                                <AppSelect
+                                                    size="sm"
+                                                    :model-value="line.discount_type ?? ''"
+                                                    :options="discountTypeOptions"
+                                                    @update:model-value="setLineDiscountType(index, String($event ?? ''))"
+                                                />
+                                            </div>
+                                            <AppInput
+                                                v-if="line.discount_type === 'percent'"
+                                                class="!h-8 w-16 !px-2 !py-1 text-right text-xs tabular-nums"
+                                                :model-value="line.discount_percent ?? 0"
+                                                type="number"
+                                                inputmode="decimal"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                placeholder="%"
+                                                @update:model-value="updateLine(index, 'discount_percent', Number($event))"
+                                            />
+                                            <AppInput
+                                                v-if="line.discount_type === 'fixed'"
+                                                class="!h-8 w-20 !px-2 !py-1 text-right text-xs tabular-nums"
+                                                :model-value="line.discount_amount"
+                                                type="text"
+                                                inputmode="decimal"
+                                                placeholder="0.00"
+                                                @update:model-value="updateLine(index, 'discount_amount', $event)"
+                                                @blur="onDiscountAmountBlur(index)"
                                             />
                                         </div>
                                     </td>
@@ -683,38 +714,6 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             @update:model-value="updateLine(index, 'unit_price', $event)"
                                             @blur="onUnitPriceBlur(index)"
                                         />
-                                    </td>
-                                    <td class="px-1.5 py-1.5 align-top">
-                                        <div class="flex flex-col gap-1">
-                                            <AppSelect
-                                                size="sm"
-                                                :model-value="line.discount_type ?? ''"
-                                                :options="discountTypeOptions"
-                                                @update:model-value="setLineDiscountType(index, String($event ?? ''))"
-                                            />
-                                            <AppInput
-                                                v-if="line.discount_type === 'percent'"
-                                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
-                                                :model-value="line.discount_percent ?? 0"
-                                                type="number"
-                                                inputmode="decimal"
-                                                min="0"
-                                                max="100"
-                                                step="0.01"
-                                                placeholder="%"
-                                                @update:model-value="updateLine(index, 'discount_percent', Number($event))"
-                                            />
-                                            <AppInput
-                                                v-else-if="line.discount_type === 'fixed'"
-                                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
-                                                :model-value="line.discount_amount"
-                                                type="text"
-                                                inputmode="decimal"
-                                                placeholder="0.00"
-                                                @update:model-value="updateLine(index, 'discount_amount', $event)"
-                                                @blur="onDiscountAmountBlur(index)"
-                                            />
-                                        </div>
                                     </td>
                                     <td v-if="chargesVat" class="px-1.5 py-1.5 align-top">
                                         <AppSelect
@@ -754,15 +753,44 @@ const submit = (submitAction: 'draft' | 'send') => {
 
                 <AppCard>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Totals</h3>
-                    <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3">
-                        <p class="mb-2 text-xs font-medium text-slate-600">Document discount</p>
+                    <div class="space-y-2 text-sm text-slate-700">
+                        <div class="flex items-center justify-between">
+                            <span>{{ chargesVat ? 'Subtotal (excl VAT)' : 'Subtotal' }}</span>
+                            <span>{{ money(totals.subtotal_cents) }}</span>
+                        </div>
+                        <div
+                            v-if="totals.discount_total_cents > 0"
+                            class="flex items-center justify-between text-rose-700"
+                        >
+                            <span>Discounts applied</span>
+                            <span>&minus;{{ money(totals.discount_total_cents) }}</span>
+                        </div>
+                        <template v-if="chargesVat">
+                            <div
+                                v-for="(amount, key) in vatBreakdown"
+                                :key="key"
+                                class="flex items-center justify-between"
+                            >
+                                <span>VAT {{ key }}</span>
+                                <span>{{ money(amount) }}</span>
+                            </div>
+                        </template>
+                        <div class="flex items-center justify-between border-t border-slate-200 pt-2 font-semibold">
+                            <span>{{ chargesVat ? 'Total (incl VAT)' : 'Total' }}</span>
+                            <span>{{ money(totals.total_cents) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 border-t border-slate-200 pt-4">
+                        <p class="mb-2 text-xs font-medium text-slate-500">Document discount</p>
                         <div class="flex flex-wrap items-center gap-2">
-                            <AppSelect
-                                class="w-28"
-                                :model-value="form.discount_type ?? ''"
-                                :options="discountTypeOptions"
-                                @update:model-value="setDocumentDiscountType(String($event ?? ''))"
-                            />
+                            <div class="min-w-[5.5rem]">
+                                <AppSelect
+                                    :model-value="form.discount_type ?? ''"
+                                    :options="discountTypeOptions"
+                                    @update:model-value="setDocumentDiscountType(String($event ?? ''))"
+                                />
+                            </div>
                             <AppInput
                                 v-if="form.discount_type === 'percent'"
                                 class="w-24 text-right tabular-nums"
@@ -776,7 +804,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                 @update:model-value="form.discount_percent = Number($event)"
                             />
                             <AppInput
-                                v-else-if="form.discount_type === 'fixed'"
+                                v-if="form.discount_type === 'fixed'"
                                 class="w-28 text-right tabular-nums"
                                 :model-value="form.discount_amount"
                                 type="text"
@@ -785,33 +813,6 @@ const submit = (submitAction: 'draft' | 'send') => {
                                 @update:model-value="form.discount_amount = String($event)"
                                 @blur="onDiscountAmountBlur('document')"
                             />
-                        </div>
-                    </div>
-                    <div class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-slate-500">{{ chargesVat ? 'Subtotal (excl VAT)' : 'Subtotal' }}</span>
-                            <span>{{ money(totals.subtotal_cents) }}</span>
-                        </div>
-                        <div
-                            v-if="totals.discount_total_cents > 0"
-                            class="flex justify-between text-rose-700"
-                        >
-                            <span>Discounts</span>
-                            <span>-{{ money(totals.discount_total_cents) }}</span>
-                        </div>
-                        <template v-if="chargesVat">
-                            <div
-                                v-for="(amount, key) in vatBreakdown"
-                                :key="key"
-                                class="flex justify-between"
-                            >
-                                <span class="text-slate-500">VAT {{ key }}</span>
-                                <span>{{ money(amount) }}</span>
-                            </div>
-                        </template>
-                        <div class="flex justify-between border-t border-slate-200 pt-2 font-semibold">
-                            <span>{{ chargesVat ? 'Total (incl VAT)' : 'Total' }}</span>
-                            <span>{{ money(totals.total_cents) }}</span>
                         </div>
                     </div>
                 </AppCard>
