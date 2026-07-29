@@ -22,13 +22,23 @@ class InvoicePdfController extends Controller
 
     public function download(Invoice $invoice): StreamedResponse|RedirectResponse
     {
+        return $this->streamPdf($invoice, asAttachment: true);
+    }
+
+    public function preview(Invoice $invoice): StreamedResponse|RedirectResponse
+    {
+        return $this->streamPdf($invoice, asAttachment: false);
+    }
+
+    private function streamPdf(Invoice $invoice, bool $asAttachment): StreamedResponse|RedirectResponse
+    {
         $this->authorizeTeam('invoices.view');
         abort_unless($invoice->team_id === auth()->user()->current_team_id, 403);
 
         try {
             $media = $this->invoicePdfService->generate($invoice);
         } catch (Throwable $e) {
-            Log::warning('Invoice PDF download failed; missing PDF generator', [
+            Log::warning('Invoice PDF '.($asAttachment ? 'download' : 'preview').' failed; missing PDF generator', [
                 'invoice_id' => $invoice->id,
                 'error' => $e->getMessage(),
             ]);
@@ -41,15 +51,30 @@ class InvoicePdfController extends Controller
         $disk = Storage::disk($media->disk);
         $path = $media->getPathRelativeToRoot();
         $stream = $disk->readStream($path);
+        $fileName = $media->file_name ?: ($invoice->number.'.pdf');
+        $headers = [
+            'Content-Type' => $media->mime_type ?: 'application/pdf',
+        ];
 
-        return response()->streamDownload(function () use ($stream): void {
+        if ($asAttachment) {
+            return response()->streamDownload(function () use ($stream): void {
+                if (is_resource($stream)) {
+                    fpassthru($stream);
+                    fclose($stream);
+                }
+            }, $fileName, $headers);
+        }
+
+        $safeName = str_replace('"', '', $fileName);
+        $headers['Content-Disposition'] = 'inline; filename="'.$safeName.'"';
+        $headers['Cache-Control'] = 'private, max-age=0, must-revalidate';
+
+        return response()->stream(function () use ($stream): void {
             if (is_resource($stream)) {
                 fpassthru($stream);
                 fclose($stream);
             }
-        }, $media->file_name, [
-            'Content-Type' => $media->mime_type ?: 'application/pdf',
-        ]);
+        }, 200, $headers);
     }
 
     public function downloadZip(Request $request): StreamedResponse|RedirectResponse|JsonResponse

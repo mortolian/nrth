@@ -10,7 +10,7 @@ import RecordInvoicePaymentDrawer, {
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
-import { CheckCircle2, CircleDot, Download, Edit3, Mail, QrCode, Trash2, Wallet } from 'lucide-vue-next';
+import { CheckCircle2, CircleDot, Download, Edit3, Eye, Mail, QrCode, Trash2, Wallet, X } from 'lucide-vue-next';
 
 type Issuer = {
     name: string;
@@ -129,6 +129,7 @@ const bookCurrencySnapshot = computed(() => {
 });
 
 const paymentDrawerOpen = ref(false);
+const pdfPreviewOpen = ref(false);
 const toast = useToast();
 const sendingInvoice = ref(false);
 const sendingReminder = ref(false);
@@ -273,6 +274,17 @@ const deleteInvoice = () => {
 const downloadPdf = () => {
     window.location.assign(route('invoices.pdf.download', props.invoice.id));
 };
+
+const openPdfPreview = () => {
+    pdfPreviewOpen.value = true;
+};
+
+const openPdfInNewTab = () => {
+    window.open(pdfPreviewUrl.value, '_blank', 'noopener,noreferrer');
+};
+
+const pdfPreviewUrl = computed(() => route('invoices.pdf.preview', props.invoice.id));
+
 const openRecordPayment = () => {
     paymentDrawerOpen.value = true;
 };
@@ -359,6 +371,9 @@ const undoPayment = (paymentId: number) => {
                 {{ documentTitle }} · Issued {{ invoice.issue_date ?? '—' }}
             </p>
             <div class="mt-4 flex min-w-0 flex-nowrap justify-end gap-2 overflow-x-auto pb-1">
+                <AppButton class="shrink-0" variant="secondary" @click="openPdfPreview">
+                    <Eye class="mr-1 h-4 w-4 shrink-0" /> Preview PDF
+                </AppButton>
                 <AppButton class="shrink-0" variant="primary" @click="downloadPdf">
                     <Download class="mr-1 h-4 w-4 shrink-0" /> Download PDF
                 </AppButton>
@@ -650,5 +665,49 @@ const undoPayment = (paymentId: number) => {
             :charges-vat="charges_vat"
             @update:open="paymentDrawerOpen = $event"
         />
+
+        <div
+            v-if="pdfPreviewOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Invoice PDF preview"
+            @click.self="pdfPreviewOpen = false"
+        >
+            <div class="flex h-[min(92vh,56rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-slate-900">PDF preview · {{ invoice.number }}</p>
+                        <p class="truncate text-xs text-slate-500">Same document as the downloadable invoice PDF</p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                        <AppButton
+                            size="sm"
+                            variant="secondary"
+                            type="button"
+                            @click="openPdfInNewTab"
+                        >
+                            Open in new tab
+                        </AppButton>
+                        <AppButton size="sm" variant="primary" type="button" @click="downloadPdf">
+                            <Download class="mr-1 h-4 w-4 shrink-0" /> Download
+                        </AppButton>
+                        <button
+                            type="button"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                            aria-label="Close PDF preview"
+                            @click="pdfPreviewOpen = false"
+                        >
+                            <X class="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+                <iframe
+                    :src="pdfPreviewUrl"
+                    class="h-full w-full flex-1 bg-slate-100"
+                    title="Invoice PDF preview"
+                />
+            </div>
+        </div>
     </AppLayout>
 </template>

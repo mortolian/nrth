@@ -245,4 +245,5 @@ Route::middleware([
         Route::get('/invoices/{invoice}/public-pay-qr', [InvoiceController::class, 'publicPayQr'])->name('invoices.public-pay-qr');
     });
     Route::get('/invoices/{invoice}/pdf', [InvoicePdfController::class, 'download'])->name('invoices.pdf.download');
+    Route::get('/invoices/{invoice}/pdf/preview', [InvoicePdfController::class, 'preview'])->name('invoices.pdf.preview');
 });

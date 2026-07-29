@@ -189,6 +189,7 @@ const navigateToPage = (page: number) => {
 const rowActionItems = (invoice: InvoiceRow) => {
     const actions = [
         { id: 'view', label: 'View' },
+        { id: 'preview_pdf', label: 'Preview PDF' },
         { id: 'download_pdf', label: 'Download PDF' },
     ];
     if (invoice.status === 'draft') {
@@ -209,6 +210,8 @@ const rowActionItems = (invoice: InvoiceRow) => {
 const onAction = (invoice: InvoiceRow, actionId: string) => {
     if (actionId === 'view') {
         router.visit(route('invoicing.invoices.show', invoice.id));
+    } else if (actionId === 'preview_pdf') {
+        window.open(route('invoices.pdf.preview', invoice.id), '_blank', 'noopener,noreferrer');
     } else if (actionId === 'download_pdf') {
         window.location.assign(route('invoices.pdf.download', invoice.id));
     } else if (actionId === 'send' || actionId === 'resend') {
