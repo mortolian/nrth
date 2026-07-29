@@ -44,6 +44,7 @@ class PublicInvoicePayController extends Controller
             : [
                 'name' => (string) config('app.name'),
                 'address' => null,
+                'address_lines' => [],
                 'email' => null,
                 'phone' => null,
                 'website' => null,

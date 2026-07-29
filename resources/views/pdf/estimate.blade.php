@@ -13,6 +13,7 @@
     $issuer = $team ? $team->issuerForInvoicingDocuments('estimate') : [
         'name' => config('app.name'),
         'address' => null,
+        'address_lines' => [],
         'email' => null,
         'phone' => null,
         'website' => null,
@@ -26,6 +27,15 @@
     $companyPhone = $issuer['phone'];
     $companyWebsite = $issuer['website'];
     $physical = $issuer['address'] ?? '';
+    $physicalLines = $issuer['address_lines'] ?? (
+        is_string($physical) && $physical !== ''
+            ? preg_split("/\r\n|\n|\r/", $physical) ?: []
+            : []
+    );
+    $physicalLines = array_values(array_filter(array_map(
+        static fn ($line) => trim((string) $line),
+        is_array($physicalLines) ? $physicalLines : [],
+    )));
 
     $clientAddress = is_array($client?->address)
         ? trim(collect([
@@ -89,7 +99,9 @@
                 <img src="{{ $logoSrc }}" alt="" style="max-width: 200px; max-height: 70px; object-fit: contain; margin-bottom: 6px;">
             @endif
             <div class="company-name">{{ $businessName }}</div>
-            @if($physical)<div class="company-line">{{ $physical }}</div>@endif
+            @foreach($physicalLines as $line)
+                <div class="company-line">{{ $line }}</div>
+            @endforeach
             @if($companyEmail)<div class="company-line">{{ $companyEmail }}</div>@endif
             @if($companyPhone)<div class="company-line">{{ $companyPhone }}</div>@endif
             @if($companyWebsite)<div class="company-line">{{ $companyWebsite }}</div>@endif

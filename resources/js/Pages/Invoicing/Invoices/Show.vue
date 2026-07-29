@@ -15,6 +15,7 @@ import { CheckCircle2, CircleDot, Download, Edit3, Mail, QrCode, Trash2, Wallet 
 type Issuer = {
     name: string;
     address: string | null;
+    address_lines?: string[];
     email: string | null;
     phone: string | null;
     website: string | null;
@@ -165,6 +166,18 @@ const issuerRegLine = computed(() => {
         parts.push(`VAT: ${props.issuer.vat_number}`);
     }
     return parts.length ? parts.join(' · ') : null;
+});
+
+const issuerAddressLines = computed(() => {
+    const lines = props.issuer.address_lines?.map((line) => line.trim()).filter(Boolean) ?? [];
+    if (lines.length) {
+        return lines;
+    }
+    const legacy = props.issuer.address?.trim();
+    if (!legacy) {
+        return [];
+    }
+    return legacy.split(/\n+/).map((line) => line.trim()).filter(Boolean);
 });
 
 const statusBadgeVariant = computed(() =>
@@ -436,8 +449,16 @@ const undoPayment = (paymentId: number) => {
                         <div>
                             <p class="text-xs uppercase tracking-wide text-slate-500">From</p>
                             <p class="mt-1 text-sm font-medium text-slate-900">{{ issuer.name }}</p>
-                            <p v-if="issuer.address" class="text-sm text-slate-600">{{ issuer.address }}</p>
-                            <p v-if="issuer.email" class="text-sm text-slate-600">{{ issuer.email }}</p>
+                            <div v-if="issuerAddressLines.length" class="mt-0.5 space-y-0.5">
+                                <p
+                                    v-for="(line, index) in issuerAddressLines"
+                                    :key="index"
+                                    class="text-sm leading-snug text-slate-600"
+                                >
+                                    {{ line }}
+                                </p>
+                            </div>
+                            <p v-if="issuer.email" class="mt-1 text-sm text-slate-600">{{ issuer.email }}</p>
                             <p v-if="issuer.phone" class="text-sm text-slate-600">{{ issuer.phone }}</p>
                             <p v-if="issuer.website" class="text-sm text-slate-600">{{ issuer.website }}</p>
                             <p v-if="issuerRegLine" class="mt-0.5 text-xs text-slate-500">{{ issuerRegLine }}</p>

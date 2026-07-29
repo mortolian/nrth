@@ -454,6 +454,7 @@ class Team extends JetstreamTeam implements HasMedia
      * @return array{
      *     name: string,
      *     address: string|null,
+     *     address_lines: list<string>,
      *     email: string|null,
      *     phone: string|null,
      *     website: string|null,
@@ -470,23 +471,8 @@ class Team extends JetstreamTeam implements HasMedia
 
         $showStreetSetting = $documentType === 'estimate' ? 'estimate_show_street_address' : 'invoice_show_street_address';
         $showStreet = (bool) ($settings[$showStreetSetting] ?? true);
-        $physicalParts = $showStreet
-            ? [
-                $settings['physical_street'] ?? null,
-                $settings['physical_city'] ?? null,
-                $settings['physical_province'] ?? null,
-                $settings['physical_postal_code'] ?? null,
-                $settings['physical_country'] ?? null,
-            ]
-            : [
-                $settings['physical_city'] ?? null,
-                $settings['physical_province'] ?? null,
-                $settings['physical_postal_code'] ?? null,
-                $settings['physical_country'] ?? null,
-            ];
-
-        $address = trim(collect($physicalParts)->filter()->implode(', '));
-        $address = $address !== '' ? $address : null;
+        $addressLines = $this->physicalAddressLines($settings, $showStreet);
+        $address = $addressLines !== [] ? implode("\n", $addressLines) : null;
 
         $nullIfEmpty = static function (mixed $v): ?string {
             if ($v === null || $v === '') {
@@ -499,12 +485,52 @@ class Team extends JetstreamTeam implements HasMedia
         return [
             'name' => $name,
             'address' => $address,
+            'address_lines' => $addressLines,
             'email' => $nullIfEmpty($settings['business_email'] ?? null),
             'phone' => $nullIfEmpty($settings['business_phone'] ?? null),
             'website' => $nullIfEmpty($settings['business_website'] ?? null),
             'registration_number' => $nullIfEmpty($settings['registration_number'] ?? null),
             'vat_number' => $nullIfEmpty($settings['vat_number'] ?? null),
         ];
+    }
+
+    /**
+     * Format the team physical address as postal-style lines for invoices/PDFs.
+     *
+     * @param  array<string, mixed>  $settings
+     * @return list<string>
+     */
+    private function physicalAddressLines(array $settings, bool $includeStreet): array
+    {
+        $trim = static fn (mixed $value): string => trim((string) ($value ?? ''));
+
+        $street = $includeStreet ? $trim($settings['physical_street'] ?? null) : '';
+        $city = $trim($settings['physical_city'] ?? null);
+        $province = $trim($settings['physical_province'] ?? null);
+        $postalCode = $trim($settings['physical_postal_code'] ?? null);
+        $country = $trim($settings['physical_country'] ?? null);
+
+        $lines = [];
+
+        if ($street !== '') {
+            $lines[] = $street;
+        }
+
+        // e.g. "Cape Town, Western Cape 8001"
+        $localityParts = array_values(array_filter([$city, $province], static fn (string $part): bool => $part !== ''));
+        $locality = implode(', ', $localityParts);
+        if ($postalCode !== '') {
+            $locality = $locality !== '' ? "{$locality} {$postalCode}" : $postalCode;
+        }
+        if ($locality !== '') {
+            $lines[] = $locality;
+        }
+
+        if ($country !== '') {
+            $lines[] = $country;
+        }
+
+        return $lines;
     }
 
     /**
