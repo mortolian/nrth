@@ -5,7 +5,7 @@ import EmptyState from '@/Components/EmptyState.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import SettingsShell from '@/Components/SettingsShell.vue';
-import { FileText, Pencil, Trash2 } from 'lucide-vue-next';
+import { FileText, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 
 type Template = {
     id: number;
@@ -27,6 +27,7 @@ const blankForm = () => ({
 
 const form = ref(blankForm());
 const editingId = ref<number | null>(null);
+const formOpen = ref(false);
 const saving = ref(false);
 
 const isEditing = computed(() => editingId.value !== null);
@@ -36,6 +37,12 @@ const noteTemplates = computed(() =>
     props.templates.filter((template) => template.target === 'notes'),
 );
 
+const startCreate = () => {
+    editingId.value = null;
+    form.value = blankForm();
+    formOpen.value = true;
+};
+
 const startEdit = (template: Template) => {
     editingId.value = template.id;
     form.value = {
@@ -44,12 +51,13 @@ const startEdit = (template: Template) => {
         is_active: template.is_active,
         sort_order: template.sort_order,
     };
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    formOpen.value = true;
 };
 
-const cancelEdit = () => {
+const cancelForm = () => {
     editingId.value = null;
     form.value = blankForm();
+    formOpen.value = false;
 };
 
 const save = () => {
@@ -69,7 +77,7 @@ const save = () => {
             saving.value = false;
         },
         onSuccess: () => {
-            cancelEdit();
+            cancelForm();
         },
     };
 
@@ -86,7 +94,7 @@ const destroy = (id: number) => {
     router.delete(route('settings.note-templates.destroy', id), {
         onSuccess: () => {
             if (editingId.value === id) {
-                cancelEdit();
+                cancelForm();
             }
         },
     });
@@ -99,14 +107,14 @@ const destroy = (id: number) => {
         title="Note templates"
         subtitle="Named markdown snippets (e.g. banking details) you can attach to clients and insert on invoices and estimates."
     >
-        <AppCard class="space-y-3">
+        <AppCard v-if="formOpen" class="space-y-3">
             <div>
                 <h3 class="text-sm font-semibold text-slate-900">
-                    {{ isEditing ? 'Edit note template' : 'Create note template' }}
+                    {{ isEditing ? 'Edit note template' : 'New note template' }}
                 </h3>
                 <p class="mt-1 text-xs text-slate-500">
                     Give it a clear name such as &ldquo;International Banking Details&rdquo;, then attach it on clients
-                    or insert it while editing an invoice or estimate. Footers stay freeform on each document.
+                    or insert it while editing an invoice or estimate.
                 </p>
             </div>
 
@@ -137,18 +145,22 @@ const destroy = (id: number) => {
                 <AppButton variant="primary" :loading="saving" @click="save">
                     {{ isEditing ? 'Update template' : 'Save template' }}
                 </AppButton>
-                <AppButton v-if="isEditing" variant="secondary" @click="cancelEdit">Cancel</AppButton>
+                <AppButton variant="secondary" @click="cancelForm">Cancel</AppButton>
             </FormActions>
         </AppCard>
 
-        <AppCard class="mt-5 overflow-hidden p-0">
-            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <AppCard v-else class="overflow-hidden p-0">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
                 <div>
-                    <h3 class="text-sm font-semibold text-slate-900">Your templates</h3>
+                    <h3 class="text-sm font-semibold text-slate-900">Your note templates</h3>
                     <p class="mt-0.5 text-xs text-slate-500">
                         {{ noteTemplates.length === 0 ? 'None yet' : `${noteTemplates.length} template${noteTemplates.length === 1 ? '' : 's'}` }}
                     </p>
                 </div>
+                <AppButton size="sm" variant="primary" type="button" @click="startCreate">
+                    <Plus class="mr-1.5 h-3.5 w-3.5" />
+                    New template
+                </AppButton>
             </div>
 
             <div v-if="noteTemplates.length === 0" class="p-4">
@@ -156,15 +168,21 @@ const destroy = (id: number) => {
                     title="No note templates yet"
                     description="Create reusable notes such as banking details, then select them on clients or insert them on invoices and estimates."
                     :icon="FileText"
-                />
+                >
+                    <template #action>
+                        <AppButton variant="primary" type="button" @click="startCreate">
+                            <Plus class="mr-1.5 h-4 w-4" />
+                            New template
+                        </AppButton>
+                    </template>
+                </EmptyState>
             </div>
 
             <ul v-else class="divide-y divide-slate-100" role="list">
                 <li
                     v-for="template in noteTemplates"
                     :key="template.id"
-                    class="px-4 py-4 transition-colors"
-                    :class="editingId === template.id ? 'bg-brand-50/60' : 'hover:bg-slate-50/80'"
+                    class="px-4 py-4 transition-colors hover:bg-slate-50/80"
                 >
                     <div class="flex flex-col gap-3 sm:flex-row sm:gap-4">
                         <div class="flex min-w-0 flex-1 gap-3">
@@ -182,12 +200,6 @@ const destroy = (id: number) => {
                                     <AppBadge :variant="template.is_active ? 'success' : 'neutral'">
                                         {{ template.is_active ? 'Active' : 'Inactive' }}
                                     </AppBadge>
-                                    <span
-                                        v-if="editingId === template.id"
-                                        class="text-xs font-medium text-brand-700"
-                                    >
-                                        Editing
-                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -217,7 +229,7 @@ const destroy = (id: number) => {
             </ul>
         </AppCard>
 
-        <p class="mt-4 text-xs text-slate-500">
+        <p v-if="!formOpen" class="mt-4 text-xs text-slate-500">
             Tip: after saving templates, open a
             <Link :href="route('invoicing.clients.index')" class="font-medium text-brand-700 hover:underline">client</Link>
             and tick the ones that should prefill new invoices and estimates.
