@@ -105,7 +105,6 @@ class ClientController extends Controller
 
         $payload = $this->validateClient($request);
         $teamId = (int) $request->user()->current_team_id;
-        $noteTemplateIds = $this->extractNoteTemplateIds($payload);
         $returnTo = $this->safeInternalReturn(
             is_string($request->input('return')) ? (string) $request->input('return') : null
         );
@@ -114,8 +113,6 @@ class ClientController extends Controller
             'team_id' => $teamId,
             ...$payload,
         ]);
-
-        $this->syncClientNoteTemplates($client, $noteTemplateIds);
 
         if ($returnTo !== null) {
             return redirect($returnTo);
@@ -216,7 +213,7 @@ class ClientController extends Controller
 
         return Inertia::render('Invoicing/Clients/Form', [
             'isEditing' => true,
-            'client' => $this->serializeClient($client->loadMissing('noteTemplates')),
+            'client' => $this->serializeClient($client),
             'note_templates' => $this->noteTemplatesForForm((int) $client->team_id),
         ]);
     }
@@ -227,10 +224,7 @@ class ClientController extends Controller
         abort_unless($client->team_id === $request->user()->current_team_id, 403);
 
         $payload = $this->validateClient($request);
-        $noteTemplateIds = $this->extractNoteTemplateIds($payload);
-
         $client->update($payload);
-        $this->syncClientNoteTemplates($client, $noteTemplateIds);
 
         return to_route('invoicing.clients.show', $client);
     }
@@ -258,12 +252,8 @@ class ClientController extends Controller
             'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'notes' => ['nullable', 'string'],
+            'default_invoice_notes' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
-            'note_template_ids' => ['nullable', 'array'],
-            'note_template_ids.*' => [
-                'integer',
-                Rule::exists('note_templates', 'id')->where(fn ($q) => $q->where('team_id', $teamId)),
-            ],
         ]);
 
         if (! empty($validated['phone'])) {
@@ -276,31 +266,7 @@ class ClientController extends Controller
     }
 
     /**
-     * @param  array<string, mixed>  $payload
-     * @return list<int>
-     */
-    private function extractNoteTemplateIds(array &$payload): array
-    {
-        $ids = array_values(array_map('intval', $payload['note_template_ids'] ?? []));
-        unset($payload['note_template_ids']);
-
-        return $ids;
-    }
-
-    /**
-     * @param  list<int>  $ids
-     */
-    private function syncClientNoteTemplates(Client $client, array $ids): void
-    {
-        $sync = [];
-        foreach ($ids as $i => $id) {
-            $sync[$id] = ['sort_order' => $i];
-        }
-        $client->noteTemplates()->sync($sync);
-    }
-
-    /**
-     * @return list<array{id: int, name: string, target: string}>
+     * @return list<array{id: int, name: string, body: string, target: string}>
      */
     private function noteTemplatesForForm(int $teamId): array
     {
@@ -310,10 +276,11 @@ class ClientController extends Controller
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'target'])
+            ->get(['id', 'name', 'body', 'target'])
             ->map(fn (NoteTemplate $template) => [
                 'id' => $template->id,
                 'name' => $template->name,
+                'body' => $template->body,
                 'target' => $template->target,
             ])
             ->all();
@@ -360,10 +327,8 @@ class ClientController extends Controller
             'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
             'payment_terms_days' => (int) $client->payment_terms_days,
             'notes' => $client->notes,
+            'default_invoice_notes' => $client->default_invoice_notes,
             'is_active' => (bool) $client->is_active,
-            'note_template_ids' => $client->relationLoaded('noteTemplates')
-                ? $client->noteTemplates->pluck('id')->values()->all()
-                : [],
         ];
     }
 }

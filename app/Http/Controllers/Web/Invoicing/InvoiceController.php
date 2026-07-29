@@ -860,23 +860,14 @@ class InvoiceController extends Controller
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
-                ->with(['noteTemplates' => fn ($q) => $q
-                    ->where('note_templates.is_active', true)
-                    ->where('note_templates.target', 'notes')
-                    ->orderByPivot('sort_order')])
                 ->orderBy('name')
-                ->get(['id', 'name', 'payment_terms_days', 'currency'])
+                ->get(['id', 'name', 'payment_terms_days', 'currency', 'default_invoice_notes'])
                 ->map(fn (Client $client) => [
                     'id' => $client->id,
                     'name' => $client->name,
                     'payment_terms_days' => (int) $client->payment_terms_days,
                     'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
-                    'note_template_ids' => $client->noteTemplates->pluck('id')->values()->all(),
-                    'default_notes' => $client->noteTemplates
-                        ->where('target', 'notes')
-                        ->pluck('body')
-                        ->filter()
-                        ->implode("\n\n"),
+                    'default_notes' => (string) ($client->default_invoice_notes ?? ''),
                 ])
                 ->all(),
             'items' => Item::queryWithoutTeamScope()

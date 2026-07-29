@@ -92,7 +92,7 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
         $this->assertNotNull($invoice->viewed_at);
     }
 
-    public function test_note_template_crud_and_client_assignment_prefills_create(): void
+    public function test_note_template_crud_and_client_default_notes_prefills_create(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();
         EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
@@ -117,12 +117,12 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
                 'currency' => 'ZAR',
                 'payment_terms_days' => 30,
                 'is_active' => true,
-                'note_template_ids' => [$template->id],
+                'default_invoice_notes' => $template->body,
             ])
             ->assertRedirect();
 
         $client->refresh();
-        $this->assertTrue($client->noteTemplates()->whereKey($template->id)->exists());
+        $this->assertSame('**Pay** to ABC Bank', $client->default_invoice_notes);
 
         $this->actingAs($owner)
             ->get(route('invoicing.invoices.create'))
@@ -130,6 +130,7 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Invoicing/Invoices/Form')
                 ->has('note_templates', 1)
+                ->where('note_templates.0.body', '**Pay** to ABC Bank')
                 ->where('clients.0.default_notes', '**Pay** to ABC Bank'));
 
         $this->actingAs($owner)
@@ -160,17 +161,15 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
             'target' => 'notes',
             'is_active' => true,
         ]);
-        $inactive = NoteTemplate::factory()->for($team)->create([
+        NoteTemplate::factory()->for($team)->create([
             'name' => 'Inactive',
             'body' => 'Inactive body',
             'target' => 'notes',
             'is_active' => false,
         ]);
 
-        $client = Client::factory()->for($team)->create();
-        $client->noteTemplates()->sync([
-            $active->id => ['sort_order' => 0],
-            $inactive->id => ['sort_order' => 1],
+        Client::factory()->for($team)->create([
+            'default_invoice_notes' => 'Client default notes',
         ]);
 
         $this->actingAs($owner)
@@ -179,7 +178,7 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->has('note_templates', 1)
                 ->where('note_templates.0.id', $active->id)
-                ->where('clients.0.default_notes', 'Active body'));
+                ->where('clients.0.default_notes', 'Client default notes'));
     }
 
     public function test_note_template_can_be_updated_from_settings(): void

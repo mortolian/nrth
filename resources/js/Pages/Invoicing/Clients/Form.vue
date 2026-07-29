@@ -1,20 +1,21 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Link, router, usePage } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
-import FieldHelp from '@/Components/FieldHelp.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useToast } from '@/Composables/useToast';
+
+type NoteTemplateOption = { id: number; name: string; body: string; target: 'notes' | 'footer' };
 
 const props = defineProps<{
     isEditing: boolean;
     /** When set (e.g. from invoice create), redirect here after successful create. */
     return_to?: string | null;
-    note_templates: Array<{ id: number; name: string; target: 'notes' | 'footer' }>;
+    note_templates: NoteTemplateOption[];
     client: null | {
         id: number;
         name: string;
@@ -33,8 +34,8 @@ const props = defineProps<{
         currency: string;
         payment_terms_days: number;
         notes: string | null;
+        default_invoice_notes: string | null;
         is_active: boolean;
-        note_template_ids: number[];
     };
 }>();
 
@@ -64,8 +65,8 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         currency: props.client?.currency ?? 'ZAR',
         payment_terms_days: props.client?.payment_terms_days ?? 30,
         notes: props.client?.notes ?? '',
+        default_invoice_notes: props.client?.default_invoice_notes ?? '',
         is_active: props.client?.is_active ?? true,
-        note_template_ids: [...(props.client?.note_template_ids ?? [])],
     },
 });
 
@@ -84,17 +85,20 @@ const noteTemplates = computed(() =>
     props.note_templates.filter((template) => template.target === 'notes'),
 );
 
-const isNoteTemplateSelected = (id: number) => (formValues.value.note_template_ids ?? []).includes(id);
+const notesTemplateOptions = computed(() =>
+    noteTemplates.value.map((template) => ({
+        label: template.name,
+        value: String(template.id),
+    })),
+);
 
-const toggleNoteTemplate = (id: number) => {
-    const current = [...(formValues.value.note_template_ids ?? [])];
-    const index = current.indexOf(id);
-    if (index >= 0) {
-        current.splice(index, 1);
-    } else {
-        current.push(id);
-    }
-    setFieldValue('note_template_ids', current);
+const insertNoteTemplate = (templateId: string) => {
+    if (!templateId) return;
+    const template = noteTemplates.value.find((entry) => String(entry.id) === templateId);
+    if (!template) return;
+    const current = String(formValues.value.default_invoice_notes ?? '');
+    const next = current.trim() ? `${current.trim()}\n\n${template.body}` : template.body;
+    setFieldValue('default_invoice_notes', next);
 };
 
 const schema = z.object({
@@ -117,8 +121,8 @@ const schema = z.object({
         .regex(/^[A-Z]{3}$/, 'Use a 3-letter ISO currency code'),
     payment_terms_days: z.coerce.number().int().min(0, 'Must be 0–365').max(365, 'Must be 0–365'),
     notes: z.string().optional(),
+    default_invoice_notes: z.string().optional(),
     is_active: z.boolean(),
-    note_template_ids: z.array(z.coerce.number().int()).optional(),
 });
 
 const submit = () => {
@@ -174,66 +178,84 @@ const submit = () => {
 
         <AppCard class="mt-5">
             <form class="space-y-0" @submit.prevent="submit">
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Company name</label>
-                        <AppInput :model-value="values.name" @update:model-value="setFieldValue('name', $event)" />
-                        <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Contact name</label>
-                        <AppInput :model-value="values.contact_name" @update:model-value="setFieldValue('contact_name', $event)" />
-                        <p v-if="fieldErrors.contact_name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.contact_name }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
-                        <AppInput :model-value="values.email" type="email" @update:model-value="setFieldValue('email', $event)" />
-                        <p v-if="fieldErrors.email" class="mt-1 text-xs text-rose-600">{{ fieldErrors.email }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                        <AppPhoneInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event ?? '')" />
-                        <p v-if="fieldErrors.phone" class="mt-1 text-xs text-rose-600">{{ fieldErrors.phone }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
-                        <AppInput :model-value="values.vat_number" placeholder="4XXXXXXXXX" @update:model-value="setFieldValue('vat_number', $event)" />
-                        <p v-if="fieldErrors.vat_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.vat_number }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Company registration number</label>
-                        <AppInput :model-value="values.registration_number" @update:model-value="setFieldValue('registration_number', $event)" />
-                        <p v-if="fieldErrors.registration_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.registration_number }}</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <h3 class="mb-2 text-sm font-semibold text-slate-800">Address</h3>
-                        <div class="grid gap-3 md:grid-cols-2">
-                            <AppInput :model-value="values.address.street" placeholder="Street" @update:model-value="setFieldValue('address.street', $event)" />
-                            <AppInput :model-value="values.address.city" placeholder="City" @update:model-value="setFieldValue('address.city', $event)" />
-                            <AppInput :model-value="values.address.province" placeholder="Province" @update:model-value="setFieldValue('address.province', $event)" />
-                            <AppInput :model-value="values.address.postal_code" placeholder="Postal code" @update:model-value="setFieldValue('address.postal_code', $event)" />
-                            <AppInput :model-value="values.address.country" placeholder="Country" @update:model-value="setFieldValue('address.country', $event)" />
+                <section>
+                    <h3 class="text-sm font-semibold text-slate-900">Details</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Company profile and billing defaults</p>
+
+                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Company name</label>
+                            <AppInput :model-value="values.name" @update:model-value="setFieldValue('name', $event)" />
+                            <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Contact name</label>
+                            <AppInput :model-value="values.contact_name" @update:model-value="setFieldValue('contact_name', $event)" />
+                            <p v-if="fieldErrors.contact_name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.contact_name }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
+                            <AppInput :model-value="values.email" type="email" @update:model-value="setFieldValue('email', $event)" />
+                            <p v-if="fieldErrors.email" class="mt-1 text-xs text-rose-600">{{ fieldErrors.email }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
+                            <AppPhoneInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event ?? '')" />
+                            <p v-if="fieldErrors.phone" class="mt-1 text-xs text-rose-600">{{ fieldErrors.phone }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">VAT number</label>
+                            <AppInput :model-value="values.vat_number" placeholder="4XXXXXXXXX" @update:model-value="setFieldValue('vat_number', $event)" />
+                            <p v-if="fieldErrors.vat_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.vat_number }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Company registration number</label>
+                            <AppInput :model-value="values.registration_number" @update:model-value="setFieldValue('registration_number', $event)" />
+                            <p v-if="fieldErrors.registration_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.registration_number }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
+                            <AppSelect
+                                :model-value="values.currency"
+                                :options="currencyOptions"
+                                @update:model-value="setFieldValue('currency', $event)"
+                            />
+                            <p v-if="fieldErrors.currency" class="mt-1 text-xs text-rose-600">{{ fieldErrors.currency }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Payment terms (days)</label>
+                            <AppInput :model-value="values.payment_terms_days" type="number" @update:model-value="setFieldValue('payment_terms_days', Number($event))" />
+                            <p v-if="fieldErrors.payment_terms_days" class="mt-1 text-xs text-rose-600">{{ fieldErrors.payment_terms_days }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                            <AppSelect
+                                :model-value="values.is_active ? 'active' : 'inactive'"
+                                :options="[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]"
+                                @update:model-value="setFieldValue('is_active', $event === 'active')"
+                            />
                         </div>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
-                        <AppSelect
-                            :model-value="values.currency"
-                            :options="currencyOptions"
-                            @update:model-value="setFieldValue('currency', $event)"
-                        />
-                        <p v-if="fieldErrors.currency" class="mt-1 text-xs text-rose-600">{{ fieldErrors.currency }}</p>
+                </section>
+
+                <section class="mt-8 border-t border-slate-100 pt-6">
+                    <h3 class="text-sm font-semibold text-slate-900">Address</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Billing and postal details for this client</p>
+
+                    <div class="mt-4 grid gap-3 md:grid-cols-2">
+                        <AppInput :model-value="values.address.street" placeholder="Street" @update:model-value="setFieldValue('address.street', $event)" />
+                        <AppInput :model-value="values.address.city" placeholder="City" @update:model-value="setFieldValue('address.city', $event)" />
+                        <AppInput :model-value="values.address.province" placeholder="Province" @update:model-value="setFieldValue('address.province', $event)" />
+                        <AppInput :model-value="values.address.postal_code" placeholder="Postal code" @update:model-value="setFieldValue('address.postal_code', $event)" />
+                        <AppInput :model-value="values.address.country" placeholder="Country" @update:model-value="setFieldValue('address.country', $event)" />
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Payment terms (days)</label>
-                        <AppInput :model-value="values.payment_terms_days" type="number" @update:model-value="setFieldValue('payment_terms_days', Number($event))" />
-                        <p v-if="fieldErrors.payment_terms_days" class="mt-1 text-xs text-rose-600">{{ fieldErrors.payment_terms_days }}</p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <FieldHelp
-                            label="Internal notes"
-                            text="Private notes about this client (not shown on invoices)."
-                        />
+                </section>
+
+                <section class="mt-8 border-t border-slate-100 pt-6">
+                    <h3 class="text-sm font-semibold text-slate-900">Internal notes</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Private notes about this client — not shown on invoices</p>
+
+                    <div class="mt-4">
                         <MarkdownEditor
                             :model-value="String(values.notes ?? '')"
                             :rows="4"
@@ -242,58 +264,43 @@ const submit = () => {
                             @update:model-value="setFieldValue('notes', $event)"
                         />
                     </div>
-                    <div class="md:col-span-2">
-                        <div class="mb-2 flex flex-wrap items-end justify-between gap-2">
-                            <div>
-                                <h3 class="text-sm font-semibold text-slate-800">Default invoice notes</h3>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Select named templates to prefill notes on new invoices and estimates for this client.
-                                </p>
-                            </div>
-                            <Link
+                </section>
+
+                <section class="mt-8 border-t border-slate-100 pt-6">
+                    <h3 class="text-sm font-semibold text-slate-900">Default invoice notes</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">
+                        Prefills notes on new invoices and estimates for this client. Insert templates, then edit freely.
+                    </p>
+
+                    <div class="mt-4 space-y-3">
+                        <MarkdownEditor
+                            :model-value="String(values.default_invoice_notes ?? '')"
+                            :rows="6"
+                            placeholder="Payment instructions, banking details…"
+                            aria-label="Default invoice notes"
+                            @update:model-value="setFieldValue('default_invoice_notes', $event)"
+                        />
+                        <div v-if="notesTemplateOptions.length">
+                            <AppSelect
+                                :model-value="''"
+                                :options="[{ label: 'Insert note template…', value: '' }, ...notesTemplateOptions]"
+                                @update:model-value="insertNoteTemplate(String($event ?? ''))"
+                            />
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <AppButton
+                                as="a"
+                                size="sm"
+                                variant="secondary"
                                 :href="route('settings.note-templates.index')"
-                                class="text-xs font-medium text-brand-700 hover:underline"
                             >
                                 Manage note templates
-                            </Link>
+                            </AppButton>
                         </div>
-                        <div v-if="noteTemplates.length" class="grid gap-2 sm:grid-cols-2">
-                            <label
-                                v-for="template in noteTemplates"
-                                :key="template.id"
-                                class="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 text-sm transition-colors"
-                                :class="isNoteTemplateSelected(template.id)
-                                    ? 'border-brand-300 bg-brand-50/70 text-slate-900'
-                                    : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
-                            >
-                                <input
-                                    type="checkbox"
-                                    class="mt-0.5 rounded border-slate-300"
-                                    :checked="isNoteTemplateSelected(template.id)"
-                                    @change="toggleNoteTemplate(template.id)"
-                                />
-                                <span class="min-w-0 font-medium leading-snug">{{ template.name }}</span>
-                            </label>
-                        </div>
-                        <p v-else class="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
-                            No note templates yet.
-                            <Link :href="route('settings.note-templates.index')" class="font-medium text-brand-700 hover:underline">
-                                Create one in Settings
-                            </Link>
-                            (e.g. &ldquo;International Banking Details&rdquo;).
-                        </p>
-                        <p v-if="fieldErrors.note_template_ids" class="mt-1 text-xs text-rose-600">{{ fieldErrors.note_template_ids }}</p>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
-                        <AppSelect
-                            :model-value="values.is_active ? 'active' : 'inactive'"
-                            :options="[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]"
-                            @update:model-value="setFieldValue('is_active', $event === 'active')"
-                        />
-                    </div>
-                </div>
-                <FormActions>
+                </section>
+
+                <FormActions bordered>
                     <AppButton type="submit" variant="primary" :loading="saving">
                         {{
                             saving

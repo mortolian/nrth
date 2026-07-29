@@ -509,21 +509,13 @@ class EstimateController extends Controller
             'clients' => Client::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('is_active', true)
-                ->with(['noteTemplates' => fn ($q) => $q
-                    ->where('note_templates.is_active', true)
-                    ->where('note_templates.target', 'notes')
-                    ->orderByPivot('sort_order')])
                 ->orderBy('name')
-                ->get(['id', 'name', 'currency'])
+                ->get(['id', 'name', 'currency', 'default_invoice_notes'])
                 ->map(fn (Client $client) => [
                     'id' => $client->id,
                     'name' => $client->name,
                     'currency' => Iso4217Currencies::normalize((string) ($client->currency ?? 'ZAR')),
-                    'default_notes' => $client->noteTemplates
-                        ->where('target', 'notes')
-                        ->pluck('body')
-                        ->filter()
-                        ->implode("\n\n"),
+                    'default_notes' => (string) ($client->default_invoice_notes ?? ''),
                 ])
                 ->values()
                 ->all(),

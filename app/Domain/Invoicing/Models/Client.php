@@ -30,6 +30,7 @@ class Client extends Model
         'currency',
         'payment_terms_days',
         'notes',
+        'default_invoice_notes',
         'is_active',
     ];
 

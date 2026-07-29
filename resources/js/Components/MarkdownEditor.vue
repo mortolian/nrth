@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import { MdEditor, type ToolbarNames } from 'md-editor-v3';
 import 'md-editor-v3/lib/style.css';
 import { ensureMarkdownEditorConfig } from '@/Support/markdownEditorConfig';
@@ -30,9 +30,23 @@ const emit = defineEmits<{
 /** Stable unique id for md-editor-v3 (required when multiple editors are on one page). */
 const editorId = `md-editor-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
-const value = computed({
-    get: () => props.modelValue ?? '',
-    set: (next: string) => emit('update:modelValue', next),
+/** Local mirror so programmatic parent updates (e.g. insert template) reach the editor. */
+const localValue = ref(props.modelValue ?? '');
+
+watch(
+    () => props.modelValue,
+    (next) => {
+        const normalized = next ?? '';
+        if (normalized !== localValue.value) {
+            localValue.value = normalized;
+        }
+    },
+);
+
+watch(localValue, (next) => {
+    if (next !== (props.modelValue ?? '')) {
+        emit('update:modelValue', next);
+    }
 });
 
 const editorHeight = computed(() => `${Math.max(props.rows, 4) * 1.55 + 5.5}rem`);
@@ -57,7 +71,7 @@ const toolbarsExclude: ToolbarNames[] = [
     <div class="nrth-markdown-editor overflow-hidden rounded-md border border-slate-300" :aria-label="ariaLabel">
         <MdEditor
             :id="editorId"
-            v-model="value"
+            v-model="localValue"
             language="en-US"
             theme="light"
             preview-theme="github"

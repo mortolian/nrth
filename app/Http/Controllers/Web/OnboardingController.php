@@ -16,6 +16,7 @@ use App\Models\Team;
 use App\Models\TeamBankAccount;
 use App\Models\User;
 use App\Support\AcceptTeamInvitations;
+use App\Support\CalendarMonths;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,10 +72,7 @@ class OnboardingController extends Controller
 
         return Inertia::render('Onboarding/Setup', [
             'industries' => $this->industryOptions(),
-            'financial_year_months' => collect(range(1, 12))->map(fn (int $m): array => [
-                'value' => $m,
-                'label' => now()->month($m)->format('F'),
-            ])->all(),
+            'financial_year_months' => CalendarMonths::options(),
             'bank_account_types' => [
                 ['value' => 'current', 'label' => 'Current'],
                 ['value' => 'savings', 'label' => 'Savings'],

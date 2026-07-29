@@ -8,6 +8,7 @@ use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\TeamBankAccount;
+use App\Support\CalendarMonths;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,10 +67,7 @@ class BusinessSettingsController extends Controller
                 ['value' => 'healthcare', 'label' => 'Healthcare'],
                 ['value' => 'other', 'label' => 'Other'],
             ],
-            'financial_year_months' => collect(range(1, 12))->map(fn (int $m): array => [
-                'value' => $m,
-                'label' => now()->month($m)->format('F'),
-            ])->all(),
+            'financial_year_months' => CalendarMonths::options(),
             'vat_period_types' => [
                 ['value' => 'bi_monthly', 'label' => 'Bi-monthly (SARS small vendor)'],
                 ['value' => 'monthly', 'label' => 'Monthly'],
