@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
+import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
 import { BarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
@@ -307,8 +308,11 @@ const onInvoiceAction = (invoice, actionId) => {
                                     <p class="truncate font-medium text-slate-900">{{ invoice.client }}</p>
                                     <p class="truncate text-sm text-slate-600">{{ invoice.number }}</p>
                                 </div>
-                                <AppBadge :variant="daysOverdueInt(invoice.days_overdue) > 0 ? 'danger' : 'neutral'" class="whitespace-nowrap">
-                                    {{ daysOverdueInt(invoice.days_overdue) > 0 ? `${daysOverdueInt(invoice.days_overdue)}d` : 'OK' }}
+                                <AppBadge
+                                    class="whitespace-nowrap capitalize"
+                                    :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: daysOverdueInt(invoice.days_overdue) > 0 })"
+                                >
+                                    {{ invoiceStatusLabel(invoice.status, { isOverdue: daysOverdueInt(invoice.days_overdue) > 0 }) }}
                                 </AppBadge>
                             </div>
                             <div class="mt-2 flex items-center justify-between text-sm">
@@ -353,8 +357,11 @@ const onInvoiceAction = (invoice, actionId) => {
                             <td class="px-4 py-3 whitespace-nowrap">{{ formatRowCents(invoice.amount, invoice.currency) }}</td>
                             <td class="px-4 py-3 whitespace-nowrap"><DateDisplay :value="invoice.due_date" /></td>
                             <td class="px-4 py-3">
-                                <AppBadge :variant="daysOverdueInt(invoice.days_overdue) > 0 ? 'danger' : 'neutral'" class="whitespace-nowrap">
-                                    {{ daysOverdueInt(invoice.days_overdue) > 0 ? `${daysOverdueInt(invoice.days_overdue)} days` : 'Current' }}
+                                <AppBadge
+                                    class="whitespace-nowrap capitalize"
+                                    :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: daysOverdueInt(invoice.days_overdue) > 0 })"
+                                >
+                                    {{ invoiceStatusLabel(invoice.status, { isOverdue: daysOverdueInt(invoice.days_overdue) > 0 }) }}
                                 </AppBadge>
                             </td>
                             <td class="px-4 py-3 text-right align-middle">

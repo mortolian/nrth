@@ -19,9 +19,12 @@ const props = withDefaults(defineProps<{
     options: Option[];
     placeholder?: string;
     disabled?: boolean;
+    /** Compact control for dense tables (e.g. invoice lines). */
+    size?: 'md' | 'sm';
 }>(), {
     placeholder: 'Select...',
     disabled: false,
+    size: 'md',
 });
 
 const model = defineModel<string>();
@@ -54,16 +57,21 @@ const selectModel = computed<string | undefined>({
         model.value = value;
     },
 });
+
+const triggerClass = computed(() =>
+    props.size === 'sm'
+        ? 'inline-flex h-8 w-full items-center justify-between gap-1.5 rounded-md border border-slate-300 bg-white px-2 text-xs leading-normal text-slate-900 outline-none ring-slate-300 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 data-[placeholder]:text-slate-400'
+        : 'inline-flex h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm leading-normal text-slate-900 outline-none ring-slate-300 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 data-[placeholder]:text-slate-400',
+);
 </script>
 
 <template>
     <SelectRoot v-model="selectModel" :disabled="props.disabled">
         <SelectTrigger
-            class="inline-flex h-10 w-full items-center justify-between gap-2 rounded-md border border-slate-300 bg-white px-3 text-sm leading-normal text-slate-900 outline-none ring-slate-300 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 data-[placeholder]:text-slate-400"
-            :class="props.disabled ? 'cursor-not-allowed opacity-60' : ''"
+            :class="[triggerClass, props.disabled ? 'cursor-not-allowed opacity-60' : '']"
         >
             <SelectValue :placeholder="props.placeholder" class="min-w-0 flex-1 truncate text-left" />
-            <ChevronDown class="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ChevronDown class="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
         </SelectTrigger>
         <SelectPortal>
             <SelectContent class="z-[200] min-w-[10rem] rounded-md border border-slate-200 bg-white p-1 shadow-sm">

@@ -4,6 +4,7 @@ import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
 
 type Line = {
@@ -64,14 +65,6 @@ const statusBadge = (status: string) => {
     if (status === 'active') return 'success';
     if (status === 'on_hold') return 'warning';
     if (status === 'completed') return 'neutral';
-    return 'info';
-};
-
-const invoiceStatusBadge = (status: string) => {
-    if (status === 'paid') return 'success';
-    if (status === 'void') return 'neutral';
-    if (status === 'overdue') return 'danger';
-    if (status === 'draft') return 'neutral';
     return 'info';
 };
 
@@ -424,8 +417,11 @@ const onOverflow = (actionId: string) => {
                             {{ formatCents(invoice.total_cents, invoice.currency) }}
                         </td>
                         <td class="whitespace-nowrap px-3 py-2">
-                            <AppBadge :variant="invoiceStatusBadge(invoice.status)" class="capitalize">
-                                {{ invoice.status }}
+                            <AppBadge
+                                class="capitalize"
+                                :variant="invoiceStatusBadgeVariant(invoice.status)"
+                            >
+                                {{ invoiceStatusLabel(invoice.status) }}
                             </AppBadge>
                         </td>
                     </tr>

@@ -7,6 +7,7 @@ import RecordInvoicePaymentDrawer, {
     type RecordPaymentInvoiceInput,
 } from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
 import { CheckCircle2, CircleDot, Download, Edit3, Mail, QrCode, Trash2, Wallet } from 'lucide-vue-next';
 
@@ -163,12 +164,13 @@ const issuerRegLine = computed(() => {
     return parts.length ? parts.join(' · ') : null;
 });
 
-const statusBadgeVariant = computed(() => {
-    if (props.invoice.status === 'paid') return 'success';
-    if (props.invoice.status === 'void') return 'neutral';
-    if (props.invoice.status === 'overdue') return 'danger';
-    return 'info';
-});
+const statusBadgeVariant = computed(() =>
+    invoiceStatusBadgeVariant(props.invoice.status, {
+        isOverdue: props.invoice.status === 'overdue',
+    }),
+);
+
+const statusLabel = computed(() => invoiceStatusLabel(props.invoice.status));
 
 const timeline = computed(() => ([
     { label: 'Created', at: props.invoice.created_at, done: Boolean(props.invoice.created_at) },
@@ -504,7 +506,7 @@ const undoPayment = (paymentId: number) => {
                 <AppCard>
                     <div class="flex items-center justify-between">
                         <h3 class="text-base font-semibold text-slate-900">Status</h3>
-                        <AppBadge :variant="statusBadgeVariant">{{ invoice.status }}</AppBadge>
+                        <AppBadge class="capitalize" :variant="statusBadgeVariant">{{ statusLabel }}</AppBadge>
                     </div>
                     <div class="mt-4 space-y-2">
                         <div v-for="step in timeline" :key="step.label" class="flex items-start gap-2 text-sm">

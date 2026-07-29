@@ -6,6 +6,7 @@ import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.vue';
 import { useMoneyInTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
+import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
 import { Filter, X } from 'lucide-vue-next';
 
@@ -461,9 +462,10 @@ const exportSelectedPdfZip = async () => {
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
                                 <AppBadge
-                                    :variant="invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : invoice.is_overdue ? 'danger' : 'info'"
+                                    class="capitalize"
+                                    :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: invoice.is_overdue })"
                                 >
-                                    {{ invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void' ? 'overdue' : invoice.status }}
+                                    {{ invoiceStatusLabel(invoice.status, { isOverdue: invoice.is_overdue }) }}
                                 </AppBadge>
                                 <InvoiceRowActionsMenu
                                     :actions="rowActionItems(invoice)"
@@ -548,9 +550,10 @@ const exportSelectedPdfZip = async () => {
                         </td>
                         <td class="whitespace-nowrap px-3 py-3 align-middle">
                             <AppBadge
-                                :variant="invoice.status === 'paid' ? 'success' : invoice.status === 'void' ? 'neutral' : invoice.is_overdue ? 'danger' : 'info'"
+                                class="capitalize"
+                                :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: invoice.is_overdue })"
                             >
-                                {{ invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void' ? 'overdue' : invoice.status }}
+                                {{ invoiceStatusLabel(invoice.status, { isOverdue: invoice.is_overdue }) }}
                             </AppBadge>
                         </td>
                         <td class="px-3 py-3 text-right align-middle" @click.stop>

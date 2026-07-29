@@ -550,25 +550,25 @@ const submit = (submitAction: 'draft' | 'send') => {
                     <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>
 
                     <div class="-mx-1 overflow-x-auto px-1 [scrollbar-width:thin]">
-                        <table class="w-full min-w-[60rem] table-fixed divide-y divide-slate-200 text-sm">
+                        <table class="w-full min-w-[48rem] table-fixed divide-y divide-slate-200 text-sm">
                             <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                                 <tr>
-                                    <th class="w-10 px-1 py-2.5 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
-                                    <th class="w-[34%] min-w-[12rem] px-3 py-2.5 text-left font-medium">Description</th>
-                                    <th class="w-16 px-2 py-2.5 text-right font-medium">Qty</th>
-                                    <th class="w-28 px-2 py-2.5 text-right font-medium">Unit price</th>
-                                    <th class="w-28 px-2 py-2.5 text-left font-medium">Discount</th>
-                                    <th v-if="chargesVat" class="w-32 px-2 py-2.5 text-left font-medium">VAT</th>
-                                    <th v-if="chargesVat" class="w-24 px-2 py-2.5 text-right font-medium">VAT amt</th>
-                                    <th class="w-28 px-2 py-2.5 text-right font-medium">Line total</th>
-                                    <th class="w-11 px-1 py-2.5 text-center font-medium"><span class="sr-only">Remove</span></th>
+                                    <th class="w-8 px-1 py-2 text-center" scope="col"><span class="sr-only">Drag to reorder</span></th>
+                                    <th class="min-w-[14rem] px-2 py-2 text-left font-medium">Description</th>
+                                    <th class="w-16 px-1.5 py-2 text-right font-medium">Qty</th>
+                                    <th class="w-24 px-1.5 py-2 text-right font-medium">Price</th>
+                                    <th class="w-28 px-1.5 py-2 text-left font-medium">Discount</th>
+                                    <th v-if="chargesVat" class="w-28 px-1.5 py-2 text-left font-medium">VAT</th>
+                                    <th v-if="chargesVat" class="w-20 px-1.5 py-2 text-right font-medium">VAT amt</th>
+                                    <th class="w-24 px-1.5 py-2 text-right font-medium">Total</th>
+                                    <th class="w-9 px-1 py-2 text-center font-medium"><span class="sr-only">Remove</span></th>
                                 </tr>
                             </thead>
                             <tbody ref="lineItemsTbodyRef" class="divide-y divide-slate-100">
                                 <tr v-for="(line, index) in lineItems" :key="line.row_key">
-                                    <td class="w-10 px-1 py-3 align-top">
+                                    <td class="w-8 px-1 py-1.5 align-middle">
                                         <span
-                                            class="estimate-line-drag-handle mt-1 inline-flex cursor-grab touch-manipulation rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                            class="estimate-line-drag-handle inline-flex cursor-grab touch-manipulation rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
                                             role="button"
                                             tabindex="0"
                                             aria-label="Drag to reorder line"
@@ -576,42 +576,42 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             <GripVertical class="h-4 w-4 shrink-0" />
                                         </span>
                                     </td>
-                                    <td class="px-3 py-3 align-top">
-                                        <div class="space-y-2">
+                                    <td class="px-2 py-1.5 align-top">
+                                        <textarea
+                                            :value="line.description"
+                                            rows="1"
+                                            placeholder="Line item description"
+                                            class="block w-full resize-y rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                                            @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
+                                        />
+                                        <div v-if="catalogItems.length" class="mt-1">
                                             <AppSelect
-                                                v-if="catalogItems.length"
+                                                size="sm"
                                                 :model-value="line.item_id ? String(line.item_id) : ''"
                                                 :options="[
-                                                    { label: 'Catalog item…', value: '' },
+                                                    { label: 'From catalog…', value: '' },
                                                     ...catalogItems.map((item) => ({
                                                         label: item.name,
                                                         value: String(item.id),
                                                     })),
                                                 ]"
-                                                placeholder="Add from catalog"
+                                                placeholder="From catalog…"
                                                 @update:model-value="applyCatalogItem(index, String($event ?? ''))"
-                                            />
-                                            <textarea
-                                                :value="line.description"
-                                                rows="3"
-                                                placeholder="Line item description"
-                                                class="min-h-[4.5rem] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-snug text-slate-900 outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                                                @input="updateLine(index, 'description', ($event.target as HTMLTextAreaElement).value)"
                                             />
                                         </div>
                                     </td>
-                                    <td class="px-2 py-3 align-top">
+                                    <td class="px-1.5 py-1.5 align-top">
                                         <AppInput
-                                            class="text-right tabular-nums"
+                                            class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
                                             :model-value="line.quantity"
                                             type="number"
                                             inputmode="decimal"
                                             @update:model-value="updateLine(index, 'quantity', Number($event))"
                                         />
                                     </td>
-                                    <td class="px-2 py-3 align-top">
+                                    <td class="px-1.5 py-1.5 align-top">
                                         <AppInput
-                                            class="text-right tabular-nums"
+                                            class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
                                             :model-value="line.unit_price"
                                             type="text"
                                             inputmode="decimal"
@@ -621,17 +621,17 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             @blur="onUnitPriceBlur(index)"
                                         />
                                     </td>
-                                    <td class="px-2 py-3 align-top">
-                                        <div class="space-y-1">
+                                    <td class="px-1.5 py-1.5 align-top">
+                                        <div class="flex flex-col gap-1">
                                             <AppSelect
-                                                class="text-xs"
+                                                size="sm"
                                                 :model-value="line.discount_type ?? ''"
                                                 :options="discountTypeOptions"
                                                 @update:model-value="setLineDiscountType(index, String($event ?? ''))"
                                             />
                                             <AppInput
                                                 v-if="line.discount_type === 'percent'"
-                                                class="text-right tabular-nums"
+                                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
                                                 :model-value="line.discount_percent ?? 0"
                                                 type="number"
                                                 inputmode="decimal"
@@ -643,7 +643,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             />
                                             <AppInput
                                                 v-else-if="line.discount_type === 'fixed'"
-                                                class="text-right tabular-nums"
+                                                class="!h-8 !px-2 !py-1 text-right text-xs tabular-nums"
                                                 :model-value="line.discount_amount"
                                                 type="text"
                                                 inputmode="decimal"
@@ -653,22 +653,23 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             />
                                         </div>
                                     </td>
-                                    <td v-if="chargesVat" class="px-2 py-3 align-top">
+                                    <td v-if="chargesVat" class="px-1.5 py-1.5 align-top">
                                         <AppSelect
+                                            size="sm"
                                             :model-value="String(line.vat_rate)"
                                             :options="vatSelectOptions"
                                             @update:model-value="updateLine(index, 'vat_rate', Number($event))"
                                         />
                                     </td>
-                                    <td v-if="chargesVat" class="px-2 py-3 align-top text-right tabular-nums text-slate-700">
+                                    <td v-if="chargesVat" class="whitespace-nowrap px-1.5 py-1.5 align-middle text-right text-xs tabular-nums text-slate-600">
                                         {{ money(totals.lines[index]?.vat_amount_cents ?? 0) }}
                                     </td>
-                                    <td class="px-2 py-3 align-top text-right text-base font-semibold tabular-nums text-slate-900">
+                                    <td class="whitespace-nowrap px-1.5 py-1.5 align-middle text-right text-sm font-semibold tabular-nums text-slate-900">
                                         {{ money(totals.lines[index]?.total_cents ?? 0) }}
                                     </td>
-                                    <td class="px-1 py-3 align-top text-center">
+                                    <td class="px-1 py-1.5 align-middle text-center">
                                         <button
-                                            class="mt-1 rounded p-1.5 text-rose-600 hover:bg-rose-50"
+                                            class="rounded p-1 text-rose-600 hover:bg-rose-50"
                                             type="button"
                                             :aria-label="`Remove line ${index + 1}`"
                                             @click="removeLine(index)"

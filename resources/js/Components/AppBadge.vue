@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 
 const props = withDefaults(defineProps<{
-    variant?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'default';
+    variant?: 'success' | 'warning' | 'danger' | 'info' | 'accent' | 'neutral' | 'default';
 }>(), {
     variant: 'neutral',
 });
@@ -12,6 +12,7 @@ const className = computed(() => ({
     warning: 'bg-amber-100 text-amber-800',
     danger: 'bg-rose-100 text-rose-800',
     info: 'bg-sky-100 text-sky-800',
+    accent: 'bg-indigo-100 text-indigo-800',
     neutral: 'bg-slate-100 text-slate-800',
     default: 'bg-slate-100 text-slate-800',
 }[props.variant]));

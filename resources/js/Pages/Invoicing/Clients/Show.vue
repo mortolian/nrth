@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 
 type InvoiceHistoryRow = {
     id: number;
@@ -54,14 +55,6 @@ const props = defineProps<{
 
 const formatInvoiceCents = (cents: number, currency: string) =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
-
-const statusBadgeVariant = (status: string) => {
-    if (status === 'paid') return 'success';
-    if (status === 'void') return 'neutral';
-    if (status === 'overdue') return 'danger';
-
-    return 'info';
-};
 
 const addressLines = computed(() => {
     const a = props.client.address;
@@ -238,12 +231,11 @@ const goHistoryPage = (page: number) => {
                                     Issued <DateDisplay :value="invoice.issue_date" />
                                 </p>
                             </div>
-                            <AppBadge :variant="statusBadgeVariant(invoice.status)">
-                                {{
-                                    invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void'
-                                        ? 'overdue'
-                                        : invoice.status
-                                }}
+                            <AppBadge
+                                class="capitalize"
+                                :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: invoice.is_overdue })"
+                            >
+                                {{ invoiceStatusLabel(invoice.status, { isOverdue: invoice.is_overdue }) }}
                             </AppBadge>
                         </div>
                         <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
@@ -314,12 +306,11 @@ const goHistoryPage = (page: number) => {
                                 </span>
                             </td>
                             <td class="whitespace-nowrap px-3 py-3 align-middle">
-                                <AppBadge :variant="statusBadgeVariant(invoice.status)">
-                                    {{
-                                        invoice.is_overdue && invoice.status !== 'paid' && invoice.status !== 'void'
-                                            ? 'overdue'
-                                            : invoice.status
-                                    }}
+                                <AppBadge
+                                    class="capitalize"
+                                    :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: invoice.is_overdue })"
+                                >
+                                    {{ invoiceStatusLabel(invoice.status, { isOverdue: invoice.is_overdue }) }}
                                 </AppBadge>
                             </td>
                         </tr>
