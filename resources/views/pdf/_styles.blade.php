@@ -39,11 +39,32 @@
         font-weight: 800;
     }
     .brand .doc-meta {
-        margin-top: 6px;
+        margin-top: 8px;
+        margin-left: auto;
+        border-collapse: collapse;
         font-size: 10px;
         color: #475569;
     }
-    .brand .doc-meta .label { color: #64748b; }
+    .brand .doc-meta td {
+        padding: 2px 0;
+        vertical-align: top;
+        line-height: 1.4;
+    }
+    .brand .doc-meta td.key {
+        color: #64748b;
+        text-align: right;
+        white-space: nowrap;
+        padding-right: 8px;
+        width: 1%;
+    }
+    .brand .doc-meta td.val {
+        color: #0f172a;
+        text-align: left;
+        font-weight: 600;
+    }
+    .brand .doc-meta td.val.strong {
+        font-weight: 700;
+    }
     .brand .company-name {
         font-size: 16px;
         font-weight: 700;

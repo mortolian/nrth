@@ -113,13 +113,22 @@
         <td class="doc-cell">
             <h1>Estimate</h1>
             <div class="pill {{ $statusClass }}">{{ $statusLabel }}</div>
-            <div class="doc-meta">
-                <div><span class="label">Estimate #</span> &nbsp; <span class="b">{{ $estimate->number }}</span></div>
-                <div><span class="label">Issued</span> &nbsp; {{ optional($estimate->issue_date)->format('d M Y') }}</div>
-                @if($estimate->expiry_date)
-                    <div><span class="label">Valid until</span> &nbsp; {{ optional($estimate->expiry_date)->format('d M Y') }}</div>
-                @endif
-            </div>
+                <table class="doc-meta">
+                    <tr>
+                        <td class="key">Estimate #:</td>
+                        <td class="val strong">{{ $estimate->number }}</td>
+                    </tr>
+                    <tr>
+                        <td class="key">Issued:</td>
+                        <td class="val">{{ optional($estimate->issue_date)->format('d M Y') }}</td>
+                    </tr>
+                    @if($estimate->expiry_date)
+                        <tr>
+                            <td class="key">Valid until:</td>
+                            <td class="val">{{ optional($estimate->expiry_date)->format('d M Y') }}</td>
+                        </tr>
+                    @endif
+                </table>
         </td>
     </tr>
 </table>

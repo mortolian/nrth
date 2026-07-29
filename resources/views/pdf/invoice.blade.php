@@ -88,14 +88,26 @@
         </td>
         <td class="doc-cell">
             <h1>{{ $documentTitle }}</h1>
-            <div class="doc-meta">
-                <div><span class="label">Invoice #</span> &nbsp; <span class="b">{{ $invoice->number }}</span></div>
-                @if($invoice->reference)
-                    <div><span class="label">Reference</span> &nbsp; {{ $invoice->reference }}</div>
-                @endif
-                <div><span class="label">Issued</span> &nbsp; {{ optional($invoice->issue_date)->format('d M Y') }}</div>
-                <div><span class="label">Due</span> &nbsp; {{ optional($invoice->due_date)->format('d M Y') }}</div>
-            </div>
+                <table class="doc-meta">
+                    <tr>
+                        <td class="key">Invoice #:</td>
+                        <td class="val strong">{{ $invoice->number }}</td>
+                    </tr>
+                    @if($invoice->reference)
+                        <tr>
+                            <td class="key">Reference:</td>
+                            <td class="val">{{ $invoice->reference }}</td>
+                        </tr>
+                    @endif
+                    <tr>
+                        <td class="key">Issued:</td>
+                        <td class="val">{{ optional($invoice->issue_date)->format('d M Y') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="key">Due:</td>
+                        <td class="val">{{ optional($invoice->due_date)->format('d M Y') }}</td>
+                    </tr>
+                </table>
         </td>
     </tr>
 </table>
