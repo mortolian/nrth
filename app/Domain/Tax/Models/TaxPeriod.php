@@ -5,6 +5,7 @@ namespace App\Domain\Tax\Models;
 use App\Domain\Shared\HasTeamScope;
 use App\Domain\Tax\Enums\TaxPeriodStatus;
 use App\Domain\Tax\Enums\TaxPeriodType;
+use App\Models\Team;
 use Database\Factories\TaxPeriodFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ class TaxPeriod extends Model
 {
     /** @use HasFactory<TaxPeriodFactory> */
     use HasFactory;
+
     use HasTeamScope;
 
     protected $fillable = [
@@ -45,7 +47,7 @@ class TaxPeriod extends Model
 
     public function team(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Team::class);
+        return $this->belongsTo(Team::class);
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Domain\Invoicing\Actions\MarkInvoiceViewedAction;
 use App\Domain\Invoicing\Actions\StartInvoiceOnlinePaymentSessionAction;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Services\InvoiceMarkdownRenderer;
 use App\Domain\Invoicing\Services\InvoicePdfService;
 use App\Http\Controllers\Controller;
 use App\Support\InvoiceOnlinePaymentProviders;
@@ -74,8 +75,8 @@ class PublicInvoicePayController extends Controller
                 'amount_due_cents' => $amountDueCents,
                 'notes' => $invoice->notes,
                 'footer' => $invoice->footer,
-                'notes_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->notes),
-                'footer_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->footer),
+                'notes_html' => app(InvoiceMarkdownRenderer::class)->toHtml($invoice->notes),
+                'footer_html' => app(InvoiceMarkdownRenderer::class)->toHtml($invoice->footer),
                 'client' => [
                     'name' => $invoice->client?->name,
                     'email' => $invoice->client?->email,

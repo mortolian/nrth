@@ -25,6 +25,7 @@ use App\Domain\Invoicing\Models\Item;
 use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
+use App\Domain\Invoicing\Services\InvoiceMarkdownRenderer;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
 use App\Domain\Tax\Models\TaxRate;
@@ -601,8 +602,8 @@ class InvoiceController extends Controller
                 'due_date' => optional($invoice->due_date)->toDateString(),
                 'notes' => $invoice->notes,
                 'footer' => $invoice->footer,
-                'notes_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->notes),
-                'footer_html' => app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class)->toHtml($invoice->footer),
+                'notes_html' => app(InvoiceMarkdownRenderer::class)->toHtml($invoice->notes),
+                'footer_html' => app(InvoiceMarkdownRenderer::class)->toHtml($invoice->footer),
                 'currency' => Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR')),
                 'business_currency_code' => $invoice->business_currency_code !== null
                     ? Iso4217Currencies::normalize((string) $invoice->business_currency_code)

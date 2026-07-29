@@ -4,6 +4,7 @@ namespace Tests\Feature\Tax;
 
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
+use App\Domain\Takeout\Services\TakeoutBuilder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -27,7 +28,7 @@ class GenerateTakeoutJobTest extends TestCase
             'to_date' => now()->endOfYear()->toDateString(),
         ]);
 
-        (new GenerateTakeoutJob($run->id))->handle(app(\App\Domain\Takeout\Services\TakeoutBuilder::class));
+        (new GenerateTakeoutJob($run->id))->handle(app(TakeoutBuilder::class));
 
         $run->refresh();
 

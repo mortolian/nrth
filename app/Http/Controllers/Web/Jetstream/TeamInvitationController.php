@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Web\Jetstream;
 
+use App\Models\TeamInvitation;
 use App\Support\AcceptTeamInvitations;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Gate;
@@ -15,13 +17,13 @@ class TeamInvitationController extends Controller
      * Accept a team invitation and land on that business (no owner onboarding).
      *
      * @param  int  $invitationId
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function accept(Request $request, $invitationId)
     {
         $model = Jetstream::teamInvitationModel();
 
-        /** @var \App\Models\TeamInvitation $invitation */
+        /** @var TeamInvitation $invitation */
         $invitation = $model::whereKey($invitationId)->firstOrFail();
         $user = $request->user();
 
@@ -57,7 +59,7 @@ class TeamInvitationController extends Controller
      * Cancel the given team invitation.
      *
      * @param  int  $invitationId
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function destroy(Request $request, $invitationId)
     {

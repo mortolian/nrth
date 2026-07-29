@@ -124,9 +124,6 @@ final class AnthropicProvider implements AiProvider
         ];
     }
 
-    /**
-     * @param  mixed  $content
-     */
     private function firstTextBlock(mixed $content): ?string
     {
         if (! is_array($content)) {

@@ -11,6 +11,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Item;
 use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
+use App\Domain\Invoicing\Services\InvoiceMarkdownRenderer;
 use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
 use App\Domain\Tax\Models\TaxRate;
@@ -112,7 +113,7 @@ class EstimateController extends Controller
         $this->authorizeTeam('estimates.view', $request);
         abort_unless($estimate->team_id === (int) $request->user()->current_team_id, 403);
 
-        $markdown = app(\App\Domain\Invoicing\Services\InvoiceMarkdownRenderer::class);
+        $markdown = app(InvoiceMarkdownRenderer::class);
 
         return Inertia::render('Invoicing/Estimates/Show', [
             'estimate' => [

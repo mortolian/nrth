@@ -10,6 +10,7 @@ use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -213,7 +214,7 @@ class ItemController extends Controller
             }
 
             if (! in_array(mb_strtolower($unit), $allowedLower, true)) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'unit' => __('Choose a unit from Settings → Business → Items, or leave blank.'),
                 ]);
             }

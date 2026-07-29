@@ -37,7 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->respond(function (Response $response, \Throwable $e, Request $request) {
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
             if ($response->getStatusCode() !== 403 || ! $request->header('X-Inertia')) {
                 return $response;
             }

@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
+use App\Domain\Takeout\Services\TakeoutBuilder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +39,7 @@ class TakeoutVoidedInvoiceTest extends TestCase
             'to_date' => '2026-06-30',
         ]);
 
-        (new GenerateTakeoutJob($run->id))->handle(app(\App\Domain\Takeout\Services\TakeoutBuilder::class));
+        (new GenerateTakeoutJob($run->id))->handle(app(TakeoutBuilder::class));
 
         $zipPath = storage_path('app/private/'.$run->fresh()->storage_path);
         $zip = new ZipArchive;

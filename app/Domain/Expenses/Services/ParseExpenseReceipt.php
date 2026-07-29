@@ -6,6 +6,7 @@ use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Ai\AiProviderRegistry;
 use App\Domain\Expenses\DTOs\ParsedExpenseReceipt;
 use App\Models\Team;
+use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -157,7 +158,7 @@ class ParseExpenseReceipt
         }
 
         try {
-            return \Carbon\Carbon::parse($raw)->toDateString();
+            return Carbon::parse($raw)->toDateString();
         } catch (Throwable) {
             return null;
         }

@@ -16,6 +16,7 @@ class TakeoutRun extends Model
 {
     /** @use HasFactory<TakeoutRunFactory> */
     use HasFactory;
+
     use HasTeamScope;
 
     protected $fillable = [

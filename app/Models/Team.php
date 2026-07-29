@@ -386,7 +386,6 @@ class Team extends JetstreamTeam implements HasMedia
     }
 
     /**
-     * @param  mixed  $units
      * @return list<string>
      */
     public static function normalizeItemUnits(mixed $units): array

@@ -8,6 +8,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Jetstream\HasTeams;
@@ -110,7 +111,7 @@ class User extends Authenticatable
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, \App\Models\Team>
+     * @return Collection<int, Team>
      */
     public function allTeams()
     {

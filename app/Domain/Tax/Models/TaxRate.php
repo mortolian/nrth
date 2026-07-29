@@ -3,6 +3,7 @@
 namespace App\Domain\Tax\Models;
 
 use App\Domain\Shared\HasTeamScope;
+use App\Models\Team;
 use Database\Factories\TaxRateFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ class TaxRate extends Model
 {
     /** @use HasFactory<TaxRateFactory> */
     use HasFactory;
+
     use HasTeamScope;
 
     protected $table = 'tax_rates';
@@ -43,7 +45,7 @@ class TaxRate extends Model
 
     public function team(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Team::class);
+        return $this->belongsTo(Team::class);
     }
 
     protected static function newFactory(): TaxRateFactory

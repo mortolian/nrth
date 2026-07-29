@@ -2,8 +2,8 @@
 
 namespace App\Domain\Invoicing\Services;
 
-use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Models\Team;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;

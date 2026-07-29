@@ -2,6 +2,8 @@
 
 namespace App\Domain\Takeout\Services;
 
+use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Contracting\Models\Contract;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
@@ -102,7 +104,7 @@ final class TakeoutDocumentCollector
 
     private function exportExpenseReceipts(
         string $directory,
-        \App\Domain\Accounting\Models\Transaction $expense,
+        Transaction $expense,
         TakeoutDocumentExportResult $result,
     ): ?string {
         $mediaItems = $expense->getMedia('attachments');
@@ -145,7 +147,7 @@ final class TakeoutDocumentCollector
 
     private function exportBankStatement(
         string $directory,
-        \App\Domain\Banking\Models\BankingStatementImport $import,
+        BankingStatementImport $import,
         TakeoutDocumentExportResult $result,
     ): ?string {
         $accountName = TakeoutFilename::sanitize($import->account?->name ?? 'account');

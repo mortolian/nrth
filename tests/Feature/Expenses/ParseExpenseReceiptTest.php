@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Expenses;
 
+use App\Domain\Accounting\Enums\TransactionStatus;
+use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
-use App\Domain\Accounting\Enums\TransactionStatus;
-use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Banking\Models\BankingAccount;
 use App\Models\Team;
 use App\Models\User;

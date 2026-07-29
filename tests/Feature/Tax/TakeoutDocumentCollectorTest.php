@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Tax;
 
-use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\EntryType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
@@ -19,6 +18,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
+use App\Domain\Takeout\Services\TakeoutBuilder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -106,7 +106,7 @@ class TakeoutDocumentCollectorTest extends TestCase
             'to_date' => '2026-06-30',
         ]);
 
-        (new GenerateTakeoutJob($run->id))->handle(app(\App\Domain\Takeout\Services\TakeoutBuilder::class));
+        (new GenerateTakeoutJob($run->id))->handle(app(TakeoutBuilder::class));
 
         $run->refresh();
         $zipPath = storage_path('app/private/'.$run->storage_path);

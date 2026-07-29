@@ -2,11 +2,11 @@
 
 namespace App\Actions\Jetstream;
 
+use App\Rules\TeamRoleKey;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Jetstream\Events\TeamMemberUpdated;
 use Laravel\Jetstream\Jetstream;
-use App\Rules\TeamRoleKey;
 
 class UpdateTeamMemberRole
 {

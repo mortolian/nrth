@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web\Jetstream;
 
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Laravel\Jetstream\Contracts\RemovesTeamMembers;
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamMemberController as JetstreamTeamMemberController;
@@ -14,7 +15,7 @@ class TeamMemberController extends JetstreamTeamMemberController
      *
      * @param  int  $teamId
      * @param  int  $userId
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function destroy(Request $request, $teamId, $userId)
     {

@@ -10,6 +10,7 @@ use App\Models\Team;
 use Brick\Money\Money;
 use Carbon\Carbon;
 use Database\Factories\InvoiceFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -175,8 +176,8 @@ class Invoice extends Model implements HasMedia
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeIssued($query)
     {
@@ -184,8 +185,8 @@ class Invoice extends Model implements HasMedia
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
     public function scopeOpen($query)
     {

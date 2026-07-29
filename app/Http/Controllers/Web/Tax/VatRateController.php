@@ -139,4 +139,3 @@ class VatRateController extends Controller
         return to_route('tax.vat-rates.index')->with('success', 'VAT rate removed.');
     }
 }
-

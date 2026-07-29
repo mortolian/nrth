@@ -453,7 +453,6 @@ class ExpenseCrudTest extends TestCase
         $this->assertStringContainsString('REF-1', $csv);
     }
 
-
     public function test_update_via_multipart_method_spoof_persists_fields(): void
     {
         [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
