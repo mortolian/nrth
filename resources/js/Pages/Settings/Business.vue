@@ -457,6 +457,9 @@ const submit = () => {
         preserveState: true,
         preserveScroll: true,
         forceFormData: Boolean(logoFile.value),
+        onSuccess: () => {
+            toast.success('Business settings saved.');
+        },
         onError: (errors) => {
             if (errors.vat_number && tab.value !== 'profile' && tab.value !== 'tax') {
                 tab.value = 'tax';

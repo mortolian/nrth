@@ -24,6 +24,8 @@ use App\Policies\TakeoutRunPolicy;
 use App\Support\DestructiveDatabaseResetGuard;
 use App\Support\EnsureTeamSpatieRoles;
 use App\Support\Https;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
@@ -153,20 +155,32 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        $argv = array_values(array_filter($_SERVER['argv'] ?? [], 'is_string'));
         $allowOverride = filter_var(env('NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET', false), FILTER_VALIDATE_BOOLEAN);
-        $appEnv = (string) config('app.env');
 
-        if (! DestructiveDatabaseResetGuard::shouldBlock($argv, $appEnv, $allowOverride)) {
-            return;
-        }
+        // Direct `php artisan migrate:fresh` (argv is the command itself).
+        $argv = array_values(array_filter($_SERVER['argv'] ?? [], 'is_string'));
+        $this->throwIfDestructiveDatabaseResetBlocked(
+            DestructiveDatabaseResetGuard::commandFromArgv($argv),
+            $allowOverride,
+        );
 
-        $command = DestructiveDatabaseResetGuard::commandFromArgv($argv) ?? 'unknown';
+        // RefreshDatabase / Artisan::call('migrate:fresh') while argv is still `phpunit` or `artisan test`.
+        Event::listen(CommandStarting::class, function (CommandStarting $event) use ($allowOverride): void {
+            $this->throwIfDestructiveDatabaseResetBlocked($event->command, $allowOverride);
+        });
+    }
+
+    private function throwIfDestructiveDatabaseResetBlocked(?string $command, bool $allowOverride): void
+    {
         $connection = (string) config('database.default');
         $database = (string) config("database.connections.{$connection}.database", '');
 
+        if (! DestructiveDatabaseResetGuard::shouldBlockCommand($command, $allowOverride, $connection, $database)) {
+            return;
+        }
+
         throw new \RuntimeException(
-            DestructiveDatabaseResetGuard::message($command, $connection, $database)
+            DestructiveDatabaseResetGuard::message($command ?? 'unknown', $connection, $database)
         );
     }
 }

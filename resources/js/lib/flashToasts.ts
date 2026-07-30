@@ -27,7 +27,7 @@ type BridgeState = {
     recentKeys: Map<string, number>;
 };
 
-const DEDUPE_MS = 120_000;
+const DEDUPE_MS = 2500;
 
 const getState = (): BridgeState => {
     const g = globalThis as typeof globalThis & { [GLOBAL_KEY]?: BridgeState };

@@ -328,27 +328,25 @@ const isStepCurrent = (id) => setupStep.value === id;
         </template>
 
         <template #content>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div class="max-w-xl">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <p class="text-sm font-semibold text-slate-900">
-                            {{ twoFactorEnabled ? 'Enabled on this account' : 'Not enabled yet' }}
-                        </p>
-                        <AppBadge :variant="twoFactorEnabled ? 'success' : 'neutral'">
-                            {{ twoFactorEnabled ? 'Protected' : 'Optional' }}
-                        </AppBadge>
-                    </div>
-                    <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                        After you sign in with your password, you’ll enter a one-time code from an app such as
-                        Google Authenticator, 1Password, or Authy. Keep your recovery codes somewhere safe.
+            <div class="max-w-xl">
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-sm font-semibold text-slate-900">
+                        {{ twoFactorEnabled ? 'Enabled on this account' : 'Not enabled yet' }}
                     </p>
+                    <AppBadge :variant="twoFactorEnabled ? 'success' : 'neutral'">
+                        {{ twoFactorEnabled ? 'Protected' : 'Optional' }}
+                    </AppBadge>
                 </div>
+                <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                    After you sign in with your password, you’ll enter a one-time code from an app such as
+                    Google Authenticator, 1Password, or Authy. Keep your recovery codes somewhere safe.
+                </p>
+            </div>
 
-                <div v-if="! twoFactorEnabled && ! setupOpen" class="shrink-0">
-                    <AppButton variant="primary" @click="openSetup">
-                        Enable two-factor
-                    </AppButton>
-                </div>
+            <div v-if="! twoFactorEnabled && ! setupOpen" class="mt-4">
+                <AppButton variant="primary" @click="openSetup">
+                    Enable two-factor
+                </AppButton>
             </div>
 
             <div v-if="twoFactorEnabled" class="mt-5 flex flex-wrap gap-2">
