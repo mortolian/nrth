@@ -4,9 +4,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 import type { Ref } from 'vue';
 import ApplicationMark from '@/Components/ApplicationMark.vue';
 import Checkbox from '@/Components/Checkbox.vue';
+import AppCard from '@/Components/AppCard.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
 import AppButton from '@/Components/AppButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { useAppDisplayName } from '@/lib/appName';
@@ -381,12 +381,12 @@ const liveInvoicePreview = computed(() => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="min-h-screen bg-[#F8FAFD] text-slate-900">
         <Head title="Set up your company" />
 
-        <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+        <header class="border-b border-slate-200 bg-white/95 backdrop-blur">
             <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
-                <Link href="/" class="flex items-center gap-2 text-slate-200 hover:text-white">
+                <Link href="/" class="flex items-center gap-2 text-slate-700 hover:text-slate-900">
                     <ApplicationMark class="h-10 w-10" />
                     <span class="text-sm font-semibold tracking-tight">{{ appDisplayName }}</span>
                 </Link>
@@ -394,7 +394,7 @@ const liveInvoicePreview = computed(() => {
                     <span class="text-xs text-slate-500">Step {{ step }} of 5</span>
                     <button
                         type="button"
-                        class="text-xs font-medium text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-slate-200"
+                        class="text-xs font-medium text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
                         @click="skip"
                     >
                         Skip for now
@@ -407,65 +407,65 @@ const liveInvoicePreview = computed(() => {
                         v-for="s in 5"
                         :key="s"
                         class="h-1 flex-1 rounded-full transition-colors"
-                        :class="s <= step ? 'bg-brand-500' : 'bg-slate-800'"
+                        :class="s <= step ? 'bg-brand-500' : 'bg-slate-200'"
                     />
                 </div>
             </div>
         </header>
 
         <main class="mx-auto max-w-3xl px-4 py-10">
-            <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-xl shadow-slate-950/50">
+            <AppCard class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
                 <!-- Step 1 -->
                 <div v-if="step === 1" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">Welcome to {{ appDisplayName }}</h1>
-                        <p class="mt-3 text-sm leading-relaxed text-slate-400">
+                        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Welcome to {{ appDisplayName }}</h1>
+                        <p class="mt-3 text-sm leading-relaxed text-slate-600">
                             {{ appDisplayName }} helps South African small businesses invoice clients, track expenses, stay on top of
                             VAT and provisional tax, and understand profit with clear reports — without spreadsheet chaos.
                         </p>
                     </div>
                     <div class="flex justify-end gap-3">
-                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
+                        <AppButton type="button" variant="primary" @click="next">
                             Let&rsquo;s set up your company
-                        </PrimaryButton>
+                        </AppButton>
                     </div>
                 </div>
 
                 <!-- Step 2 -->
                 <div v-else-if="step === 2" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">Business details</h1>
-                        <p class="mt-1 text-sm text-slate-400">We&rsquo;ll use this on invoices, tax returns, and reports.</p>
+                        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Business details</h1>
+                        <p class="mt-1 text-sm text-slate-600">We&rsquo;ll use this on invoices, tax returns, and reports.</p>
                     </div>
 
                     <div class="space-y-4">
                         <div>
-                            <InputLabel for="co_name" value="Business name" class="!text-slate-300" />
+                            <InputLabel for="co_name" value="Business name" class="!text-slate-700" />
                             <TextInput
                                 id="co_name"
                                 v-model="wizard.businessName"
                                 type="text"
-                                class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                class="mt-1 block w-full"
                                 autocomplete="organization"
                             />
                             <InputError :message="fieldErrors.business_name || fieldErrors.businessName" class="mt-1" />
                         </div>
 
-                        <div class="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                        <div class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                             <Checkbox id="vat_reg" :checked="wizard.vatRegistered" @update:checked="wizard.vatRegistered = $event" />
                             <div class="flex-1">
-                                <InputLabel for="vat_reg" value="Are you VAT registered?" class="!text-slate-300" />
+                                <InputLabel for="vat_reg" value="Are you VAT registered?" class="!text-slate-700" />
                                 <p class="mt-1 text-xs text-slate-500">You can change this later in business settings.</p>
                             </div>
                         </div>
 
                         <div v-if="wizard.vatRegistered">
-                            <InputLabel for="vat_num" value="VAT number" class="!text-slate-300" />
+                            <InputLabel for="vat_num" value="VAT number" class="!text-slate-700" />
                             <TextInput
                                 id="vat_num"
                                 v-model="wizard.vatNumber"
                                 type="text"
-                                class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                class="mt-1 block w-full"
                                 placeholder="4XXXXXXXXX"
                                 maxlength="10"
                             />
@@ -473,11 +473,11 @@ const liveInvoicePreview = computed(() => {
                         </div>
 
                         <div>
-                            <InputLabel for="fy_end" value="Financial year end" class="!text-slate-300" />
+                            <InputLabel for="fy_end" value="Financial year end" class="!text-slate-700" />
                             <select
                                 id="fy_end"
                                 v-model.number="wizard.financialYearEndMonth"
-                                class="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                                class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                             >
                                 <option v-for="m in financial_year_months" :key="m.value" :value="m.value">
                                     {{ m.label }}
@@ -487,11 +487,11 @@ const liveInvoicePreview = computed(() => {
                         </div>
 
                         <div>
-                            <InputLabel for="industry" value="Industry" class="!text-slate-300" />
+                            <InputLabel for="industry" value="Industry" class="!text-slate-700" />
                             <select
                                 id="industry"
                                 v-model="wizard.industry"
-                                class="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                                class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                             >
                                 <option value="">Select…</option>
                                 <option v-for="i in industries" :key="i.value" :value="i.value">
@@ -505,66 +505,66 @@ const liveInvoicePreview = computed(() => {
                     <div class="flex justify-between gap-3">
                         <button
                             type="button"
-                            class="text-sm font-medium text-slate-400 hover:text-slate-200"
+                            class="text-sm font-medium text-slate-500 hover:text-slate-800"
                             @click="back"
                         >
                             Back
                         </button>
-                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
+                        <AppButton type="button" variant="primary" @click="next">
                             Continue
-                        </PrimaryButton>
+                        </AppButton>
                     </div>
                 </div>
 
                 <!-- Step 3 -->
                 <div v-else-if="step === 3" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">Opening balances</h1>
-                        <p class="mt-1 text-sm text-slate-400">Bring across your current position from a previous system.</p>
+                        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Opening balances</h1>
+                        <p class="mt-1 text-sm text-slate-600">Bring across your current position from a previous system.</p>
                     </div>
 
-                    <div class="flex items-start gap-3 rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                    <div class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                         <Checkbox id="books" :checked="wizard.hasExistingBooks" @update:checked="wizard.hasExistingBooks = $event" />
                         <div class="flex-1">
-                            <InputLabel for="books" value="Do you have existing books?" class="!text-slate-300" />
+                            <InputLabel for="books" value="Do you have existing books?" class="!text-slate-700" />
                             <p class="mt-1 text-xs text-slate-500">If not, we&rsquo;ll start from zero.</p>
                         </div>
                     </div>
 
-                    <div v-if="wizard.hasExistingBooks" class="space-y-4 rounded-xl border border-slate-800 bg-slate-950/30 p-4">
-                        <p class="text-sm text-slate-400">
-                            Enter balances in <span class="text-slate-200">rand</span> for the main control accounts. We&rsquo;ll post a single
+                    <div v-if="wizard.hasExistingBooks" class="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-sm text-slate-600">
+                            Enter balances in <span class="text-slate-900">rand</span> for the main control accounts. We&rsquo;ll post a single
                             opening entry balanced against owner&rsquo;s equity.
                         </p>
                         <div>
-                            <InputLabel for="ob_bank" value="Cash / bank (1010)" class="!text-slate-300" />
+                            <InputLabel for="ob_bank" value="Cash / bank (1010)" class="!text-slate-700" />
                             <TextInput
                                 id="ob_bank"
                                 v-model="wizard.openingBank"
                                 type="text"
-                                class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                class="mt-1 block w-full"
                                 placeholder="0.00"
                             />
                             <InputError :message="fieldErrors.opening_bank" class="mt-1" />
                         </div>
                         <div>
-                            <InputLabel for="ob_ar" value="Accounts receivable (1100)" class="!text-slate-300" />
+                            <InputLabel for="ob_ar" value="Accounts receivable (1100)" class="!text-slate-700" />
                             <TextInput
                                 id="ob_ar"
                                 v-model="wizard.openingAr"
                                 type="text"
-                                class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                class="mt-1 block w-full"
                                 placeholder="0.00"
                             />
                             <InputError :message="fieldErrors.opening_ar" class="mt-1" />
                         </div>
                         <div>
-                            <InputLabel for="ob_ap" value="Accounts payable (2000)" class="!text-slate-300" />
+                            <InputLabel for="ob_ap" value="Accounts payable (2000)" class="!text-slate-700" />
                             <TextInput
                                 id="ob_ap"
                                 v-model="wizard.openingAp"
                                 type="text"
-                                class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                class="mt-1 block w-full"
                                 placeholder="0.00"
                             />
                             <InputError :message="fieldErrors.opening_ap" class="mt-1" />
@@ -578,27 +578,27 @@ const liveInvoicePreview = computed(() => {
                     <div class="flex justify-between gap-3">
                         <button
                             type="button"
-                            class="text-sm font-medium text-slate-400 hover:text-slate-200"
+                            class="text-sm font-medium text-slate-500 hover:text-slate-800"
                             @click="back"
                         >
                             Back
                         </button>
-                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
+                        <AppButton type="button" variant="primary" @click="next">
                             Continue
-                        </PrimaryButton>
+                        </AppButton>
                     </div>
                 </div>
 
                 <!-- Step 4 -->
                 <div v-else-if="step === 4" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">Invoice setup</h1>
-                        <p class="mt-1 text-sm text-slate-400">Logo and banking details appear on PDF invoices.</p>
+                        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Invoice setup</h1>
+                        <p class="mt-1 text-sm text-slate-600">Logo and banking details appear on PDF invoices.</p>
                     </div>
 
                     <div class="space-y-4">
                         <div>
-                            <InputLabel value="Business logo" class="!text-slate-300" />
+                            <InputLabel value="Business logo" class="!text-slate-700" />
                             <div class="mt-2 flex flex-wrap items-center gap-3">
                                 <input
                                     ref="logoInput"
@@ -609,7 +609,7 @@ const liveInvoicePreview = computed(() => {
                                 >
                                 <button
                                     type="button"
-                                    class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 hover:border-slate-600"
+                                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                     @click="openLogo"
                                 >
                                     {{ logoFile ? 'Change image' : 'Upload logo' }}
@@ -621,51 +621,51 @@ const liveInvoicePreview = computed(() => {
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div class="sm:col-span-2">
-                                <InputLabel for="b_name" value="Bank name" class="!text-slate-300" />
+                                <InputLabel for="b_name" value="Bank name" class="!text-slate-700" />
                                 <TextInput
                                     id="b_name"
                                     v-model="wizard.bankName"
                                     type="text"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="fieldErrors.bank_name" class="mt-1" />
                             </div>
                             <div class="sm:col-span-2">
-                                <InputLabel for="b_holder" value="Account holder" class="!text-slate-300" />
+                                <InputLabel for="b_holder" value="Account holder" class="!text-slate-700" />
                                 <TextInput
                                     id="b_holder"
                                     v-model="wizard.bankAccountHolder"
                                     type="text"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="fieldErrors.bank_account_holder" class="mt-1" />
                             </div>
                             <div>
-                                <InputLabel for="b_num" value="Account number" class="!text-slate-300" />
+                                <InputLabel for="b_num" value="Account number" class="!text-slate-700" />
                                 <TextInput
                                     id="b_num"
                                     v-model="wizard.bankAccountNumber"
                                     type="text"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="fieldErrors.bank_account_number" class="mt-1" />
                             </div>
                             <div>
-                                <InputLabel for="b_branch" value="Branch code" class="!text-slate-300" />
+                                <InputLabel for="b_branch" value="Branch code" class="!text-slate-700" />
                                 <TextInput
                                     id="b_branch"
                                     v-model="wizard.bankBranchCode"
                                     type="text"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="fieldErrors.bank_branch_code" class="mt-1" />
                             </div>
                             <div class="sm:col-span-2">
-                                <InputLabel for="b_type" value="Account type" class="!text-slate-300" />
+                                <InputLabel for="b_type" value="Account type" class="!text-slate-700" />
                                 <select
                                     id="b_type"
                                     v-model="wizard.bankAccountType"
-                                    class="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+                                    class="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                 >
                                     <option v-for="b in bank_account_types" :key="b.value" :value="b.value">
                                         {{ b.label }}
@@ -676,95 +676,121 @@ const liveInvoicePreview = computed(() => {
                         </div>
 
                         <div>
-                            <InputLabel for="pay_terms" value="Default payment terms (days)" class="!text-slate-300" />
+                            <InputLabel for="pay_terms" value="Default payment terms (days)" class="!text-slate-700" />
                             <TextInput
                                 id="pay_terms"
                                 v-model.number="wizard.paymentTermsDays"
                                 type="number"
                                 min="0"
                                 max="365"
-                                class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                class="mt-1 block w-full"
                             />
                             <InputError :message="fieldErrors.invoice_default_payment_terms_days" class="mt-1" />
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <InputLabel for="inv_pref" value="Invoice prefix" class="!text-slate-300" />
+                                <InputLabel for="inv_pref" value="Invoice prefix" class="!text-slate-700" />
                                 <TextInput
                                     id="inv_pref"
                                     v-model="wizard.invoicePrefix"
                                     type="text"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="fieldErrors.invoice_prefix" class="mt-1" />
                             </div>
-                            <div>
-                                <InputLabel for="inv_seq" value="Starting invoice number" class="!text-slate-300" />
+                            <div v-if="!wizard.invoiceUseRandomSuffix">
+                                <InputLabel for="inv_seq" value="Starting invoice number" class="!text-slate-700" />
                                 <TextInput
                                     id="inv_seq"
                                     v-model.number="wizard.invoiceStartNumber"
                                     type="number"
                                     min="1"
-                                    :disabled="wizard.invoiceUseRandomSuffix"
-                                    class="mt-1 block w-full border-slate-700 bg-slate-950 text-slate-100 disabled:opacity-50"
+                                    class="mt-1 block w-full"
                                 />
                                 <InputError :message="fieldErrors.invoice_next_sequence" class="mt-1" />
                             </div>
                         </div>
-
                         <div>
-                            <InputLabel value="Numbering style" class="!text-slate-300" />
-                            <div class="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-3">
-                                <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-200">
-                                    <input
-                                        v-model="wizard.invoiceUseRandomSuffix"
-                                        type="radio"
-                                        :value="false"
-                                        class="border-slate-600 bg-slate-950 text-brand-500 focus:ring-brand-500"
+                            <InputLabel value="Numbering style" class="!text-slate-700" />
+                            <div class="mt-2 space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                                <button
+                                    type="button"
+                                    :class="[
+                                        'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition',
+                                        !wizard.invoiceUseRandomSuffix
+                                            ? 'border-brand-500 bg-brand-50 text-brand-800'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+                                    ]"
+                                    @click="wizard.invoiceUseRandomSuffix = false"
+                                >
+                                    <span
+                                        :class="[
+                                            'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                                            !wizard.invoiceUseRandomSuffix ? 'border-brand-500' : 'border-slate-300',
+                                        ]"
                                     >
+                                        <span
+                                            v-if="!wizard.invoiceUseRandomSuffix"
+                                            class="h-2 w-2 rounded-full bg-brand-500"
+                                        />
+                                    </span>
                                     Sequential numbers (0001, 0002, …)
-                                </label>
-                                <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-200">
-                                    <input
-                                        v-model="wizard.invoiceUseRandomSuffix"
-                                        type="radio"
-                                        :value="true"
-                                        class="border-slate-600 bg-slate-950 text-brand-500 focus:ring-brand-500"
+                                </button>
+                                <button
+                                    type="button"
+                                    :class="[
+                                        'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition',
+                                        wizard.invoiceUseRandomSuffix
+                                            ? 'border-brand-500 bg-brand-50 text-brand-800'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+                                    ]"
+                                    @click="wizard.invoiceUseRandomSuffix = true"
+                                >
+                                    <span
+                                        :class="[
+                                            'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border',
+                                            wizard.invoiceUseRandomSuffix ? 'border-brand-500' : 'border-slate-300',
+                                        ]"
                                     >
+                                        <span
+                                            v-if="wizard.invoiceUseRandomSuffix"
+                                            class="h-2 w-2 rounded-full bg-brand-500"
+                                        />
+                                    </span>
                                     Random identifier (e.g. a3f9)
-                                </label>
+                                </button>
                             </div>
                             <InputError :message="fieldErrors.invoice_number_use_random_suffix" class="mt-1" />
                         </div>
                         <p class="text-xs text-slate-500">
                             Next invoice preview:
-                            <span class="font-mono text-slate-300">{{ liveInvoicePreview }}</span>
+                            <span class="font-mono text-slate-700">{{ liveInvoicePreview }}</span>
                         </p>
                     </div>
 
                     <div class="flex justify-between gap-3">
                         <button
                             type="button"
-                            class="text-sm font-medium text-slate-400 hover:text-slate-200"
+                            class="text-sm font-medium text-slate-500 hover:text-slate-800"
                             @click="back"
                         >
                             Back
                         </button>
-                        <PrimaryButton type="button" class="!bg-brand-500 !tracking-normal hover:!bg-brand-400" @click="next">
+                        <AppButton type="button" variant="primary" @click="next">
                             Continue
-                        </PrimaryButton>
+                        </AppButton>
                     </div>
                 </div>
 
                 <!-- Step 5 -->
                 <div v-else-if="step === 5" class="space-y-6">
                     <div>
-                        <h1 class="text-2xl font-semibold tracking-tight text-white">You&rsquo;re all set</h1>
-                        <p class="mt-1 text-sm text-slate-400">Here&rsquo;s what we&rsquo;ll save when you finish.</p>
+                        <h1 class="text-2xl font-semibold tracking-tight text-slate-900">You&rsquo;re all set</h1>
+                        <p class="mt-1 text-sm text-slate-600">Here&rsquo;s what we&rsquo;ll save when you finish.</p>
                     </div>
 
-                    <ul class="space-y-3 rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
+                    <ul class="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                         <li>
                             <span class="text-slate-500">Business:</span>
                             {{ wizard.businessName }}
@@ -799,10 +825,10 @@ const liveInvoicePreview = computed(() => {
 
                     <div
                         v-if="finishErrorMessages.length"
-                        class="rounded-lg border border-red-900/50 bg-red-950/40 p-4"
+                        class="rounded-lg border border-rose-200 bg-rose-50 p-4"
                     >
-                        <p class="text-sm font-medium text-red-300">Could not finish setup:</p>
-                        <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-red-400">
+                        <p class="text-sm font-medium text-rose-700">Could not finish setup:</p>
+                        <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-rose-600">
                             <li v-for="(msg, idx) in finishErrorMessages" :key="idx">{{ msg }}</li>
                         </ul>
                     </div>
@@ -810,7 +836,7 @@ const liveInvoicePreview = computed(() => {
                     <div class="flex justify-between gap-3">
                         <button
                             type="button"
-                            class="text-sm font-medium text-slate-400 hover:text-slate-200"
+                            class="text-sm font-medium text-slate-500 hover:text-slate-800"
                             @click="back"
                         >
                             Back
@@ -818,7 +844,6 @@ const liveInvoicePreview = computed(() => {
                         <AppButton
                             type="button"
                             variant="primary"
-                            class="!bg-brand-500 !tracking-normal hover:!bg-brand-400"
                             :loading="finishing"
                             @click="finish"
                         >
@@ -826,7 +851,7 @@ const liveInvoicePreview = computed(() => {
                         </AppButton>
                     </div>
                 </div>
-            </div>
+            </AppCard>
         </main>
     </div>
 </template>
