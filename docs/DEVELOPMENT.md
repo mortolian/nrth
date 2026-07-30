@@ -38,9 +38,11 @@ The default `.env.example` uses SQLite for quick experiments. For features that 
 
 ```bash
 php artisan test
+# or with Sail:
+./vendor/bin/sail test
 ```
 
-Vite is stubbed in `tests/TestCase.php` — a production asset build is not required for PHPUnit.
+PHPUnit forces SQLite in-memory via `phpunit.xml`. Under Docker/Sail, Compose also injects `DB_*` / `SESSION_*` into `$_SERVER`; `tests/bootstrap.php` syncs those with PHPUnit's env so `RefreshDatabase` never targets your app Postgres. Vite is stubbed in `tests/TestCase.php` — a production asset build is not required for PHPUnit.
 
 ### Code style
 
