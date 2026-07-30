@@ -1,9 +1,9 @@
 <script setup>
-import { ref, reactive, nextTick } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import AppButton from './AppButton.vue';
 import DialogModal from './DialogModal.vue';
 import InputError from './InputError.vue';
-import SecondaryButton from './SecondaryButton.vue';
+import InputLabel from './InputLabel.vue';
 import TextInput from './TextInput.vue';
 
 const emit = defineEmits(['confirmed']);
@@ -11,11 +11,11 @@ const emit = defineEmits(['confirmed']);
 defineProps({
     title: {
         type: String,
-        default: 'Confirm Password',
+        default: 'Confirm your password',
     },
     content: {
         type: String,
-        default: 'For your security, please confirm your password to continue.',
+        default: 'For your security, confirm your password to continue.',
     },
     button: {
         type: String,
@@ -34,7 +34,7 @@ const form = reactive({
 const passwordInput = ref(null);
 
 const startConfirmingPassword = () => {
-    axios.get(route('password.confirmation')).then(response => {
+    axios.get(route('password.confirmation')).then((response) => {
         if (response.data.confirmed) {
             emit('confirmed');
         } else {
@@ -55,10 +55,9 @@ const confirmPassword = () => {
 
         closeModal();
         nextTick().then(() => emit('confirmed'));
-
-    }).catch(error => {
+    }).catch((error) => {
         form.processing = false;
-        form.error = error.response.data.errors.password[0];
+        form.error = error.response?.data?.errors?.password?.[0] || 'Incorrect password.';
         passwordInput.value.focus();
     });
 };
@@ -76,21 +75,25 @@ const closeModal = () => {
             <slot />
         </span>
 
-        <DialogModal :show="confirmingPassword" @close="closeModal">
+        <DialogModal :show="confirmingPassword" max-width="md" @close="closeModal">
             <template #title>
                 {{ title }}
             </template>
 
             <template #content>
-                {{ content }}
+                <p class="text-sm text-slate-600">
+                    {{ content }}
+                </p>
 
                 <div class="mt-4">
+                    <InputLabel for="confirming_user_password" value="Password" />
                     <TextInput
+                        id="confirming_user_password"
                         ref="passwordInput"
                         v-model="form.password"
                         type="password"
-                        class="mt-1 block w-3/4"
-                        placeholder="Password"
+                        class="mt-1 block w-full"
+                        placeholder="Your current password"
                         autocomplete="current-password"
                         @keyup.enter="confirmPassword"
                     />
@@ -100,14 +103,15 @@ const closeModal = () => {
             </template>
 
             <template #footer>
-                <SecondaryButton @click="closeModal">
+                <AppButton variant="ghost" @click="closeModal">
                     Cancel
-                </SecondaryButton>
+                </AppButton>
 
                 <AppButton
                     class="ms-3"
                     variant="primary"
                     :loading="form.processing"
+                    :disabled="form.processing || ! form.password"
                     @click="confirmPassword"
                 >
                     {{ form.processing ? 'Confirming…' : button }}
