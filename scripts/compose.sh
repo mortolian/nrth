@@ -33,6 +33,23 @@ compose_args_include_force() {
     [[ "${NRTH_FORCE:-}" == "1" ]]
 }
 
+destructive_artisan_command() {
+    local prev=""
+    local arg
+    for arg in "$@"; do
+        if [[ "$prev" == "artisan" ]]; then
+            case "$arg" in
+                db:wipe|migrate:fresh|migrate:refresh)
+                    printf '%s\n' "$arg"
+                    return 0
+                    ;;
+            esac
+        fi
+        prev="$arg"
+    done
+    return 1
+}
+
 # Our --force is consumed by this wrapper; docker compose does not accept it.
 compose_args_without_force() {
     local arg
@@ -89,12 +106,35 @@ EOF
     exit 1
 }
 
+guard_destructive_artisan_reset() {
+    local command=""
+    command="$(destructive_artisan_command "$@")" || return 0
+
+    if [[ "${NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET:-0}" == "1" ]]; then
+        return 0
+    fi
+
+    cat >&2 <<EOF
+error: blocked \`php artisan ${command}\` from scripts/compose.sh
+
+This command destroys database contents. To run it intentionally, opt in explicitly:
+  NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET=1 ./scripts/compose.sh $*
+
+Safer alternatives:
+  ./scripts/update
+  php artisan migrate
+EOF
+    exit 1
+}
+
 if [[ -n "${COMPOSE:-}" && "${COMPOSE}" != *compose.sh* ]]; then
     guard_destructive_compose "$@"
+    guard_destructive_artisan_reset "$@"
     # shellcheck disable=SC2086
     exec $COMPOSE "$@"
 fi
 
 guard_destructive_compose "$@"
+guard_destructive_artisan_reset "$@"
 
 run_compose "$@"

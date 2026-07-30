@@ -6,20 +6,15 @@ use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\URL;
-use Laravel\Fortify\Features;
 use Laravel\Jetstream\Features as JetstreamFeatures;
-use Laravel\Jetstream\Jetstream;
 use Tests\TestCase;
 
 class AcceptTeamInvitationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_registering_with_pending_invitation_joins_team_without_personal_business(): void
+    public function test_pending_invitation_does_not_allow_self_registration(): void
     {
-        if (! Features::enabled(Features::registration())) {
-            $this->markTestSkipped('Registration support is not enabled.');
-        }
         if (! JetstreamFeatures::sendsTeamInvitations()) {
             $this->markTestSkipped('Team invitations not enabled.');
         }
@@ -40,21 +35,11 @@ class AcceptTeamInvitationTest extends TestCase
             'email' => 'invitee@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
-            'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature(),
-        ])->assertRedirect();
+        ])->assertNotFound();
 
         $invitee = User::query()->where('email', 'invitee@example.com')->first();
-        $this->assertNotNull($invitee);
-        $this->assertTrue($invitee->belongsToTeam($team));
-        $this->assertTrue($invitee->hasTeamRole($team, 'viewer'));
-        $this->assertFalse($invitee->ownedTeams()->exists());
-        $this->assertNotNull($invitee->completed_onboarding_at);
-        $this->assertSame($team->id, $invitee->current_team_id);
-        $this->assertCount(0, $team->fresh()->teamInvitations);
-
-        $this->actingAs($invitee)
-            ->get(route('dashboard'))
-            ->assertOk();
+        $this->assertNull($invitee);
+        $this->assertCount(1, $team->fresh()->teamInvitations);
     }
 
     public function test_accepting_invitation_switches_team_and_skips_onboarding_for_members(): void
@@ -166,11 +151,8 @@ class AcceptTeamInvitationTest extends TestCase
         $this->assertStringContainsString('invitee@example.com', (string) session('error'));
     }
 
-    public function test_join_link_shows_account_form_for_new_invitees(): void
+    public function test_join_link_redirects_new_invitees_to_login_with_help_message(): void
     {
-        if (! Features::enabled(Features::registration())) {
-            $this->markTestSkipped('Registration support is not enabled.');
-        }
         if (! JetstreamFeatures::sendsTeamInvitations()) {
             $this->markTestSkipped('Team invitations not enabled.');
         }
@@ -189,30 +171,10 @@ class AcceptTeamInvitationTest extends TestCase
         $url = URL::signedRoute('team-invitations.join', ['invitation' => $invitation]);
 
         $this->get($url)
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('Auth/JoinInvitation')
-                ->where('invitation.email', 'newbie@example.com')
-                ->where('invitation.team_name', $team->name));
+            ->assertRedirect(route('login'));
 
-        $this->withSession(['invitation_join' => [
-            'email' => 'newbie@example.com',
-            'team_name' => $team->name,
-            'role_label' => 'Viewer',
-        ]])->post('/register', [
-            'name' => 'New Member',
-            'email' => 'attacker@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-            'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature(),
-        ])->assertRedirect();
-
-        $this->assertDatabaseHas('users', ['email' => 'newbie@example.com']);
-        $this->assertDatabaseMissing('users', ['email' => 'attacker@example.com']);
-
-        $member = User::query()->where('email', 'newbie@example.com')->first();
-        $this->assertTrue($member->belongsToTeam($team));
-        $this->assertFalse($member->ownedTeams()->exists());
+        $this->assertStringContainsString('No account exists for newbie@example.com yet.', (string) session('error'));
+        $this->assertNull(session('invitation_join'));
     }
 
     public function test_login_with_pending_invitation_joins_and_skips_business_setup(): void

@@ -44,6 +44,13 @@ php artisan test
 
 PHPUnit forces SQLite in-memory via `phpunit.xml`. Under Docker/Sail, Compose also injects `DB_*` / `SESSION_*` into `$_SERVER`; `tests/bootstrap.php` syncs those with PHPUnit's env so `RefreshDatabase` never targets your app Postgres. Vite is stubbed in `tests/TestCase.php` — a production asset build is not required for PHPUnit.
 
+Destructive reset commands are blocked outside `APP_ENV=testing`, including when invoked through `./scripts/compose.sh`. If you truly mean to wipe your current DB, opt in explicitly for that shell only:
+
+```bash
+NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET=1 php artisan migrate:fresh
+NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET=1 ./scripts/compose.sh exec -T app php artisan migrate:fresh
+```
+
 ### Code style
 
 ```bash
@@ -102,7 +109,7 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 ### Backups & exports (local)
 
 - Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).
-- The first user created is an instance operator. Manage operators under **Backups & exports → Instance backup**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
+- The first user created is an instance operator. Public self-registration is disabled; for local access, use the installer-created account or create users/admins explicitly. Manage operators under **Backups & exports → Instance backup**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
 - Takeout and instance backup jobs run on Horizon’s `long` queue (multi-minute). Restart Horizon after pulling changes: `./vendor/bin/sail restart horizon` (or `php artisan horizon:terminate`).
 - Instance backups need `pg_dump` matching Compose Postgres (**16**). After Dockerfile client changes: `./vendor/bin/sail build` then recreate containers.
 ## Architecture

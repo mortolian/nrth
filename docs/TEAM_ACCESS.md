@@ -53,7 +53,7 @@ Invited people should **join the existing business**, not create a new one:
 
 1. Owner invites by email (role = `team_roles.key`).
 2. The email has one button: **Join {business}** → signed `/invitations/{id}` (`team-invitations.join`).
-3. **New user** (no account): join page asks only for name + password (email locked). Registering accepts the invite automatically — no personal team, no owner onboarding.
+3. **New user** (no account): self-registration is disabled. The invite link sends them to sign in with a message to ask the instance administrator or business owner to create their account first.
 4. **Existing user**: sign in with that email; login automatically accepts pending invites and lands on the invited business (skips owner onboarding even if a leftover personal team exists).
 5. Middleware / onboarding also settle pending invites and prefer membership on another business over unfinished personal-team setup.
 

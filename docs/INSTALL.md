@@ -28,6 +28,8 @@ From a git clone: `./scripts/install.sh --production` (or `--lan`).
 
 The installer installs Docker if needed, writes `.env`, starts Compose, and runs `app:install` (admin + business). Open the URL it prints and sign in.
 
+Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance.
+
 If the admin wizard did not run (non-interactive install):
 
 ```bash

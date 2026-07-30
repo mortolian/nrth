@@ -10,16 +10,13 @@ use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use App\Support\TeamAccess\RolePresets;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
-use Laravel\Fortify\Features;
 
 class JoinTeamInvitationController extends Controller
 {
     /**
      * Single entry for invitation emails: join as a new or existing user.
      */
-    public function __invoke(Request $request, TeamInvitation $invitation): Response|RedirectResponse
+    public function __invoke(Request $request, TeamInvitation $invitation): RedirectResponse
     {
         $invitation->loadMissing('team');
         $team = $invitation->team;
@@ -59,25 +56,13 @@ class JoinTeamInvitationController extends Controller
             return redirect()->route('login');
         }
 
-        if (! Features::enabled(Features::registration())) {
-            $request->session()->put('url.intended', $request->fullUrl());
-            $request->session()->put('invitation_join', $inviteContext);
+        $request->session()->put('url.intended', $request->fullUrl());
 
-            return redirect()
-                ->route('login')
-                ->with('error', __('Registration is disabled. Ask the business owner for help signing in.'));
-        }
-
-        $request->session()->put('invitation_join', $inviteContext);
-
-        return Inertia::render('Auth/JoinInvitation', [
-            'invitation' => [
-                'id' => $invitation->id,
+        return redirect()
+            ->route('login')
+            ->with('error', __('No account exists for :email yet. Ask the instance administrator or business owner to create one before you sign in.', [
                 'email' => $invitation->email,
-                'team_name' => $team->name,
-                'role_label' => $this->roleLabel($invitation),
-            ],
-        ]);
+            ]));
     }
 
     private function acceptAuthenticated(User $user, TeamInvitation $invitation): RedirectResponse

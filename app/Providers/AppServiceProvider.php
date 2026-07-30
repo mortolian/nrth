@@ -21,6 +21,7 @@ use App\Http\Controllers\Web\Jetstream\TeamMemberController as AppTeamMemberCont
 use App\Http\Controllers\Web\UserProfileController;
 use App\Models\User;
 use App\Policies\TakeoutRunPolicy;
+use App\Support\DestructiveDatabaseResetGuard;
 use App\Support\EnsureTeamSpatieRoles;
 use App\Support\Https;
 use Illuminate\Support\Facades\Gate;
@@ -71,6 +72,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->guardDestructiveDatabaseResetCommands();
+
         if (Https::shouldForce()) {
             $rootUrl = rtrim((string) config('app.url'), '/');
 
@@ -142,5 +145,28 @@ class AppServiceProvider extends ServiceProvider
         putenv('NODE_PATH='.$merged);
         $_ENV['NODE_PATH'] = $merged;
         $_SERVER['NODE_PATH'] = $merged;
+    }
+
+    private function guardDestructiveDatabaseResetCommands(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        $argv = array_values(array_filter($_SERVER['argv'] ?? [], 'is_string'));
+        $allowOverride = filter_var(env('NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET', false), FILTER_VALIDATE_BOOLEAN);
+        $appEnv = (string) config('app.env');
+
+        if (! DestructiveDatabaseResetGuard::shouldBlock($argv, $appEnv, $allowOverride)) {
+            return;
+        }
+
+        $command = DestructiveDatabaseResetGuard::commandFromArgv($argv) ?? 'unknown';
+        $connection = (string) config('database.default');
+        $database = (string) config("database.connections.{$connection}.database", '');
+
+        throw new \RuntimeException(
+            DestructiveDatabaseResetGuard::message($command, $connection, $database)
+        );
     }
 }
