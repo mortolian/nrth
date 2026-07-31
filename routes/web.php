@@ -132,6 +132,7 @@ Route::middleware([
     Route::delete('/expenses/{transaction}/attachments/{media}', [ExpensesController::class, 'destroyAttachment'])->name('expenses.attachments.destroy');
     Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index');
     Route::get('/suppliers/create', [SupplierController::class, 'create'])->name('suppliers.create');
+    Route::post('/suppliers/parse-document', [SupplierController::class, 'parseDocument'])->name('suppliers.parse-document');
     Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
     Route::get('/suppliers/{supplier}', [SupplierController::class, 'show'])->name('suppliers.show');
     Route::get('/suppliers/{supplier}/edit', [SupplierController::class, 'edit'])->name('suppliers.edit');

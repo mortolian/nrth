@@ -34,6 +34,18 @@ class SupplierTest extends TestCase
         $this->get(route('suppliers.create'))->assertOk();
 
         $this->post(route('suppliers.store'), [
+            'name' => '',
+            'contact_name' => null,
+            'email' => null,
+            'phone' => null,
+            'vat_number' => null,
+            'registration_number' => null,
+            'address' => null,
+            'notes' => null,
+            'is_active' => true,
+        ])->assertSessionHasErrors('name');
+
+        $this->post(route('suppliers.store'), [
             'name' => 'Acme Supplies',
             'contact_name' => null,
             'email' => 'billing@acme.test',

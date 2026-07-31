@@ -22,7 +22,7 @@
 ## Features
 
 - **Invoicing & estimates** — clients, items catalog, recurring invoices, discounts, note templates, PDFs, payments, payment receipts, online pay links
-- **Expenses & suppliers** — receipts, categories, VAT on purchases
+- **Expenses & suppliers** — receipts, AI document fill, categories, VAT on purchases
 - **Accounting** — chart of accounts, journal, general ledger, account statements
 - **Banking** — import CSV/OFX statements, duplicate detection, transaction list
 - **Tax** — VAT returns and rates (configure during setup wizard)

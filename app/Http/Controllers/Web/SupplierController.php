@@ -7,11 +7,13 @@ use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Accounting\Services\ParseSupplierDocument;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Propaganistas\LaravelPhone\PhoneNumber;
@@ -87,6 +89,31 @@ class SupplierController extends Controller
             'prefill' => [
                 'name' => $namePrefill !== '' ? $namePrefill : null,
             ],
+        ]);
+    }
+
+    public function parseDocument(Request $request, ParseSupplierDocument $parser): JsonResponse
+    {
+        $this->authorizeTeam('suppliers.manage', $request);
+        $team = $request->user()?->currentTeam;
+        abort_if($team === null, 403);
+
+        if (! $parser->enabledFor($team)) {
+            throw ValidationException::withMessages([
+                'document' => __('AI is not configured. Add an API key in Business settings → AI.'),
+            ]);
+        }
+
+        $request->validate([
+            'document' => ['required', 'file', 'max:10240'],
+        ]);
+
+        /** @var \Illuminate\Http\UploadedFile $document */
+        $document = $request->file('document');
+        $parsed = $parser->parse($document, $team);
+
+        return response()->json([
+            'data' => $parsed->toFormPayload(),
         ]);
     }
 
