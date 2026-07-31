@@ -157,7 +157,7 @@ class BusinessSettingsController extends Controller
             'vat_registered' => ['required', 'boolean'],
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
             'default_vat_rate' => ['required', 'numeric', 'min:0', 'max:1'],
-            'payment_pages_enabled' => ['sometimes', 'boolean'],
+            'payment_pages_enabled' => ['required', 'boolean'],
             'session_idle_timeout_minutes' => [
                 'sometimes',
                 'integer',
@@ -182,31 +182,91 @@ class BusinessSettingsController extends Controller
             'payment_gateways' => ['required', 'array'],
             'payment_gateways.payfast' => ['required', 'array'],
             'payment_gateways.payfast.enabled' => ['required', 'boolean'],
-            'payment_gateways.payfast.merchant_id' => ['nullable', 'string', 'max:255'],
-            'payment_gateways.payfast.merchant_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.payfast.merchant_id' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.payfast.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'payment_gateways.payfast.merchant_key' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.payfast.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.payfast.passphrase' => ['nullable', 'string', 'max:255'],
             'payment_gateways.stripe' => ['required', 'array'],
             'payment_gateways.stripe.enabled' => ['required', 'boolean'],
-            'payment_gateways.stripe.publishable_key' => ['nullable', 'string', 'max:255'],
-            'payment_gateways.stripe.secret_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.stripe.publishable_key' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.stripe.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'payment_gateways.stripe.secret_key' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.stripe.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.stripe.webhook_secret' => ['nullable', 'string', 'max:255'],
             'payment_gateways.paypal' => ['required', 'array'],
             'payment_gateways.paypal.enabled' => ['required', 'boolean'],
-            'payment_gateways.paypal.client_id' => ['nullable', 'string', 'max:255'],
-            'payment_gateways.paypal.client_secret' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.paypal.client_id' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.paypal.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'payment_gateways.paypal.client_secret' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.paypal.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.paypal.environment' => ['required', Rule::in(['sandbox', 'live'])],
             'payment_gateways.netcash' => ['required', 'array'],
             'payment_gateways.netcash.enabled' => ['required', 'boolean'],
-            'payment_gateways.netcash.account_id' => ['nullable', 'string', 'max:255'],
-            'payment_gateways.netcash.service_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.netcash.account_id' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.netcash.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'payment_gateways.netcash.service_key' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.netcash.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.snapscan' => ['required', 'array'],
             'payment_gateways.snapscan.enabled' => ['required', 'boolean'],
-            'payment_gateways.snapscan.merchant_id' => ['nullable', 'string', 'max:255'],
-            'payment_gateways.snapscan.api_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.snapscan.merchant_id' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.snapscan.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'payment_gateways.snapscan.api_key' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.snapscan.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.zapper' => ['required', 'array'],
             'payment_gateways.zapper.enabled' => ['required', 'boolean'],
-            'payment_gateways.zapper.merchant_id' => ['nullable', 'string', 'max:255'],
-            'payment_gateways.zapper.api_key' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.zapper.merchant_id' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.zapper.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'payment_gateways.zapper.api_key' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.zapper.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'bank_accounts' => ['required', 'array', 'max:50'],
             'bank_accounts.*.bank_name' => ['nullable', 'string', 'max:255'],
             'bank_accounts.*.bank_account_holder' => ['nullable', 'string', 'max:255'],
@@ -234,6 +294,14 @@ class BusinessSettingsController extends Controller
 
         // Free-form default replaces the legacy tax-rate-id pointer.
         $validated['default_tax_rate_id'] = null;
+
+        $validated['payment_pages_enabled'] = (bool) $validated['payment_pages_enabled'];
+        foreach (['payfast', 'stripe', 'paypal', 'netcash', 'snapscan', 'zapper'] as $gateway) {
+            if (! isset($validated['payment_gateways'][$gateway]) || ! is_array($validated['payment_gateways'][$gateway])) {
+                continue;
+            }
+            $validated['payment_gateways'][$gateway]['enabled'] = (bool) ($validated['payment_gateways'][$gateway]['enabled'] ?? false);
+        }
 
         if (! empty($validated['business_phone'])) {
             $validated['business_phone'] = (new PhoneNumber((string) $validated['business_phone']))->formatE164();

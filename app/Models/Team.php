@@ -361,8 +361,30 @@ class Team extends JetstreamTeam implements HasMedia
         // New companies start VAT-off; normalize legacy string/int flags to a real boolean.
         $merged['vat_registered'] = filter_var($merged['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $merged['default_vat_rate'] = $this->resolveDefaultVatRateFromSettings($stored, $merged);
+        $merged['payment_pages_enabled'] = filter_var($merged['payment_pages_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $merged['payment_gateways'] = $this->normalizePaymentGatewayFlags(
+            is_array($merged['payment_gateways'] ?? null) ? $merged['payment_gateways'] : []
+        );
 
         return $merged;
+    }
+
+    /**
+     * Ensure each gateway's enabled flag is a real boolean (default off).
+     *
+     * @param  array<string, mixed>  $gateways
+     * @return array<string, mixed>
+     */
+    private function normalizePaymentGatewayFlags(array $gateways): array
+    {
+        foreach (['payfast', 'stripe', 'paypal', 'netcash', 'snapscan', 'zapper'] as $key) {
+            if (! is_array($gateways[$key] ?? null)) {
+                continue;
+            }
+            $gateways[$key]['enabled'] = filter_var($gateways[$key]['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        return $gateways;
     }
 
     /**

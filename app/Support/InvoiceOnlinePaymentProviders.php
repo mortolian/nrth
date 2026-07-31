@@ -46,7 +46,7 @@ final class InvoiceOnlinePaymentProviders
         /** @var array<string, mixed> $stripe */
         $stripe = is_array($gateways['stripe'] ?? null) ? $gateways['stripe'] : [];
         $stripeSecret = isset($stripe['secret_key']) && is_string($stripe['secret_key']) ? trim($stripe['secret_key']) : '';
-        if (($stripe['enabled'] ?? false) && $stripeSecret !== '') {
+        if (filter_var($stripe['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN) && $stripeSecret !== '') {
             $providers[] = 'stripe';
         }
 
@@ -54,7 +54,7 @@ final class InvoiceOnlinePaymentProviders
         $payfast = is_array($gateways['payfast'] ?? null) ? $gateways['payfast'] : [];
         $mid = isset($payfast['merchant_id']) && is_string($payfast['merchant_id']) ? trim($payfast['merchant_id']) : '';
         $mkey = isset($payfast['merchant_key']) && is_string($payfast['merchant_key']) ? trim($payfast['merchant_key']) : '';
-        if ($currency === 'ZAR' && ($payfast['enabled'] ?? false) && $mid !== '' && $mkey !== '') {
+        if ($currency === 'ZAR' && filter_var($payfast['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN) && $mid !== '' && $mkey !== '') {
             $providers[] = 'payfast';
         }
 

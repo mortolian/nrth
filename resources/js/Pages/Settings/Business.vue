@@ -128,7 +128,7 @@ const form = useForm({
             Number(props.settings.default_vat_rate ?? 0) * 100
         ).toFixed(4),
     ),
-    payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? false),
+    payment_pages_enabled: props.settings.payment_pages_enabled === true,
     ai: {
         provider: String((props.settings.ai as any)?.provider ?? 'openai'),
         api_key: String((props.settings.ai as any)?.api_key ?? ''),
@@ -137,35 +137,35 @@ const form = useForm({
     },
     payment_gateways: {
         payfast: {
-            enabled: Boolean((props.settings.payment_gateways as any)?.payfast?.enabled ?? false),
+            enabled: (props.settings.payment_gateways as any)?.payfast?.enabled === true,
             merchant_id: String((props.settings.payment_gateways as any)?.payfast?.merchant_id ?? ''),
             merchant_key: String((props.settings.payment_gateways as any)?.payfast?.merchant_key ?? ''),
             passphrase: String((props.settings.payment_gateways as any)?.payfast?.passphrase ?? ''),
         },
         stripe: {
-            enabled: Boolean((props.settings.payment_gateways as any)?.stripe?.enabled ?? false),
+            enabled: (props.settings.payment_gateways as any)?.stripe?.enabled === true,
             publishable_key: String((props.settings.payment_gateways as any)?.stripe?.publishable_key ?? ''),
             secret_key: String((props.settings.payment_gateways as any)?.stripe?.secret_key ?? ''),
             webhook_secret: String((props.settings.payment_gateways as any)?.stripe?.webhook_secret ?? ''),
         },
         paypal: {
-            enabled: Boolean((props.settings.payment_gateways as any)?.paypal?.enabled ?? false),
+            enabled: (props.settings.payment_gateways as any)?.paypal?.enabled === true,
             client_id: String((props.settings.payment_gateways as any)?.paypal?.client_id ?? ''),
             client_secret: String((props.settings.payment_gateways as any)?.paypal?.client_secret ?? ''),
             environment: String((props.settings.payment_gateways as any)?.paypal?.environment ?? 'sandbox'),
         },
         netcash: {
-            enabled: Boolean((props.settings.payment_gateways as any)?.netcash?.enabled ?? false),
+            enabled: (props.settings.payment_gateways as any)?.netcash?.enabled === true,
             account_id: String((props.settings.payment_gateways as any)?.netcash?.account_id ?? ''),
             service_key: String((props.settings.payment_gateways as any)?.netcash?.service_key ?? ''),
         },
         snapscan: {
-            enabled: Boolean((props.settings.payment_gateways as any)?.snapscan?.enabled ?? false),
+            enabled: (props.settings.payment_gateways as any)?.snapscan?.enabled === true,
             merchant_id: String((props.settings.payment_gateways as any)?.snapscan?.merchant_id ?? ''),
             api_key: String((props.settings.payment_gateways as any)?.snapscan?.api_key ?? ''),
         },
         zapper: {
-            enabled: Boolean((props.settings.payment_gateways as any)?.zapper?.enabled ?? false),
+            enabled: (props.settings.payment_gateways as any)?.zapper?.enabled === true,
             merchant_id: String((props.settings.payment_gateways as any)?.zapper?.merchant_id ?? ''),
             api_key: String((props.settings.payment_gateways as any)?.zapper?.api_key ?? ''),
         },
@@ -469,6 +469,9 @@ const submit = () => {
         onError: (errors) => {
             if (errors.vat_number && tab.value !== 'profile' && tab.value !== 'tax') {
                 tab.value = 'tax';
+            }
+            if (Object.keys(errors).some((key) => key.startsWith('payment_gateways.') || key === 'payment_pages_enabled')) {
+                tab.value = 'payment_pages';
             }
             if (!Object.keys(errors).length) {
                 toast.error('Could not save business settings.');
@@ -1146,7 +1149,7 @@ const resetItemUnits = () => {
             <AppCard v-show="tab === 'payment_pages'">
                 <h3 class="text-base font-semibold text-slate-900">Online payments</h3>
                 <p class="mt-1 text-sm text-slate-500">
-                    Store gateway credentials for hosted checkout (Stripe, PayFast, PayPal, Netcash, SnapScan, Zapper). When online payment pages are on, invoice “Pay online”, the customer pay page, and the public PDF link use the enabled providers.
+                    Offline by default. Turn on online payment pages, then enable and configure each provider you want to offer. Checkout only appears when both are done.
                 </p>
                 <div class="mt-4 rounded-lg border border-slate-300 bg-slate-100 px-4 py-3">
                     <label class="flex cursor-pointer items-start gap-3">
@@ -1158,7 +1161,7 @@ const resetItemUnits = () => {
                         <span>
                             <span class="block text-sm font-semibold text-slate-900">Enable online payment pages</span>
                             <span class="mt-0.5 block text-sm text-slate-600">
-                                When off, public pay URLs, QR codes, public invoice PDF, and hosted checkout are disabled. Gateway settings below are kept so you can turn this back on without re-entering keys.
+                                When off, public pay URLs, QR codes, public invoice PDF, and hosted checkout stay disabled. Credentials below are kept so you can turn this back on without re-entering keys.
                             </span>
                         </span>
                     </label>
@@ -1173,8 +1176,16 @@ const resetItemUnits = () => {
                             Enable PayFast
                         </label>
                         <div v-show="form.payment_gateways.payfast.enabled" class="mt-3 grid gap-3 md:grid-cols-3">
-                            <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.payfast.merchant_id" /></div>
-                            <div><label class="mb-1 block text-xs text-slate-500">Merchant Key</label><AppInput v-model="form.payment_gateways.payfast.merchant_key" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Merchant ID</label>
+                                <AppInput v-model="form.payment_gateways.payfast.merchant_id" />
+                                <p v-if="form.errors['payment_gateways.payfast.merchant_id']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.payfast.merchant_id'] }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Merchant Key</label>
+                                <AppInput v-model="form.payment_gateways.payfast.merchant_key" />
+                                <p v-if="form.errors['payment_gateways.payfast.merchant_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.payfast.merchant_key'] }}</p>
+                            </div>
                             <div><label class="mb-1 block text-xs text-slate-500">Passphrase</label><AppInput v-model="form.payment_gateways.payfast.passphrase" /></div>
                         </div>
                     </div>
@@ -1184,8 +1195,16 @@ const resetItemUnits = () => {
                             Enable Stripe
                         </label>
                         <div v-show="form.payment_gateways.stripe.enabled" class="mt-3 grid gap-3 md:grid-cols-3">
-                            <div><label class="mb-1 block text-xs text-slate-500">Publishable key</label><AppInput v-model="form.payment_gateways.stripe.publishable_key" /></div>
-                            <div><label class="mb-1 block text-xs text-slate-500">Secret key</label><AppInput v-model="form.payment_gateways.stripe.secret_key" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Publishable key</label>
+                                <AppInput v-model="form.payment_gateways.stripe.publishable_key" />
+                                <p v-if="form.errors['payment_gateways.stripe.publishable_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.stripe.publishable_key'] }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Secret key</label>
+                                <AppInput v-model="form.payment_gateways.stripe.secret_key" />
+                                <p v-if="form.errors['payment_gateways.stripe.secret_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.stripe.secret_key'] }}</p>
+                            </div>
                             <div><label class="mb-1 block text-xs text-slate-500">Webhook secret</label><AppInput v-model="form.payment_gateways.stripe.webhook_secret" /></div>
                         </div>
                     </div>
@@ -1195,8 +1214,16 @@ const resetItemUnits = () => {
                             Enable PayPal
                         </label>
                         <div v-show="form.payment_gateways.paypal.enabled" class="mt-3 grid gap-3 md:grid-cols-3">
-                            <div><label class="mb-1 block text-xs text-slate-500">Client ID</label><AppInput v-model="form.payment_gateways.paypal.client_id" /></div>
-                            <div><label class="mb-1 block text-xs text-slate-500">Client Secret</label><AppInput v-model="form.payment_gateways.paypal.client_secret" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Client ID</label>
+                                <AppInput v-model="form.payment_gateways.paypal.client_id" />
+                                <p v-if="form.errors['payment_gateways.paypal.client_id']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.paypal.client_id'] }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Client Secret</label>
+                                <AppInput v-model="form.payment_gateways.paypal.client_secret" />
+                                <p v-if="form.errors['payment_gateways.paypal.client_secret']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.paypal.client_secret'] }}</p>
+                            </div>
                             <div>
                                 <label class="mb-1 block text-xs text-slate-500">Environment</label>
                                 <AppSelect
@@ -1213,8 +1240,16 @@ const resetItemUnits = () => {
                             Enable Netcash
                         </label>
                         <div v-show="form.payment_gateways.netcash.enabled" class="mt-3 grid gap-3 md:grid-cols-2">
-                            <div><label class="mb-1 block text-xs text-slate-500">Account ID</label><AppInput v-model="form.payment_gateways.netcash.account_id" /></div>
-                            <div><label class="mb-1 block text-xs text-slate-500">Service key</label><AppInput v-model="form.payment_gateways.netcash.service_key" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Account ID</label>
+                                <AppInput v-model="form.payment_gateways.netcash.account_id" />
+                                <p v-if="form.errors['payment_gateways.netcash.account_id']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.netcash.account_id'] }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Service key</label>
+                                <AppInput v-model="form.payment_gateways.netcash.service_key" />
+                                <p v-if="form.errors['payment_gateways.netcash.service_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.netcash.service_key'] }}</p>
+                            </div>
                         </div>
                     </div>
                     <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -1223,8 +1258,16 @@ const resetItemUnits = () => {
                             Enable SnapScan
                         </label>
                         <div v-show="form.payment_gateways.snapscan.enabled" class="mt-3 grid gap-3 md:grid-cols-2">
-                            <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.snapscan.merchant_id" /></div>
-                            <div><label class="mb-1 block text-xs text-slate-500">API key</label><AppInput v-model="form.payment_gateways.snapscan.api_key" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Merchant ID</label>
+                                <AppInput v-model="form.payment_gateways.snapscan.merchant_id" />
+                                <p v-if="form.errors['payment_gateways.snapscan.merchant_id']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.snapscan.merchant_id'] }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">API key</label>
+                                <AppInput v-model="form.payment_gateways.snapscan.api_key" />
+                                <p v-if="form.errors['payment_gateways.snapscan.api_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.snapscan.api_key'] }}</p>
+                            </div>
                         </div>
                     </div>
                     <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -1233,8 +1276,16 @@ const resetItemUnits = () => {
                             Enable Zapper
                         </label>
                         <div v-show="form.payment_gateways.zapper.enabled" class="mt-3 grid gap-3 md:grid-cols-2">
-                            <div><label class="mb-1 block text-xs text-slate-500">Merchant ID</label><AppInput v-model="form.payment_gateways.zapper.merchant_id" /></div>
-                            <div><label class="mb-1 block text-xs text-slate-500">API key</label><AppInput v-model="form.payment_gateways.zapper.api_key" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Merchant ID</label>
+                                <AppInput v-model="form.payment_gateways.zapper.merchant_id" />
+                                <p v-if="form.errors['payment_gateways.zapper.merchant_id']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.zapper.merchant_id'] }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">API key</label>
+                                <AppInput v-model="form.payment_gateways.zapper.api_key" />
+                                <p v-if="form.errors['payment_gateways.zapper.api_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.zapper.api_key'] }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
