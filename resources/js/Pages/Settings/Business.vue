@@ -304,7 +304,7 @@ const tabs = [
     { id: 'estimate' as const, label: 'Estimates' },
     { id: 'tax' as const, label: 'VAT' },
     { id: 'banking' as const, label: 'Banking' },
-    { id: 'items' as const, label: 'Items' },
+    { id: 'items' as const, label: 'Units' },
     { id: 'payment_pages' as const, label: 'Online payments' },
     { id: 'ai' as const, label: 'AI' },
 ];
@@ -1099,17 +1099,10 @@ const resetItemUnits = () => {
             </AppCard>
 
             <AppCard v-show="tab === 'items'">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h3 class="text-base font-semibold text-slate-900">Item units</h3>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Units offered when creating catalog items (hour, each, kg, …). Order here is the order in the picker.
-                        </p>
-                    </div>
-                    <AppButton type="button" size="sm" variant="ghost" @click="resetItemUnits">
-                        Restore defaults
-                    </AppButton>
-                </div>
+                <h3 class="text-base font-semibold text-slate-900">Units</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Units offered when creating catalog items (hour, each, kg, …). Order here is the order in the picker.
+                </p>
 
                 <div class="mt-4 space-y-2">
                     <div
@@ -1138,14 +1131,15 @@ const resetItemUnits = () => {
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    class="mt-4 inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                    @click="addItemUnit"
-                >
-                    <Plus class="h-4 w-4" aria-hidden="true" />
-                    Add unit
-                </button>
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <AppButton type="button" variant="secondary" @click="addItemUnit">
+                        <Plus class="h-4 w-4" aria-hidden="true" />
+                        Add unit
+                    </AppButton>
+                    <AppButton type="button" variant="ghost" @click="resetItemUnits">
+                        Restore default units
+                    </AppButton>
+                </div>
                 <p v-if="form.errors.item_units" class="mt-2 text-xs text-rose-600">{{ form.errors.item_units }}</p>
             </AppCard>
 
