@@ -136,14 +136,15 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array{labels: array<int, string>, revenue_cents: array<int, int>, expense_cents: array<int, int>}
+     * @return list<array{month: string, revenue: int, expenses: int}>
      */
     private function revenueChart(Team $team): array
     {
         $rows = [];
 
         for ($i = 5; $i >= 0; $i--) {
-            $start = now()->subMonths($i)->startOfMonth();
+            // startOfMonth before subMonths avoids overflow on day 31 (e.g. "Jun 31" → Jul).
+            $start = now()->copy()->startOfMonth()->subMonths($i);
             $end = $start->copy()->endOfMonth();
 
             $rows[] = [

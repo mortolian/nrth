@@ -71,7 +71,8 @@ class BudgetingController extends Controller
         }
 
         $active = $budgetRows->firstWhere('is_active', true);
-        $months = collect(range(0, 5))->map(fn (int $i) => now()->subMonths(5 - $i)->startOfMonth());
+        // startOfMonth before subMonths avoids overflow on day 31 (e.g. "Jun 31" → Jul).
+        $months = collect(range(0, 5))->map(fn (int $i) => now()->copy()->startOfMonth()->subMonths(5 - $i));
 
         $varianceAligned = $active === null || strcasecmp((string) $active->currency, $businessCurrency) === 0;
         $periodSpentBusiness = $active !== null && $varianceAligned

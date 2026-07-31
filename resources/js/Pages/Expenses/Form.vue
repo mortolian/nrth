@@ -603,6 +603,126 @@ const canSaveAsSupplier = computed(
     () => form.supplier_id === 0 && (form.supplier_custom?.trim().length ?? 0) > 0,
 );
 
+const hasReceiptsForSupplierScan = computed(
+    () => receiptFiles.value.length > 0 || visibleExistingAttachments.value.length > 0,
+);
+
+type SupplierScanPayload = {
+    name?: string | null;
+    contact_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    vat_number?: string | null;
+    registration_number?: string | null;
+    address?: {
+        street?: string | null;
+        city?: string | null;
+        province?: string | null;
+        postal_code?: string | null;
+        country?: string | null;
+    } | null;
+    notes?: string | null;
+};
+
+const firstReceiptFileForSupplierScan = async (): Promise<File | null> => {
+    if (receiptFiles.value.length > 0) {
+        return receiptFiles.value[0] ?? null;
+    }
+
+    const attachment = visibleExistingAttachments.value[0];
+    if (!attachment?.url) {
+        return null;
+    }
+
+    try {
+        const res = await fetch(attachment.url, {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!res.ok) {
+            return null;
+        }
+        const blob = await res.blob();
+        return new File([blob], attachment.name || 'receipt', {
+            type: attachment.mime_type || blob.type || 'application/octet-stream',
+        });
+    } catch {
+        return null;
+    }
+};
+
+const parseSupplierFromReceipt = async (token: string): Promise<SupplierScanPayload | null> => {
+    if (!aiEnabled.value || !hasReceiptsForSupplierScan.value) {
+        return null;
+    }
+
+    const file = await firstReceiptFileForSupplierScan();
+    if (!file) {
+        return null;
+    }
+
+    const body = new FormData();
+    body.append('document', file);
+
+    const res = await fetch(route('suppliers.parse-document'), {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': token,
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body,
+    });
+
+    if (!res.ok) {
+        return null;
+    }
+
+    const payload = (await res.json().catch(() => null)) as { data?: SupplierScanPayload } | null;
+    return payload?.data ?? null;
+};
+
+const sanitizeSupplierPhone = (phone: string | null | undefined): string | null => {
+    const raw = phone?.trim() ?? '';
+    if (!raw) {
+        return null;
+    }
+    // Store expects an international number; skip ambiguous local formats.
+    if (/^\+[1-9]\d{6,14}$/.test(raw.replace(/[\s()-]/g, ''))) {
+        return raw.replace(/[\s()-]/g, '');
+    }
+
+    return null;
+};
+
+const buildSupplierStorePayload = (name: string, parsed: SupplierScanPayload | null) => {
+    const address = parsed?.address
+        ? {
+              street: parsed.address.street?.trim() || null,
+              city: parsed.address.city?.trim() || null,
+              province: parsed.address.province?.trim() || null,
+              postal_code: parsed.address.postal_code?.trim() || null,
+              country: parsed.address.country?.trim() || null,
+          }
+        : null;
+    const hasAddress = address
+        ? Object.values(address).some((value) => typeof value === 'string' && value.length > 0)
+        : false;
+
+    return {
+        name,
+        contact_name: parsed?.contact_name?.trim() || null,
+        email: parsed?.email?.trim() || null,
+        phone: sanitizeSupplierPhone(parsed?.phone),
+        vat_number: parsed?.vat_number?.trim() || null,
+        registration_number: parsed?.registration_number?.trim() || null,
+        address: hasAddress ? address : null,
+        notes: parsed?.notes?.trim() || null,
+        is_active: true,
+    };
+};
+
 const expenseReturnPath = computed(() =>
     props.isEditing && props.expense ? `/expenses/${props.expense.id}/edit` : '/expenses/create',
 );
@@ -632,45 +752,72 @@ const saveAsSupplier = async () => {
     saveSupplierError.value = null;
 
     try {
-        const res = await fetch(route('suppliers.store'), {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': token,
-            },
-            body: JSON.stringify({
-                name,
-                contact_name: null,
-                email: null,
-                phone: null,
-                vat_number: null,
-                registration_number: null,
-                address: null,
-                notes: null,
-                is_active: true,
-            }),
-        });
+        let parsed: SupplierScanPayload | null = null;
+        let enriched = false;
+        if (aiEnabled.value && hasReceiptsForSupplierScan.value) {
+            try {
+                parsed = await parseSupplierFromReceipt(token);
+                enriched = parsed != null;
+            } catch {
+                parsed = null;
+            }
+        }
 
-        const payload = (await res.json().catch(() => null)) as {
+        const storeSupplier = async (payload: Record<string, unknown>) =>
+            fetch(route('suppliers.store'), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': token,
+                },
+                body: JSON.stringify(payload),
+            });
+
+        let body = buildSupplierStorePayload(name, parsed);
+        let res = await storeSupplier(body);
+        let responsePayload = (await res.json().catch(() => null)) as {
             data?: { id?: number; name?: string };
             message?: string;
             errors?: Record<string, string[]>;
         } | null;
 
+        // Retry without fields that commonly fail validation from OCR (phone / VAT / email).
+        if (!res.ok && responsePayload?.errors) {
+            const retryBody = { ...body };
+            let shouldRetry = false;
+            if (responsePayload.errors.phone) {
+                retryBody.phone = null;
+                shouldRetry = true;
+            }
+            if (responsePayload.errors.vat_number) {
+                retryBody.vat_number = null;
+                shouldRetry = true;
+            }
+            if (responsePayload.errors.email) {
+                retryBody.email = null;
+                shouldRetry = true;
+            }
+            if (shouldRetry) {
+                body = retryBody;
+                res = await storeSupplier(retryBody);
+                responsePayload = (await res.json().catch(() => null)) as typeof responsePayload;
+            }
+        }
+
         if (!res.ok) {
-            const firstError = payload?.errors
-                ? Object.values(payload.errors).flat()[0]
+            const firstError = responsePayload?.errors
+                ? Object.values(responsePayload.errors).flat()[0]
                 : null;
-            saveSupplierError.value = firstError || payload?.message || 'Could not save this supplier.';
+            saveSupplierError.value = firstError || responsePayload?.message || 'Could not save this supplier.';
             toast.error(saveSupplierError.value);
             return;
         }
 
-        const id = Number(payload?.data?.id ?? 0);
-        const savedName = String(payload?.data?.name ?? name);
+        const id = Number(responsePayload?.data?.id ?? 0);
+        const savedName = String(responsePayload?.data?.name ?? name);
         if (id <= 0) {
             saveSupplierError.value = 'Could not save this supplier.';
             toast.error(saveSupplierError.value);
@@ -680,7 +827,11 @@ const saveAsSupplier = async () => {
         createdSuppliers.value = [...createdSuppliers.value, { id, name: savedName }];
         form.supplier_id = id;
         form.supplier_custom = '';
-        toast.success('Supplier saved and selected.');
+        toast.success(
+            enriched
+                ? 'Supplier saved from receipt details and selected.'
+                : 'Supplier saved and selected.',
+        );
     } catch {
         saveSupplierError.value = 'Could not save this supplier. Try again.';
         toast.error(saveSupplierError.value);
@@ -1123,10 +1274,20 @@ const submit = () => {
                                 :loading="saveSupplierLoading"
                                 @click="saveAsSupplier"
                             >
-                                {{ saveSupplierLoading ? 'Saving…' : 'Save as supplier' }}
+                                {{
+                                    saveSupplierLoading
+                                        ? aiEnabled && hasReceiptsForSupplierScan
+                                            ? 'Reading receipt…'
+                                            : 'Saving…'
+                                        : 'Save as supplier'
+                                }}
                             </AppButton>
                             <p class="text-xs text-slate-500">
-                                Keep this vendor for future expenses (from the receipt name).
+                                {{
+                                    aiEnabled && hasReceiptsForSupplierScan
+                                        ? 'Saves this vendor and fills contact details from the receipt when AI can read them.'
+                                        : 'Keep this vendor for future expenses (from the receipt name).'
+                                }}
                             </p>
                         </div>
                         <p v-if="saveSupplierError" class="text-xs text-rose-700">{{ saveSupplierError }}</p>
@@ -1167,7 +1328,12 @@ const submit = () => {
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-1 block text-xs font-medium text-slate-500">Description <span class="font-normal text-slate-400">(optional)</span></label>
-                    <AppInput v-model="form.description" placeholder="What was purchased?" class="min-h-12 text-base md:min-h-0 md:text-sm" />
+                    <textarea
+                        v-model="form.description"
+                        rows="3"
+                        placeholder="What was purchased?"
+                        class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-base outline-none ring-slate-300 transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 md:text-sm"
+                    />
                 </div>
             </div>
 
