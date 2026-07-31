@@ -71,7 +71,7 @@ There is no in-app one-click restore. On **Backups & exports → Instance backup
 
 ### Optional AI
 
-Configure under **Business settings → AI** (provider, model, API key, and base URL where needed).
+Configure under **Business settings → AI**. AI is **off by default** — enable it there, then set provider, model, API key, and base URL where needed.
 
 Supported providers:
 

@@ -94,6 +94,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'anthropic',
                     'api_key' => 'sk-ant-live',
                     'model' => 'claude-sonnet-4-5',
@@ -103,11 +104,69 @@ class AiSettingsTest extends TestCase
         )->assertRedirect(route('settings.business', ['tab' => 'ai']));
 
         $ai = $team->fresh()->mergedBusinessSettings()['ai'];
+        $this->assertTrue($ai['enabled']);
         $this->assertSame('anthropic', $ai['provider']);
         $this->assertSame('sk-ant-live', $ai['api_key']);
         $this->assertSame('claude-sonnet-4-5', $ai['model']);
         $this->assertTrue($team->fresh()->aiEnabled());
         $this->assertSame('anthropic', $team->fresh()->aiProvider());
+    }
+
+    public function test_new_company_starts_with_ai_disabled(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        $ai = $team->mergedBusinessSettings()['ai'];
+        $this->assertFalse($ai['enabled']);
+        $this->assertFalse($team->aiEnabled());
+    }
+
+    public function test_enabling_ai_without_api_key_is_rejected(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingAs($user);
+
+        $this->post(
+            route('settings.business.update'),
+            $this->companySettingsPayload($team, [
+                'ai' => [
+                    'enabled' => true,
+                    'provider' => 'openai',
+                    'api_key' => '',
+                    'model' => 'gpt-4o-mini',
+                ],
+                'tab' => 'ai',
+            ])
+        )->assertSessionHasErrors('ai.api_key');
+    }
+
+    public function test_ai_can_be_disabled_while_keeping_credentials(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingAs($user);
+
+        $this->post(
+            route('settings.business.update'),
+            $this->companySettingsPayload($team, [
+                'ai' => [
+                    'enabled' => false,
+                    'provider' => 'openai',
+                    'api_key' => 'sk-kept',
+                    'model' => 'gpt-4o-mini',
+                ],
+                'tab' => 'ai',
+            ])
+        )->assertRedirect(route('settings.business', ['tab' => 'ai']));
+
+        $fresh = $team->fresh();
+        $this->assertSame('sk-kept', $fresh->aiApiKey());
+        $this->assertFalse($fresh->aiEnabled());
     }
 
     public function test_ai_rejects_model_for_wrong_provider(): void
@@ -122,6 +181,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'anthropic',
                     'api_key' => 'sk-ant-live',
                     'model' => 'gpt-4o-mini',
@@ -143,6 +203,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'not-a-provider',
                     'api_key' => 'sk-test',
                     'model' => 'gpt-4o-mini',
@@ -163,6 +224,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'gemini',
                     'api_key' => 'AIza-test',
                     'model' => 'gemini-2.5-flash',
@@ -186,6 +248,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'openai_compatible',
                     'api_key' => '',
                     'model' => 'llava',
@@ -234,6 +297,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'openai_compatible',
                     'api_key' => 'sk-local',
                     'model' => 'gpt-4o-mini',
@@ -255,6 +319,7 @@ class AiSettingsTest extends TestCase
             route('settings.business.update'),
             $this->companySettingsPayload($team, [
                 'ai' => [
+                    'enabled' => true,
                     'provider' => 'openrouter',
                     'api_key' => 'sk-or-test',
                     'model' => 'openai/gpt-4o-mini',

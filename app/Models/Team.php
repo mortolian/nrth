@@ -252,6 +252,7 @@ class Team extends JetstreamTeam implements HasMedia
             'session_idle_timeout_minutes' => 0,
             /** Optional AI provider (expenses, documents, …). Env keys are per-provider fallback. */
             'ai' => [
+                'enabled' => false,
                 'provider' => 'openai',
                 'api_key' => null,
                 'model' => 'gpt-4o-mini',
@@ -365,8 +366,49 @@ class Team extends JetstreamTeam implements HasMedia
         $merged['payment_gateways'] = $this->normalizePaymentGatewayFlags(
             is_array($merged['payment_gateways'] ?? null) ? $merged['payment_gateways'] : []
         );
+        $merged['ai'] = $this->normalizeAiSettings(
+            is_array($stored['ai'] ?? null) ? $stored['ai'] : [],
+            is_array($merged['ai'] ?? null) ? $merged['ai'] : []
+        );
 
         return $merged;
+    }
+
+    /**
+     * @param  array<string, mixed>  $storedAi
+     * @param  array<string, mixed>  $mergedAi
+     * @return array<string, mixed>
+     */
+    private function normalizeAiSettings(array $storedAi, array $mergedAi): array
+    {
+        if (array_key_exists('enabled', $storedAi)) {
+            $mergedAi['enabled'] = filter_var($storedAi['enabled'], FILTER_VALIDATE_BOOLEAN);
+        } else {
+            // Legacy teams had no master switch — treat as on when credentials were already configured.
+            $mergedAi['enabled'] = $this->aiCredentialsConfigured($mergedAi);
+        }
+
+        return $mergedAi;
+    }
+
+    /**
+     * @param  array<string, mixed>  $ai
+     */
+    private function aiCredentialsConfigured(array $ai): bool
+    {
+        $provider = trim((string) ($ai['provider'] ?? ''));
+        if ($provider === '' || ! AiCatalog::isValidProvider($provider)) {
+            $provider = AiCatalog::PROVIDER_OPENAI;
+        }
+
+        $apiKey = trim((string) ($ai['api_key'] ?? ''));
+        $baseUrl = trim((string) ($ai['base_url'] ?? ''));
+
+        if (AiCatalog::apiKeyOptional($provider)) {
+            return $baseUrl !== '';
+        }
+
+        return $apiKey !== '';
     }
 
     /**
@@ -607,6 +649,11 @@ class Team extends JetstreamTeam implements HasMedia
 
     public function aiEnabled(): bool
     {
+        $settings = $this->mergedBusinessSettings();
+        if (! filter_var($settings['ai']['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return false;
+        }
+
         $provider = $this->aiProvider();
 
         if (AiCatalog::apiKeyOptional($provider)) {

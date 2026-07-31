@@ -165,8 +165,15 @@ class BusinessSettingsController extends Controller
                 'max:'.(int) config('session.lifetime'),
             ],
             'ai' => ['required', 'array'],
+            'ai.enabled' => ['required', 'boolean'],
             'ai.provider' => ['required', 'string', Rule::in(AiCatalog::providers())],
-            'ai.api_key' => ['nullable', 'string', 'max:255'],
+            'ai.api_key' => [
+                Rule::requiredIf(fn () => $request->boolean('ai.enabled')
+                    && ! AiCatalog::apiKeyOptional((string) $request->input('ai.provider', ''))),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'ai.base_url' => ['nullable', 'string', 'max:255'],
             'ai.model' => [
                 'required',
@@ -346,12 +353,18 @@ class BusinessSettingsController extends Controller
             $newSettings['ai']['api_key'] = $key !== '' ? $key : null;
         }
 
+        $newSettings['ai']['enabled'] = (bool) ($newSettings['ai']['enabled'] ?? false);
+
         $aiProvider = (string) ($newSettings['ai']['provider'] ?? '');
         $baseUrl = trim((string) ($newSettings['ai']['base_url'] ?? ''));
         if ($baseUrl === '' && AiCatalog::defaultBaseUrl($aiProvider)) {
             $baseUrl = (string) AiCatalog::defaultBaseUrl($aiProvider);
         }
-        if ($aiProvider === AiCatalog::PROVIDER_OPENAI_COMPATIBLE && $baseUrl === '') {
+        if (
+            $newSettings['ai']['enabled']
+            && $aiProvider === AiCatalog::PROVIDER_OPENAI_COMPATIBLE
+            && $baseUrl === ''
+        ) {
             throw ValidationException::withMessages([
                 'ai.base_url' => 'A base URL is required for OpenAI-compatible providers.',
             ]);

@@ -130,6 +130,7 @@ const form = useForm({
     ),
     payment_pages_enabled: props.settings.payment_pages_enabled === true,
     ai: {
+        enabled: (props.settings.ai as any)?.enabled === true,
         provider: String((props.settings.ai as any)?.provider ?? 'openai'),
         api_key: String((props.settings.ai as any)?.api_key ?? ''),
         model: String((props.settings.ai as any)?.model ?? 'gpt-4o-mini'),
@@ -396,6 +397,7 @@ const submit = () => {
         default_vat_rate: form.vat_registered ? defaultVatRate : 0,
         payment_pages_enabled: form.payment_pages_enabled,
         ai: {
+            enabled: form.ai.enabled,
             provider: form.ai.provider,
             api_key: form.ai.api_key,
             model: form.ai.model,
@@ -472,6 +474,9 @@ const submit = () => {
             }
             if (Object.keys(errors).some((key) => key.startsWith('payment_gateways.') || key === 'payment_pages_enabled')) {
                 tab.value = 'payment_pages';
+            }
+            if (Object.keys(errors).some((key) => key.startsWith('ai.'))) {
+                tab.value = 'ai';
             }
             if (!Object.keys(errors).length) {
                 toast.error('Could not save business settings.');
@@ -1294,14 +1299,33 @@ const resetItemUnits = () => {
             <AppCard v-show="tab === 'ai'">
                 <h3 class="text-base font-semibold text-slate-900">AI</h3>
                 <p class="mt-1 text-sm text-slate-500">
-                    Shared AI provider for features like expense receipt autofill. When those features run, files or text may be sent to the selected provider. For local tools like Ollama, choose OpenAI-compatible and set the base URL (e.g. http://127.0.0.1:11434/v1). Local vision models usually need images, not PDFs.
+                    Offline by default. Turn AI on, then choose a provider and credentials. Features like expense receipt autofill only run when AI is enabled and set up. For local tools like Ollama, choose OpenAI-compatible and set the base URL (e.g. http://127.0.0.1:11434/v1).
                 </p>
-                <div class="mt-4 grid max-w-2xl gap-4 md:grid-cols-2">
+                <div class="mt-4 rounded-lg border border-slate-300 bg-slate-100 px-4 py-3">
+                    <label class="flex cursor-pointer items-start gap-3">
+                        <input
+                            v-model="form.ai.enabled"
+                            type="checkbox"
+                            class="mt-1 rounded border-slate-300"
+                        >
+                        <span>
+                            <span class="block text-sm font-semibold text-slate-900">Enable AI</span>
+                            <span class="mt-0.5 block text-sm text-slate-600">
+                                When off, AI features stay unavailable. Provider settings below are kept so you can turn this back on without re-entering keys.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+                <div
+                    class="mt-4 grid max-w-2xl gap-4 transition-opacity md:grid-cols-2"
+                    :class="{ 'pointer-events-none opacity-45': !form.ai.enabled }"
+                >
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Provider</label>
                         <AppSelect
                             v-model="form.ai.provider"
                             :options="ai_providers"
+                            :disabled="!form.ai.enabled"
                         />
                         <p v-if="form.errors['ai.provider']" class="mt-1 text-xs text-rose-600">
                             {{ form.errors['ai.provider'] }}
@@ -1313,12 +1337,14 @@ const resetItemUnits = () => {
                             v-if="!aiAllowsCustomModel"
                             v-model="form.ai.model"
                             :options="aiModelOptions"
+                            :disabled="!form.ai.enabled"
                         />
                         <AppInput
                             v-else
                             v-model="form.ai.model"
                             :list="'ai-model-suggestions-' + form.ai.provider"
                             placeholder="Model id"
+                            :disabled="!form.ai.enabled"
                         />
                         <datalist v-if="aiAllowsCustomModel" :id="'ai-model-suggestions-' + form.ai.provider">
                             <option v-for="option in aiModelOptions" :key="option.value" :value="option.value" />
@@ -1336,6 +1362,7 @@ const resetItemUnits = () => {
                             v-model="form.ai.base_url"
                             placeholder="https://…"
                             autocomplete="off"
+                            :disabled="!form.ai.enabled"
                         />
                         <p class="mt-2 text-xs text-slate-500">
                             Chat completions root ending in /v1. Example for Ollama: http://127.0.0.1:11434/v1.
@@ -1352,6 +1379,7 @@ const resetItemUnits = () => {
                             v-model="form.ai.api_key"
                             type="password"
                             autocomplete="off"
+                            :disabled="!form.ai.enabled"
                             :placeholder="form.ai.provider === 'anthropic' ? 'sk-ant-…' : form.ai.provider === 'gemini' ? 'AIza…' : 'sk-…'"
                         />
                         <p v-if="form.errors['ai.api_key']" class="mt-1 text-xs text-rose-600">
