@@ -861,7 +861,7 @@ const submit = () => {
                         @click="scanAllReceipts"
                     >
                         <ScanLine class="mr-1.5 h-4 w-4" />
-                        {{ scanningKey === 'all' ? 'Scanning all…' : 'Scan all' }}
+                        {{ scanningKey === 'all' ? 'AI Scanning all…' : 'AI Scan all' }}
                     </AppButton>
                     <p class="text-xs text-slate-500">Combines every receipt into one form fill (overwrites fields).</p>
                 </div>
@@ -924,11 +924,11 @@ const submit = () => {
                             type="button"
                             class="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                             :disabled="scanReceiptLoading"
-                            :aria-label="`Scan ${attachment.name}`"
+                            :aria-label="`AI Scan ${attachment.name}`"
                             @click.stop="scanExistingAttachment(attachment)"
                         >
                             <ScanLine class="h-3 w-3 shrink-0" />
-                            {{ scanningKey === `existing:${attachment.id}` ? 'Scanning…' : 'Scan' }}
+                            {{ scanningKey === `existing:${attachment.id}` ? 'AI Scanning…' : 'AI Scan' }}
                         </button>
                         <button
                             type="button"
@@ -985,11 +985,11 @@ const submit = () => {
                             type="button"
                             class="mt-1 inline-flex w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                             :disabled="scanReceiptLoading"
-                            :aria-label="`Scan ${file.name}`"
+                            :aria-label="`AI Scan ${file.name}`"
                             @click.stop="scanNewReceipt(index)"
                         >
                             <ScanLine class="h-3 w-3 shrink-0" />
-                            {{ scanningKey === `new:${index}` ? 'Scanning…' : 'Scan' }}
+                            {{ scanningKey === `new:${index}` ? 'AI Scanning…' : 'AI Scan' }}
                         </button>
                         <button
                             type="button"
