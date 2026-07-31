@@ -181,6 +181,48 @@ const onScanFileChange = (event: Event) => {
     input.value = '';
 };
 
+const scanDropActive = ref(false);
+
+const isAcceptedScanFile = (file: File) => isImageFile(file) || isPdfFile(file);
+
+const onScanDragEnter = (event: DragEvent) => {
+    event.preventDefault();
+    scanDropActive.value = true;
+};
+
+const onScanDragOver = (event: DragEvent) => {
+    event.preventDefault();
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy';
+    }
+    scanDropActive.value = true;
+};
+
+const onScanDragLeave = (event: DragEvent) => {
+    event.preventDefault();
+    const current = event.currentTarget as HTMLElement | null;
+    const related = event.relatedTarget as Node | null;
+    if (current && related && current.contains(related)) {
+        return;
+    }
+    scanDropActive.value = false;
+};
+
+const onScanDrop = (event: DragEvent) => {
+    event.preventDefault();
+    scanDropActive.value = false;
+    const file = event.dataTransfer?.files?.[0] ?? null;
+    if (!file) {
+        return;
+    }
+    if (!isAcceptedScanFile(file)) {
+        scanError.value = 'Upload an image or PDF.';
+        scanApplied.value = false;
+        return;
+    }
+    setScanFile(file);
+};
+
 const clearScanFile = () => {
     setScanFile(null);
 };
@@ -326,13 +368,20 @@ const submit = () => {
                         Upload a tax invoice, letterhead, or statement and AI Scan will fill supplier details.
                     </p>
                     <label
-                        class="mt-3 flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-center transition hover:border-slate-400 hover:bg-slate-50"
+                        class="mt-3 flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-3 text-center transition"
+                        :class="scanDropActive
+                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20'
+                            : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50'"
+                        @dragenter="onScanDragEnter"
+                        @dragover="onScanDragOver"
+                        @dragleave="onScanDragLeave"
+                        @drop="onScanDrop"
                     >
                         <Upload class="h-4 w-4 shrink-0 text-slate-500" />
                         <span class="text-sm font-medium text-slate-800">
-                            {{ scanFile ? 'Replace document' : 'Upload document' }}
+                            {{ scanDropActive ? 'Drop to upload' : scanFile ? 'Replace document' : 'Upload document' }}
                         </span>
-                        <span class="hidden text-xs text-slate-500 sm:inline">Photo or PDF</span>
+                        <span class="hidden text-xs text-slate-500 sm:inline">Photo or PDF — click or drag</span>
                         <input type="file" accept="image/*,.pdf" class="hidden" @change="onScanFileChange">
                     </label>
                     <div v-if="scanFile" class="mt-3 flex flex-wrap items-start gap-3">

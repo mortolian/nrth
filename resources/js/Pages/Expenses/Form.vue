@@ -338,13 +338,23 @@ onUnmounted(() => {
     });
 });
 
-const onReceiptChange = (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    const incoming = Array.from(input.files ?? []);
-    if (!incoming.length) return;
+const receiptDropActive = ref(false);
+
+const addReceiptFiles = (incoming: File[]) => {
+    if (!incoming.length) {
+        return;
+    }
+
+    const accepted = incoming.filter((file) => isImageFile(file) || isPdfFile(file));
+    if (!accepted.length) {
+        scanReceiptError.value = 'Upload images or PDFs only.';
+        scanReceiptApplied.value = false;
+        receiptUploadSuccess.value = null;
+        return;
+    }
 
     const previousCount = receiptFiles.value.length;
-    const nextFiles = [...receiptFiles.value, ...incoming].slice(0, 20);
+    const nextFiles = [...receiptFiles.value, ...accepted].slice(0, 20);
     const added = nextFiles.length - previousCount;
     receiptPreviewUrls.value.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
@@ -358,7 +368,41 @@ const onReceiptChange = (event: Event) => {
         : added > 1
             ? `${added} receipts added — they will be saved with this expense.`
             : 'Receipt limit reached (20 files).';
+};
+
+const onReceiptChange = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    addReceiptFiles(Array.from(input.files ?? []));
     input.value = '';
+};
+
+const onReceiptDragEnter = (event: DragEvent) => {
+    event.preventDefault();
+    receiptDropActive.value = true;
+};
+
+const onReceiptDragOver = (event: DragEvent) => {
+    event.preventDefault();
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy';
+    }
+    receiptDropActive.value = true;
+};
+
+const onReceiptDragLeave = (event: DragEvent) => {
+    event.preventDefault();
+    const current = event.currentTarget as HTMLElement | null;
+    const related = event.relatedTarget as Node | null;
+    if (current && related && current.contains(related)) {
+        return;
+    }
+    receiptDropActive.value = false;
+};
+
+const onReceiptDrop = (event: DragEvent) => {
+    event.preventDefault();
+    receiptDropActive.value = false;
+    addReceiptFiles(Array.from(event.dataTransfer?.files ?? []));
 };
 
 const removeReceiptAt = (index: number) => {
@@ -861,13 +905,26 @@ const submit = () => {
                     </button>
                 </div>
                 <label
-                    class="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center transition hover:border-slate-400 hover:bg-slate-100"
+                    class="flex min-h-16 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-3 text-center transition"
+                    :class="receiptDropActive
+                        ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20'
+                        : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'"
+                    @dragenter="onReceiptDragEnter"
+                    @dragover="onReceiptDragOver"
+                    @dragleave="onReceiptDragLeave"
+                    @drop="onReceiptDrop"
                 >
                     <Upload class="h-4 w-4 shrink-0 text-slate-500" />
                     <span class="text-sm font-medium text-slate-800">
-                        {{ receiptFiles.length || visibleExistingAttachments.length ? 'Add more' : 'Upload receipts' }}
+                        {{
+                            receiptDropActive
+                                ? 'Drop to upload'
+                                : receiptFiles.length || visibleExistingAttachments.length
+                                    ? 'Add more'
+                                    : 'Upload receipts'
+                        }}
                     </span>
-                    <span class="hidden text-xs text-slate-500 sm:inline">Photos or PDFs</span>
+                    <span class="hidden text-xs text-slate-500 sm:inline">Photos or PDFs — click or drag</span>
                     <input type="file" accept="image/*,.pdf" multiple class="hidden" @change="onReceiptChange">
                 </label>
 
