@@ -125,7 +125,7 @@ const initialFromProps = () => {
             date: e.date ?? new Date().toISOString().slice(0, 10),
             supplier_id: e.supplier_id,
             supplier_custom: e.supplier_custom,
-            category_account_id: e.category_account_id || (categoryList.value[0]?.id ?? 0),
+            category_account_id: e.category_account_id || 0,
             description: e.description,
             amount_excl_vat: e.amount_excl_vat,
             vat_rate: e.vat_rate,
@@ -143,7 +143,7 @@ const initialFromProps = () => {
         date: new Date().toISOString().slice(0, 10),
         supplier_id: p?.supplier_id && p.supplier_id > 0 ? p.supplier_id : 0,
         supplier_custom: p?.supplier_custom ?? '',
-        category_account_id: categoryList.value[0]?.id ?? 0,
+        category_account_id: 0,
         description: '',
         amount_excl_vat: 0,
         vat_rate: 'vat15' as const,
@@ -743,6 +743,12 @@ const submit = () => {
             if (field === 'amount_excl_vat') {
                 return 'Enter an amount excluding VAT.';
             }
+            if (field === 'paid_from_banking_account_id') {
+                return 'Choose which account this was paid from.';
+            }
+            if (field === 'vat_rate') {
+                return 'Choose a VAT rate.';
+            }
 
             return issue.message;
         });
@@ -1021,12 +1027,16 @@ const submit = () => {
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Date</label>
-                    <AppInput v-model="form.date" type="date" class="min-h-12 text-base md:min-h-0 md:text-sm" />
+                    <label class="mb-1 block text-xs font-medium text-slate-500">
+                        Date <span class="text-rose-500" aria-hidden="true">*</span>
+                    </label>
+                    <AppInput v-model="form.date" type="date" class="min-h-12 text-base md:min-h-0 md:text-sm" required />
                 </div>
                 <div class="md:col-span-2">
                     <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
-                        <label class="block text-xs font-medium text-slate-500">Supplier</label>
+                        <label class="block text-xs font-medium text-slate-500">
+                            Supplier <span class="text-rose-500" aria-hidden="true">*</span>
+                        </label>
                         <AppButton
                             type="button"
                             variant="secondary"
@@ -1066,15 +1076,20 @@ const submit = () => {
                     </div>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Category</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">
+                        Category <span class="text-rose-500" aria-hidden="true">*</span>
+                    </label>
                     <AppSelect
-                        :model-value="String(form.category_account_id)"
+                        :model-value="form.category_account_id > 0 ? String(form.category_account_id) : ''"
                         :options="categorySelectOptions"
-                        @update:model-value="form.category_account_id = Number($event)"
+                        placeholder="Select category"
+                        @update:model-value="form.category_account_id = Number($event) || 0"
                     />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Amount (excl VAT)</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">
+                        Amount (excl VAT) <span class="text-rose-500" aria-hidden="true">*</span>
+                    </label>
                     <AppInput
                         v-model="form.amount_excl_vat"
                         type="text"
@@ -1110,7 +1125,9 @@ const submit = () => {
 
             <div :class="['mt-4 grid gap-4 md:grid-cols-2', !showAdvanced && 'max-md:hidden']">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">VAT rate</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">
+                        VAT rate <span class="text-rose-500" aria-hidden="true">*</span>
+                    </label>
                     <AppSelect
                         :model-value="form.vat_rate"
                         :options="taxRateSelectOptions"
@@ -1118,11 +1135,13 @@ const submit = () => {
                     />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount (override)</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount (override) <span class="font-normal text-slate-400">(optional)</span></label>
                     <AppInput v-model="form.vat_amount" type="text" inputmode="decimal" />
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Paid from</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">
+                        Paid from <span class="text-rose-500" aria-hidden="true">*</span>
+                    </label>
                     <AppSelect
                         :model-value="String(form.paid_from_banking_account_id)"
                         :options="paidFromList.map((option) => ({ label: `${option.name} (${option.gl_label})`, value: String(option.id) }))"
@@ -1131,11 +1150,11 @@ const submit = () => {
                     <p class="mt-1 text-xs text-slate-500">Which bank, cash, or card account this expense was paid from (posts to its linked ledger account).</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Reference</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Reference <span class="font-normal text-slate-400">(optional)</span></label>
                     <AppInput v-model="form.reference" placeholder="Invoice / order #" />
                 </div>
                 <div class="md:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Notes <span class="font-normal text-slate-400">(optional)</span></label>
                     <textarea v-model="form.notes" class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
                 </div>
             </div>
