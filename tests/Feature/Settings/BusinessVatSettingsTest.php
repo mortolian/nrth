@@ -2,44 +2,63 @@
 
 namespace Tests\Feature\Settings;
 
-use App\Models\Team;
 use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
-class ItemUnitsSettingsTest extends TestCase
+class BusinessVatSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_merged_settings_include_default_item_units(): void
+    public function test_new_company_starts_with_vat_registered_off_and_zero_default_rate(): void
     {
-        $team = User::factory()->withPersonalTeam()->create()->currentTeam;
-        $this->assertNotNull($team);
-
-        $units = $team->itemUnits();
-
-        $this->assertContains('hour', $units);
-        $this->assertContains('each', $units);
-        $this->assertContains('month', $units);
-        $this->assertSame(Team::defaultItemUnits(), $units);
-    }
-
-    public function test_owner_can_save_custom_item_units(): void
-    {
-        $user = User::factory()->withPersonalTeam()->create();
-        EnsureTeamSystemRoles::ensureFor($user->currentTeam);
-        $team = $user->currentTeam;
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
         $this->assertNotNull($team);
 
         $settings = $team->mergedBusinessSettings();
+        $this->assertFalse($settings['vat_registered']);
+        $this->assertSame(0.0, (float) $settings['default_vat_rate']);
+        $this->assertFalse($team->chargesVat());
+        $this->assertSame(0.0, $team->defaultVatRateForInvoicing());
+    }
+
+    public function test_vat_registered_with_zero_default_still_charges_vat_as_zero_rated(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+
+        $team->forceFill([
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
+                [
+                    'vat_registered' => true,
+                    'default_vat_rate' => 0,
+                ],
+            ),
+        ])->save();
+
+        $team = $team->fresh();
+        $this->assertTrue($team->chargesVat());
+        $this->assertSame(0.0, $team->defaultVatRateForInvoicing());
+    }
+
+    public function test_business_settings_accepts_freeform_default_vat_rate_percent(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
+        $team = $owner->currentTeam;
+        $settings = $team->mergedBusinessSettings();
 
         $payload = [
-            'tab' => 'items',
+            'tab' => 'tax',
             'name' => $team->name,
             'trading_name' => $settings['trading_name'],
             'registration_number' => $settings['registration_number'],
-            'vat_number' => $settings['vat_number'],
+            'vat_number' => '4123456789',
             'tax_reference' => $settings['tax_reference'],
             'industry' => $settings['industry'],
             'financial_year_end_month' => $settings['financial_year_end_month'],
@@ -73,9 +92,9 @@ class ItemUnitsSettingsTest extends TestCase
             'invoice_default_footer' => $settings['invoice_default_footer'],
             'invoice_email_subject_template' => $settings['invoice_email_subject_template'],
             'invoice_email_body_template' => $settings['invoice_email_body_template'],
-            'vat_registered' => $settings['vat_registered'],
-            'vat_period_type' => $settings['vat_period_type'],
-            'default_vat_rate' => $settings['default_vat_rate'],
+            'vat_registered' => true,
+            'vat_period_type' => 'bi_monthly',
+            'default_vat_rate' => 0.15,
             'payment_pages_enabled' => $settings['payment_pages_enabled'],
             'session_idle_timeout_minutes' => $settings['session_idle_timeout_minutes'],
             'ai' => $settings['ai'],
@@ -95,46 +114,35 @@ class ItemUnitsSettingsTest extends TestCase
                     'show_on_invoice' => true,
                 ],
             ],
-            'item_units' => ['hour', 'day', 'retainer'],
         ];
 
-        $this->actingAs($user)
+        $this->actingAs($owner)
             ->post(route('settings.business.update'), $payload)
-            ->assertRedirect(route('settings.business', ['tab' => 'items']));
+            ->assertRedirect(route('settings.business', ['tab' => 'tax']));
 
-        $team->refresh();
-        $this->assertSame(['hour', 'day', 'retainer'], $team->itemUnits());
+        $fresh = $team->fresh()->mergedBusinessSettings();
+        $this->assertTrue($fresh['vat_registered']);
+        $this->assertSame(0.15, (float) $fresh['default_vat_rate']);
+        $this->assertNull($fresh['default_tax_rate_id']);
     }
 
-    public function test_item_form_rejects_unit_not_in_catalog(): void
+    public function test_business_settings_vat_period_types_omit_sars_small_vendor_label(): void
     {
-        $user = User::factory()->withPersonalTeam()->create();
-        EnsureTeamSystemRoles::ensureFor($user->currentTeam);
-        $team = $user->currentTeam;
-        $this->assertNotNull($team);
+        $owner = User::factory()->withPersonalTeam()->create();
+        EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
 
-        $team->business_settings = array_replace_recursive(
-            $team->mergedBusinessSettings(),
-            ['item_units' => ['hour', 'day']]
-        );
-        $team->save();
-
-        $this->actingAs($user)
-            ->post(route('invoicing.items.store'), [
-                'name' => 'Consulting',
-                'unit' => 'furlong',
-                'unit_price_cents' => 10000,
-                'is_active' => true,
-            ])
-            ->assertSessionHasErrors('unit');
-
-        $this->actingAs($user)
-            ->post(route('invoicing.items.store'), [
-                'name' => 'Consulting',
-                'unit' => 'hour',
-                'unit_price_cents' => 10000,
-                'is_active' => true,
-            ])
-            ->assertRedirect();
+        $this->actingAs($owner)
+            ->get(route('settings.business', ['tab' => 'tax']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Settings/Business')
+                ->where('settings.vat_registered', false)
+                ->where('settings.default_vat_rate', 0)
+                ->where('vat_period_types', [
+                    ['value' => 'bi_monthly', 'label' => 'Bi-monthly'],
+                    ['value' => 'monthly', 'label' => 'Monthly'],
+                    ['value' => 'quarterly', 'label' => 'Quarterly'],
+                ])
+            );
     }
 }

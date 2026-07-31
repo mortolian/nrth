@@ -38,19 +38,15 @@ const help = {
     description: 'Copied onto the invoice or estimate line when you pick this item. You can still edit the line afterward.',
     unit: 'Optional unit from Settings → Business → Items. Display only — quantity stays free on each line.',
     unitPrice: 'Default unit price in your team currency. Snapshotted onto the line when picked.',
-    vat: 'Default VAT for this item. Overridable per line on the invoice.',
+    vat: 'Default VAT % for this item (0 = zero-rated). Overridable per line on the invoice.',
     status: 'Inactive items stay in your catalog but are hidden from invoice and estimate pickers.',
 };
 
-const initialVatRate = () => {
-    if (props.item?.default_vat_rate != null) {
-        return String(props.item.default_vat_rate);
-    }
-    if (props.tax_rates.length) {
-        const preferred = props.tax_rates.find((r) => r.is_default) ?? props.tax_rates[0];
-        return String(preferred.rate);
-    }
-    return String(props.default_vat_rate ?? 0);
+const initialVatPercent = () => {
+    const rate = props.item?.default_vat_rate != null
+        ? Number(props.item.default_vat_rate)
+        : Number(props.default_vat_rate ?? 0);
+    return String(Number((rate * 100).toFixed(4)));
 };
 
 const { values, setFieldValue: setVeeFieldValue } = useForm({
@@ -59,7 +55,7 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         description: props.item?.description ?? '',
         unit: props.item?.unit ?? '',
         unit_price: ((props.item?.unit_price_cents ?? 0) / 100).toFixed(2),
-        default_vat_rate: initialVatRate(),
+        default_vat_rate_percent: initialVatPercent(),
         is_active: props.item?.is_active ?? true,
     },
 });
@@ -83,39 +79,12 @@ const unitOptions = computed(() => {
     return options;
 });
 
-const vatOptions = computed(() => {
-    const options = props.tax_rates.length
-        ? props.tax_rates.map((r) => ({
-            label: `${r.name} (${formatVatPercent(r.rate)})`,
-            value: String(r.rate),
-        }))
-        : [
-            { label: '0%', value: '0' },
-            { label: '15%', value: '0.15' },
-        ];
-
-    const current = String(formValues.value.default_vat_rate ?? '');
-    if (current !== '' && !options.some((o) => o.value === current)) {
-        options.unshift({
-            label: `${formatVatPercent(Number(current))} (custom)`,
-            value: current,
-        });
-    }
-
-    return options;
-});
-
-const formatVatPercent = (rate: number) => {
-    const pct = rate * 100;
-    return `${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(2)}%`;
-};
-
 const schema = z.object({
     name: z.string().trim().min(1, 'Name is required'),
     description: z.string().optional(),
     unit: z.string().max(32).optional(),
     unit_price: z.coerce.number().min(0, 'Price must be 0 or more'),
-    default_vat_rate: z.coerce.number().min(0).max(1),
+    default_vat_rate_percent: z.coerce.number().min(0).max(100),
     is_active: z.boolean(),
 });
 
@@ -141,7 +110,9 @@ const submit = () => {
         description: result.data.description || null,
         unit: result.data.unit || null,
         unit_price_cents: Math.round(Number(result.data.unit_price) * 100),
-        default_vat_rate: props.charges_vat ? Number(result.data.default_vat_rate) : null,
+        default_vat_rate: props.charges_vat
+            ? Math.round((Number(result.data.default_vat_rate_percent) / 100) * 10000) / 10000
+            : null,
         is_active: result.data.is_active,
     };
 
@@ -259,14 +230,22 @@ const submit = () => {
                         </div>
 
                         <div v-if="charges_vat">
-                            <FieldHelp label="Default VAT" :text="help.vat" />
-                            <AppSelect
-                                :model-value="formValues.default_vat_rate"
-                                :options="vatOptions"
-                                @update:model-value="setFieldValue('default_vat_rate', String($event))"
-                            />
-                            <p v-if="fieldErrors.default_vat_rate" class="mt-1 text-xs text-rose-600">
-                                {{ fieldErrors.default_vat_rate }}
+                            <FieldHelp label="Default VAT (%)" :text="help.vat" />
+                            <div class="flex max-w-xs items-center gap-2">
+                                <AppInput
+                                    :model-value="formValues.default_vat_rate_percent"
+                                    type="number"
+                                    inputmode="decimal"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    class="tabular-nums"
+                                    @update:model-value="setFieldValue('default_vat_rate_percent', $event)"
+                                />
+                                <span class="text-sm text-slate-500">%</span>
+                            </div>
+                            <p v-if="fieldErrors.default_vat_rate_percent" class="mt-1 text-xs text-rose-600">
+                                {{ fieldErrors.default_vat_rate_percent }}
                             </p>
                         </div>
                     </div>

@@ -59,7 +59,7 @@ class AiSettingsTest extends TestCase
             'invoice_email_body_template' => $settings['invoice_email_body_template'],
             'vat_registered' => $settings['vat_registered'],
             'vat_period_type' => $settings['vat_period_type'],
-            'default_tax_rate_id' => $settings['default_tax_rate_id'],
+            'default_vat_rate' => $settings['default_vat_rate'],
             'payment_pages_enabled' => $settings['payment_pages_enabled'],
             'session_idle_timeout_minutes' => $settings['session_idle_timeout_minutes'],
             'ai' => $settings['ai'],

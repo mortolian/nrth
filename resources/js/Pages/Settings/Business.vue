@@ -120,9 +120,14 @@ const form = useForm({
     invoice_default_footer: String(props.settings.invoice_default_footer ?? ''),
     invoice_email_subject_template: String(props.settings.invoice_email_subject_template ?? ''),
     invoice_email_body_template: String(props.settings.invoice_email_body_template ?? ''),
-    vat_registered: Boolean(props.settings.vat_registered ?? false),
+    vat_registered: props.settings.vat_registered === true,
     vat_period_type: String(props.settings.vat_period_type ?? 'bi_monthly'),
-    default_tax_rate_id: props.settings.default_tax_rate_id != null ? String(props.settings.default_tax_rate_id) : '',
+    /** Percent for the input (0 = zero-rated); stored as decimal 0–1. */
+    default_vat_rate_percent: Number(
+        (
+            Number(props.settings.default_vat_rate ?? 0) * 100
+        ).toFixed(4),
+    ),
     payment_pages_enabled: Boolean(props.settings.payment_pages_enabled ?? false),
     ai: {
         provider: String((props.settings.ai as any)?.provider ?? 'openai'),
@@ -341,10 +346,11 @@ watch(
     },
 );
 
-const activeTaxRates = computed(() => props.tax_rates.filter((rate) => rate.is_active));
-const validTaxRateIds = computed(() => new Set(activeTaxRates.value.map((rate) => String(rate.id))));
 const submit = () => {
-    const selectedTaxRateId = form.default_tax_rate_id ? String(form.default_tax_rate_id) : '';
+    const percent = Number(form.default_vat_rate_percent);
+    const defaultVatRate = Number.isFinite(percent)
+        ? Math.min(1, Math.max(0, Math.round((percent / 100) * 10000) / 10000))
+        : 0;
 
     const payload: Record<string, unknown> = {
         name: form.name,
@@ -387,7 +393,7 @@ const submit = () => {
         invoice_email_body_template: form.invoice_email_body_template,
         vat_registered: form.vat_registered,
         vat_period_type: form.vat_period_type,
-        default_tax_rate_id: validTaxRateIds.value.has(selectedTaxRateId) ? selectedTaxRateId : '',
+        default_vat_rate: form.vat_registered ? defaultVatRate : 0,
         payment_pages_enabled: form.payment_pages_enabled,
         ai: {
             provider: form.ai.provider,
@@ -979,16 +985,24 @@ const resetItemUnits = () => {
                         />
                     </div>
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Default VAT rate</label>
-                        <AppSelect
-                            :model-value="form.default_tax_rate_id"
-                            :options="[
-                                { label: '— None —', value: '' },
-                                ...activeTaxRates.map((r) => ({ label: `${r.name} (${(r.rate * 100).toFixed(0)}%)`, value: String(r.id) })),
-                            ]"
-                            :disabled="!form.vat_registered"
-                            @update:model-value="form.default_tax_rate_id = $event"
-                        />
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Default VAT rate (%)</label>
+                        <div class="flex max-w-xs items-center gap-2">
+                            <AppInput
+                                v-model="form.default_vat_rate_percent"
+                                type="number"
+                                inputmode="decimal"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                class="tabular-nums"
+                                :disabled="!form.vat_registered"
+                            />
+                            <span class="text-sm text-slate-500">%</span>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">
+                            Used on new invoice and estimate lines. 0% is zero-rated. You can still change the rate on each line.
+                        </p>
+                        <p v-if="form.errors.default_vat_rate" class="mt-1 text-xs text-rose-600">{{ form.errors.default_vat_rate }}</p>
                     </div>
                 </div>
             </AppCard>

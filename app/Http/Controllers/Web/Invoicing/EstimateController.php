@@ -524,6 +524,7 @@ class EstimateController extends Controller
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $this->taxRatesForEstimateForm($teamId, $chargesVat),
             'charges_vat' => $chargesVat,
+            'default_vat_rate' => $chargesVat ? (float) ($settings['default_vat_rate'] ?? 0) : 0.0,
             'note_templates' => NoteTemplate::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('target', 'notes')

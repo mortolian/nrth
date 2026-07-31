@@ -70,7 +70,7 @@ class BusinessSettingsController extends Controller
             ],
             'financial_year_months' => CalendarMonths::options(),
             'vat_period_types' => [
-                ['value' => 'bi_monthly', 'label' => 'Bi-monthly (SARS small vendor)'],
+                ['value' => 'bi_monthly', 'label' => 'Bi-monthly'],
                 ['value' => 'monthly', 'label' => 'Monthly'],
                 ['value' => 'quarterly', 'label' => 'Quarterly'],
             ],
@@ -100,8 +100,8 @@ class BusinessSettingsController extends Controller
             ]);
         }
 
-        if ($request->input('default_tax_rate_id') === '' || $request->input('default_tax_rate_id') === null) {
-            $request->merge(['default_tax_rate_id' => null]);
+        if ($request->input('default_vat_rate') === '' || $request->input('default_vat_rate') === null) {
+            $request->merge(['default_vat_rate' => 0]);
         }
 
         $validated = $request->validate([
@@ -156,7 +156,7 @@ class BusinessSettingsController extends Controller
             'invoice_email_body_template' => ['nullable', 'string'],
             'vat_registered' => ['required', 'boolean'],
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
-            'default_tax_rate_id' => ['nullable', 'integer', Rule::exists('tax_rates', 'id')->where('team_id', $teamId)],
+            'default_vat_rate' => ['required', 'numeric', 'min:0', 'max:1'],
             'payment_pages_enabled' => ['sometimes', 'boolean'],
             'session_idle_timeout_minutes' => [
                 'sometimes',
@@ -227,7 +227,13 @@ class BusinessSettingsController extends Controller
 
         if (! $validated['vat_registered']) {
             $validated['vat_number'] = null;
+            $validated['default_vat_rate'] = 0.0;
+        } else {
+            $validated['default_vat_rate'] = round((float) $validated['default_vat_rate'], 4);
         }
+
+        // Free-form default replaces the legacy tax-rate-id pointer.
+        $validated['default_tax_rate_id'] = null;
 
         if (! empty($validated['business_phone'])) {
             $validated['business_phone'] = (new PhoneNumber((string) $validated['business_phone']))->formatE164();
@@ -248,7 +254,7 @@ class BusinessSettingsController extends Controller
             'invoice_show_street_address', 'estimate_show_street_address',
             'invoice_default_notes', 'invoice_default_footer',
             'invoice_email_subject_template', 'invoice_email_body_template',
-            'vat_registered', 'vat_period_type', 'default_tax_rate_id',
+            'vat_registered', 'vat_period_type', 'default_vat_rate', 'default_tax_rate_id',
             'payment_pages_enabled',
             'session_idle_timeout_minutes',
             'ai',
@@ -424,14 +430,7 @@ class BusinessSettingsController extends Controller
         $team = $request->user()->currentTeam;
         abort_unless((int) $taxRate->team_id === (int) $team->id, 404);
 
-        $taxRateId = (int) $taxRate->id;
         $taxRate->delete();
-
-        $team->business_settings = array_replace_recursive(
-            $team->mergedBusinessSettings(),
-            ['default_tax_rate_id' => $team->mergedBusinessSettings()['default_tax_rate_id'] === $taxRateId ? null : $team->mergedBusinessSettings()['default_tax_rate_id']]
-        );
-        $team->save();
 
         return to_route('settings.business', ['tab' => 'tax'])->with('success', 'VAT rate removed.');
     }

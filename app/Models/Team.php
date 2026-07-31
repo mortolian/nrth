@@ -240,6 +240,9 @@ class Team extends JetstreamTeam implements HasMedia
             'invoice_email_body_template' => "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{business}}",
             'vat_registered' => false,
             'vat_period_type' => 'bi_monthly',
+            /** Decimal 0–1; 0 = zero-rated. Free-form (not tied to a tax_rates row). */
+            'default_vat_rate' => 0.0,
+            /** @deprecated Prefer default_vat_rate; kept for reading legacy settings. */
             'default_tax_rate_id' => null,
             /** Labels offered when picking a unit on catalog items. */
             'item_units' => self::defaultItemUnits(),
@@ -355,7 +358,37 @@ class Team extends JetstreamTeam implements HasMedia
             $merged['item_units'] = self::defaultItemUnits();
         }
 
+        // New companies start VAT-off; normalize legacy string/int flags to a real boolean.
+        $merged['vat_registered'] = filter_var($merged['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $merged['default_vat_rate'] = $this->resolveDefaultVatRateFromSettings($stored, $merged);
+
         return $merged;
+    }
+
+    /**
+     * Decimal 0–1 default VAT for new lines. Prefer stored default_vat_rate; else legacy tax rate id; else 0.
+     *
+     * @param  array<string, mixed>  $stored
+     * @param  array<string, mixed>  $merged
+     */
+    private function resolveDefaultVatRateFromSettings(array $stored, array $merged): float
+    {
+        if (array_key_exists('default_vat_rate', $stored) && $stored['default_vat_rate'] !== null && $stored['default_vat_rate'] !== '') {
+            return max(0.0, min(1.0, round((float) $stored['default_vat_rate'], 4)));
+        }
+
+        $taxRateId = (int) ($stored['default_tax_rate_id'] ?? 0);
+        if ($taxRateId > 0 && $this->id) {
+            $rate = TaxRate::queryWithoutTeamScope()
+                ->where('team_id', $this->id)
+                ->whereKey($taxRateId)
+                ->value('rate');
+            if ($rate !== null) {
+                return max(0.0, min(1.0, (float) $rate));
+            }
+        }
+
+        return max(0.0, min(1.0, (float) ($merged['default_vat_rate'] ?? 0)));
     }
 
     /**
@@ -533,42 +566,21 @@ class Team extends JetstreamTeam implements HasMedia
     }
 
     /**
-     * Whether invoices/estimates may apply VAT: VAT-registered in settings and a valid default VAT rate is configured.
+     * Whether invoices/estimates may apply VAT (including 0% zero-rated): VAT-registered in settings.
      */
     public function chargesVat(): bool
     {
-        $settings = $this->mergedBusinessSettings();
-        if (! filter_var($settings['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-            return false;
-        }
-
-        $taxRateId = $settings['default_tax_rate_id'] ?? null;
-        if ($taxRateId === null || $taxRateId === '' || (int) $taxRateId <= 0) {
-            return false;
-        }
-
-        return TaxRate::queryWithoutTeamScope()
-            ->where('team_id', $this->id)
-            ->whereKey((int) $taxRateId)
-            ->where('is_active', true)
-            ->exists();
+        return filter_var($this->mergedBusinessSettings()['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN);
     }
 
-    /** Effective default VAT rate (0–1) for new line items; 0 when VAT must not be charged. */
+    /** Effective default VAT rate (0–1) for new line items; 0 when not VAT-registered or when zero-rated. */
     public function defaultVatRateForInvoicing(): float
     {
         if (! $this->chargesVat()) {
             return 0.0;
         }
 
-        $settings = $this->mergedBusinessSettings();
-        $taxRateId = (int) ($settings['default_tax_rate_id'] ?? 0);
-        $rate = TaxRate::queryWithoutTeamScope()
-            ->where('team_id', $this->id)
-            ->whereKey($taxRateId)
-            ->value('rate');
-
-        return $rate !== null ? (float) $rate : 0.0;
+        return (float) ($this->mergedBusinessSettings()['default_vat_rate'] ?? 0);
     }
 
     public function aiEnabled(): bool

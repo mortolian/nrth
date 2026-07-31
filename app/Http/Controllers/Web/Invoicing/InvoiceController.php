@@ -887,6 +887,8 @@ class InvoiceController extends Controller
                 ])
                 ->all(),
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
+            'charges_vat' => $chargesVat,
+            'default_vat_rate' => $chargesVat ? $team->defaultVatRateForInvoicing() : 0.0,
             'tax_rates' => $chargesVat
                 ? TaxRate::queryWithoutTeamScope()
                     ->where('team_id', $teamId)
@@ -902,7 +904,6 @@ class InvoiceController extends Controller
                     ])
                     ->all()
                 : [],
-            'charges_vat' => $chargesVat,
             'accounts' => Account::queryWithoutTeamScope()
                 ->where('team_id', $teamId)
                 ->where('type', AccountType::Income->value)

@@ -37,6 +37,7 @@ const props = defineProps<{
     clients: ClientOption[];
     items: CatalogItem[];
     charges_vat: boolean;
+    default_vat_rate?: number;
     default_currency: string;
     tax_rates: Array<{ id: number; name: string; rate: number; is_default: boolean }>;
     note_templates?: NoteTemplateOption[];
@@ -53,6 +54,9 @@ const currencyOptions = computed(
 const accounts = computed(() => props.accounts ?? []);
 const defaultVat = computed(() => {
     if (!props.charges_vat) return 0;
+    if (props.default_vat_rate != null && Number.isFinite(Number(props.default_vat_rate))) {
+        return Number(props.default_vat_rate);
+    }
     return props.tax_rates.find((r) => r.is_default)?.rate ?? props.tax_rates[0]?.rate ?? 0;
 });
 
@@ -118,7 +122,7 @@ const mapLines = (raw: any[] | undefined): Line[] => {
         description: String(line.description ?? ''),
         quantity: Number(line.quantity) || 1,
         unit_price: ((Number(line.unit_price_cents) || 0) / 100).toFixed(2),
-        vat_rate: Number(line.vat_rate) || defaultVat.value,
+        vat_rate: line.vat_rate != null && line.vat_rate !== '' ? Number(line.vat_rate) : defaultVat.value,
         item_id: line.item_id ?? null,
         income_account_id: line.income_account_id ?? null,
         discount_type: line.discount_type ?? null,
@@ -564,8 +568,14 @@ const submit = () => {
                             <AppSelect
                                 :model-value="String(line.vat_rate)"
                                 :options="tax_rates.length
-                                    ? tax_rates.map((r) => ({ label: r.name, value: String(r.rate) }))
-                                    : [{ label: 'No VAT', value: '0' }]"
+                                    ? tax_rates.map((r) => ({
+                                        label: r.rate === 0 ? `${r.name} (zero rated)` : r.name,
+                                        value: String(r.rate),
+                                    }))
+                                    : [
+                                        { label: 'Zero rated (0%)', value: '0' },
+                                        { label: '15%', value: '0.15' },
+                                    ]"
                                 @update:model-value="line.vat_rate = Number($event)"
                             />
                         </div>

@@ -325,6 +325,7 @@ class RecurringInvoiceController extends Controller
                     'default_vat_rate' => $item->default_vat_rate !== null ? (float) $item->default_vat_rate : null,
                 ])->all(),
             'charges_vat' => $chargesVat,
+            'default_vat_rate' => $chargesVat && $team ? (float) $team->defaultVatRateForInvoicing() : 0.0,
             'default_currency' => Iso4217Currencies::normalize((string) ($settings['invoice_default_currency'] ?? 'ZAR')),
             'tax_rates' => $chargesVat
                 ? TaxRate::queryWithoutTeamScope()

@@ -76,6 +76,8 @@ const props = defineProps<{
     items?: CatalogItemOption[];
     tax_rates: TaxRateOption[];
     charges_vat: boolean;
+    /** Team default VAT rate (0–1); 0 = zero-rated when charges_vat. */
+    default_vat_rate?: number;
     next_number: string;
     default_currency: string;
     /** Business settings: used when creating a new estimate only */
@@ -106,6 +108,9 @@ const defaultLineVat = computed(() => {
     if (!chargesVat.value) {
         return 0;
     }
+    if (props.default_vat_rate != null && Number.isFinite(Number(props.default_vat_rate))) {
+        return Number(props.default_vat_rate);
+    }
     const def = props.tax_rates.find((r) => r.is_default);
     if (def) {
         return def.rate;
@@ -115,12 +120,28 @@ const defaultLineVat = computed(() => {
 
 const vatSelectOptions = computed(() => {
     if (!chargesVat.value) {
-        return [{ label: 'No VAT', value: '0' }];
+        return [{ label: 'Zero rated (0%)', value: '0' }];
     }
-    if (props.tax_rates.length) {
-        return props.tax_rates.map((r) => ({ label: `${r.name} (${(r.rate * 100).toFixed(0)}%)`, value: String(r.rate) }));
+    const options = props.tax_rates.length
+        ? props.tax_rates.map((r) => ({
+            label: r.rate === 0 ? `${r.name} (zero rated)` : `${r.name} (${(r.rate * 100).toFixed(0)}%)`,
+            value: String(r.rate),
+        }))
+        : [
+            { label: 'Zero rated (0%)', value: '0' },
+            { label: '15%', value: '0.15' },
+        ];
+
+    const defaultRate = String(defaultLineVat.value);
+    if (!options.some((o) => o.value === defaultRate)) {
+        const pct = (defaultLineVat.value * 100).toFixed(defaultLineVat.value === 0 ? 0 : 2).replace(/\.?0+$/, '');
+        options.unshift({
+            label: defaultLineVat.value === 0 ? 'Zero rated (0%)' : `${pct}% (default)`,
+            value: defaultRate,
+        });
     }
-    return [{ label: 'No VAT', value: '0' }];
+
+    return options;
 });
 
 const initialEstimateClientId = props.estimate?.client_id ?? props.clients[0]?.id ?? 0;
@@ -607,7 +628,7 @@ const submit = (submitAction: 'draft' | 'send') => {
 
                 <AppCard>
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        VAT is not applied on this estimate. Enable VAT registered and choose a default VAT rate in Business settings to charge VAT.
+                        VAT is not applied on this estimate. Enable VAT registered in Business settings to charge VAT (0% is zero-rated).
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
                     <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>

@@ -48,8 +48,10 @@ type InvoiceLine = {
 };
 
 const props = defineProps<{
-    /** When false, VAT is not applied (company not VAT-registered or no default VAT rate). */
+    /** When false, VAT fields are hidden (company not VAT-registered). */
     charges_vat: boolean;
+    /** Team default VAT rate (0–1); 0 = zero-rated when charges_vat. */
+    default_vat_rate?: number;
     isEditing: boolean;
     invoice: null | {
         id: number;
@@ -95,6 +97,9 @@ const defaultVatRate = computed(() => {
     if (!chargesVat.value) {
         return 0;
     }
+    if (props.default_vat_rate != null && Number.isFinite(Number(props.default_vat_rate))) {
+        return Number(props.default_vat_rate);
+    }
     return props.tax_rates.find((rate) => rate.is_default)?.rate ?? props.tax_rates[0]?.rate ?? 0;
 });
 const makeRowKey = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -115,7 +120,7 @@ const mapLineFromInvoice = (line: InvoiceLine & { discount_cents?: number | null
     description: line.description,
     quantity: Number(line.quantity) || 1,
     unit_price: (Number(line.unit_price) || 0).toFixed(2),
-    vat_rate: Number(line.vat_rate) || defaultVatRate.value,
+    vat_rate: line.vat_rate != null && line.vat_rate !== '' ? Number(line.vat_rate) : defaultVatRate.value,
     income_account_id: line.income_account_id ?? null,
     discount_type: line.discount_type ?? null,
     discount_percent: line.discount_percent ?? null,
@@ -219,13 +224,29 @@ const visibleValidationErrors = computed(() =>
 /** Options for VAT select when VAT applies. */
 const taxRateSelectOptions = computed(() => {
     if (!chargesVat.value) {
-        return [{ label: 'No VAT', value: '0' }];
-    }
-    if (props.tax_rates.length) {
-        return props.tax_rates.map((rate) => ({ label: rate.name, value: String(rate.rate) }));
+        return [{ label: 'Zero rated (0%)', value: '0' }];
     }
 
-    return [{ label: 'No VAT', value: '0' }];
+    const options = props.tax_rates.length
+        ? props.tax_rates.map((rate) => ({
+            label: rate.rate === 0 ? `${rate.name} (zero rated)` : rate.name,
+            value: String(rate.rate),
+        }))
+        : [
+            { label: 'Zero rated (0%)', value: '0' },
+            { label: '15%', value: '0.15' },
+        ];
+
+    const defaultRate = String(defaultVatRate.value);
+    if (!options.some((o) => o.value === defaultRate)) {
+        const pct = (defaultVatRate.value * 100).toFixed(defaultVatRate.value === 0 ? 0 : 2).replace(/\.?0+$/, '');
+        options.unshift({
+            label: defaultVatRate.value === 0 ? 'Zero rated (0%)' : `${pct}% (default)`,
+            value: defaultRate,
+        });
+    }
+
+    return options;
 });
 
 const accountSelectOptions = computed(() =>
@@ -736,7 +757,7 @@ const onSave = () => {
 
                 <AppCard>
                     <p v-if="!chargesVat" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        VAT is not applied on this invoice. Enable VAT registered and choose a default VAT rate in Business settings to charge VAT.
+                        VAT is not applied on this invoice. Enable VAT registered in Business settings to charge VAT (0% is zero-rated).
                     </p>
                     <h3 class="mb-3 text-base font-semibold text-slate-900">Line items</h3>
                     <p v-if="fieldErrors.line_items" class="mb-3 text-xs text-rose-600">{{ fieldErrors.line_items }}</p>
