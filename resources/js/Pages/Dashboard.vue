@@ -7,14 +7,14 @@ import RecordInvoicePaymentDrawer from '@/Components/RecordInvoicePaymentDrawer.
 import { useFormatCurrency } from '@/composables/useFormatCurrency';
 import { invoiceStatusBadgeVariant, invoiceStatusLabel } from '@/Composables/useInvoiceStatusBadge';
 import { useToast } from '@/Composables/useToast';
-import { BarChart } from 'echarts/charts';
+import { LineChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
 import VChart from 'vue-echarts';
 import { CircleDollarSign, HandCoins, Landmark, TrendingUp } from 'lucide-vue-next';
 
-use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
+use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
 const toast = useToast();
 
@@ -104,25 +104,67 @@ const chartOptions = computed(() => ({
     tooltip: { trigger: 'axis' },
     legend: { data: ['Revenue', 'Expenses'] },
     grid: { left: 16, right: 16, top: 36, bottom: 24, containLabel: true },
-    xAxis: { type: 'category', data: props.revenue_chart.map((row) => row.month) ?? [] },
+    xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: props.revenue_chart.map((row) => row.month) ?? [],
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
+        axisLabel: { color: '#64748b' },
+    },
     yAxis: {
         type: 'value',
+        splitLine: { lineStyle: { color: '#f1f5f9' } },
         axisLabel: {
+            color: '#64748b',
             formatter: (value) => `R ${(Number(value) / 100).toLocaleString('en-ZA')}`,
         },
     },
     series: [
         {
             name: 'Revenue',
-            type: 'bar',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 6,
             data: props.revenue_chart.map((row) => row.revenue) ?? [],
+            lineStyle: { width: 2.5, color: '#00a86b' },
             itemStyle: { color: '#00a86b' },
+            areaStyle: {
+                color: {
+                    type: 'linear',
+                    x: 0,
+                    y: 0,
+                    x2: 0,
+                    y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(0, 168, 107, 0.22)' },
+                        { offset: 1, color: 'rgba(0, 168, 107, 0.02)' },
+                    ],
+                },
+            },
         },
         {
             name: 'Expenses',
-            type: 'bar',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 6,
             data: props.revenue_chart.map((row) => row.expenses) ?? [],
+            lineStyle: { width: 2.5, color: '#ef6f6c' },
             itemStyle: { color: '#ef6f6c' },
+            areaStyle: {
+                color: {
+                    type: 'linear',
+                    x: 0,
+                    y: 0,
+                    x2: 0,
+                    y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(239, 111, 108, 0.18)' },
+                        { offset: 1, color: 'rgba(239, 111, 108, 0.02)' },
+                    ],
+                },
+            },
         },
     ],
 }));
