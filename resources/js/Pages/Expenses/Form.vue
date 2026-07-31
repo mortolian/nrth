@@ -175,7 +175,23 @@ const selectedTax = computed(
 );
 const vatAutoCents = computed(() => Math.round(Number(form.amount_excl_vat || 0) * Number(selectedTax.value?.rate || 0) * 100));
 const totalCents = computed(() => Math.round(Number(form.amount_excl_vat || 0) * 100) + Math.round(Number(form.vat_amount || 0) * 100));
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+
+const totalInclVat = computed({
+    get: () => totalCents.value / 100,
+    set: (value: string | number) => {
+        const total = Number(value);
+        if (!Number.isFinite(total) || total < 0) {
+            return;
+        }
+        const rate = Number(selectedTax.value?.rate || 0);
+        const totalC = Math.round(total * 100);
+        if (rate > 0) {
+            form.amount_excl_vat = Math.round(totalC / (1 + rate)) / 100;
+        } else {
+            form.amount_excl_vat = totalC / 100;
+        }
+    },
+});
 
 const selectedCategory = computed(() => {
     const id = Number(form.category_account_id || 0);
@@ -408,9 +424,9 @@ const applyScanPayload = (data: ScanPayload) => {
         form.supplier_custom = data.supplier.trim();
     }
     if (data.description != null) form.description = data.description;
+    if (data.vat_rate) form.vat_rate = data.vat_rate;
     if (data.amount_excl_vat != null) form.amount_excl_vat = data.amount_excl_vat;
     if (data.vat_amount != null) form.vat_amount = data.vat_amount;
-    if (data.vat_rate) form.vat_rate = data.vat_rate;
     if (data.reference != null) form.reference = data.reference;
 };
 
@@ -1067,6 +1083,16 @@ const submit = () => {
                     />
                     <p v-if="isTravel" class="mt-1 text-xs text-amber-700">Travel uses distance × rate for the posted amount; this field is ignored when you save.</p>
                 </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Total (incl VAT)</label>
+                    <AppInput
+                        v-model="totalInclVat"
+                        type="text"
+                        inputmode="decimal"
+                        class="min-h-12 text-base md:min-h-0 md:text-sm"
+                    />
+                    <p class="mt-1 text-xs text-slate-500">Enter the paid total to back-calculate amount excl VAT.</p>
+                </div>
                 <div class="md:col-span-2">
                     <label class="mb-1 block text-xs font-medium text-slate-500">Description <span class="font-normal text-slate-400">(optional)</span></label>
                     <AppInput v-model="form.description" placeholder="What was purchased?" class="min-h-12 text-base md:min-h-0 md:text-sm" />
@@ -1094,10 +1120,6 @@ const submit = () => {
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount (override)</label>
                     <AppInput v-model="form.vat_amount" type="text" inputmode="decimal" />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Total (incl VAT)</label>
-                    <AppInput :model-value="formatCents(totalCents)" disabled />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Paid from</label>

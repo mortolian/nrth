@@ -502,4 +502,102 @@ class ParseExpenseReceiptTest extends TestCase
 
         Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer sk-env'));
     }
+
+    public function test_parse_receipt_derives_excl_from_amount_incl_vat(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'date' => '2026-05-01',
+                            'supplier_name' => 'Till Slip Co',
+                            'description' => 'Groceries',
+                            'amount_incl_vat' => 100.0,
+                            'amount_excl_vat' => null,
+                            'vat_amount' => null,
+                            'vat_rate' => 'vat15',
+                            'reference' => 'TS-1',
+                            'confidence' => 0.9,
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'receipt' => UploadedFile::fake()->image('receipt.jpg'),
+        ])->assertOk()
+            ->assertJsonPath('data.amount_excl_vat', 86.96)
+            ->assertJsonPath('data.vat_amount', 13.04)
+            ->assertJsonPath('data.vat_rate', 'vat15');
+    }
+
+    public function test_parse_receipt_prefers_amount_incl_vat_over_excl(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'date' => '2026-05-01',
+                            'supplier_name' => 'Double Count Co',
+                            'description' => 'Stationery',
+                            // Model mistakenly copied the paid total into amount_excl_vat.
+                            'amount_incl_vat' => 100.0,
+                            'amount_excl_vat' => 100.0,
+                            'vat_amount' => 15.0,
+                            'vat_rate' => 'vat15',
+                            'reference' => 'INV-1',
+                            'confidence' => 0.8,
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'receipt' => UploadedFile::fake()->image('receipt.jpg'),
+        ])->assertOk()
+            ->assertJsonPath('data.amount_excl_vat', 86.96)
+            ->assertJsonPath('data.vat_amount', 13.04);
+    }
+
+    public function test_parse_receipt_detects_gross_total_in_amount_excl_vat(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        Http::fake([
+            'api.openai.com/v1/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'date' => '2026-05-01',
+                            'supplier_name' => 'Embedded Vat Co',
+                            'description' => 'Coffee',
+                            // Paid R100 incl VAT; model put 100 in excl and the embedded VAT (≈13.04).
+                            'amount_excl_vat' => 100.0,
+                            'vat_amount' => 13.04,
+                            'vat_rate' => 'vat15',
+                            'reference' => null,
+                            'confidence' => 0.75,
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $this->postJson(route('expenses.parse-receipt'), [
+            'receipt' => UploadedFile::fake()->image('receipt.jpg'),
+        ])->assertOk()
+            ->assertJsonPath('data.amount_excl_vat', 86.96)
+            ->assertJsonPath('data.vat_amount', 13.04);
+    }
 }

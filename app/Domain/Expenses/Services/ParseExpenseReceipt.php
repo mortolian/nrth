@@ -78,20 +78,27 @@ class ParseExpenseReceipt
     {
         return 'Extract fields from this South African tax invoice / receipt. '
             .'Return JSON only with keys: date (YYYY-MM-DD or null), supplier_name, description, '
-            .'amount_excl_vat (number in ZAR, excl VAT), vat_amount (number in ZAR), '
+            .'amount_incl_vat (number in ZAR — TOTAL / Amount due / Grand total the customer paid, VAT included), '
+            .'amount_excl_vat (number in ZAR — subtotal before VAT only; never the paid total), '
+            .'vat_amount (number in ZAR), '
             .'vat_rate (one of vat15, vat0, exempt, no_vat), reference (invoice/receipt number), '
-            .'confidence (0 to 1). Use null when unknown. Prefer vat15 when 15% VAT is shown.';
+            .'confidence (0 to 1). Use null when unknown. Prefer vat15 when 15% VAT is shown. '
+            .'If the receipt only shows one money total (often labelled TOTAL), put it in amount_incl_vat '
+            .'and leave amount_excl_vat null — do not copy the paid total into amount_excl_vat.';
     }
 
     private function mergeExtractionPrompt(): string
     {
         return 'These documents may be pages or parts of one South African tax invoice / receipt. '
             .'Combine them into a single expense. Return JSON only with keys: date (YYYY-MM-DD or null), '
-            .'supplier_name, description, amount_excl_vat (number in ZAR, excl VAT for the whole expense), '
+            .'supplier_name, description, '
+            .'amount_incl_vat (number in ZAR — TOTAL / Amount due / Grand total paid, VAT included), '
+            .'amount_excl_vat (number in ZAR — subtotal before VAT for the whole expense; never the paid total), '
             .'vat_amount (number in ZAR), vat_rate (one of vat15, vat0, exempt, no_vat), '
             .'reference (invoice/receipt number), confidence (0 to 1). '
             .'Do not sum duplicate totals that appear on multiple pages. Use null when unknown. '
-            .'Prefer vat15 when 15% VAT is shown.';
+            .'Prefer vat15 when 15% VAT is shown. '
+            .'If only one money total is shown, put it in amount_incl_vat and leave amount_excl_vat null.';
     }
 
     /**
@@ -110,17 +117,87 @@ class ParseExpenseReceipt
         $confidence = $decoded['confidence'] ?? 0;
         $confidence = is_numeric($confidence) ? max(0.0, min(1.0, (float) $confidence)) : 0.0;
 
+        [$amountExclVat, $vatAmount, $vatRate] = $this->normalizeAmounts(
+            $this->nullableFloat($decoded['amount_excl_vat'] ?? null),
+            $this->nullableFloat($decoded['vat_amount'] ?? null),
+            $this->nullableFloat($decoded['amount_incl_vat'] ?? null),
+            $vatRate,
+        );
+
         return new ParsedExpenseReceipt(
             date: $this->normalizeDate($decoded['date'] ?? null),
             supplierName: $supplierName,
             supplierId: $supplierId,
             description: $this->nullableString($decoded['description'] ?? null),
-            amountExclVat: $this->nullableFloat($decoded['amount_excl_vat'] ?? null),
-            vatAmount: $this->nullableFloat($decoded['vat_amount'] ?? null),
+            amountExclVat: $amountExclVat,
+            vatAmount: $vatAmount,
             vatRate: $vatRate,
             reference: $this->nullableString($decoded['reference'] ?? null),
             confidence: $confidence,
         );
+    }
+
+    /**
+     * Prefer the paid/gross total when present; derive excl + VAT so scan does not double-count VAT.
+     *
+     * @return array{0: float|null, 1: float|null, 2: string|null}
+     */
+    private function normalizeAmounts(
+        ?float $amountExclVat,
+        ?float $vatAmount,
+        ?float $amountInclVat,
+        ?string $vatRate,
+    ): array {
+        $rate = match ($vatRate) {
+            'vat15' => 0.15,
+            default => 0.0,
+        };
+
+        if ($amountInclVat !== null && $amountInclVat > 0) {
+            if ($vatRate === null && $rate === 0.0) {
+                $vatRate = 'vat15';
+                $rate = 0.15;
+            }
+
+            if ($rate > 0) {
+                return [...$this->splitInclusiveTotal($amountInclVat, $rate), $vatRate];
+            }
+
+            return [$amountInclVat, 0.0, $vatRate ?? 'no_vat'];
+        }
+
+        // Model sometimes puts the paid total in amount_excl_vat and the embedded VAT in vat_amount.
+        if ($amountExclVat !== null && $vatAmount !== null && $rate > 0) {
+            $asExclExpected = $amountExclVat * $rate;
+            $asInclExpected = $amountExclVat * $rate / (1 + $rate);
+            $errAsExcl = abs($vatAmount - $asExclExpected);
+            $errAsIncl = abs($vatAmount - $asInclExpected);
+
+            if ($errAsIncl + 0.02 < $errAsExcl && $errAsIncl <= 0.06) {
+                return [...$this->splitInclusiveTotal($amountExclVat, $rate), $vatRate];
+            }
+        }
+
+        if ($amountExclVat !== null && $vatAmount === null && $rate > 0) {
+            $exclCents = (int) round($amountExclVat * 100);
+            $vatCents = (int) round($exclCents * $rate);
+
+            return [$amountExclVat, $vatCents / 100, $vatRate];
+        }
+
+        return [$amountExclVat, $vatAmount, $vatRate];
+    }
+
+    /**
+     * @return array{0: float, 1: float}
+     */
+    private function splitInclusiveTotal(float $amountInclVat, float $rate): array
+    {
+        $inclCents = (int) round($amountInclVat * 100);
+        $exclCents = (int) round($inclCents / (1 + $rate));
+        $vatCents = $inclCents - $exclCents;
+
+        return [$exclCents / 100, $vatCents / 100];
     }
 
     private function matchSupplierId(int $teamId, string $name): ?int
