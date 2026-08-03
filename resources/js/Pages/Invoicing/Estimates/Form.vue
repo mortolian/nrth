@@ -667,6 +667,15 @@ const submit = (submitAction: 'draft' | 'send') => {
                                                 @update:model-value="applyCatalogItem(index, String($event ?? ''))"
                                             />
                                         </div>
+                                        <div v-else class="min-w-[12rem] flex-[2]">
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Description</label>
+                                            <AppInput
+                                                class="!h-8 !px-2 !py-1 text-sm"
+                                                :model-value="line.description"
+                                                placeholder="Line item description"
+                                                @update:model-value="updateLine(index, 'description', $event)"
+                                            />
+                                        </div>
                                         <div class="w-[4.5rem] shrink-0">
                                             <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Qty</label>
                                             <AppInput
@@ -724,7 +733,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                         </div>
                                     </div>
 
-                                    <div>
+                                    <div v-if="catalogItems.length">
                                         <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Description</label>
                                         <textarea
                                             :value="line.description"

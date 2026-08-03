@@ -549,6 +549,14 @@ const submit = () => {
                                 @update:model-value="applyItem(index, String($event ?? ''))"
                             />
                         </div>
+                        <div v-else class="min-w-[12rem] flex-[2]">
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Description</label>
+                            <AppInput
+                                v-model="line.description"
+                                class="!h-8 !px-2 !py-1 text-sm"
+                                placeholder="Description (placeholders allowed)"
+                            />
+                        </div>
                         <div class="w-[4.5rem] shrink-0">
                             <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Qty</label>
                             <AppInput v-model="line.quantity" type="number" step="0.01" min="0" class="!h-8 !px-2 !py-1 text-right tabular-nums" />
@@ -592,7 +600,7 @@ const submit = () => {
                             </button>
                         </div>
                     </div>
-                    <div>
+                    <div v-if="items.length">
                         <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Description</label>
                         <textarea
                             v-model="line.description"
