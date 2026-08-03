@@ -5,6 +5,7 @@ namespace App\Domain\Backup\Services;
 use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Enums\InstanceBackupType;
 use App\Domain\Backup\Models\InstanceBackupRun;
+use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -28,6 +29,7 @@ class InstanceBackupService
     public function __construct(
         private readonly InstanceBackupRetentionSettings $retention,
         private readonly InstanceBackupTypeResolver $typeResolver,
+        private readonly InstanceBackupDestinationSettings $destinationsSettings,
     ) {}
 
     public function isRunning(): bool
@@ -139,9 +141,8 @@ class InstanceBackupService
             ])
             ->exists();
 
-        foreach ($this->listBackups() as $backup) {
+        foreach ($this->listLocalBackups() as $backup) {
             $exists = InstanceBackupRun::query()
-                ->where('disk', $backup['disk'])
                 ->where('filename', $backup['filename'])
                 ->exists();
 
@@ -166,6 +167,7 @@ class InstanceBackupService
                 'file_size_bytes' => $backup['size_bytes'],
                 'completed_at' => $backupAt,
                 'error_message' => null,
+                'mirror_warning' => null,
                 'created_at' => $backupAt,
                 'updated_at' => $backupAt,
             ]);
@@ -194,7 +196,7 @@ class InstanceBackupService
             ->pluck('filename')
             ->all();
 
-        foreach ($this->listBackups() as $backup) {
+        foreach ($this->listLocalBackups() as $backup) {
             if (in_array($backup['filename'], $trackedFilenames, true)) {
                 continue;
             }
@@ -224,6 +226,7 @@ class InstanceBackupService
                 'storage_path' => $backup['path'],
                 'file_size_bytes' => $backup['size_bytes'],
                 'error_message' => null,
+                'mirror_warning' => $this->mirrorWarningFor($backup['filename']),
                 'completed_at' => $backupAt ?? now(),
                 'types' => $run->typeList() !== []
                     ? $run->typeList()
@@ -436,10 +439,23 @@ class InstanceBackupService
      */
     public function backupFilenames(): array
     {
-        return array_map(
+        return array_values(array_unique(array_map(
             static fn (array $backup): string => $backup['filename'],
+            $this->listLocalBackups(),
+        )));
+    }
+
+    /**
+     * Local destination only — source of truth for runs / rotation inventory.
+     *
+     * @return list<array{filename: string, path: string, disk: string, date: string|null, size_bytes: int}>
+     */
+    public function listLocalBackups(): array
+    {
+        return array_values(array_filter(
             $this->listBackups(),
-        );
+            static fn (array $backup): bool => $backup['disk'] === 'local',
+        ));
     }
 
     /**
@@ -468,7 +484,7 @@ class InstanceBackupService
 
     public function latestBackupAt(): ?CarbonInterface
     {
-        $backups = $this->listBackups();
+        $backups = $this->listLocalBackups();
 
         if ($backups === []) {
             return null;
@@ -477,14 +493,28 @@ class InstanceBackupService
         return Carbon::parse($backups[0]['date']);
     }
 
-    public function findBackup(string $filename): ?Backup
+    public function findBackup(string $filename, ?string $preferDisk = 'local'): ?Backup
     {
         $safeName = $this->sanitizeFilename($filename);
         if ($safeName === null) {
             return null;
         }
 
-        foreach ($this->destinations() as $destination) {
+        $destinations = $this->destinations();
+        if ($preferDisk !== null) {
+            $preferred = $destinations->first(
+                fn (BackupDestination $destination): bool => $destination->diskName() === $preferDisk,
+            );
+            if ($preferred !== null) {
+                foreach ($preferred->backups() as $backup) {
+                    if (basename($backup->path()) === $safeName) {
+                        return $backup;
+                    }
+                }
+            }
+        }
+
+        foreach ($destinations as $destination) {
             foreach ($destination->backups() as $backup) {
                 if (basename($backup->path()) === $safeName) {
                     return $backup;
@@ -495,33 +525,84 @@ class InstanceBackupService
         return null;
     }
 
+    public function filenameExistsOnDisk(string $filename, string $diskName): bool
+    {
+        $safeName = $this->sanitizeFilename($filename);
+        if ($safeName === null) {
+            return false;
+        }
+
+        $destination = $this->destinations()->first(
+            fn (BackupDestination $candidate): bool => $candidate->diskName() === $diskName,
+        );
+        if ($destination === null) {
+            return false;
+        }
+
+        foreach ($destination->backups() as $backup) {
+            if (basename($backup->path()) === $safeName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function missingOffsiteDisksFor(string $filename): array
+    {
+        $missing = [];
+        foreach ($this->destinationsSettings->offsiteDiskNames() as $disk) {
+            if (! $this->filenameExistsOnDisk($filename, $disk)) {
+                $missing[] = $disk;
+            }
+        }
+
+        return $missing;
+    }
+
+    public function mirrorWarningFor(string $filename): ?string
+    {
+        $missing = $this->missingOffsiteDisksFor($filename);
+        if ($missing === []) {
+            return null;
+        }
+
+        $labels = array_map(static function (string $disk): string {
+            return match ($disk) {
+                InstanceBackupDestinationSettings::DISK_S3 => 'S3',
+                InstanceBackupDestinationSettings::DISK_PATH => 'path/NFS',
+                default => $disk,
+            };
+        }, $missing);
+
+        return 'Offsite mirror missing on: '.implode(', ', $labels).'.';
+    }
+
     public function download(string $filename): BinaryFileResponse|StreamedResponse
     {
-        $backup = $this->findBackup($filename);
+        $backup = $this->findBackup($filename, 'local');
         abort_unless($backup !== null && $backup->exists(), 404);
 
         $name = basename($backup->path());
 
         // Prefer a real filesystem download. Octane/Swoole often hangs or returns an
         // empty body for streamDownload() + fpassthru() on large zip archives.
-        foreach ($this->destinationDiskNames() as $diskName) {
-            $disk = Storage::disk($diskName);
-            $relative = $backup->path();
+        $disk = Storage::disk('local');
+        $relative = $backup->path();
 
-            if (! $disk->exists($relative)) {
-                continue;
-            }
-
+        if ($disk->exists($relative)) {
             try {
                 $absolute = $disk->path($relative);
+                if (is_string($absolute) && is_file($absolute)) {
+                    return response()->download($absolute, $name, [
+                        'Content-Type' => 'application/zip',
+                    ]);
+                }
             } catch (\Throwable) {
-                break;
-            }
-
-            if (is_string($absolute) && is_file($absolute)) {
-                return response()->download($absolute, $name, [
-                    'Content-Type' => 'application/zip',
-                ]);
+                // Fall through to stream.
             }
         }
 
@@ -539,14 +620,27 @@ class InstanceBackupService
 
     public function delete(string $filename): bool
     {
-        $backup = $this->findBackup($filename);
-        if ($backup === null || ! $backup->exists()) {
+        $safeName = $this->sanitizeFilename($filename);
+        if ($safeName === null) {
             return false;
         }
 
-        $backup->delete();
+        $deletedAny = false;
 
-        return true;
+        foreach ($this->destinations() as $destination) {
+            foreach ($destination->backups() as $backup) {
+                if (basename($backup->path()) !== $safeName) {
+                    continue;
+                }
+
+                if ($backup->exists()) {
+                    $backup->delete();
+                    $deletedAny = true;
+                }
+            }
+        }
+
+        return $deletedAny;
     }
 
     /**
@@ -569,7 +663,12 @@ class InstanceBackupService
         /** @var list<string>|string $disks */
         $disks = config('backup.backup.destination.disks', ['local']);
 
-        return array_values(array_filter((array) $disks, fn ($disk): bool => is_string($disk) && $disk !== ''));
+        $names = array_values(array_filter(
+            (array) $disks,
+            fn ($disk): bool => is_string($disk) && $disk !== '',
+        ));
+
+        return $names !== [] ? $names : ['local'];
     }
 
     private function sanitizeFilename(string $filename): ?string

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+
 type TakeoutRunRow = {
     id: number;
     download_token: string;
@@ -30,35 +31,15 @@ type BackupRunRow = {
     file_size_bytes: number | null;
     download_url: string | null;
     error_message: string | null;
+    mirror_warning: string | null;
     can_retry: boolean;
     source: 'manual' | 'scheduled';
     types: RetentionBand[];
 };
 
-type RestoreGuide = {
-    backup_name: string;
-    container_zip_dir: string;
-    db_connection: string;
-    db_database: string;
-    db_username: string;
-    archive_password_configured: boolean;
-};
-
-type OperatorRow = {
-    id: number | null;
-    name: string | null;
-    email: string;
-    source: string;
-    can_remove: boolean;
-};
-
-type BackupRetention = {
-    keep_daily: number;
-    keep_weekly: number;
-    keep_monthly: number;
-    keep_yearly: number;
-    weekly_on: string;
-    delete_oldest_backups_when_using_more_megabytes_than: number | null;
+type BackupLinks = {
+    destinations_summary: string;
+    operators_summary: string;
 };
 
 const props = defineProps<{
@@ -86,11 +67,8 @@ const props = defineProps<{
     }>;
     recent_takeouts: TakeoutRunRow[];
     recent_backups: BackupRunRow[];
-    operators: OperatorRow[];
-    env_break_glass_configured: boolean;
     backup_schedule_hint: string;
-    restore_guide: RestoreGuide | null;
-    backup_retention: BackupRetention | null;
+    backup_links: BackupLinks | null;
 }>();
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
@@ -108,86 +86,6 @@ const takeoutForm = useForm({
 
 const backupForm = useForm({});
 
-const operatorForm = useForm({
-    email: '',
-});
-
-const retentionForm = useForm({
-    keep_daily: props.backup_retention?.keep_daily ?? 7,
-    keep_weekly: props.backup_retention?.keep_weekly ?? 8,
-    keep_monthly: props.backup_retention?.keep_monthly ?? 4,
-    keep_yearly: props.backup_retention?.keep_yearly ?? 2,
-    weekly_on: props.backup_retention?.weekly_on ?? 'sunday',
-    delete_oldest_backups_when_using_more_megabytes_than:
-        props.backup_retention?.delete_oldest_backups_when_using_more_megabytes_than ?? null,
-});
-
-watch(
-    () => props.backup_retention,
-    (next) => {
-        if (!next) {
-            return;
-        }
-        retentionForm.keep_daily = next.keep_daily;
-        retentionForm.keep_weekly = next.keep_weekly;
-        retentionForm.keep_monthly = next.keep_monthly;
-        retentionForm.keep_yearly = next.keep_yearly;
-        retentionForm.weekly_on = next.weekly_on;
-        retentionForm.delete_oldest_backups_when_using_more_megabytes_than =
-            next.delete_oldest_backups_when_using_more_megabytes_than;
-        retentionForm.clearErrors();
-    },
-);
-
-const saveRetention = () => {
-    retentionForm
-        .transform((data) => ({
-            ...data,
-            delete_oldest_backups_when_using_more_megabytes_than:
-                data.delete_oldest_backups_when_using_more_megabytes_than === ''
-                || data.delete_oldest_backups_when_using_more_megabytes_than === null
-                    ? null
-                    : Number(data.delete_oldest_backups_when_using_more_megabytes_than),
-        }))
-        .put(route('settings.instance.backup-retention.update'), {
-            preserveScroll: true,
-        });
-};
-
-const addOperator = () => {
-    operatorForm.post(route('settings.instance.operators.store'), {
-        preserveScroll: true,
-        onSuccess: () => operatorForm.reset('email'),
-    });
-};
-
-const removeOperator = (row: OperatorRow) => {
-    if (!row.id || !row.can_remove) {
-        return;
-    }
-    if (!confirm(`Remove ${row.email} as an instance operator?`)) {
-        return;
-    }
-    useForm({}).delete(route('settings.instance.operators.destroy', row.id), {
-        preserveScroll: true,
-    });
-};
-
-const operatorSourceLabel = (source: string) => {
-    if (source === 'environment') {
-        return 'Environment';
-    }
-    if (source === 'database+environment') {
-        return 'Database + environment';
-    }
-
-    return 'Database';
-};
-
-const readyBackups = computed(() =>
-    props.recent_backups.filter((run) => run.status === 'ready' && !!run.filename),
-);
-
 const retentionBandLabel: Record<RetentionBand, string> = {
     daily: 'Daily',
     weekly: 'Weekly',
@@ -201,16 +99,6 @@ const retentionBandVariant: Record<RetentionBand, 'success' | 'info' | 'neutral'
     monthly: 'warning',
     yearly: 'default',
 };
-
-const weeklyOnOptions = [
-    { label: 'Sunday', value: 'sunday' },
-    { label: 'Monday', value: 'monday' },
-    { label: 'Tuesday', value: 'tuesday' },
-    { label: 'Wednesday', value: 'wednesday' },
-    { label: 'Thursday', value: 'thursday' },
-    { label: 'Friday', value: 'friday' },
-    { label: 'Saturday', value: 'saturday' },
-];
 
 const backupMonthGroups = computed(() => {
     const groups: Array<{
@@ -248,110 +136,6 @@ const backupDateLabel = (run: BackupRunRow): string => {
     return stamp ? stamp.slice(0, 19).replace('T', ' ') : '—';
 };
 
-const restoreFilename = ref(readyBackups.value[0]?.filename ?? '');
-const restoreRuntime = ref<'compose' | 'sail'>('compose');
-const restoreCopied = ref(false);
-
-watch(
-    readyBackups,
-    (rows) => {
-        if (!restoreFilename.value || !rows.some((run) => run.filename === restoreFilename.value)) {
-            restoreFilename.value = rows[0]?.filename ?? '';
-        }
-    },
-    { immediate: true },
-);
-
-const restoreBackupOptions = computed(() =>
-    readyBackups.value.map((run) => ({
-        label: run.filename ?? `backup #${run.id}`,
-        value: run.filename ?? '',
-    })),
-);
-
-const restoreRuntimeOptions = [
-    { label: 'Self-host (./scripts/compose.sh)', value: 'compose' },
-    { label: 'Sail (./vendor/bin/sail)', value: 'sail' },
-];
-
-const restoreScript = computed(() => {
-    const guide = props.restore_guide;
-    const filename = restoreFilename.value;
-    if (!guide || !filename) {
-        return '# Select a ready backup to generate restore commands.';
-    }
-
-    const runner = restoreRuntime.value === 'sail' ? './vendor/bin/sail' : './scripts/compose.sh';
-    const zipPath = `/var/www/html/${guide.container_zip_dir}/${filename}`;
-    const db = guide.db_database;
-    const user = guide.db_username;
-    const passwordNote = guide.archive_password_configured
-        ? '# Archive encryption is enabled (BACKUP_ARCHIVE_PASSWORD). If unzip fails, decrypt with that password first.\n'
-        : '';
-
-    return `#!/usr/bin/env bash
-# nrth instance restore (generated) — review before running
-# Backup: ${filename}
-# WARNING: replaces the live Postgres database. Expect downtime.
-# App code should still come from git / ./scripts/update — this restores data, not a full OS image.
-set -euo pipefail
-
-cd "\${INSTALL_DIR:-\$(pwd)}"
-RUNNER="${runner}"
-ZIP="${zipPath}"
-WORKDIR="/tmp/nrth-restore-\$\$"
-HOST_DUMP="\$(pwd)/.nrth-restore-\$\$-dump.sql"
-DB_NAME="${db}"
-DB_USER="${user}"
-
-${passwordNote}echo "Extracting backup zip (app still running)…"
-$RUNNER exec -T app mkdir -p "$WORKDIR"
-$RUNNER exec -T app unzip -o "$ZIP" -d "$WORKDIR"
-
-DUMP="$($RUNNER exec -T app sh -c "ls $WORKDIR/db-dumps/*.sql 2>/dev/null | head -1")"
-if [ -z "$DUMP" ]; then
-  echo "No SQL dump found in $WORKDIR/db-dumps — aborting." >&2
-  exit 1
-fi
-echo "Using dump: $DUMP"
-$RUNNER exec -T app cat "$DUMP" > "$HOST_DUMP"
-
-echo "Stopping app + worker + scheduler (postgres stays up)…"
-$RUNNER stop app worker scheduler
-
-echo "Recreating database $DB_NAME…"
-$RUNNER exec -T postgres psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();"
-$RUNNER exec -T postgres psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \\"$DB_NAME\\";"
-$RUNNER exec -T postgres psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \\"$DB_NAME\\" OWNER \\"$DB_USER\\";"
-
-echo "Importing dump…"
-$RUNNER exec -T -i postgres psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$HOST_DUMP"
-rm -f "$HOST_DUMP"
-
-echo "Starting services…"
-$RUNNER start app worker scheduler
-
-echo "Cleaning up extract dir…"
-$RUNNER exec -T app rm -rf "$WORKDIR"
-
-echo "Optional: restore uploaded files from the zip (re-extract, then):"
-echo "  $RUNNER exec -T app sh -c 'unzip -o $ZIP -d /tmp/nrth-files && cp -a /tmp/nrth-files/var/www/html/storage/app/private/. /var/www/html/storage/app/private/ && rm -rf /tmp/nrth-files'"
-echo "(Skip if you only need the database.)"
-
-echo "Done. Open the app and sign in. If assets look wrong, run ./scripts/update (self-host) or rebuild Vite."
-`;
-});
-
-const useBackupForRestore = (run: BackupRunRow) => {
-    if (!run.filename) {
-        return;
-    }
-    restoreFilename.value = run.filename;
-    window.requestAnimationFrame(() => {
-        document.getElementById('instance-restore-guide')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-};
-
 const backupRowActions = (run: BackupRunRow) => {
     const actions: Array<{ id: string; label: string }> = [];
     if (run.download_url) {
@@ -382,7 +166,10 @@ const onBackupAction = (run: BackupRunRow, actionId: string) => {
         return;
     }
     if (actionId === 'restore_guide') {
-        useBackupForRestore(run);
+        if (!run.filename) {
+            return;
+        }
+        router.visit(route('backups-exports.restore', { filename: run.filename }));
         return;
     }
     if (actionId === 'retry') {
@@ -392,39 +179,6 @@ const onBackupAction = (run: BackupRunRow, actionId: string) => {
     if (actionId === 'delete') {
         deleteBackup(run);
     }
-};
-
-const copyRestoreScript = async () => {
-    try {
-        await navigator.clipboard.writeText(restoreScript.value);
-        restoreCopied.value = true;
-        window.setTimeout(() => {
-            restoreCopied.value = false;
-        }, 2000);
-    } catch {
-        // Fallback for older browsers / insecure context
-        const area = document.createElement('textarea');
-        area.value = restoreScript.value;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand('copy');
-        document.body.removeChild(area);
-        restoreCopied.value = true;
-        window.setTimeout(() => {
-            restoreCopied.value = false;
-        }, 2000);
-    }
-};
-
-const downloadRestoreScript = () => {
-    const blob = new Blob([restoreScript.value], { type: 'text/x-shellscript' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    const stamp = (restoreFilename.value || 'backup').replace(/\.zip$/i, '');
-    anchor.href = url;
-    anchor.download = `nrth-restore-${stamp}.sh`;
-    anchor.click();
-    URL.revokeObjectURL(url);
 };
 
 watch(
@@ -611,7 +365,6 @@ const startPolling = () => {
         router.reload({
             only: ['recent_takeouts', 'recent_backups'],
             preserveScroll: true,
-            // Keep form state, but always replace polled lists from the server.
             preserveState: true,
             replace: true,
         });
@@ -837,98 +590,32 @@ onBeforeUnmount(() => {
                 {{ backup_schedule_hint }}
             </div>
 
-            <AppCard v-if="backup_retention" class="mt-5">
-                <h3 class="text-base font-semibold text-slate-900">Backup retention</h3>
-                <p class="mt-1 text-sm text-slate-600">
-                    One backup zip is created each day. On the weekly day it also counts as weekly;
-                    on month-end also monthly; on 31 Dec also yearly. Counts below are how many of
-                    each type to keep — older unprotected zips are rotated out at 03:30.
-                </p>
-
-                <form class="mt-4 space-y-4" @submit.prevent="saveRetention">
-                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep daily backups</label>
-                            <AppInput
-                                v-model="retentionForm.keep_daily"
-                                type="number"
-                                min="1"
-                                max="90"
-                                required
-                            />
-                            <p v-if="retentionForm.errors.keep_daily" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_daily }}
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep weekly backups</label>
-                            <AppInput
-                                v-model="retentionForm.keep_weekly"
-                                type="number"
-                                min="0"
-                                max="104"
-                                required
-                            />
-                            <p v-if="retentionForm.errors.keep_weekly" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_weekly }}
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep monthly backups</label>
-                            <AppInput
-                                v-model="retentionForm.keep_monthly"
-                                type="number"
-                                min="0"
-                                max="60"
-                                required
-                            />
-                            <p v-if="retentionForm.errors.keep_monthly" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_monthly }}
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep yearly backups</label>
-                            <AppInput
-                                v-model="retentionForm.keep_yearly"
-                                type="number"
-                                min="0"
-                                max="20"
-                                required
-                            />
-                            <p v-if="retentionForm.errors.keep_yearly" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_yearly }}
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Weekly backup day</label>
-                            <AppSelect v-model="retentionForm.weekly_on" :options="weeklyOnOptions" />
-                            <p v-if="retentionForm.errors.weekly_on" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.weekly_on }}
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Max storage (MB)</label>
-                            <AppInput
-                                v-model="retentionForm.delete_oldest_backups_when_using_more_megabytes_than"
-                                type="number"
-                                min="100"
-                                max="200000"
-                                placeholder="Unlimited"
-                            />
-                            <p class="mt-1 text-xs text-slate-500">Leave blank for no size cap. Oldest unprotected backups are removed first.</p>
-                            <p v-if="retentionForm.errors.delete_oldest_backups_when_using_more_megabytes_than" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.delete_oldest_backups_when_using_more_megabytes_than }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <FormActions class="!mt-2">
-                        <AppButton type="submit" variant="primary" :loading="retentionForm.processing">
-                            {{ retentionForm.processing ? 'Saving…' : 'Save retention' }}
-                        </AppButton>
-                    </FormActions>
-                </form>
-            </AppCard>
+            <div v-if="backup_links" class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Link :href="route('backups-exports.destinations')" class="block">
+                    <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
+                        <h3 class="text-sm font-semibold text-slate-900">Offsite destinations</h3>
+                        <p class="mt-1 text-xs text-slate-600">{{ backup_links.destinations_summary }}</p>
+                    </AppCard>
+                </Link>
+                <Link :href="route('backups-exports.retention')" class="block">
+                    <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
+                        <h3 class="text-sm font-semibold text-slate-900">Backup retention</h3>
+                        <p class="mt-1 text-xs text-slate-600">Daily, weekly, monthly, and yearly keep counts</p>
+                    </AppCard>
+                </Link>
+                <Link :href="route('backups-exports.restore')" class="block">
+                    <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
+                        <h3 class="text-sm font-semibold text-slate-900">Instance restore guide</h3>
+                        <p class="mt-1 text-xs text-slate-600">Generate a CLI restore script for a ready zip</p>
+                    </AppCard>
+                </Link>
+                <Link :href="route('backups-exports.operators')" class="block">
+                    <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
+                        <h3 class="text-sm font-semibold text-slate-900">Instance operators</h3>
+                        <p class="mt-1 text-xs text-slate-600">{{ backup_links.operators_summary }}</p>
+                    </AppCard>
+                </Link>
+            </div>
 
             <AppCard class="mt-5">
                 <div class="mb-3 flex items-center justify-between gap-2">
@@ -996,6 +683,7 @@ onBeforeUnmount(() => {
                                             {{ statusLabel(run.status) }}
                                         </span>
                                         <p v-if="run.error_message" class="mt-0.5 text-xs text-rose-600">{{ run.error_message }}</p>
+                                        <p v-if="run.mirror_warning" class="mt-0.5 text-xs text-amber-700">{{ run.mirror_warning }}</p>
                                     </td>
                                     <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
                                     <td class="px-2 py-2">{{ backupDateLabel(run) }}</td>
@@ -1013,118 +701,6 @@ onBeforeUnmount(() => {
                         </tbody>
                     </table>
                 </div>
-            </AppCard>
-
-            <AppCard v-if="restore_guide" id="instance-restore-guide" class="mt-5">
-                <h3 class="text-base font-semibold text-slate-900">Instance restore guide</h3>
-                <p class="mt-1 text-sm text-slate-600">
-                    One-click restore is not available in the app (it would overwrite the live database while the app is running).
-                    Pick a ready backup to generate a downtime-aware shell script for your host.
-                </p>
-
-                <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <p class="font-medium">Before you run anything</p>
-                    <ul class="mt-1 list-disc space-y-0.5 pl-4">
-                        <li>This replaces the live Postgres database. Everyone will be signed out.</li>
-                        <li>Prefer a quiet maintenance window; stop public traffic first if the instance is exposed.</li>
-                        <li>Keep a copy of the current backup zip before overwriting data.</li>
-                        <li>App code still comes from git — the script restores data (and optionally storage files).</li>
-                    </ul>
-                </div>
-
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600">Backup zip</label>
-                        <AppSelect
-                            v-model="restoreFilename"
-                            :options="restoreBackupOptions"
-                            :disabled="restoreBackupOptions.length === 0"
-                            placeholder="No ready backups"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600">Host runner</label>
-                        <AppSelect v-model="restoreRuntime" :options="restoreRuntimeOptions" />
-                    </div>
-                </div>
-
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <AppButton
-                        variant="secondary"
-                        size="sm"
-                        :disabled="!restoreFilename"
-                        @click="copyRestoreScript"
-                    >
-                        {{ restoreCopied ? 'Copied' : 'Copy script' }}
-                    </AppButton>
-                    <AppButton
-                        variant="ghost"
-                        size="sm"
-                        :disabled="!restoreFilename"
-                        @click="downloadRestoreScript"
-                    >
-                        Download .sh
-                    </AppButton>
-                </div>
-
-                <pre class="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-950 p-3 text-xs leading-relaxed text-slate-100">{{ restoreScript }}</pre>
-            </AppCard>
-
-            <AppCard id="instance-operators" class="mt-5">
-                <h3 class="text-base font-semibold text-slate-900">Instance operators</h3>
-                <p class="mt-1 text-sm text-slate-600">
-                    Who can manage whole-server backups for this install. Separate from business ownership.
-                    The first registered user is promoted automatically; add others only when you need them.
-                </p>
-
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-slate-200 text-left text-slate-600">
-                                <th class="px-2 py-2 font-medium">Name</th>
-                                <th class="px-2 py-2 font-medium">Email</th>
-                                <th class="px-2 py-2 font-medium">Source</th>
-                                <th class="px-2 py-2 font-medium" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="row in operators" :key="`${row.source}-${row.email}`" class="border-b border-slate-100">
-                                <td class="px-2 py-2">{{ row.name || '—' }}</td>
-                                <td class="px-2 py-2">{{ row.email }}</td>
-                                <td class="px-2 py-2">{{ operatorSourceLabel(row.source) }}</td>
-                                <td class="px-2 py-2 text-right">
-                                    <button
-                                        v-if="row.can_remove && row.id"
-                                        type="button"
-                                        class="text-rose-600 hover:underline"
-                                        @click="removeOperator(row)"
-                                    >
-                                        Remove
-                                    </button>
-                                    <span v-else-if="row.source === 'environment'" class="text-xs text-slate-500">
-                                        Edit NRTH_OPERATOR_EMAILS in .env
-                                    </span>
-                                    <span v-else class="text-xs text-slate-500">Last operator</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <form class="mt-5 grid gap-3 md:grid-cols-[1fr_auto] md:items-end" @submit.prevent="addOperator">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600">Add operator by email</label>
-                        <AppInput v-model="operatorForm.email" type="email" required placeholder="user@example.com" />
-                        <p v-if="operatorForm.errors.email" class="mt-1 text-xs text-rose-600">{{ operatorForm.errors.email }}</p>
-                    </div>
-                    <AppButton type="submit" variant="primary" :loading="operatorForm.processing">
-                        {{ operatorForm.processing ? 'Adding…' : 'Add operator' }}
-                    </AppButton>
-                </form>
-
-                <p v-if="env_break_glass_configured" class="mt-3 text-xs text-slate-500">
-                    Break-glass emails from NRTH_OPERATOR_EMAILS are active. You can clear that env var once database operators are set.
-                </p>
             </AppCard>
         </section>
     </AppLayout>

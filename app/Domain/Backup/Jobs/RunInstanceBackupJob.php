@@ -38,6 +38,7 @@ class RunInstanceBackupJob implements ShouldQueue
         $run->forceFill([
             'status' => InstanceBackupRunStatus::Processing,
             'error_message' => null,
+            'mirror_warning' => null,
         ])->save();
 
         $backups->markRunning();
@@ -66,7 +67,7 @@ class RunInstanceBackupJob implements ShouldQueue
             }
 
             $created = array_values(array_diff($backups->backupFilenames(), $filenamesBefore));
-            $listed = $backups->listBackups();
+            $listed = $backups->listLocalBackups();
             $match = null;
 
             if ($created !== []) {
@@ -77,14 +78,13 @@ class RunInstanceBackupJob implements ShouldQueue
             $match ??= $listed[0] ?? null;
 
             if ($match === null) {
-                $message = 'Backup command finished but no backup zip was found.';
+                $message = 'Backup command finished but no backup zip was found on the local disk.';
                 $this->markFailed($run, $backups, $message);
 
                 throw new RuntimeException($message);
             }
 
             InstanceBackupRun::query()
-                ->where('disk', $match['disk'])
                 ->where('filename', $match['filename'])
                 ->where('id', '!=', $run->id)
                 ->delete();
@@ -92,10 +92,11 @@ class RunInstanceBackupJob implements ShouldQueue
             $run->forceFill([
                 'status' => InstanceBackupRunStatus::Ready,
                 'filename' => $match['filename'],
-                'disk' => $match['disk'],
+                'disk' => 'local',
                 'storage_path' => $match['path'],
                 'file_size_bytes' => $match['size_bytes'],
                 'error_message' => null,
+                'mirror_warning' => $backups->mirrorWarningFor($match['filename']),
                 'completed_at' => ! empty($match['date'])
                     ? \Illuminate\Support\Carbon::parse($match['date'])
                     : now(),

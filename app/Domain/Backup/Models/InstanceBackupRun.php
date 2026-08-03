@@ -23,6 +23,7 @@ class InstanceBackupRun extends Model
         'storage_path',
         'file_size_bytes',
         'error_message',
+        'mirror_warning',
         'completed_at',
     ];
 

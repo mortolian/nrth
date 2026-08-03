@@ -103,10 +103,37 @@ class BackupsExportsControllerTest extends TestCase
             ->where('recent_backups.1.id', $scheduled->id)
             ->where('recent_backups.1.source', 'scheduled')
             ->where('recent_backups.1.types', ['daily', 'weekly'])
-            ->where('backup_retention.weekly_on', 'sunday')
-            ->has('restore_guide')
-            ->has('restore_guide.container_zip_dir')
-            ->has('backup_schedule_hint'));
+            ->has('backup_links')
+            ->has('backup_schedule_hint')
+            ->missing('backup_retention')
+            ->missing('restore_guide')
+            ->missing('operators'));
+    }
+
+    public function test_operator_can_view_restore_page_with_selected_filename(): void
+    {
+        Config::set('nrth.operator_emails', []);
+
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'ops@example.com',
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAsTeamOwner($user, $user->currentTeam);
+
+        InstanceBackupRun::factory()->ready()->create([
+            'requested_by' => $user->id,
+            'filename' => 'manual-2026-08-01.zip',
+            'storage_path' => 'nrth/manual-2026-08-01.zip',
+        ]);
+
+        $this->get(route('backups-exports.restore', ['filename' => 'manual-2026-08-01.zip']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('BackupsExports/Restore')
+                ->has('restore_guide')
+                ->has('restore_guide.container_zip_dir')
+                ->where('selected_filename', 'manual-2026-08-01.zip')
+                ->where('ready_filenames', ['manual-2026-08-01.zip']));
     }
 
     public function test_non_owner_non_operator_forbidden(): void
@@ -304,8 +331,12 @@ class BackupsExportsControllerTest extends TestCase
         // Spatie reads real filesystem dates; fake disk may not expose BackupDestination well.
         // Exercise reclaim directly with a partial mock of listBackups via subclassing service is heavy —
         // instead call reclaim with a real service after binding list via partial mock.
-        $service = \Mockery::mock(InstanceBackupService::class)->makePartial();
-        $service->shouldReceive('listBackups')->andReturn([
+        $service = \Mockery::mock(InstanceBackupService::class, [
+            app(\App\Domain\Instance\Services\InstanceBackupRetentionSettings::class),
+            app(\App\Domain\Backup\Services\InstanceBackupTypeResolver::class),
+            app(\App\Domain\Instance\Services\InstanceBackupDestinationSettings::class),
+        ])->makePartial();
+        $service->shouldReceive('listLocalBackups')->andReturn([
             [
                 'filename' => $filename,
                 'path' => 'nrth/'.$filename,

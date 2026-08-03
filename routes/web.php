@@ -93,10 +93,24 @@ Route::middleware([
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
     Route::put('/settings/instance/backup-retention', [InstanceSettingsController::class, 'updateBackupRetention'])
         ->name('settings.instance.backup-retention.update');
+    Route::put('/settings/instance/backup-destinations', [InstanceSettingsController::class, 'updateBackupDestinations'])
+        ->name('settings.instance.backup-destinations.update');
+    Route::post('/settings/instance/backup-destinations/test-s3', [InstanceSettingsController::class, 'testBackupS3'])
+        ->name('settings.instance.backup-destinations.test-s3');
+    Route::post('/settings/instance/backup-destinations/test-path', [InstanceSettingsController::class, 'testBackupPath'])
+        ->name('settings.instance.backup-destinations.test-path');
     Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
     Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');
     Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');
     Route::get('/backups-exports', [BackupsExportsController::class, 'index'])->name('backups-exports.index');
+    Route::get('/backups-exports/destinations', [BackupsExportsController::class, 'destinations'])
+        ->name('backups-exports.destinations');
+    Route::get('/backups-exports/retention', [BackupsExportsController::class, 'retention'])
+        ->name('backups-exports.retention');
+    Route::get('/backups-exports/restore', [BackupsExportsController::class, 'restore'])
+        ->name('backups-exports.restore');
+    Route::get('/backups-exports/operators', [BackupsExportsController::class, 'operators'])
+        ->name('backups-exports.operators');
     Route::post('/backups-exports/backups', [BackupsExportsController::class, 'storeBackup'])->name('backups-exports.backups.store');
     Route::get('/backups-exports/backups/{instanceBackupRun}/download', [BackupsExportsController::class, 'downloadBackup'])
         ->name('backups-exports.backups.download');

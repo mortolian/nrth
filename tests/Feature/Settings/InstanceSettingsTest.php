@@ -38,19 +38,17 @@ class InstanceSettingsTest extends TestCase
             ->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
     }
 
-    public function test_operator_sees_operators_on_backups_exports(): void
+    public function test_operator_sees_operators_on_operators_page(): void
     {
         $user = User::factory()->withPersonalTeam()->create([
             'is_instance_operator' => true,
         ]);
         $this->actingAs($user);
 
-        $this->get(route('backups-exports.index', ['section' => 'backup']))
+        $this->get(route('backups-exports.operators'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('BackupsExports/Index')
-                ->where('can_manage_backups', true)
-                ->where('section', 'backup')
+                ->component('BackupsExports/Operators')
                 ->has('operators')
                 ->has('env_break_glass_configured'));
     }
@@ -84,7 +82,7 @@ class InstanceSettingsTest extends TestCase
             'email' => 'colleague@example.com',
         ]);
 
-        $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+        $response->assertRedirect(route('backups-exports.operators'));
         $this->assertTrue($other->fresh()->is_instance_operator);
     }
 
@@ -117,7 +115,7 @@ class InstanceSettingsTest extends TestCase
         $this->actingAs($operator);
         $response = $this->delete(route('settings.instance.operators.destroy', $other));
 
-        $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+        $response->assertRedirect(route('backups-exports.operators'));
         $this->assertFalse($other->fresh()->is_instance_operator);
     }
 
@@ -136,22 +134,30 @@ class InstanceSettingsTest extends TestCase
             ->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
     }
 
-    public function test_operator_sees_backup_retention_on_backups_exports(): void
+    public function test_operator_sees_backup_retention_on_retention_page(): void
     {
         $user = User::factory()->withPersonalTeam()->create([
             'is_instance_operator' => true,
         ]);
         $this->actingAs($user);
 
-        $this->get(route('backups-exports.index', ['section' => 'backup']))
+        $this->get(route('backups-exports.retention'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('BackupsExports/Index')
+                ->component('BackupsExports/Retention')
                 ->where('backup_retention.keep_daily', 7)
                 ->where('backup_retention.keep_weekly', 8)
                 ->where('backup_retention.keep_monthly', 4)
                 ->where('backup_retention.weekly_on', 'sunday')
                 ->where('backup_retention.delete_oldest_backups_when_using_more_megabytes_than', 5000));
+
+        $this->get(route('backups-exports.destinations'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('BackupsExports/Destinations')
+                ->where('backup_destinations.s3.enabled', false)
+                ->where('backup_destinations.path.enabled', false)
+                ->where('backup_destinations.active_disks', ['local']));
     }
 
     public function test_operator_can_update_backup_retention(): void
@@ -170,18 +176,83 @@ class InstanceSettingsTest extends TestCase
             'delete_oldest_backups_when_using_more_megabytes_than' => 2000,
         ]);
 
-        $response->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+        $response->assertRedirect(route('backups-exports.retention'));
         $response->assertSessionHas('success');
-
-        $this->assertDatabaseHas('instance_settings', [
-            'key' => 'backup.cleanup',
-        ]);
 
         $current = app(\App\Domain\Instance\Services\InstanceBackupRetentionSettings::class)->current();
         $this->assertSame(3, $current['keep_daily']);
         $this->assertSame(12, $current['keep_monthly']);
         $this->assertSame('monday', $current['weekly_on']);
         $this->assertSame(2000, $current['delete_oldest_backups_when_using_more_megabytes_than']);
+    }
+
+    public function test_operator_can_update_backup_destinations(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $root = storage_path('framework/testing/backup-offsite-feature');
+        if (! is_dir($root)) {
+            mkdir($root, 0777, true);
+        }
+
+        $response = $this->put(route('settings.instance.backup-destinations.update'), [
+            's3' => [
+                'enabled' => true,
+                'key' => 'AKIATEST',
+                'secret' => 'secret-value',
+                'region' => 'eu-west-1',
+                'bucket' => 'nrth-backups',
+                'endpoint' => '',
+                'use_path_style_endpoint' => false,
+                'root' => '',
+            ],
+            'path' => [
+                'enabled' => true,
+                'root' => $root,
+            ],
+        ]);
+
+        $response->assertRedirect(route('backups-exports.destinations'));
+        $response->assertSessionHas('success');
+
+        $props = app(\App\Domain\Instance\Services\InstanceBackupDestinationSettings::class)->publicProps();
+        $this->assertTrue($props['s3']['enabled']);
+        $this->assertTrue($props['path']['enabled']);
+        $this->assertTrue($props['s3']['secret_set']);
+        $this->assertContains('backup_s3', $props['active_disks']);
+        $this->assertContains('backup_path', $props['active_disks']);
+    }
+
+    public function test_non_operator_cannot_update_backup_destinations(): void
+    {
+        Config::set('nrth.operator_emails', []);
+
+        $first = User::factory()->withPersonalTeam()->create();
+        $member = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => false,
+        ]);
+        $this->assertTrue($first->fresh()->is_instance_operator);
+
+        $this->actingAs($member);
+        $this->put(route('settings.instance.backup-destinations.update'), [
+            's3' => [
+                'enabled' => true,
+                'key' => 'AKIATEST',
+                'secret' => 'secret',
+                'region' => 'us-east-1',
+                'bucket' => 'x',
+                'endpoint' => '',
+                'use_path_style_endpoint' => false,
+                'root' => '',
+            ],
+            'path' => [
+                'enabled' => false,
+                'root' => '',
+            ],
+        ])->assertForbidden();
     }
 
     public function test_non_operator_cannot_update_backup_retention(): void

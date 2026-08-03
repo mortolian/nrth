@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "aws/aws-sdk-php": "^3.0",
         "barryvdh/laravel-dompdf": "^3.1",
         "brick/money": "^0.11.2",
         "endroid/qr-code": "^6.0",
@@ -19,6 +20,7 @@
         "laravel/pennant": "^1.23",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "phpoffice/phpspreadsheet": "^3.10",
         "propaganistas/laravel-phone": "^6.0",
         "spatie/laravel-activitylog": "^4.12",

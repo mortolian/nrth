@@ -7,6 +7,7 @@ use App\Domain\Backup\Jobs\RunInstanceBackupJob;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Backup\Services\InstanceBackupTypeResolver;
+use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
@@ -32,6 +33,7 @@ class BackupsExportsController extends Controller
         private readonly InstanceOperatorService $operators,
         private readonly InstanceBackupRetentionSettings $backupRetention,
         private readonly InstanceBackupTypeResolver $backupTypes,
+        private readonly InstanceBackupDestinationSettings $backupDestinations,
     ) {}
 
     public function index(Request $request): Response
@@ -66,11 +68,8 @@ class BackupsExportsController extends Controller
             'document_categories' => [],
             'recent_takeouts' => [],
             'recent_backups' => [],
-            'operators' => [],
-            'env_break_glass_configured' => false,
             'backup_schedule_hint' => $this->backupScheduleHint($weeklyOn),
-            'restore_guide' => null,
-            'backup_retention' => null,
+            'backup_links' => null,
         ];
 
         if ($isOwner) {
@@ -78,17 +77,79 @@ class BackupsExportsController extends Controller
         }
 
         if ($canManageBackups) {
+            $this->backupDestinations->applyToRuntime();
             $this->backups->syncDiskBackupsIntoRuns();
             $retention = $this->backupRetention->current();
+            $destinations = $this->backupDestinations->publicProps();
+            $operatorCount = count($this->operators->listEffectiveOperators());
             $props['recent_backups'] = $this->backupRunProps();
-            $props['restore_guide'] = $this->backups->restoreGuideProps();
-            $props['operators'] = $this->operators->listEffectiveOperators();
-            $props['env_break_glass_configured'] = $this->operators->envOperatorEmails() !== [];
-            $props['backup_retention'] = $retention;
-            $props['backup_schedule_hint'] = $this->backupScheduleHint($retention['weekly_on']);
+            $props['backup_schedule_hint'] = $this->backupScheduleHint(
+                $retention['weekly_on'],
+                $destinations['active_disks'],
+            );
+            $props['backup_links'] = $this->backupLinkSummaries($destinations['active_disks'], $operatorCount);
         }
 
         return Inertia::render('BackupsExports/Index', $props);
+    }
+
+    public function destinations(): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $this->backupDestinations->applyToRuntime();
+
+        return Inertia::render('BackupsExports/Destinations', [
+            'backup_destinations' => $this->backupDestinations->publicProps(),
+        ]);
+    }
+
+    public function retention(): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        return Inertia::render('BackupsExports/Retention', [
+            'backup_retention' => $this->backupRetention->current(),
+        ]);
+    }
+
+    public function restore(Request $request): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $this->backupDestinations->applyToRuntime();
+        $this->backups->syncDiskBackupsIntoRuns();
+
+        $readyFilenames = InstanceBackupRun::query()
+            ->where('status', InstanceBackupRunStatus::Ready)
+            ->whereNotNull('filename')
+            ->orderByRaw('COALESCE(completed_at, created_at) DESC')
+            ->limit(50)
+            ->pluck('filename')
+            ->filter()
+            ->values()
+            ->all();
+
+        $requested = $request->string('filename')->toString();
+        $selected = in_array($requested, $readyFilenames, true)
+            ? $requested
+            : ($readyFilenames[0] ?? null);
+
+        return Inertia::render('BackupsExports/Restore', [
+            'restore_guide' => $this->backups->restoreGuideProps(),
+            'ready_filenames' => $readyFilenames,
+            'selected_filename' => $selected,
+        ]);
+    }
+
+    public function operators(): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        return Inertia::render('BackupsExports/Operators', [
+            'operators' => $this->operators->listEffectiveOperators(),
+            'env_break_glass_configured' => $this->operators->envOperatorEmails() !== [],
+        ]);
     }
 
     public function storeBackup(Request $request): RedirectResponse
@@ -198,6 +259,28 @@ class BackupsExportsController extends Controller
     }
 
     /**
+     * @param  list<string>  $activeDisks
+     * @return array{
+     *     destinations_summary: string,
+     *     operators_summary: string
+     * }
+     */
+    private function backupLinkSummaries(array $activeDisks, int $operatorCount): array
+    {
+        $offsite = array_values(array_filter($activeDisks, static fn (string $disk): bool => $disk !== 'local'));
+        $destinationsSummary = $offsite === []
+            ? 'Local disk only'
+            : 'Mirroring to '.implode(', ', $offsite);
+
+        return [
+            'destinations_summary' => $destinationsSummary,
+            'operators_summary' => $operatorCount === 1
+                ? '1 operator'
+                : "{$operatorCount} operators",
+        ];
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function backupRunProps(): array
@@ -225,6 +308,7 @@ class BackupsExportsController extends Controller
                         ? route('backups-exports.backups.download', $run)
                         : null,
                     'error_message' => $run->error_message,
+                    'mirror_warning' => $run->mirror_warning,
                     'can_retry' => $run->status === InstanceBackupRunStatus::Failed,
                     'source' => $run->requested_by ? 'manual' : 'scheduled',
                     'types' => $types,
@@ -234,11 +318,18 @@ class BackupsExportsController extends Controller
             ->all();
     }
 
-    private function backupScheduleHint(string $weeklyOn): string
+    /**
+     * @param  list<string>  $activeDisks
+     */
+    private function backupScheduleHint(string $weeklyOn, array $activeDisks = ['local']): string
     {
         $day = ucfirst($weeklyOn);
+        $offsite = array_values(array_filter($activeDisks, static fn (string $disk): bool => $disk !== 'local'));
+        $mirror = $offsite === []
+            ? 'Local disk only — configure offsite destinations for cloud or NFS mirrors.'
+            : 'Also mirrors to: '.implode(', ', $offsite).'.';
 
-        return "Scheduled daily at 03:00 (rotation at 03:30). Each zip is a daily backup; on {$day} it is also weekly, on month-end also monthly, and on 31 Dec also yearly. Retention counts below control how many of each type are kept. Use the restore guide for CLI recovery — there is no one-click restore in the app.";
+        return "Scheduled daily at 03:00 (rotation at 03:30). Each zip is a daily backup; on {$day} it is also weekly, on month-end also monthly, and on 31 Dec also yearly. Retention counts control how many of each type are kept. {$mirror} Use the restore guide for CLI recovery — there is no one-click restore in the app.";
     }
 
     /**

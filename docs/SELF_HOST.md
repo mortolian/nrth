@@ -53,9 +53,25 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 ## Backups
 
-Laravel schedules `nrth:backup-run` (03:00) and `nrth:backup-rotate` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage operators and runs under **Backups & exports → Instance backup**.
+Laravel schedules `nrth:backup-run` (03:00) and `nrth:backup-rotate` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage runs under **Backups & exports → Instance backup**, and operators under **Backups & exports → Instance operators**.
 
-Retention is typed and count-based: each daily zip can also count as weekly (configurable weekday), monthly (month-end), and yearly (31 Dec). Settings under **Backup retention** control how many of each type to keep; rotation deletes zips that are no longer needed by any type. An optional size cap is also available.
+Retention is typed and count-based: each daily zip can also count as weekly (configurable weekday), monthly (month-end), and yearly (31 Dec). Settings under **Backups & exports → Backup retention** control how many of each type to keep; rotation deletes zips that are no longer needed by any type. An optional size cap is also available.
+
+### Offsite destinations
+
+Backups are always written to the local disk. Operators can also mirror each zip to offsite targets under **Backups & exports → Offsite destinations**:
+
+- **S3-compatible** — AWS S3, Cloudflare R2, MinIO, etc. Credentials are stored encrypted in instance settings (no `.env` AWS_* required for backups when using the UI). Use **Test S3** after saving.
+- **Path / NFS** — an absolute path inside the container. Mount the share into both the `app` and `scheduler` (and queue worker) services, for example:
+
+```yaml
+volumes:
+  - /mnt/nas/nrth-backups:/mnt/backups
+```
+
+Then set the path to `/mnt/backups` in the UI and use **Test path**.
+
+Rotation and manual delete remove the zip from **every** configured destination. Downloads and the restore guide still use the **local** copy (copy an offsite zip back to the local backup directory if you need to restore from offsite only).
 
 | | Data takeout | Instance backup |
 |--|--------------|-----------------|
@@ -67,7 +83,7 @@ Optional break-glass: `NRTH_OPERATOR_EMAILS` in `.env`. Existing installs with n
 
 ### Restore (CLI)
 
-There is no in-app one-click restore. On **Backups & exports → Instance backup**, operators can open **Instance restore guide**, pick a ready zip, and copy/download a shell script for `./scripts/compose.sh` (self-host) or Sail. The script extracts the dump, stops app services, replaces the Postgres database, then starts services again. Review the script before running — it replaces the live database.
+There is no in-app one-click restore. Operators open **Backups & exports → Instance restore guide** (or **Restore guide** on a ready backup row), pick a ready zip, and copy/download a shell script for `./scripts/compose.sh` (self-host) or Sail. The script extracts the dump, stops app services, replaces the Postgres database, then starts services again. Review the script before running — it replaces the live database.
 
 ### Optional AI
 
