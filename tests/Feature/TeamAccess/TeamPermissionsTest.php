@@ -197,6 +197,39 @@ class TeamPermissionsTest extends TestCase
         ]);
     }
 
+    public function test_viewer_cannot_create_vehicle_or_trip(): void
+    {
+        [$owner, $viewer] = $this->ownerAndMember(RolePresets::VIEWER);
+
+        $this->actingAs($viewer)
+            ->get(route('vehicles.create'))
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
+            ->get(route('vehicles.trips.create'))
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
+            ->post(route('vehicles.store'), [
+                'name' => 'Blocked',
+                'is_active' => true,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_viewer_can_view_trip_log(): void
+    {
+        [, $viewer] = $this->ownerAndMember(RolePresets::VIEWER);
+
+        $this->actingAs($viewer)
+            ->get(route('vehicles.trips.index'))
+            ->assertOk();
+
+        $this->actingAs($viewer)
+            ->get(route('vehicles.index'))
+            ->assertOk();
+    }
+
     /**
      * @return array{0: User, 1: User}
      */

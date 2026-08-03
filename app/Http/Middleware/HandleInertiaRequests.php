@@ -147,6 +147,9 @@ class HandleInertiaRequests extends Middleware
             $can('invoices.manage')
                 ? ['id' => 'record-payment', 'label' => 'Record Payment', 'href' => route('dashboard').'#outstanding-invoices', 'icon' => 'payment']
                 : null,
+            $can('vehicles.manage')
+                ? ['id' => 'log-trip', 'label' => 'Log Trip', 'href' => route('vehicles.trips.create'), 'icon' => 'expense']
+                : null,
             $can('clients.manage')
                 ? ['id' => 'new-client', 'label' => 'New Client', 'href' => route('invoicing.clients.create'), 'icon' => 'client']
                 : null,
@@ -165,6 +168,8 @@ class HandleInertiaRequests extends Middleware
             $can('suppliers.view') ? ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')] : null,
             $can('banking.view') ? ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')] : null,
             $can('banking.view') ? ['id' => 'banking-accounts', 'label' => 'Bank Accounts', 'href' => route('banking.accounts.index')] : null,
+            $can('vehicles.view') ? ['id' => 'vehicles-trips', 'label' => 'Trip Log', 'href' => route('vehicles.trips.index')] : null,
+            $can('vehicles.view') ? ['id' => 'vehicles', 'label' => 'Vehicles', 'href' => route('vehicles.index')] : null,
             $can('accounting.view') ? ['id' => 'accounting-transactions', 'label' => 'Accounting Transactions', 'href' => route('accounting.transactions.index')] : null,
             $can('accounting.view') ? ['id' => 'general-ledger', 'label' => 'General Ledger (period)', 'href' => route('accounting.journal.index')] : null,
             $can('accounting.view') ? ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts (setup)', 'href' => route('accounting.accounts.index')] : null,

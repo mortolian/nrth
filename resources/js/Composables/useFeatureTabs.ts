@@ -61,6 +61,13 @@ export function useBankingTabs() {
     );
 }
 
+export function useTravelTabs() {
+    return computed((): AppTabItem[] => [
+        { id: 'trips', label: 'Log book', href: route('vehicles.trips.index') },
+        { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
+    ]);
+}
+
 export function useAccountingTabs() {
     return computed((): AppTabItem[] => [
         { id: 'transactions', label: 'Transactions', href: route('accounting.transactions.index') },

@@ -8,6 +8,7 @@ import {
     Briefcase,
     Building2,
     Calculator,
+    Car,
     ChartColumnBig,
     ChevronDown,
     ChevronRight,
@@ -134,6 +135,15 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
+    if (canTeam('vehicles.view')) {
+        items.push({
+            label: 'Travel',
+            href: route('vehicles.trips.index'),
+            icon: Car,
+            matchPrefixes: ['/vehicles'],
+        });
+    }
+
     if (canTeam('budgets.view')) {
         items.push({
             label: 'Planning',
@@ -250,6 +260,8 @@ const commandPaletteData = computed<PaletteData>(() => ({
         { id: 'expenses', label: 'Expenses', href: route('expenses.index') },
         { id: 'suppliers', label: 'Suppliers', href: route('suppliers.index') },
         { id: 'banking-transactions', label: 'Banking Transactions', href: route('banking.transactions.index') },
+        { id: 'vehicles-trips', label: 'Trip Log', href: route('vehicles.trips.index') },
+        { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
         { id: 'accounting-transactions', label: 'Accounting Transactions', href: route('accounting.transactions.index') },
         { id: 'budgets', label: 'Budgets', href: route('budgeting.index') },
         { id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') },

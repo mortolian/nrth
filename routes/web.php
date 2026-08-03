@@ -40,6 +40,8 @@ use App\Http\Controllers\Web\Tax\TakeoutController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
 use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
+use App\Http\Controllers\Web\Vehicles\TripController;
+use App\Http\Controllers\Web\Vehicles\VehicleController;
 use App\Http\Controllers\Web\Webhooks\PayFastPaymentWebhookController;
 use App\Http\Controllers\Web\Webhooks\StripePaymentWebhookController;
 use App\Http\Middleware\EnforceSessionIdleTimeout;
@@ -190,6 +192,23 @@ Route::middleware([
     Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');
     Route::get('/reports/cash-flow', [ReportsController::class, 'cashFlow'])->name('reports.cash-flow');
+    Route::prefix('vehicles')->name('vehicles.')->group(function () {
+        Route::get('/trips', [TripController::class, 'index'])->name('trips.index');
+        Route::get('/trips/export', [TripController::class, 'exportCsv'])->name('trips.export');
+        Route::get('/trips/create', [TripController::class, 'create'])->name('trips.create');
+        Route::post('/trips', [TripController::class, 'store'])->name('trips.store');
+        Route::get('/trips/{trip}/edit', [TripController::class, 'edit'])->name('trips.edit');
+        Route::put('/trips/{trip}', [TripController::class, 'update'])->name('trips.update');
+        Route::delete('/trips/{trip}', [TripController::class, 'destroy'])->name('trips.destroy');
+
+        Route::get('/', [VehicleController::class, 'index'])->name('index');
+        Route::get('/create', [VehicleController::class, 'create'])->name('create');
+        Route::post('/', [VehicleController::class, 'store'])->name('store');
+        Route::get('/{vehicle}', [VehicleController::class, 'show'])->name('show');
+        Route::get('/{vehicle}/edit', [VehicleController::class, 'edit'])->name('edit');
+        Route::put('/{vehicle}', [VehicleController::class, 'update'])->name('update');
+        Route::delete('/{vehicle}', [VehicleController::class, 'destroy'])->name('destroy');
+    });
     Route::prefix('contracting')->name('contracting.')->group(function () {
         Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
         Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
