@@ -50,6 +50,7 @@ class BusinessSettingsController extends Controller
                 'bic' => (string) ($b->bic ?? ''),
                 'iban' => (string) ($b->iban ?? ''),
                 'routing_sort_code' => (string) ($b->routing_sort_code ?? ''),
+                'bank_address' => (string) ($b->bank_address ?? ''),
                 'bank_branch_code' => (string) ($b->bank_branch_code ?? ''),
                 'bank_account_type' => (string) ($b->bank_account_type ?? 'current'),
                 'show_on_invoice' => (bool) $b->show_on_invoice,
@@ -282,6 +283,7 @@ class BusinessSettingsController extends Controller
             'bank_accounts.*.bic' => ['nullable', 'string', 'max:32'],
             'bank_accounts.*.iban' => ['nullable', 'string', 'max:64'],
             'bank_accounts.*.routing_sort_code' => ['nullable', 'string', 'max:64'],
+            'bank_accounts.*.bank_address' => ['nullable', 'string', 'max:1000'],
             'bank_accounts.*.bank_branch_code' => ['nullable', 'string', 'max:32'],
             'bank_accounts.*.bank_account_type' => ['nullable', Rule::in(['current', 'savings'])],
             'bank_accounts.*.title' => ['nullable', 'string', 'max:128'],
@@ -533,6 +535,7 @@ class BusinessSettingsController extends Controller
                 || filled($row['bic'] ?? null)
                 || filled($row['iban'] ?? null)
                 || filled($row['routing_sort_code'] ?? null)
+                || filled($row['bank_address'] ?? null)
                 || filled($row['bank_branch_code'] ?? null)
                 || filled($row['title'] ?? null);
             if (! $hasDetail) {
@@ -555,6 +558,7 @@ class BusinessSettingsController extends Controller
                 'bic' => filled($row['bic'] ?? null) ? (string) $row['bic'] : null,
                 'iban' => filled($row['iban'] ?? null) ? (string) $row['iban'] : null,
                 'routing_sort_code' => filled($row['routing_sort_code'] ?? null) ? (string) $row['routing_sort_code'] : null,
+                'bank_address' => filled($row['bank_address'] ?? null) ? (string) $row['bank_address'] : null,
                 'bank_branch_code' => filled($row['bank_branch_code'] ?? null) ? (string) $row['bank_branch_code'] : null,
                 'bank_account_type' => $type,
                 'show_on_invoice' => filter_var($row['show_on_invoice'] ?? true, FILTER_VALIDATE_BOOLEAN),

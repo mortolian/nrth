@@ -103,7 +103,7 @@ class Team extends JetstreamTeam implements HasMedia
     /**
      * Banking rows to print on invoice PDFs (show_on_invoice + any detail present).
      *
-     * @return list<array{title: string|null, name: string|null, holder: string|null, account: string|null, swift_code: string|null, bic: string|null, iban: string|null, routing_sort_code: string|null, branch: string|null, type: string|null}>
+     * @return list<array{title: string|null, name: string|null, holder: string|null, account: string|null, swift_code: string|null, bic: string|null, iban: string|null, routing_sort_code: string|null, address: string|null, branch: string|null, type: string|null}>
      */
     public function bankAccountsForInvoicePdf(): array
     {
@@ -121,6 +121,7 @@ class Team extends JetstreamTeam implements HasMedia
                         'bic' => $b->bic,
                         'iban' => $b->iban,
                         'routing_sort_code' => $b->routing_sort_code,
+                        'address' => $b->bank_address,
                         'branch' => $b->bank_branch_code,
                         'type' => $b->bank_account_type,
                     ];
@@ -148,6 +149,7 @@ class Team extends JetstreamTeam implements HasMedia
             'bic' => null,
             'iban' => null,
             'routing_sort_code' => null,
+            'address' => null,
             'branch' => $settings['bank_branch_code'] ?? null,
             'type' => $settings['bank_account_type'] ?? null,
         ];

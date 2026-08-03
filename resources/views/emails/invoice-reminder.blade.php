@@ -12,7 +12,7 @@ This is a friendly reminder that **{{ $doc_label }} {{ $invoice->number }}** sti
 **Amount due:** {{ $amount_due }}
 @endcomponent
 
-Please use your invoice number as the payment reference. If you have already paid, you can ignore this message.
+Please use **{{ $invoice->number }}** as your payment reference. If you have already paid, you can ignore this message.
 
 @if ($has_attachment)
 A PDF copy of this {{ $doc_label }} is attached to this email.

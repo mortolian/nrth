@@ -242,6 +242,28 @@
         letter-spacing: 0.12em;
         color: #475569;
     }
+    .bank-payment-ref {
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+    }
+    .bank-payment-ref-label {
+        display: block;
+        font-size: 8px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 2px;
+    }
+    .bank-payment-ref-value {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+    }
     table.bank-grid {
         width: 100%;
         border-collapse: separate;

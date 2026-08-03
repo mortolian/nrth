@@ -26,6 +26,7 @@ class BusinessBankAccountsTest extends TestCase
             'bic' => 'DEUTDEFF',
             'iban' => 'GB29NWBK60161331926819',
             'routing_sort_code' => '20-00-00',
+            'bank_address' => "1 Simmonds Street\nJohannesburg\n2001\nSouth Africa",
             'bank_branch_code' => null,
             'bank_account_type' => 'current',
             'title' => 'Primary operating account',
@@ -50,6 +51,7 @@ class BusinessBankAccountsTest extends TestCase
         $this->assertSame('DEUTDEFF', $shown[0]['bic']);
         $this->assertSame('GB29NWBK60161331926819', $shown[0]['iban']);
         $this->assertSame('20-00-00', $shown[0]['routing_sort_code']);
+        $this->assertSame("1 Simmonds Street\nJohannesburg\n2001\nSouth Africa", $shown[0]['address']);
         $this->assertSame('Primary operating account', $shown[0]['title']);
     }
 

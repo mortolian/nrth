@@ -18,6 +18,7 @@ class TeamBankAccount extends Model
         'bic',
         'iban',
         'routing_sort_code',
+        'bank_address',
         'bank_branch_code',
         'bank_account_type',
         'show_on_invoice',

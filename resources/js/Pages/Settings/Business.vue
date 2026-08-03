@@ -22,6 +22,7 @@ type BankAccountRow = {
     bic: string;
     iban: string;
     routing_sort_code: string;
+    bank_address: string;
     bank_branch_code: string;
     bank_account_type: string;
     show_on_invoice: boolean;
@@ -36,6 +37,7 @@ const emptyBankRow = (): BankAccountRow => ({
     bic: '',
     iban: '',
     routing_sort_code: '',
+    bank_address: '',
     bank_branch_code: '',
     bank_account_type: 'current',
     show_on_invoice: true,
@@ -182,6 +184,7 @@ const form = useForm({
                   bic: String(r.bic ?? ''),
                   iban: String(r.iban ?? ''),
                   routing_sort_code: String(r.routing_sort_code ?? ''),
+                  bank_address: String(r.bank_address ?? ''),
                   bank_branch_code: String(r.bank_branch_code ?? ''),
                   bank_account_type: String(r.bank_account_type ?? 'current'),
                   show_on_invoice: Boolean(r.show_on_invoice),
@@ -447,6 +450,7 @@ const submit = () => {
             bic: r.bic,
             iban: r.iban,
             routing_sort_code: r.routing_sort_code,
+            bank_address: r.bank_address,
             bank_branch_code: r.bank_branch_code,
             bank_account_type: r.bank_account_type,
             show_on_invoice: r.show_on_invoice,
@@ -1019,7 +1023,8 @@ const resetItemUnits = () => {
                 <h3 class="text-base font-semibold text-slate-900">Bank accounts</h3>
                 <p class="mt-1 text-sm text-slate-500">
                     Add one or more accounts. Give each a title (e.g. “Primary”, “USD”) for your own reference and for invoice PDFs. Tick
-                    <span class="font-medium text-slate-700">Show on invoice</span> for accounts that should appear on PDFs.
+                    <span class="font-medium text-slate-700">Show on invoice</span> for accounts that should appear on PDFs. Invoices always
+                    tell the client to use the invoice number as the payment reference.
                 </p>
                 <div class="mt-4 space-y-6">
                     <div
@@ -1074,6 +1079,18 @@ const resetItemUnits = () => {
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Routing / sort code</label>
                                 <AppInput v-model="row.routing_sort_code" placeholder="e.g. 20-00-00" />
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Bank address</label>
+                                <textarea
+                                    v-model="row.bank_address"
+                                    rows="3"
+                                    placeholder="Street, city, postal code, country — for international incoming payments"
+                                    class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Printed on the invoice with SWIFT/IBAN details so overseas payers know where to send funds.
+                                </p>
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Branch code</label>

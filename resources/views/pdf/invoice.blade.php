@@ -217,6 +217,10 @@
 @if($hasBankDetails)
     <div class="section section-banking">
         <h3>Payment details</h3>
+        <div class="bank-payment-ref">
+            <span class="bank-payment-ref-label">Payment reference</span>
+            <span class="bank-payment-ref-value">{{ $invoice->number }}</span>
+        </div>
         <table class="bank-grid">
             <tbody>
                 @foreach(collect($banksForInvoice)->chunk(2) as $bankPair)
@@ -230,6 +234,7 @@
                                     || !empty($bank['bic'])
                                     || !empty($bank['iban'])
                                     || !empty($bank['routing_sort_code'])
+                                    || !empty($bank['address'])
                                     || !empty($bank['branch'])
                                     || !empty($bank['type']);
                             @endphp
@@ -280,6 +285,12 @@
                                                 <tr>
                                                     <td class="bank-k">Routing / sort</td>
                                                     <td class="bank-v">{{ $bank['routing_sort_code'] }}</td>
+                                                </tr>
+                                            @endif
+                                            @if(!empty($bank['address']))
+                                                <tr>
+                                                    <td class="bank-k">Bank address</td>
+                                                    <td class="bank-v">{!! nl2br(e($bank['address'])) !!}</td>
                                                 </tr>
                                             @endif
                                             @if(!empty($bank['branch']))
