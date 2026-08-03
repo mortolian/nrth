@@ -17,7 +17,7 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_public_pay_marks_sent_as_viewed(): void
+    public function test_public_pay_does_not_mark_sent_as_viewed(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -38,8 +38,8 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
         $this->get(route('public.invoice.pay', ['token' => $invoice->public_token]))->assertOk();
 
         $invoice->refresh();
-        $this->assertSame(InvoiceStatus::Viewed, $invoice->status);
-        $this->assertNotNull($invoice->viewed_at);
+        $this->assertSame(InvoiceStatus::Sent, $invoice->status);
+        $this->assertNull($invoice->viewed_at);
     }
 
     public function test_public_pay_keeps_overdue_status(): void
@@ -63,7 +63,7 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
 
         $invoice->refresh();
         $this->assertSame(InvoiceStatus::Overdue, $invoice->status);
-        $this->assertNotNull($invoice->viewed_at);
+        $this->assertNull($invoice->viewed_at);
     }
 
     public function test_public_pay_keeps_paid_status(): void
@@ -89,7 +89,7 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
 
         $invoice->refresh();
         $this->assertSame(InvoiceStatus::Paid, $invoice->status);
-        $this->assertNotNull($invoice->viewed_at);
+        $this->assertNull($invoice->viewed_at);
     }
 
     public function test_note_template_crud_and_client_default_notes_prefills_create(): void

@@ -681,9 +681,14 @@ class InvoiceController extends Controller
                     (int) $invoice->getRawOriginal('total_cents') - (int) $invoice->getRawOriginal('amount_paid_cents')
                 ) > 0,
                 'mark_sent' => $invoice->status === InvoiceStatus::Draft,
-                'void' => $invoice->status === InvoiceStatus::Sent,
+                'void' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Viewed], true),
                 'unvoid' => $invoice->status === InvoiceStatus::Void,
-                'record_payment' => in_array($invoice->status, [InvoiceStatus::Sent, InvoiceStatus::Partial, InvoiceStatus::Overdue], true),
+                'record_payment' => in_array($invoice->status, [
+                    InvoiceStatus::Sent,
+                    InvoiceStatus::Viewed,
+                    InvoiceStatus::Partial,
+                    InvoiceStatus::Overdue,
+                ], true),
                 'delete' => ! $invoice->payments()->exists(),
             ],
             'online_payment_providers' => InvoiceOnlinePaymentProviders::enabledForInvoice($invoice),

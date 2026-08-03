@@ -12,11 +12,12 @@ export type InvoiceStatusBadgeVariant =
  *
  * draft   — slate (not issued)
  * sent    — sky (awaiting client)
- * viewed  — indigo (client opened it)
  * partial — amber (part paid)
  * paid    — green
  * overdue — rose
  * void    — slate
+ *
+ * Legacy `viewed` statuses display like sent (client open-tracking is paused).
  */
 export function invoiceStatusBadgeVariant(
     status: string,
@@ -29,8 +30,7 @@ export function invoiceStatusBadgeVariant(
     if (normalized === 'overdue' || options?.isOverdue) return 'danger';
     if (normalized === 'partial') return 'warning';
     if (normalized === 'draft') return 'neutral';
-    if (normalized === 'viewed') return 'accent';
-    if (normalized === 'sent') return 'info';
+    if (normalized === 'sent' || normalized === 'viewed') return 'info';
 
     return 'default';
 }
@@ -40,6 +40,9 @@ export function invoiceStatusLabel(status: string, options?: { isOverdue?: boole
     const normalized = String(status || '').toLowerCase();
     if (options?.isOverdue && normalized !== 'paid' && normalized !== 'void') {
         return 'overdue';
+    }
+    if (normalized === 'viewed') {
+        return 'sent';
     }
     return normalized.replaceAll('_', ' ');
 }

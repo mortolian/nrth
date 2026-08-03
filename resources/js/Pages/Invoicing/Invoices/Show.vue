@@ -203,7 +203,6 @@ const statusLabel = computed(() => invoiceStatusLabel(props.invoice.status));
 const timeline = computed(() => ([
     { label: 'Created', at: props.invoice.created_at, done: Boolean(props.invoice.created_at) },
     { label: 'Sent', at: props.invoice.sent_at, done: Boolean(props.invoice.sent_at) },
-    { label: 'Viewed', at: props.invoice.viewed_at, done: Boolean(props.invoice.viewed_at) },
     { label: 'Paid', at: props.invoice.paid_at, done: Boolean(props.invoice.paid_at) },
 ]));
 

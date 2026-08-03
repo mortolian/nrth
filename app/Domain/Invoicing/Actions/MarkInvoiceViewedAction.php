@@ -2,30 +2,19 @@
 
 namespace App\Domain\Invoicing\Actions;
 
-use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 
+/**
+ * Reserved for a future public invoice portal.
+ *
+ * Invoice email is PDF-only today and Viewed is not part of the product flow,
+ * so this intentionally does nothing. Re-enable when clients can open a
+ * reachable public link that should set viewed_at / status.
+ */
 class MarkInvoiceViewedAction
 {
     public function execute(Invoice $invoice): Invoice
     {
-        if (in_array($invoice->status, [InvoiceStatus::Draft, InvoiceStatus::Void], true)) {
-            return $invoice;
-        }
-
-        $updates = [];
-        if ($invoice->viewed_at === null) {
-            $updates['viewed_at'] = now();
-        }
-
-        if ($invoice->status === InvoiceStatus::Sent) {
-            $updates['status'] = InvoiceStatus::Viewed;
-        }
-
-        if ($updates !== []) {
-            $invoice->forceFill($updates)->save();
-        }
-
-        return $invoice->fresh() ?? $invoice;
+        return $invoice;
     }
 }

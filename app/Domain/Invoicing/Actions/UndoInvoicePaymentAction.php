@@ -102,9 +102,6 @@ class UndoInvoicePaymentAction
         if ($due !== null && $due->isPast()) {
             return InvoiceStatus::Overdue;
         }
-        if ($invoice->viewed_at !== null) {
-            return InvoiceStatus::Viewed;
-        }
         if ($invoice->sent_at !== null) {
             return InvoiceStatus::Sent;
         }
