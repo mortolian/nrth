@@ -25,7 +25,7 @@ class Vehicle extends Model
         'year',
         'registration_number',
         'vin',
-        'current_odometer_km',
+        'starting_odometer_km',
         'notes',
         'is_active',
     ];
@@ -37,7 +37,7 @@ class Vehicle extends Model
     {
         return [
             'year' => 'integer',
-            'current_odometer_km' => 'decimal:1',
+            'starting_odometer_km' => 'decimal:1',
             'is_active' => 'boolean',
         ];
     }

@@ -13,7 +13,7 @@ type VehicleOption = {
     id: number;
     name: string;
     registration_number: string | null;
-    current_odometer_km: number | null;
+    starting_odometer_km: number | null;
     is_active: boolean;
 };
 
@@ -377,7 +377,7 @@ const vehicleOptions = computed(() =>
                             </p>
                         </div>
                         <p class="text-xs text-slate-500 sm:ml-auto">
-                            From vehicle odometer and logged distances
+                            From starting odometer and logged distances
                         </p>
                     </div>
                 </section>

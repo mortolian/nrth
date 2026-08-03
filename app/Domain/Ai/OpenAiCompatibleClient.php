@@ -101,6 +101,77 @@ final class OpenAiCompatibleClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function completeStructuredJson(
+        string $prompt,
+        string $apiKey,
+        string $model,
+        string $baseUrl,
+        string $providerKey,
+        bool $useJsonResponseFormat = true,
+    ): array {
+        $endpoint = rtrim($baseUrl, '/').'/chat/completions';
+        $payload = [
+            'model' => $model,
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'You extract structured data from documents. Reply with valid JSON only.',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => $prompt,
+                ],
+            ],
+        ];
+
+        if ($useJsonResponseFormat) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
+
+        try {
+            $request = $this->http($apiKey, $providerKey);
+            $response = $request->post($endpoint, $payload);
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not reach the AI service. Try again later.'),
+            ]);
+        }
+
+        if (! $response->successful()) {
+            $message = $response->json('error.message')
+                ?? __('AI request failed. Check the endpoint, model, and API key, then try again.');
+
+            throw ValidationException::withMessages([
+                'receipt' => is_string($message) ? $message : __('AI request failed.'),
+            ]);
+        }
+
+        $content = $response->json('choices.0.message.content');
+        if (is_array($content)) {
+            $content = collect($content)->map(function ($part) {
+                if (is_string($part)) {
+                    return $part;
+                }
+                if (is_array($part) && isset($part['text']) && is_string($part['text'])) {
+                    return $part['text'];
+                }
+
+                return '';
+            })->implode('');
+        }
+
+        if (! is_string($content) || trim($content) === '') {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not read fields from this file. Try a clearer export or PDF.'),
+            ]);
+        }
+
+        return $this->decodeJsonObject($content);
+    }
+
+    /**
      * @param  UploadedFile|list<UploadedFile>  $files
      * @return list<UploadedFile>
      */

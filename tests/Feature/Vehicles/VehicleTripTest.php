@@ -37,7 +37,7 @@ class VehicleTripTest extends TestCase
             'year' => null,
             'registration_number' => '',
             'vin' => null,
-            'current_odometer_km' => null,
+            'starting_odometer_km' => null,
             'notes' => null,
             'is_active' => true,
         ])->assertSessionHasErrors(['name', 'registration_number']);
@@ -49,7 +49,7 @@ class VehicleTripTest extends TestCase
             'year' => 2020,
             'registration_number' => 'ABC 123 GP',
             'vin' => 'AHTJB3DD804533836',
-            'current_odometer_km' => 45000,
+            'starting_odometer_km' => 45000,
             'notes' => null,
             'is_active' => true,
         ])->assertRedirect();
@@ -85,7 +85,7 @@ class VehicleTripTest extends TestCase
             'year' => 2020,
             'registration_number' => 'ABC 123 GP',
             'vin' => 'AHTJB3DD804533836',
-            'current_odometer_km' => 45052.5,
+            'starting_odometer_km' => 45052.5,
             'notes' => 'Primary vehicle',
             'is_active' => true,
         ])->assertRedirect(route('vehicles.show', $vehicle));
@@ -107,7 +107,7 @@ class VehicleTripTest extends TestCase
         $this->actingTeamContext($user, $team);
 
         $vehicle = Vehicle::factory()->for($team)->create([
-            'current_odometer_km' => 10000,
+            'starting_odometer_km' => 10000,
         ]);
 
         $this->get(route('vehicles.trips.index'))->assertOk();
@@ -145,7 +145,7 @@ class VehicleTripTest extends TestCase
         $this->assertNotNull($trip);
         $this->assertSame(25.0, (float) $trip->distance_km);
         $this->assertNull($trip->start_odometer_km);
-        $this->assertSame(10025.0, (float) $vehicle->fresh()->current_odometer_km);
+        $this->assertSame(10000.0, (float) $vehicle->fresh()->starting_odometer_km);
 
         $this->get(route('vehicles.trips.index'))
             ->assertOk()
@@ -166,7 +166,15 @@ class VehicleTripTest extends TestCase
 
         $this->assertSame(TripPurpose::Private, $trip->fresh()->purpose);
         $this->assertSame(40.0, (float) $trip->fresh()->distance_km);
-        $this->assertSame(10040.0, (float) $vehicle->fresh()->current_odometer_km);
+        $this->assertSame(10000.0, (float) $vehicle->fresh()->starting_odometer_km);
+
+        $this->post(route('vehicles.trips.toggle-purpose', $trip))
+            ->assertRedirect();
+        $this->assertSame(TripPurpose::Business, $trip->fresh()->purpose);
+
+        $this->post(route('vehicles.trips.toggle-purpose', $trip))
+            ->assertRedirect();
+        $this->assertSame(TripPurpose::Private, $trip->fresh()->purpose);
 
         $export = $this->get(route('vehicles.trips.export', [
             'vehicle_id' => $vehicle->id,
@@ -183,7 +191,7 @@ class VehicleTripTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertNull(Trip::queryWithoutTeamScope()->find($trip->id));
-        $this->assertSame(10000.0, (float) $vehicle->fresh()->current_odometer_km);
+        $this->assertSame(10000.0, (float) $vehicle->fresh()->starting_odometer_km);
     }
 
     public function test_other_team_cannot_view_vehicle_or_trip(): void

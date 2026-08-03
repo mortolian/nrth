@@ -23,7 +23,7 @@
 
 - **Invoicing & estimates** — clients, items catalog, recurring invoices, discounts, note templates, PDFs, payments, payment receipts, online pay links
 - **Expenses & suppliers** — receipts, AI document fill, categories, VAT on purchases
-- **Travel** — vehicles and a business/private trip log book
+- **Travel** — vehicles and a business/private trip log book (CSV export; AI smart import for fleet/GPS exports when AI is enabled)
 - **Accounting** — chart of accounts, journal, general ledger, account statements
 - **Banking** — import CSV/OFX statements, duplicate detection, transaction list
 - **Tax** — VAT returns and rates (configure during setup wizard)

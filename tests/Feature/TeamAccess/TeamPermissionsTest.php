@@ -210,6 +210,17 @@ class TeamPermissionsTest extends TestCase
             ->assertForbidden();
 
         $this->actingAs($viewer)
+            ->get(route('vehicles.trips.import.create'))
+            ->assertForbidden();
+
+        $vehicle = \App\Domain\Vehicles\Models\Vehicle::factory()->for($owner->currentTeam)->create();
+        $trip = \App\Domain\Vehicles\Models\Trip::factory()->forVehicle($vehicle)->create();
+
+        $this->actingAs($viewer)
+            ->post(route('vehicles.trips.toggle-purpose', $trip))
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
             ->post(route('vehicles.store'), [
                 'name' => 'Blocked',
                 'is_active' => true,

@@ -29,7 +29,7 @@ class VehicleFactory extends Factory
             'year' => fake()->numberBetween(2015, 2026),
             'registration_number' => strtoupper(fake()->bothify('?? ## ?? GP')),
             'vin' => strtoupper(fake()->bothify('????#########???##')),
-            'current_odometer_km' => fake()->randomFloat(1, 1000, 180000),
+            'starting_odometer_km' => fake()->randomFloat(1, 0, 50000),
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,
         ];

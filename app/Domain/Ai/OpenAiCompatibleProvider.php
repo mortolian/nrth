@@ -59,4 +59,28 @@ final class OpenAiCompatibleProvider implements AiProvider
             useJsonResponseFormat: $useJsonResponseFormat,
         );
     }
+
+    public function completeStructuredJson(
+        string $prompt,
+        string $apiKey,
+        string $model,
+        ?string $baseUrl = null,
+    ): array {
+        $resolvedBaseUrl = trim((string) ($baseUrl ?: AiCatalog::defaultBaseUrl($this->providerKey)));
+        if ($resolvedBaseUrl === '') {
+            throw new InvalidArgumentException('A base URL is required for this AI provider.');
+        }
+
+        $useJsonResponseFormat = $this->providerKey === AiCatalog::PROVIDER_OPENAI
+            || $this->providerKey === AiCatalog::PROVIDER_OPENROUTER;
+
+        return $this->client->completeStructuredJson(
+            prompt: $prompt,
+            apiKey: $apiKey,
+            model: $model,
+            baseUrl: $resolvedBaseUrl,
+            providerKey: $this->providerKey,
+            useJsonResponseFormat: $useJsonResponseFormat,
+        );
+    }
 }

@@ -11,8 +11,8 @@ class TripOdometerEstimator
     /**
      * Estimate opening/closing odometer for trips on a vehicle.
      *
-     * Treats {@see Vehicle::$current_odometer_km} as the reading after all known trips,
-     * then walks chronologically forward from (current − total distance).
+     * Treats {@see Vehicle::$starting_odometer_km} as the reading at purchase,
+     * then walks chronologically forward by each trip distance.
      *
      * @param  Collection<int, Trip>  $allVehicleTripsChronological  All trips for the vehicle, oldest first
      * @return array<int, array{opening_km: float|null, closing_km: float|null}>
@@ -28,15 +28,11 @@ class TripOdometerEstimator
             ];
         }
 
-        if ($vehicle->current_odometer_km === null || $allVehicleTripsChronological->isEmpty()) {
+        if ($vehicle->starting_odometer_km === null || $allVehicleTripsChronological->isEmpty()) {
             return $estimates;
         }
 
-        $totalDistance = round((float) $allVehicleTripsChronological->sum(
-            fn (Trip $trip): float => (float) $trip->distance_km
-        ), 1);
-
-        $running = round((float) $vehicle->current_odometer_km - $totalDistance, 1);
+        $running = round((float) $vehicle->starting_odometer_km, 1);
 
         foreach ($allVehicleTripsChronological as $trip) {
             $distance = round((float) $trip->distance_km, 1);

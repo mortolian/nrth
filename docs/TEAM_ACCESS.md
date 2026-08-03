@@ -69,7 +69,7 @@ See [AGENTS.md](../AGENTS.md) for the agent checklist (permissions **and** docum
 
 Money In catalog keys include `invoices.*`, `estimates.*`, `clients.*`, and `items.*` (products/services catalog). Invoice **note templates** live under Settings → Note templates (`settings.business`). Item unit labels are under Settings → Business.
 
-Travel catalog keys are `vehicles.view`, `vehicles.manage`, and `vehicles.delete` (vehicles registry and trip log book).
+Travel catalog keys are `vehicles.view`, `vehicles.manage`, and `vehicles.delete` (vehicles registry and trip log book). Smart trip import (fleet/GPS exports) requires `vehicles.manage` and a team AI provider.
 
 ## Tests
 

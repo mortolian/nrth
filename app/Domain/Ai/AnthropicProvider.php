@@ -82,6 +82,54 @@ final class AnthropicProvider implements AiProvider
         return $this->decodeJsonObject($text);
     }
 
+    public function completeStructuredJson(
+        string $prompt,
+        string $apiKey,
+        string $model,
+        ?string $baseUrl = null,
+    ): array {
+        try {
+            $response = Http::withHeaders([
+                'x-api-key' => $apiKey,
+                'anthropic-version' => '2023-06-01',
+            ])
+                ->acceptJson()
+                ->timeout(120)
+                ->post('https://api.anthropic.com/v1/messages', [
+                    'model' => $model,
+                    'max_tokens' => 8192,
+                    'messages' => [
+                        [
+                            'role' => 'user',
+                            'content' => $prompt.' Reply with valid JSON only, no markdown.',
+                        ],
+                    ],
+                ]);
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not reach the AI service. Try again later.'),
+            ]);
+        }
+
+        if (! $response->successful()) {
+            $message = $response->json('error.message')
+                ?? __('AI request failed. Check the file and API key, then try again.');
+
+            throw ValidationException::withMessages([
+                'receipt' => is_string($message) ? $message : __('AI request failed.'),
+            ]);
+        }
+
+        $text = $this->firstTextBlock($response->json('content'));
+        if ($text === null) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not read fields from this file. Try a clearer export or PDF.'),
+            ]);
+        }
+
+        return $this->decodeJsonObject($text);
+    }
+
     /**
      * @return array<string, mixed>
      */

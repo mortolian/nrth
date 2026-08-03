@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 
@@ -28,7 +28,7 @@ const props = defineProps<{
         year: number | null;
         registration_number: string | null;
         vin: string | null;
-        current_odometer_km: number | null;
+        starting_odometer_km: number | null;
         notes: string | null;
         is_active: boolean;
     };
@@ -46,6 +46,12 @@ const props = defineProps<{
     };
 }>();
 
+const page = usePage();
+const canManage = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('vehicles.manage');
+});
+
 const formatKm = (km: number | null) =>
     km == null ? '—' : `${Number(km).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`;
 
@@ -55,8 +61,8 @@ const vehicleSubtitle = computed(() =>
 
 const canDelete = computed(() => props.stats.trip_count === 0);
 
-const goHistoryPage = (page: number) => {
-    router.get(route('vehicles.show', props.vehicle.id), { page }, { preserveState: true, preserveScroll: true });
+const goHistoryPage = (pageNumber: number) => {
+    router.get(route('vehicles.show', props.vehicle.id), { page: pageNumber }, { preserveState: true, preserveScroll: true });
 };
 
 const deleteVehicle = () => {
@@ -67,6 +73,24 @@ const deleteVehicle = () => {
 const confirmDeleteTrip = (trip: TripHistoryRow) => {
     if (!confirm(`Delete trip from ${trip.trip_date ?? 'this date'}?`)) return;
     router.delete(route('vehicles.trips.destroy', trip.id), { preserveScroll: true });
+};
+
+const togglingPurposeIds = ref(new Set<number>());
+
+const togglePurpose = (trip: TripHistoryRow) => {
+    if (!canManage.value || togglingPurposeIds.value.has(trip.id)) return;
+    const next = new Set(togglingPurposeIds.value);
+    next.add(trip.id);
+    togglingPurposeIds.value = next;
+
+    router.post(route('vehicles.trips.toggle-purpose', trip.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            const cleared = new Set(togglingPurposeIds.value);
+            cleared.delete(trip.id);
+            togglingPurposeIds.value = cleared;
+        },
+    });
 };
 
 const rowActionItems = () => [
@@ -129,9 +153,9 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                         <dd class="font-medium text-slate-900">{{ vehicle.vin || '—' }}</dd>
                     </div>
                     <div>
-                        <dt class="text-slate-500">Odometer</dt>
+                        <dt class="text-slate-500">Starting odometer</dt>
                         <dd class="font-medium tabular-nums text-slate-900">
-                            {{ formatKm(vehicle.current_odometer_km) }}
+                            {{ formatKm(vehicle.starting_odometer_km) }}
                         </dd>
                     </div>
                     <div>
@@ -210,8 +234,21 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                         </span>
                         <span v-else class="text-slate-400">—</span>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2">
-                        <AppBadge :variant="row.purpose === 'business' ? 'info' : 'neutral'">
+                    <td class="whitespace-nowrap px-3 py-2" @click.stop>
+                        <button
+                            v-if="canManage"
+                            type="button"
+                            class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:scale-[0.98]"
+                            :disabled="togglingPurposeIds.has(row.id)"
+                            :title="row.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                            :aria-label="row.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                            @click="togglePurpose(row)"
+                        >
+                            <AppBadge :variant="row.purpose === 'business' ? 'info' : 'neutral'">
+                                {{ row.purpose }}
+                            </AppBadge>
+                        </button>
+                        <AppBadge v-else :variant="row.purpose === 'business' ? 'info' : 'neutral'">
                             {{ row.purpose }}
                         </AppBadge>
                     </td>

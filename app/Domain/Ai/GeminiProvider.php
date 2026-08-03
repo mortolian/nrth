@@ -82,6 +82,58 @@ final class GeminiProvider implements AiProvider
         return $this->decodeJsonObject($text);
     }
 
+    public function completeStructuredJson(
+        string $prompt,
+        string $apiKey,
+        string $model,
+        ?string $baseUrl = null,
+    ): array {
+        $endpoint = sprintf(
+            'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent',
+            rawurlencode($model)
+        );
+
+        try {
+            $response = Http::withHeaders([
+                'x-goog-api-key' => $apiKey,
+            ])
+                ->acceptJson()
+                ->timeout(120)
+                ->post($endpoint, [
+                    'contents' => [[
+                        'parts' => [
+                            ['text' => $prompt.' Reply with valid JSON only, no markdown.'],
+                        ],
+                    ]],
+                    'generationConfig' => [
+                        'responseMimeType' => 'application/json',
+                    ],
+                ]);
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not reach the AI service. Try again later.'),
+            ]);
+        }
+
+        if (! $response->successful()) {
+            $message = $response->json('error.message')
+                ?? __('AI request failed. Check the file and API key, then try again.');
+
+            throw ValidationException::withMessages([
+                'receipt' => is_string($message) ? $message : __('AI request failed.'),
+            ]);
+        }
+
+        $text = $response->json('candidates.0.content.parts.0.text');
+        if (! is_string($text) || trim($text) === '') {
+            throw ValidationException::withMessages([
+                'receipt' => __('Could not read fields from this file. Try a clearer export or PDF.'),
+            ]);
+        }
+
+        return $this->decodeJsonObject($text);
+    }
+
     /**
      * @return array<string, mixed>
      */

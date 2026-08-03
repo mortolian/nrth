@@ -57,8 +57,8 @@ class VehicleController extends Controller
                 'model' => $vehicle->model,
                 'year' => $vehicle->year,
                 'registration_number' => $vehicle->registration_number,
-                'current_odometer_km' => $vehicle->current_odometer_km !== null
-                    ? (float) $vehicle->current_odometer_km
+                'starting_odometer_km' => $vehicle->starting_odometer_km !== null
+                    ? (float) $vehicle->starting_odometer_km
                     : null,
                 'status' => $vehicle->is_active ? 'active' : 'inactive',
                 'trip_count' => (int) $vehicle->trips_count,
@@ -209,13 +209,13 @@ class VehicleController extends Controller
             'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'registration_number' => ['required', 'string', 'max:50'],
             'vin' => ['nullable', 'string', 'max:32'],
-            'current_odometer_km' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
+            'starting_odometer_km' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
         ]);
 
-        if (array_key_exists('current_odometer_km', $validated) && $validated['current_odometer_km'] !== null) {
-            $validated['current_odometer_km'] = round((float) $validated['current_odometer_km'], 1);
+        if (array_key_exists('starting_odometer_km', $validated) && $validated['starting_odometer_km'] !== null) {
+            $validated['starting_odometer_km'] = round((float) $validated['starting_odometer_km'], 1);
         }
 
         return $validated;
@@ -234,8 +234,8 @@ class VehicleController extends Controller
             'year' => $vehicle->year,
             'registration_number' => $vehicle->registration_number,
             'vin' => $vehicle->vin,
-            'current_odometer_km' => $vehicle->current_odometer_km !== null
-                ? (float) $vehicle->current_odometer_km
+            'starting_odometer_km' => $vehicle->starting_odometer_km !== null
+                ? (float) $vehicle->starting_odometer_km
                 : null,
             'notes' => $vehicle->notes,
             'is_active' => (bool) $vehicle->is_active,

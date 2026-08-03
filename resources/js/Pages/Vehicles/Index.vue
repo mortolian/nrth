@@ -13,7 +13,7 @@ type VehicleRow = {
     model: string | null;
     year: number | null;
     registration_number: string | null;
-    current_odometer_km: number | null;
+    starting_odometer_km: number | null;
     status: 'active' | 'inactive';
     trip_count: number;
     last_trip_date: string | null;
@@ -107,7 +107,7 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
                 :columns="[
                     { key: 'name', label: 'Vehicle' },
                     { key: 'registration', label: 'Registration' },
-                    { key: 'odometer', label: 'Odometer' },
+                    { key: 'odometer', label: 'Starting odo' },
                     { key: 'trips', label: 'Trips' },
                     { key: 'last_trip', label: 'Last trip' },
                     { key: 'status', label: 'Status' },
@@ -130,7 +130,7 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
                     </td>
                     <td class="whitespace-nowrap px-3 py-2">{{ vehicle.registration_number || '—' }}</td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">
-                        {{ formatKm(vehicle.current_odometer_km) }}
+                        {{ formatKm(vehicle.starting_odometer_km) }}
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ vehicle.trip_count }}</td>
                     <td class="whitespace-nowrap px-3 py-2">{{ vehicle.last_trip_date || '—' }}</td>

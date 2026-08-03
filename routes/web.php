@@ -41,6 +41,7 @@ use App\Http\Controllers\Web\Tax\TaxDocumentsController;
 use App\Http\Controllers\Web\Tax\VATController;
 use App\Http\Controllers\Web\Tax\VatRateController;
 use App\Http\Controllers\Web\Vehicles\TripController;
+use App\Http\Controllers\Web\Vehicles\TripImportController;
 use App\Http\Controllers\Web\Vehicles\VehicleController;
 use App\Http\Controllers\Web\Webhooks\PayFastPaymentWebhookController;
 use App\Http\Controllers\Web\Webhooks\StripePaymentWebhookController;
@@ -195,10 +196,15 @@ Route::middleware([
     Route::prefix('vehicles')->name('vehicles.')->group(function () {
         Route::get('/trips', [TripController::class, 'index'])->name('trips.index');
         Route::get('/trips/export', [TripController::class, 'exportCsv'])->name('trips.export');
+        Route::get('/trips/import', [TripImportController::class, 'create'])->name('trips.import.create');
+        Route::post('/trips/import', [TripImportController::class, 'store'])->name('trips.import.store');
+        Route::get('/trips/import/preview', [TripImportController::class, 'preview'])->name('trips.import.preview');
+        Route::post('/trips/import/confirm', [TripImportController::class, 'confirm'])->name('trips.import.confirm');
         Route::get('/trips/create', [TripController::class, 'create'])->name('trips.create');
         Route::post('/trips', [TripController::class, 'store'])->name('trips.store');
         Route::get('/trips/{trip}/edit', [TripController::class, 'edit'])->name('trips.edit');
         Route::put('/trips/{trip}', [TripController::class, 'update'])->name('trips.update');
+        Route::post('/trips/{trip}/toggle-purpose', [TripController::class, 'togglePurpose'])->name('trips.toggle-purpose');
         Route::delete('/trips/{trip}', [TripController::class, 'destroy'])->name('trips.destroy');
 
         Route::get('/', [VehicleController::class, 'index'])->name('index');

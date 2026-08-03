@@ -18,7 +18,7 @@ const props = defineProps<{
         year: number | null;
         registration_number: string | null;
         vin: string | null;
-        current_odometer_km: number | null;
+        starting_odometer_km: number | null;
         notes: string | null;
         is_active: boolean;
     };
@@ -53,7 +53,7 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         year: props.vehicle?.year ?? (null as number | null),
         registration_number: props.vehicle?.registration_number ?? '',
         vin: props.vehicle?.vin ?? '',
-        current_odometer_km: props.vehicle?.current_odometer_km ?? (null as number | null),
+        starting_odometer_km: props.vehicle?.starting_odometer_km ?? (null as number | null),
         notes: props.vehicle?.notes ?? '',
         is_active: props.vehicle?.is_active ?? true,
     },
@@ -73,7 +73,7 @@ const schema = z.object({
     year: optionalInt(1900, 2100, 'Enter a year between 1900 and 2100'),
     registration_number: z.string().trim().min(1, 'Registration is required'),
     vin: z.string().optional(),
-    current_odometer_km: optionalNonNegative('Odometer cannot be negative'),
+    starting_odometer_km: optionalNonNegative('Starting odometer cannot be negative'),
     notes: z.string().optional(),
     is_active: z.boolean(),
 });
@@ -84,7 +84,7 @@ const submit = () => {
     const parsed = schema.safeParse({
         ...formValues.value,
         year: emptyToNull(formValues.value.year),
-        current_odometer_km: emptyToNull(formValues.value.current_odometer_km),
+        starting_odometer_km: emptyToNull(formValues.value.starting_odometer_km),
     });
 
     if (!parsed.success) {
@@ -101,7 +101,7 @@ const submit = () => {
         year: parsed.data.year,
         registration_number: parsed.data.registration_number,
         vin: parsed.data.vin?.trim() || null,
-        current_odometer_km: parsed.data.current_odometer_km,
+        starting_odometer_km: parsed.data.starting_odometer_km,
         notes: parsed.data.notes?.trim() || null,
         is_active: parsed.data.is_active,
     };
@@ -228,23 +228,24 @@ const submit = () => {
                         <p v-if="fieldErrors.year" class="mt-1 text-xs text-rose-600">{{ fieldErrors.year }}</p>
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Current odometer (km)</label>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Starting odometer (km)</label>
                         <AppInput
                             :model-value="
-                                formValues.current_odometer_km == null
+                                formValues.starting_odometer_km == null
                                     ? ''
-                                    : String(formValues.current_odometer_km)
+                                    : String(formValues.starting_odometer_km)
                             "
                             type="number"
                             step="0.1"
                             min="0"
-                            placeholder="Optional"
+                            placeholder="At purchase"
                             @update:model-value="
-                                setFieldValue('current_odometer_km', $event === '' ? null : Number($event))
+                                setFieldValue('starting_odometer_km', $event === '' ? null : Number($event))
                             "
                         />
-                        <p v-if="fieldErrors.current_odometer_km" class="mt-1 text-xs text-rose-600">
-                            {{ fieldErrors.current_odometer_km }}
+                        <p class="mt-1 text-xs text-slate-500">Odometer reading when the vehicle was purchased.</p>
+                        <p v-if="fieldErrors.starting_odometer_km" class="mt-1 text-xs text-rose-600">
+                            {{ fieldErrors.starting_odometer_km }}
                         </p>
                     </div>
                     <div class="md:col-span-2">

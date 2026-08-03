@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useTravelTabs } from '@/Composables/useFeatureTabs';
 
 const travelTabs = useTravelTabs();
+const page = usePage();
+const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
+const canManage = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('vehicles.manage');
+});
 
 type VehicleOption = {
     id: number;
@@ -90,6 +96,24 @@ const confirmDelete = (trip: TripRow) => {
     router.delete(route('vehicles.trips.destroy', trip.id), { preserveScroll: true });
 };
 
+const togglingPurposeIds = ref(new Set<number>());
+
+const togglePurpose = (trip: TripRow) => {
+    if (!canManage.value || togglingPurposeIds.value.has(trip.id)) return;
+    const next = new Set(togglingPurposeIds.value);
+    next.add(trip.id);
+    togglingPurposeIds.value = next;
+
+    router.post(route('vehicles.trips.toggle-purpose', trip.id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            const cleared = new Set(togglingPurposeIds.value);
+            cleared.delete(trip.id);
+            togglingPurposeIds.value = cleared;
+        },
+    });
+};
+
 const rowActionItems = () => [
     { id: 'edit', label: 'Edit' },
     { id: 'delete', label: 'Delete' },
@@ -116,6 +140,13 @@ const onRowAction = (trip: TripRow, actionId: string) => {
     >
         <template #actions>
             <AppButton variant="secondary" @click="exportCsv">Export CSV</AppButton>
+            <AppButton
+                v-if="aiEnabled && canManage"
+                variant="secondary"
+                @click="router.visit(route('vehicles.trips.import.create'))"
+            >
+                Smart import
+            </AppButton>
             <AppButton variant="primary" @click="router.visit(route('vehicles.trips.create'))">
                 Log trip
             </AppButton>
@@ -171,8 +202,8 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                 <AppButton variant="ghost" @click="clearFilters">Clear</AppButton>
             </div>
             <p class="mt-3 text-xs text-slate-500">
-                Opening/closing odometer are estimated from each vehicle’s current reading and trip distances. Use date
-                filters, then Export CSV for a tax-period log book.
+                Opening/closing odometer are estimated from each vehicle’s starting (purchase) reading and trip
+                distances. Use date filters, then Export CSV for a tax-period log book.
             </p>
         </AppCard>
 
@@ -209,8 +240,21 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                         </span>
                         <span v-else class="text-slate-400">—</span>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2">
-                        <AppBadge :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
+                    <td class="whitespace-nowrap px-3 py-2" @click.stop>
+                        <button
+                            v-if="canManage"
+                            type="button"
+                            class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:scale-[0.98]"
+                            :disabled="togglingPurposeIds.has(trip.id)"
+                            :title="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                            :aria-label="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                            @click="togglePurpose(trip)"
+                        >
+                            <AppBadge :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
+                                {{ trip.purpose }}
+                            </AppBadge>
+                        </button>
+                        <AppBadge v-else :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
                             {{ trip.purpose }}
                         </AppBadge>
                     </td>

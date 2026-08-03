@@ -32,7 +32,7 @@ class TripController extends Controller
         $filters = $this->filtersFromRequest($request);
 
         $query = $this->filteredTripsQuery($teamId, $filters)
-            ->with('vehicle:id,name,registration_number,current_odometer_km');
+            ->with('vehicle:id,name,registration_number,starting_odometer_km');
 
         $trips = $query
             ->orderByDesc('trip_date')
@@ -72,7 +72,7 @@ class TripController extends Controller
         $filters = $this->filtersFromRequest($request);
 
         $trips = $this->filteredTripsQuery($teamId, $filters)
-            ->with('vehicle:id,name,registration_number,vin,current_odometer_km')
+            ->with('vehicle:id,name,registration_number,vin,starting_odometer_km')
             ->orderBy('trip_date')
             ->orderBy('id')
             ->get();
@@ -167,14 +167,11 @@ class TripController extends Controller
 
         $teamId = (int) $request->user()->current_team_id;
         $payload = $this->validateTrip($request, $teamId);
-        $vehicle = $this->findTeamVehicle($teamId, (int) $payload['vehicle_id']);
 
         Trip::queryWithoutTeamScope()->create([
             'team_id' => $teamId,
             ...$payload,
         ]);
-
-        $this->bumpVehicleOdometer($vehicle, (float) $payload['distance_km']);
 
         return to_route('vehicles.trips.index')
             ->with('success', __('Trip logged.'));
@@ -186,7 +183,7 @@ class TripController extends Controller
         abort_unless($trip->team_id === $request->user()->current_team_id, 403);
 
         $teamId = (int) $trip->team_id;
-        $trip->load('vehicle:id,name,registration_number,current_odometer_km');
+        $trip->load('vehicle:id,name,registration_number,starting_odometer_km');
 
         $estimates = $this->estimatesForPage($teamId, collect([$trip]));
 
@@ -209,23 +206,27 @@ class TripController extends Controller
 
         $teamId = (int) $trip->team_id;
         $payload = $this->validateTrip($request, $teamId);
-        $vehicle = $this->findTeamVehicle($teamId, (int) $payload['vehicle_id']);
-        $previousDistance = (float) $trip->distance_km;
-        $previousVehicleId = (int) $trip->vehicle_id;
 
         $trip->update($payload);
 
-        $delta = (float) $payload['distance_km'] - $previousDistance;
-        if ($previousVehicleId === (int) $vehicle->id) {
-            $this->bumpVehicleOdometer($vehicle, $delta);
-        } else {
-            $previousVehicle = $this->findTeamVehicle($teamId, $previousVehicleId);
-            $this->bumpVehicleOdometer($previousVehicle, -$previousDistance);
-            $this->bumpVehicleOdometer($vehicle, (float) $payload['distance_km']);
-        }
-
         return to_route('vehicles.trips.index')
             ->with('success', __('Trip updated.'));
+    }
+
+    public function togglePurpose(Request $request, Trip $trip): RedirectResponse
+    {
+        $this->authorizeTeam('vehicles.manage', $request);
+        abort_unless($trip->team_id === $request->user()->current_team_id, 403);
+
+        $next = $trip->purpose === TripPurpose::Business
+            ? TripPurpose::Private
+            : TripPurpose::Business;
+
+        $trip->forceFill(['purpose' => $next->value])->save();
+
+        return back()->with('success', $next === TripPurpose::Business
+            ? __('Marked as business.')
+            : __('Marked as private.'));
     }
 
     public function destroy(Request $request, Trip $trip): RedirectResponse
@@ -233,10 +234,7 @@ class TripController extends Controller
         $this->authorizeTeam('vehicles.delete', $request);
         abort_unless($trip->team_id === $request->user()->current_team_id, 403);
 
-        $vehicle = $this->findTeamVehicle((int) $trip->team_id, (int) $trip->vehicle_id);
-        $distance = (float) $trip->distance_km;
         $trip->delete();
-        $this->bumpVehicleOdometer($vehicle, -$distance);
 
         return back()->with('success', __('Trip deleted.'));
     }
@@ -396,31 +394,8 @@ class TripController extends Controller
         return $validated;
     }
 
-    private function bumpVehicleOdometer(Vehicle $vehicle, float $deltaKm): void
-    {
-        if ($vehicle->current_odometer_km === null || abs($deltaKm) < 0.0001) {
-            return;
-        }
-
-        $vehicle->forceFill([
-            'current_odometer_km' => round(max(0, (float) $vehicle->current_odometer_km + $deltaKm), 1),
-        ])->save();
-    }
-
-    private function findTeamVehicle(int $teamId, int $vehicleId): Vehicle
-    {
-        $vehicle = Vehicle::queryWithoutTeamScope()
-            ->where('team_id', $teamId)
-            ->whereKey($vehicleId)
-            ->first();
-
-        abort_if($vehicle === null, 404);
-
-        return $vehicle;
-    }
-
     /**
-     * @return list<array{id: int, name: string, registration_number: string|null, current_odometer_km: float|null, is_active: bool}>
+     * @return list<array{id: int, name: string, registration_number: string|null, starting_odometer_km: float|null, is_active: bool}>
      */
     private function vehicleOptions(int $teamId, bool $activeOnly = false): array
     {
@@ -433,13 +408,13 @@ class TripController extends Controller
         }
 
         return $query
-            ->get(['id', 'name', 'registration_number', 'current_odometer_km', 'is_active'])
+            ->get(['id', 'name', 'registration_number', 'starting_odometer_km', 'is_active'])
             ->map(fn (Vehicle $vehicle): array => [
                 'id' => $vehicle->id,
                 'name' => $vehicle->name,
                 'registration_number' => $vehicle->registration_number,
-                'current_odometer_km' => $vehicle->current_odometer_km !== null
-                    ? (float) $vehicle->current_odometer_km
+                'starting_odometer_km' => $vehicle->starting_odometer_km !== null
+                    ? (float) $vehicle->starting_odometer_km
                     : null,
                 'is_active' => (bool) $vehicle->is_active,
             ])

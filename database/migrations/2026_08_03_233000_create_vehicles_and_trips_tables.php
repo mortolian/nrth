@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('year')->nullable();
             $table->string('registration_number')->nullable();
             $table->string('vin', 32)->nullable();
-            $table->decimal('current_odometer_km', 12, 1)->nullable();
+            $table->decimal('starting_odometer_km', 12, 1)->nullable();
             $table->text('notes')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

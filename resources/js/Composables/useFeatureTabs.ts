@@ -62,10 +62,19 @@ export function useBankingTabs() {
 }
 
 export function useTravelTabs() {
-    return computed((): AppTabItem[] => [
-        { id: 'trips', label: 'Log book', href: route('vehicles.trips.index') },
-        { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
-    ]);
+    const page = usePage();
+    const canTeam = useCanTeam();
+    const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
+
+    return computed((): AppTabItem[] =>
+        [
+            { id: 'trips', label: 'Log book', href: route('vehicles.trips.index') },
+            { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
+            aiEnabled.value && canTeam('vehicles.manage')
+                ? { id: 'import', label: 'Smart import', href: route('vehicles.trips.import.create') }
+                : null,
+        ].filter(Boolean) as AppTabItem[],
+    );
 }
 
 export function useAccountingTabs() {
