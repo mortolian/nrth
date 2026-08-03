@@ -50,6 +50,7 @@ class AccountController extends Controller
         return Inertia::render('Accounting/Accounts/Form', [
             'isEditing' => false,
             'account' => null,
+            'can_change_type' => true,
             'account_types' => $this->accountTypeOptions(),
             'parent_options' => $this->parentOptionsForTeam($team->id),
             'suggested_codes' => $suggestedCodes,
@@ -109,6 +110,10 @@ class AccountController extends Controller
         abort_unless($request->user()->can('update', $team), 403);
         abort_unless($account->team_id === $team->id, 403);
 
+        $canChangeType = ! $account->is_system
+            && ! $account->journalEntries()->exists()
+            && ! $account->children()->exists();
+
         return Inertia::render('Accounting/Accounts/Form', [
             'isEditing' => true,
             'account' => [
@@ -121,6 +126,7 @@ class AccountController extends Controller
                 'is_system' => $account->is_system,
                 'is_active' => $account->is_active,
             ],
+            'can_change_type' => $canChangeType,
             'account_types' => $this->accountTypeOptions(),
             'parent_options' => $this->parentOptionsForTeam($team->id, $account->id),
             'suggested_codes' => null,
@@ -139,6 +145,7 @@ class AccountController extends Controller
             'code' => ['required', 'string', 'max:32'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'type' => ['sometimes', Rule::enum(AccountType::class)],
             'parent_id' => [
                 'nullable',
                 'integer',
@@ -162,12 +169,18 @@ class AccountController extends Controller
             $isActiveForDto = $request->boolean('is_active');
         }
 
+        $typeForDto = Unspecified::Value;
+        if (! $account->is_system && isset($validated['type'])) {
+            $typeForDto = AccountType::from($validated['type']);
+        }
+
         $updateAccount->execute($account, new UpdateAccountDTO(
-            name: $account->is_system ? Unspecified::Value : trim($validated['name']),
+            name: trim($validated['name']),
             code: $account->is_system ? Unspecified::Value : trim($validated['code']),
             description: $descriptionForDto,
             parentId: $parentForDto,
             isActive: $isActiveForDto,
+            type: $typeForDto,
         ));
 
         return redirect()

@@ -8,8 +8,12 @@ use App\Domain\Accounting\Actions\UpdateAccountAction;
 use App\Domain\Accounting\DTOs\CreateAccountDTO;
 use App\Domain\Accounting\DTOs\UpdateAccountDTO;
 use App\Domain\Accounting\Enums\AccountType;
+use App\Domain\Accounting\Enums\EntryType;
+use App\Domain\Accounting\Enums\TransactionStatus;
+use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Exceptions\SystemAccountProtectedException;
 use App\Domain\Accounting\Models\Account;
+use App\Domain\Accounting\Models\Transaction;
 use App\Models\Team;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -66,13 +70,23 @@ class ChartOfAccountsTest extends TestCase
         $account->delete();
     }
 
-    public function test_system_account_cannot_rename_via_eloquent(): void
+    public function test_system_account_code_cannot_change_via_eloquent(): void
     {
         $account = Account::factory()->system()->create(['code' => 'SYS2', 'name' => 'Locked']);
 
         $this->expectException(SystemAccountProtectedException::class);
 
-        $account->update(['name' => 'Hacked']);
+        $account->update(['code' => 'HACK']);
+    }
+
+    public function test_system_account_name_can_be_updated_via_eloquent(): void
+    {
+        $account = Account::factory()->system()->create(['code' => 'SYS2B', 'name' => 'Bank']);
+
+        $account->update(['name' => 'Cheque account']);
+
+        $this->assertSame('Cheque account', $account->fresh()->name);
+        $this->assertSame('SYS2B', $account->fresh()->code);
     }
 
     public function test_system_account_description_can_be_updated_via_action(): void
@@ -90,15 +104,119 @@ class ChartOfAccountsTest extends TestCase
         $this->assertSame('New narrative', $account->fresh()->description);
     }
 
-    public function test_update_account_action_blocks_system_rename(): void
+    public function test_update_account_action_allows_system_name_change(): void
     {
-        $account = Account::factory()->system()->create(['code' => 'SYS4', 'name' => 'Locked']);
+        $account = Account::factory()->system()->create(['code' => 'SYS4', 'name' => 'Bank']);
+
+        (new UpdateAccountAction)->execute($account, new UpdateAccountDTO(
+            name: 'Cheque account',
+        ));
+
+        $this->assertSame('Cheque account', $account->fresh()->name);
+        $this->assertSame('SYS4', $account->fresh()->code);
+    }
+
+    public function test_update_account_action_blocks_system_code_change(): void
+    {
+        $account = Account::factory()->system()->create(['code' => 'SYS4B', 'name' => 'Bank']);
 
         $this->expectException(SystemAccountProtectedException::class);
 
         (new UpdateAccountAction)->execute($account, new UpdateAccountDTO(
-            name: 'Hacked',
+            code: '9999',
         ));
+    }
+
+    public function test_update_account_action_allows_type_change_without_activity(): void
+    {
+        $account = Account::factory()->create([
+            'code' => 'CUST-TYPE',
+            'type' => AccountType::Expense,
+            'is_system' => false,
+            'parent_id' => null,
+        ]);
+
+        (new UpdateAccountAction)->execute($account, new UpdateAccountDTO(
+            type: AccountType::Asset,
+        ));
+
+        $this->assertSame(AccountType::Asset, $account->fresh()->type);
+    }
+
+    public function test_update_account_action_blocks_type_change_with_journal_activity(): void
+    {
+        $team = Team::factory()->create();
+        $account = Account::factory()->for($team)->create([
+            'code' => 'CUST-ACT',
+            'type' => AccountType::Expense,
+            'is_system' => false,
+        ]);
+        $counter = Account::factory()->for($team)->asset()->create(['code' => 'CUST-BANK']);
+
+        $txn = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'type' => TransactionType::JournalAdjustment,
+            'status' => TransactionStatus::Posted,
+            'transaction_date' => now()->toDateString(),
+            'posted_at' => now(),
+            'description' => 'Test',
+        ]);
+
+        $txn->journalEntries()->create([
+            'account_id' => $account->id,
+            'type' => EntryType::Debit,
+            'amount_cents' => 1000,
+            'currency' => 'ZAR',
+        ]);
+        $txn->journalEntries()->create([
+            'account_id' => $counter->id,
+            'type' => EntryType::Credit,
+            'amount_cents' => 1000,
+            'currency' => 'ZAR',
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        (new UpdateAccountAction)->execute($account, new UpdateAccountDTO(
+            type: AccountType::Asset,
+        ));
+    }
+
+    public function test_update_account_action_clears_type_mismatch_requires_matching_parent(): void
+    {
+        $team = Team::factory()->create();
+        $parent = Account::factory()->for($team)->expense()->create(['code' => 'P1']);
+        $account = Account::factory()->for($team)->expense()->create([
+            'code' => 'C1',
+            'parent_id' => $parent->id,
+            'is_system' => false,
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        (new UpdateAccountAction)->execute($account, new UpdateAccountDTO(
+            type: AccountType::Asset,
+        ));
+    }
+
+    public function test_update_account_action_can_change_type_and_clear_parent(): void
+    {
+        $team = Team::factory()->create();
+        $parent = Account::factory()->for($team)->expense()->create(['code' => 'P2']);
+        $account = Account::factory()->for($team)->expense()->create([
+            'code' => 'C2',
+            'parent_id' => $parent->id,
+            'is_system' => false,
+        ]);
+
+        (new UpdateAccountAction)->execute($account, new UpdateAccountDTO(
+            type: AccountType::Asset,
+            parentId: null,
+        ));
+
+        $fresh = $account->fresh();
+        $this->assertSame(AccountType::Asset, $fresh->type);
+        $this->assertNull($fresh->parent_id);
     }
 
     public function test_deactivate_account_action_blocks_system_accounts(): void

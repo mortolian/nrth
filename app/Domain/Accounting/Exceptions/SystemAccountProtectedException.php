@@ -13,7 +13,7 @@ class SystemAccountProtectedException extends RuntimeException
 
     public static function cannotRename(): self
     {
-        return new self('System accounts cannot be renamed (code or name).');
+        return new self('System account code, type, and hierarchy cannot be changed.');
     }
 
     public static function cannotDeactivate(): self

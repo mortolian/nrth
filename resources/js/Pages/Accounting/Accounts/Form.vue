@@ -20,6 +20,7 @@ const props = defineProps<{
         is_system: boolean;
         is_active: boolean;
     };
+    can_change_type?: boolean;
     account_types: AccountTypeOpt[];
     parent_options: ParentOpt[];
     suggested_codes?: Record<string, string> | null;
@@ -27,6 +28,7 @@ const props = defineProps<{
 }>();
 
 const isSystem = computed(() => props.account?.is_system ?? false);
+const canChangeType = computed(() => props.can_change_type ?? !props.isEditing);
 const codeAccounts = computed(() => props.code_accounts ?? []);
 const suggestedCodes = computed(() => props.suggested_codes ?? {});
 
@@ -151,6 +153,7 @@ const submit = () => {
                 name: data.name,
                 description: data.description ? String(data.description) : null,
                 parent_id: data.parent_id === '' || data.parent_id === null ? null : Number(data.parent_id),
+                ...(canChangeType.value ? { type: data.type } : {}),
                 ...(!isSystem.value ? { is_active: Boolean(data.is_active) } : {}),
             }))
             .put(route('accounting.accounts.update', props.account.id));
@@ -183,7 +186,11 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
     >
         <PageHeader
             :title="isEditing ? 'Edit account' : 'Add account'"
-            :subtitle="isSystem ? 'System accounts: you can only change the description.' : 'Custom accounts for your business'"
+            :subtitle="
+                isSystem
+                    ? 'System accounts: you can rename them and edit the description. Code, type, and hierarchy stay fixed.'
+                    : 'Custom accounts for your business'
+            "
         />
 
         <AppCard class="mt-5">
@@ -221,7 +228,7 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
-                    <AppInput v-model="form.name" :disabled="isSystem" required />
+                    <AppInput v-model="form.name" required />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Description</label>
@@ -232,13 +239,23 @@ const hasFormErrors = computed(() => Object.keys(form.errors).length > 0);
                         placeholder="Optional"
                     />
                 </div>
-                <div v-if="!isEditing">
+                <div v-if="!isEditing || canChangeType">
                     <label class="mb-1 block text-xs font-medium text-slate-500">Type</label>
                     <AppSelect v-model="form.type" :options="typeSelectOptions" />
+                    <p v-if="isEditing && canChangeType" class="mt-1 text-xs text-slate-500">
+                        Type can be changed while this account has no ledger activity or sub-accounts.
+                    </p>
                 </div>
                 <div v-else class="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
                     <span class="text-xs font-medium text-slate-500">Type</span>
                     <p class="mt-0.5 capitalize">{{ form.type }}</p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        {{
+                            isSystem
+                                ? 'System account type is fixed.'
+                                : 'Type is locked because this account has ledger activity or sub-accounts.'
+                        }}
+                    </p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Parent account</label>

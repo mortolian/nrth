@@ -2,6 +2,8 @@
 
 namespace App\Domain\Accounting\DTOs;
 
+use App\Domain\Accounting\Enums\AccountType;
+
 readonly class UpdateAccountDTO
 {
     /**
@@ -13,5 +15,6 @@ readonly class UpdateAccountDTO
         public string|null|Unspecified $description = Unspecified::Value,
         public int|null|Unspecified $parentId = Unspecified::Value,
         public bool|Unspecified $isActive = Unspecified::Value,
+        public AccountType|Unspecified $type = Unspecified::Value,
     ) {}
 }

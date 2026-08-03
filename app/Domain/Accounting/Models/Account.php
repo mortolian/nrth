@@ -92,7 +92,7 @@ class Account extends Model
                 return;
             }
 
-            if ($account->isDirty('code') || $account->isDirty('name')) {
+            if ($account->isDirty(['code', 'type', 'parent_id'])) {
                 throw SystemAccountProtectedException::cannotRename();
             }
 
