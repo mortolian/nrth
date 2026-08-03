@@ -96,7 +96,9 @@ class RunInstanceBackupJob implements ShouldQueue
                 'storage_path' => $match['path'],
                 'file_size_bytes' => $match['size_bytes'],
                 'error_message' => null,
-                'completed_at' => now(),
+                'completed_at' => ! empty($match['date'])
+                    ? \Illuminate\Support\Carbon::parse($match['date'])
+                    : now(),
             ])->save();
         } catch (Throwable $e) {
             $freshRun = $run->fresh();

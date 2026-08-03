@@ -29,11 +29,11 @@ class InstanceSettingsController extends Controller
         Gate::authorize('manageInstanceBackups');
 
         $validated = $request->validate([
-            'keep_all_backups_for_days' => ['required', 'integer', 'min:1', 'max:90'],
-            'keep_daily_backups_for_days' => ['required', 'integer', 'min:0', 'max:90'],
-            'keep_weekly_backups_for_weeks' => ['required', 'integer', 'min:0', 'max:104'],
-            'keep_monthly_backups_for_months' => ['required', 'integer', 'min:0', 'max:60'],
-            'keep_yearly_backups_for_years' => ['required', 'integer', 'min:0', 'max:20'],
+            'keep_daily' => ['required', 'integer', 'min:1', 'max:90'],
+            'keep_weekly' => ['required', 'integer', 'min:0', 'max:104'],
+            'keep_monthly' => ['required', 'integer', 'min:0', 'max:60'],
+            'keep_yearly' => ['required', 'integer', 'min:0', 'max:20'],
+            'weekly_on' => ['required', 'string', 'in:sunday,monday,tuesday,wednesday,thursday,friday,saturday'],
             'delete_oldest_backups_when_using_more_megabytes_than' => [
                 'nullable',
                 'integer',

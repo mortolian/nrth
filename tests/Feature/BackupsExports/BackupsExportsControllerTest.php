@@ -73,13 +73,37 @@ class BackupsExportsControllerTest extends TestCase
         ]);
         $this->actingAsTeamOwner($user, $user->currentTeam);
 
+        $manual = InstanceBackupRun::factory()->ready()->create([
+            'requested_by' => $user->id,
+            'filename' => 'manual-2026-08-01.zip',
+            'storage_path' => 'nrth/manual-2026-08-01.zip',
+            'types' => ['daily'],
+            'created_at' => now()->subDays(2),
+            'completed_at' => now()->subDays(2),
+        ]);
+        $scheduled = InstanceBackupRun::factory()->ready()->create([
+            'requested_by' => null,
+            'filename' => 'scheduled-2026-06-24.zip',
+            'storage_path' => 'nrth/scheduled-2026-06-24.zip',
+            'types' => ['daily', 'weekly'],
+            'created_at' => now()->subHours(1),
+            'completed_at' => now()->subDays(40),
+        ]);
+
         $response = $this->get(route('backups-exports.index', ['section' => 'backup']));
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->where('can_manage_backups', true)
             ->where('section', 'backup')
-            ->has('recent_backups')
+            ->has('recent_backups', 2)
+            ->where('recent_backups.0.id', $manual->id)
+            ->where('recent_backups.0.source', 'manual')
+            ->where('recent_backups.0.types', ['daily'])
+            ->where('recent_backups.1.id', $scheduled->id)
+            ->where('recent_backups.1.source', 'scheduled')
+            ->where('recent_backups.1.types', ['daily', 'weekly'])
+            ->where('backup_retention.weekly_on', 'sunday')
             ->has('restore_guide')
             ->has('restore_guide.container_zip_dir')
             ->has('backup_schedule_hint'));
@@ -149,6 +173,9 @@ class BackupsExportsControllerTest extends TestCase
             'requested_by' => $user->id,
             'status' => InstanceBackupRunStatus::Queued->value,
         ]);
+        $run = InstanceBackupRun::query()->latest('id')->first();
+        $this->assertNotNull($run);
+        $this->assertContains('daily', $run->typeList());
         Queue::assertPushed(RunInstanceBackupJob::class, function (RunInstanceBackupJob $job): bool {
             return $job->queue === 'long' && $job->backupRunId > 0;
         });

@@ -6,6 +6,7 @@ use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
+use App\Domain\Backup\Services\InstanceBackupTypeResolver;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
@@ -30,6 +31,7 @@ class BackupsExportsController extends Controller
         private readonly InstanceBackupService $backups,
         private readonly InstanceOperatorService $operators,
         private readonly InstanceBackupRetentionSettings $backupRetention,
+        private readonly InstanceBackupTypeResolver $backupTypes,
     ) {}
 
     public function index(Request $request): Response
@@ -54,6 +56,7 @@ class BackupsExportsController extends Controller
             $section = 'backup';
         }
 
+        $weeklyOn = $this->backupRetention->defaults()['weekly_on'];
         $props = [
             'section' => $section,
             'can_generate_takeout' => $isOwner,
@@ -65,7 +68,7 @@ class BackupsExportsController extends Controller
             'recent_backups' => [],
             'operators' => [],
             'env_break_glass_configured' => false,
-            'backup_schedule_hint' => 'Scheduled daily at 03:00 (cleanup at 03:30). Retention below decides how long daily/weekly/monthly copies are kept. Use the restore guide for CLI recovery — there is no one-click restore in the app.',
+            'backup_schedule_hint' => $this->backupScheduleHint($weeklyOn),
             'restore_guide' => null,
             'backup_retention' => null,
         ];
@@ -76,11 +79,13 @@ class BackupsExportsController extends Controller
 
         if ($canManageBackups) {
             $this->backups->syncDiskBackupsIntoRuns();
+            $retention = $this->backupRetention->current();
             $props['recent_backups'] = $this->backupRunProps();
             $props['restore_guide'] = $this->backups->restoreGuideProps();
             $props['operators'] = $this->operators->listEffectiveOperators();
             $props['env_break_glass_configured'] = $this->operators->envOperatorEmails() !== [];
-            $props['backup_retention'] = $this->backupRetention->current();
+            $props['backup_retention'] = $retention;
+            $props['backup_schedule_hint'] = $this->backupScheduleHint($retention['weekly_on']);
         }
 
         return Inertia::render('BackupsExports/Index', $props);
@@ -110,6 +115,7 @@ class BackupsExportsController extends Controller
         $run = InstanceBackupRun::query()->create([
             'requested_by' => $request->user()->id,
             'status' => InstanceBackupRunStatus::Queued,
+            'types' => $this->backupTypes->typesFor(now()),
         ]);
 
         RunInstanceBackupJob::dispatch($run->id);
@@ -175,6 +181,7 @@ class BackupsExportsController extends Controller
 
         $instanceBackupRun->forceFill([
             'status' => InstanceBackupRunStatus::Queued,
+            'types' => $this->backupTypes->typesFor(now()),
             'filename' => null,
             'disk' => null,
             'storage_path' => null,
@@ -196,24 +203,42 @@ class BackupsExportsController extends Controller
     private function backupRunProps(): array
     {
         return InstanceBackupRun::query()
-            ->orderByDesc('created_at')
+            ->orderByRaw('COALESCE(completed_at, created_at) DESC')
             ->limit(25)
             ->get()
-            ->map(fn (InstanceBackupRun $run): array => [
-                'id' => $run->id,
-                'status' => $run->status->value,
-                'filename' => $run->filename,
-                'created_at' => $run->created_at?->toIso8601String(),
-                'completed_at' => $run->completed_at?->toIso8601String(),
-                'file_size_bytes' => $run->file_size_bytes,
-                'download_url' => $run->isDownloadable()
-                    ? route('backups-exports.backups.download', $run)
-                    : null,
-                'error_message' => $run->error_message,
-                'can_retry' => $run->status === InstanceBackupRunStatus::Failed,
-            ])
+            ->map(function (InstanceBackupRun $run): array {
+                $backedUpAt = $run->completed_at ?? $run->created_at;
+                $types = $run->typeList();
+                if ($types === [] && $backedUpAt !== null) {
+                    $types = $this->backupTypes->typesFor($backedUpAt);
+                }
+
+                return [
+                    'id' => $run->id,
+                    'status' => $run->status->value,
+                    'filename' => $run->filename,
+                    'created_at' => $run->created_at?->toIso8601String(),
+                    'completed_at' => $run->completed_at?->toIso8601String(),
+                    'backed_up_at' => $backedUpAt?->toIso8601String(),
+                    'file_size_bytes' => $run->file_size_bytes,
+                    'download_url' => $run->isDownloadable()
+                        ? route('backups-exports.backups.download', $run)
+                        : null,
+                    'error_message' => $run->error_message,
+                    'can_retry' => $run->status === InstanceBackupRunStatus::Failed,
+                    'source' => $run->requested_by ? 'manual' : 'scheduled',
+                    'types' => $types,
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    private function backupScheduleHint(string $weeklyOn): string
+    {
+        $day = ucfirst($weeklyOn);
+
+        return "Scheduled daily at 03:00 (rotation at 03:30). Each zip is a daily backup; on {$day} it is also weekly, on month-end also monthly, and on 31 Dec also yearly. Retention counts below control how many of each type are kept. Use the restore guide for CLI recovery — there is no one-click restore in the app.";
     }
 
     /**

@@ -18,16 +18,21 @@ type TakeoutRunRow = {
     can_retry: boolean;
 };
 
+type RetentionBand = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 type BackupRunRow = {
     id: number;
     status: string;
     filename: string | null;
     created_at: string | null;
     completed_at: string | null;
+    backed_up_at: string | null;
     file_size_bytes: number | null;
     download_url: string | null;
     error_message: string | null;
     can_retry: boolean;
+    source: 'manual' | 'scheduled';
+    types: RetentionBand[];
 };
 
 type RestoreGuide = {
@@ -48,11 +53,11 @@ type OperatorRow = {
 };
 
 type BackupRetention = {
-    keep_all_backups_for_days: number;
-    keep_daily_backups_for_days: number;
-    keep_weekly_backups_for_weeks: number;
-    keep_monthly_backups_for_months: number;
-    keep_yearly_backups_for_years: number;
+    keep_daily: number;
+    keep_weekly: number;
+    keep_monthly: number;
+    keep_yearly: number;
+    weekly_on: string;
     delete_oldest_backups_when_using_more_megabytes_than: number | null;
 };
 
@@ -108,11 +113,11 @@ const operatorForm = useForm({
 });
 
 const retentionForm = useForm({
-    keep_all_backups_for_days: props.backup_retention?.keep_all_backups_for_days ?? 7,
-    keep_daily_backups_for_days: props.backup_retention?.keep_daily_backups_for_days ?? 16,
-    keep_weekly_backups_for_weeks: props.backup_retention?.keep_weekly_backups_for_weeks ?? 8,
-    keep_monthly_backups_for_months: props.backup_retention?.keep_monthly_backups_for_months ?? 4,
-    keep_yearly_backups_for_years: props.backup_retention?.keep_yearly_backups_for_years ?? 2,
+    keep_daily: props.backup_retention?.keep_daily ?? 7,
+    keep_weekly: props.backup_retention?.keep_weekly ?? 8,
+    keep_monthly: props.backup_retention?.keep_monthly ?? 4,
+    keep_yearly: props.backup_retention?.keep_yearly ?? 2,
+    weekly_on: props.backup_retention?.weekly_on ?? 'sunday',
     delete_oldest_backups_when_using_more_megabytes_than:
         props.backup_retention?.delete_oldest_backups_when_using_more_megabytes_than ?? null,
 });
@@ -123,11 +128,11 @@ watch(
         if (!next) {
             return;
         }
-        retentionForm.keep_all_backups_for_days = next.keep_all_backups_for_days;
-        retentionForm.keep_daily_backups_for_days = next.keep_daily_backups_for_days;
-        retentionForm.keep_weekly_backups_for_weeks = next.keep_weekly_backups_for_weeks;
-        retentionForm.keep_monthly_backups_for_months = next.keep_monthly_backups_for_months;
-        retentionForm.keep_yearly_backups_for_years = next.keep_yearly_backups_for_years;
+        retentionForm.keep_daily = next.keep_daily;
+        retentionForm.keep_weekly = next.keep_weekly;
+        retentionForm.keep_monthly = next.keep_monthly;
+        retentionForm.keep_yearly = next.keep_yearly;
+        retentionForm.weekly_on = next.weekly_on;
         retentionForm.delete_oldest_backups_when_using_more_megabytes_than =
             next.delete_oldest_backups_when_using_more_megabytes_than;
         retentionForm.clearErrors();
@@ -183,10 +188,7 @@ const readyBackups = computed(() =>
     props.recent_backups.filter((run) => run.status === 'ready' && !!run.filename),
 );
 
-type RetentionBand = 'all' | 'daily' | 'weekly' | 'monthly' | 'yearly';
-
 const retentionBandLabel: Record<RetentionBand, string> = {
-    all: 'Recent',
     daily: 'Daily',
     weekly: 'Weekly',
     monthly: 'Monthly',
@@ -194,59 +196,33 @@ const retentionBandLabel: Record<RetentionBand, string> = {
 };
 
 const retentionBandVariant: Record<RetentionBand, 'success' | 'info' | 'neutral' | 'warning' | 'default'> = {
-    all: 'success',
     daily: 'info',
-    weekly: 'neutral',
+    weekly: 'success',
     monthly: 'warning',
     yearly: 'default',
 };
 
-const retentionBandFor = (createdAt: string | null): RetentionBand | null => {
-    if (!createdAt || !props.backup_retention) {
-        return null;
-    }
-
-    const created = new Date(createdAt);
-    if (Number.isNaN(created.getTime())) {
-        return null;
-    }
-
-    const ageDays = Math.max(0, (Date.now() - created.getTime()) / 86_400_000);
-    const r = props.backup_retention;
-
-    let end = Number(r.keep_all_backups_for_days) || 0;
-    if (ageDays <= end) {
-        return 'all';
-    }
-
-    end += Number(r.keep_daily_backups_for_days) || 0;
-    if (ageDays <= end) {
-        return 'daily';
-    }
-
-    end += (Number(r.keep_weekly_backups_for_weeks) || 0) * 7;
-    if (ageDays <= end) {
-        return 'weekly';
-    }
-
-    end += (Number(r.keep_monthly_backups_for_months) || 0) * 30;
-    if (ageDays <= end) {
-        return 'monthly';
-    }
-
-    return 'yearly';
-};
+const weeklyOnOptions = [
+    { label: 'Sunday', value: 'sunday' },
+    { label: 'Monday', value: 'monday' },
+    { label: 'Tuesday', value: 'tuesday' },
+    { label: 'Wednesday', value: 'wednesday' },
+    { label: 'Thursday', value: 'thursday' },
+    { label: 'Friday', value: 'friday' },
+    { label: 'Saturday', value: 'saturday' },
+];
 
 const backupMonthGroups = computed(() => {
     const groups: Array<{
         key: string;
         label: string;
-        runs: Array<BackupRunRow & { retention_band: RetentionBand | null }>;
+        runs: BackupRunRow[];
     }> = [];
     const indexByKey = new Map<string, number>();
 
     for (const run of props.recent_backups) {
-        const created = run.created_at ? new Date(run.created_at) : null;
+        const stamp = run.backed_up_at ?? run.completed_at ?? run.created_at;
+        const created = stamp ? new Date(stamp) : null;
         const valid = created && !Number.isNaN(created.getTime());
         const key = valid
             ? `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
@@ -261,14 +237,16 @@ const backupMonthGroups = computed(() => {
             indexByKey.set(key, idx);
             groups.push({ key, label, runs: [] });
         }
-        groups[idx].runs.push({
-            ...run,
-            retention_band: retentionBandFor(run.created_at),
-        });
+        groups[idx].runs.push(run);
     }
 
     return groups;
 });
+
+const backupDateLabel = (run: BackupRunRow): string => {
+    const stamp = run.backed_up_at ?? run.completed_at ?? run.created_at;
+    return stamp ? stamp.slice(0, 19).replace('T', ' ') : '—';
+};
 
 const restoreFilename = ref(readyBackups.value[0]?.filename ?? '');
 const restoreRuntime = ref<'compose' | 'sail'>('compose');
@@ -862,75 +840,70 @@ onBeforeUnmount(() => {
             <AppCard v-if="backup_retention" class="mt-5">
                 <h3 class="text-base font-semibold text-slate-900">Backup retention</h3>
                 <p class="mt-1 text-sm text-slate-600">
-                    Backups still run once a day. These settings control how cleanup keeps copies over time
-                    (all → daily → weekly → monthly → yearly). Applied on the next scheduled cleanup (03:30).
+                    One backup zip is created each day. On the weekly day it also counts as weekly;
+                    on month-end also monthly; on 31 Dec also yearly. Counts below are how many of
+                    each type to keep — older unprotected zips are rotated out at 03:30.
                 </p>
 
                 <form class="mt-4 space-y-4" @submit.prevent="saveRetention">
                     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep all for (days)</label>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep daily backups</label>
                             <AppInput
-                                v-model="retentionForm.keep_all_backups_for_days"
+                                v-model="retentionForm.keep_daily"
                                 type="number"
                                 min="1"
                                 max="90"
                                 required
                             />
-                            <p v-if="retentionForm.errors.keep_all_backups_for_days" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_all_backups_for_days }}
+                            <p v-if="retentionForm.errors.keep_daily" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_daily }}
                             </p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then daily for (days)</label>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep weekly backups</label>
                             <AppInput
-                                v-model="retentionForm.keep_daily_backups_for_days"
-                                type="number"
-                                min="0"
-                                max="90"
-                                required
-                            />
-                            <p v-if="retentionForm.errors.keep_daily_backups_for_days" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_daily_backups_for_days }}
-                            </p>
-                        </div>
-                        <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then weekly for (weeks)</label>
-                            <AppInput
-                                v-model="retentionForm.keep_weekly_backups_for_weeks"
+                                v-model="retentionForm.keep_weekly"
                                 type="number"
                                 min="0"
                                 max="104"
                                 required
                             />
-                            <p v-if="retentionForm.errors.keep_weekly_backups_for_weeks" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_weekly_backups_for_weeks }}
+                            <p v-if="retentionForm.errors.keep_weekly" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_weekly }}
                             </p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then monthly for (months)</label>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep monthly backups</label>
                             <AppInput
-                                v-model="retentionForm.keep_monthly_backups_for_months"
+                                v-model="retentionForm.keep_monthly"
                                 type="number"
                                 min="0"
                                 max="60"
                                 required
                             />
-                            <p v-if="retentionForm.errors.keep_monthly_backups_for_months" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_monthly_backups_for_months }}
+                            <p v-if="retentionForm.errors.keep_monthly" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_monthly }}
                             </p>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Then yearly for (years)</label>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Keep yearly backups</label>
                             <AppInput
-                                v-model="retentionForm.keep_yearly_backups_for_years"
+                                v-model="retentionForm.keep_yearly"
                                 type="number"
                                 min="0"
                                 max="20"
                                 required
                             />
-                            <p v-if="retentionForm.errors.keep_yearly_backups_for_years" class="mt-1 text-xs text-rose-600">
-                                {{ retentionForm.errors.keep_yearly_backups_for_years }}
+                            <p v-if="retentionForm.errors.keep_yearly" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.keep_yearly }}
+                            </p>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-500">Weekly backup day</label>
+                            <AppSelect v-model="retentionForm.weekly_on" :options="weeklyOnOptions" />
+                            <p v-if="retentionForm.errors.weekly_on" class="mt-1 text-xs text-rose-600">
+                                {{ retentionForm.errors.weekly_on }}
                             </p>
                         </div>
                         <div>
@@ -942,7 +915,7 @@ onBeforeUnmount(() => {
                                 max="200000"
                                 placeholder="Unlimited"
                             />
-                            <p class="mt-1 text-xs text-slate-500">Leave blank for no size cap. Oldest backups are removed first.</p>
+                            <p class="mt-1 text-xs text-slate-500">Leave blank for no size cap. Oldest unprotected backups are removed first.</p>
                             <p v-if="retentionForm.errors.delete_oldest_backups_when_using_more_megabytes_than" class="mt-1 text-xs text-rose-600">
                                 {{ retentionForm.errors.delete_oldest_backups_when_using_more_megabytes_than }}
                             </p>
@@ -962,7 +935,8 @@ onBeforeUnmount(() => {
                     <div>
                         <h3 class="text-base font-semibold text-slate-900">Recent backups</h3>
                         <p class="mt-0.5 text-xs text-slate-500">
-                            Grouped by month. Retention labels estimate the cleanup window by age (not separate backup jobs).
+                            Grouped by month. Type badges are the retention roles on that zip
+                            (one file can be Daily and Weekly, etc.).
                         </p>
                     </div>
                     <p v-if="backupBusy" class="text-xs text-slate-500">Refreshing status…</p>
@@ -972,8 +946,8 @@ onBeforeUnmount(() => {
                     <table class="min-w-full text-sm">
                         <thead>
                             <tr class="border-b border-slate-200 text-left text-slate-600">
+                                <th class="px-2 py-2 font-medium">Type</th>
                                 <th class="px-2 py-2 font-medium">File</th>
-                                <th class="px-2 py-2 font-medium">Retention</th>
                                 <th class="px-2 py-2 font-medium">Status</th>
                                 <th class="px-2 py-2 font-medium">Size</th>
                                 <th class="px-2 py-2 font-medium">Created</th>
@@ -995,16 +969,26 @@ onBeforeUnmount(() => {
                                     :key="run.id"
                                     class="border-b border-slate-100"
                                 >
-                                    <td class="px-2 py-2 font-mono text-xs">{{ run.filename ?? '—' }}</td>
                                     <td class="px-2 py-2">
-                                        <AppBadge
-                                            v-if="run.retention_band"
-                                            :variant="retentionBandVariant[run.retention_band]"
-                                        >
-                                            {{ retentionBandLabel[run.retention_band] }}
-                                        </AppBadge>
-                                        <span v-else class="text-xs text-slate-400">—</span>
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <AppBadge
+                                                v-for="type in run.types"
+                                                :key="type"
+                                                :variant="retentionBandVariant[type]"
+                                            >
+                                                {{ retentionBandLabel[type] }}
+                                            </AppBadge>
+                                            <span v-if="!run.types?.length" class="text-xs text-slate-400">—</span>
+                                            <AppBadge
+                                                v-if="run.source === 'manual'"
+                                                variant="neutral"
+                                                title="Started with Run backup now"
+                                            >
+                                                Manual
+                                            </AppBadge>
+                                        </div>
                                     </td>
+                                    <td class="px-2 py-2 font-mono text-xs">{{ run.filename ?? '—' }}</td>
                                     <td class="px-2 py-2">
                                         <span
                                             :class="run.status === 'failed' ? 'text-rose-600' : run.status === 'ready' ? 'text-brand-700' : 'text-slate-600'"
@@ -1014,7 +998,7 @@ onBeforeUnmount(() => {
                                         <p v-if="run.error_message" class="mt-0.5 text-xs text-rose-600">{{ run.error_message }}</p>
                                     </td>
                                     <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
-                                    <td class="px-2 py-2">{{ run.created_at ? run.created_at.slice(0, 19).replace('T', ' ') : '—' }}</td>
+                                    <td class="px-2 py-2">{{ backupDateLabel(run) }}</td>
                                     <td class="px-2 py-2 text-right">
                                         <div class="inline-flex justify-end">
                                             <InvoiceRowActionsMenu

@@ -22,6 +22,7 @@ class InstanceBackupRunFactory extends Factory
         return [
             'requested_by' => User::factory(),
             'status' => InstanceBackupRunStatus::Queued,
+            'types' => ['daily'],
             'filename' => null,
             'disk' => null,
             'storage_path' => null,
@@ -37,6 +38,7 @@ class InstanceBackupRunFactory extends Factory
 
         return $this->state(fn (): array => [
             'status' => InstanceBackupRunStatus::Ready,
+            'types' => ['daily'],
             'filename' => $filename,
             'disk' => 'local',
             'storage_path' => 'nrth/'.$filename,

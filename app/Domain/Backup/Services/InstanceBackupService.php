@@ -3,7 +3,9 @@
 namespace App\Domain\Backup\Services;
 
 use App\Domain\Backup\Enums\InstanceBackupRunStatus;
+use App\Domain\Backup\Enums\InstanceBackupType;
 use App\Domain\Backup\Models\InstanceBackupRun;
+use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -22,6 +24,11 @@ class InstanceBackupService
     public const QUEUED_CACHE_KEY = 'nrth.instance_backup.queued';
 
     public const LAST_ERROR_CACHE_KEY = 'nrth.instance_backup.last_error';
+
+    public function __construct(
+        private readonly InstanceBackupRetentionSettings $retention,
+        private readonly InstanceBackupTypeResolver $typeResolver,
+    ) {}
 
     public function isRunning(): bool
     {
@@ -147,15 +154,20 @@ class InstanceBackupService
                 continue;
             }
 
+            $backupAt = $backup['date'] ? Carbon::parse($backup['date']) : now();
+
             InstanceBackupRun::query()->create([
                 'requested_by' => null,
                 'status' => InstanceBackupRunStatus::Ready,
+                'types' => $this->typeResolver->typesFor($backupAt),
                 'filename' => $backup['filename'],
                 'disk' => $backup['disk'],
                 'storage_path' => $backup['path'],
                 'file_size_bytes' => $backup['size_bytes'],
-                'completed_at' => $backup['date'] ? Carbon::parse($backup['date']) : now(),
+                'completed_at' => $backupAt,
                 'error_message' => null,
+                'created_at' => $backupAt,
+                'updated_at' => $backupAt,
             ]);
         }
     }
@@ -213,11 +225,182 @@ class InstanceBackupService
                 'file_size_bytes' => $backup['size_bytes'],
                 'error_message' => null,
                 'completed_at' => $backupAt ?? now(),
+                'types' => $run->typeList() !== []
+                    ? $run->typeList()
+                    : $this->typeResolver->typesFor($backupAt ?? now()),
             ])->save();
 
             $trackedFilenames[] = $backup['filename'];
             $activeRuns = $activeRuns->reject(fn (InstanceBackupRun $r): bool => $r->id === $run->id)->values();
         }
+    }
+
+    /**
+     * Keep the newest N backups per type; delete zips that are not protected by any type.
+     *
+     * @return array{deleted: int, protected: int}
+     */
+    public function rotateByTypeCounts(): array
+    {
+        $settings = $this->retention->current();
+        $keepByType = [
+            InstanceBackupType::Daily->value => (int) $settings['keep_daily'],
+            InstanceBackupType::Weekly->value => (int) $settings['keep_weekly'],
+            InstanceBackupType::Monthly->value => (int) $settings['keep_monthly'],
+            InstanceBackupType::Yearly->value => (int) $settings['keep_yearly'],
+        ];
+
+        $runs = InstanceBackupRun::query()
+            ->where('status', InstanceBackupRunStatus::Ready)
+            ->whereNotNull('filename')
+            ->get()
+            ->sortByDesc(fn (InstanceBackupRun $run): int => ($run->completed_at ?? $run->created_at)?->getTimestamp() ?? 0)
+            ->values();
+
+        foreach ($runs as $run) {
+            if ($run->typeList() === []) {
+                $at = $run->completed_at ?? $run->created_at ?? now();
+                $run->forceFill(['types' => $this->typeResolver->typesFor($at)])->save();
+            }
+        }
+
+        $protectedIds = [];
+        foreach ($keepByType as $type => $keep) {
+            if ($keep <= 0) {
+                continue;
+            }
+
+            $count = 0;
+            foreach ($runs as $run) {
+                if (! $run->hasType($type)) {
+                    continue;
+                }
+                $protectedIds[$run->id] = true;
+                $count++;
+                if ($count >= $keep) {
+                    break;
+                }
+            }
+        }
+
+        $deleted = 0;
+        foreach ($runs as $run) {
+            if (isset($protectedIds[$run->id])) {
+                continue;
+            }
+
+            $this->deleteRun($run);
+            $deleted++;
+        }
+
+        $deleted += $this->enforceSizeCap($keepByType);
+
+        return [
+            'deleted' => $deleted,
+            'protected' => count($protectedIds),
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $keepByType
+     */
+    private function enforceSizeCap(array $keepByType): int
+    {
+        $megabytes = $this->retention->current()['delete_oldest_backups_when_using_more_megabytes_than'];
+        if ($megabytes === null) {
+            return 0;
+        }
+
+        $maxBytes = (int) $megabytes * 1024 * 1024;
+        $deleted = 0;
+
+        while (true) {
+            $runs = InstanceBackupRun::query()
+                ->where('status', InstanceBackupRunStatus::Ready)
+                ->whereNotNull('filename')
+                ->get()
+                ->sortBy(fn (InstanceBackupRun $run): int => ($run->completed_at ?? $run->created_at)?->getTimestamp() ?? 0)
+                ->values();
+
+            $totalBytes = (int) $runs->sum(fn (InstanceBackupRun $run): int => (int) ($run->file_size_bytes ?? 0));
+            if ($totalBytes <= $maxBytes || $runs->isEmpty()) {
+                break;
+            }
+
+            $protectedIds = $this->protectedIdsFor($runs, $keepByType);
+            $candidate = $runs->first(function (InstanceBackupRun $run) use ($protectedIds): bool {
+                if (! isset($protectedIds[$run->id])) {
+                    return true;
+                }
+
+                // Prefer pure dailies among protected set only if somehow over cap with all protected —
+                // never delete the newest protected of each type (already in protectedIds as newest N).
+                return false;
+            });
+
+            // If everything is protected, drop the oldest pure-daily that is the least critical:
+            // remove oldest protected daily-only backup beyond the first keep_daily? Actually plan says
+            // never delete newest protected of each type. If still over cap, delete oldest protected
+            // that is daily-only (not weekly/monthly/yearly).
+            if ($candidate === null) {
+                $candidate = $runs->first(function (InstanceBackupRun $run): bool {
+                    $types = $run->typeList();
+
+                    return $types === [InstanceBackupType::Daily->value];
+                });
+            }
+
+            if ($candidate === null) {
+                break;
+            }
+
+            $this->deleteRun($candidate);
+            $deleted++;
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * @param  Collection<int, InstanceBackupRun>  $runs  newest-first or any order
+     * @param  array<string, int>  $keepByType
+     * @return array<int, true>
+     */
+    private function protectedIdsFor(Collection $runs, array $keepByType): array
+    {
+        $newestFirst = $runs
+            ->sortByDesc(fn (InstanceBackupRun $run): int => ($run->completed_at ?? $run->created_at)?->getTimestamp() ?? 0)
+            ->values();
+
+        $protectedIds = [];
+        foreach ($keepByType as $type => $keep) {
+            if ($keep <= 0) {
+                continue;
+            }
+
+            $count = 0;
+            foreach ($newestFirst as $run) {
+                if (! $run->hasType($type)) {
+                    continue;
+                }
+                $protectedIds[$run->id] = true;
+                $count++;
+                if ($count >= $keep) {
+                    break;
+                }
+            }
+        }
+
+        return $protectedIds;
+    }
+
+    public function deleteRun(InstanceBackupRun $run): void
+    {
+        if (filled($run->filename)) {
+            $this->delete((string) $run->filename);
+        }
+
+        $run->delete();
     }
 
     /**

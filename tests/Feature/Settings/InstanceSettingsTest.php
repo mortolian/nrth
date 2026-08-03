@@ -147,9 +147,10 @@ class InstanceSettingsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('BackupsExports/Index')
-                ->where('backup_retention.keep_all_backups_for_days', 7)
-                ->where('backup_retention.keep_weekly_backups_for_weeks', 8)
-                ->where('backup_retention.keep_monthly_backups_for_months', 4)
+                ->where('backup_retention.keep_daily', 7)
+                ->where('backup_retention.keep_weekly', 8)
+                ->where('backup_retention.keep_monthly', 4)
+                ->where('backup_retention.weekly_on', 'sunday')
                 ->where('backup_retention.delete_oldest_backups_when_using_more_megabytes_than', 5000));
     }
 
@@ -161,11 +162,11 @@ class InstanceSettingsTest extends TestCase
         $this->actingAs($user);
 
         $response = $this->put(route('settings.instance.backup-retention.update'), [
-            'keep_all_backups_for_days' => 3,
-            'keep_daily_backups_for_days' => 10,
-            'keep_weekly_backups_for_weeks' => 6,
-            'keep_monthly_backups_for_months' => 12,
-            'keep_yearly_backups_for_years' => 3,
+            'keep_daily' => 3,
+            'keep_weekly' => 6,
+            'keep_monthly' => 12,
+            'keep_yearly' => 3,
+            'weekly_on' => 'monday',
             'delete_oldest_backups_when_using_more_megabytes_than' => 2000,
         ]);
 
@@ -176,9 +177,11 @@ class InstanceSettingsTest extends TestCase
             'key' => 'backup.cleanup',
         ]);
 
-        $this->assertSame(3, (int) config('backup.cleanup.default_strategy.keep_all_backups_for_days'));
-        $this->assertSame(12, (int) config('backup.cleanup.default_strategy.keep_monthly_backups_for_months'));
-        $this->assertSame(2000, (int) config('backup.cleanup.default_strategy.delete_oldest_backups_when_using_more_megabytes_than'));
+        $current = app(\App\Domain\Instance\Services\InstanceBackupRetentionSettings::class)->current();
+        $this->assertSame(3, $current['keep_daily']);
+        $this->assertSame(12, $current['keep_monthly']);
+        $this->assertSame('monday', $current['weekly_on']);
+        $this->assertSame(2000, $current['delete_oldest_backups_when_using_more_megabytes_than']);
     }
 
     public function test_non_operator_cannot_update_backup_retention(): void
@@ -193,11 +196,11 @@ class InstanceSettingsTest extends TestCase
 
         $this->actingAs($member);
         $this->put(route('settings.instance.backup-retention.update'), [
-            'keep_all_backups_for_days' => 3,
-            'keep_daily_backups_for_days' => 10,
-            'keep_weekly_backups_for_weeks' => 6,
-            'keep_monthly_backups_for_months' => 12,
-            'keep_yearly_backups_for_years' => 3,
+            'keep_daily' => 3,
+            'keep_weekly' => 6,
+            'keep_monthly' => 12,
+            'keep_yearly' => 3,
+            'weekly_on' => 'monday',
             'delete_oldest_backups_when_using_more_megabytes_than' => 2000,
         ])->assertForbidden();
     }

@@ -10,39 +10,46 @@ final class InstanceBackupRetentionSettings
 {
     public const SETTING_KEY = 'backup.cleanup';
 
+    /** @var list<string> */
+    public const WEEKDAYS = [
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+    ];
+
     /**
-     * Package defaults (must stay aligned with config/backup.php).
-     *
      * @return array{
-     *     keep_all_backups_for_days: int,
-     *     keep_daily_backups_for_days: int,
-     *     keep_weekly_backups_for_weeks: int,
-     *     keep_monthly_backups_for_months: int,
-     *     keep_yearly_backups_for_years: int,
+     *     keep_daily: int,
+     *     keep_weekly: int,
+     *     keep_monthly: int,
+     *     keep_yearly: int,
+     *     weekly_on: string,
      *     delete_oldest_backups_when_using_more_megabytes_than: int|null
      * }
      */
     public function defaults(): array
     {
         return [
-            'keep_all_backups_for_days' => 7,
-            'keep_daily_backups_for_days' => 16,
-            'keep_weekly_backups_for_weeks' => 8,
-            'keep_monthly_backups_for_months' => 4,
-            'keep_yearly_backups_for_years' => 2,
+            'keep_daily' => 7,
+            'keep_weekly' => 8,
+            'keep_monthly' => 4,
+            'keep_yearly' => 2,
+            'weekly_on' => 'sunday',
             'delete_oldest_backups_when_using_more_megabytes_than' => 5000,
         ];
     }
 
     /**
-     * Effective retention settings (stored overlay on config defaults).
-     *
      * @return array{
-     *     keep_all_backups_for_days: int,
-     *     keep_daily_backups_for_days: int,
-     *     keep_weekly_backups_for_weeks: int,
-     *     keep_monthly_backups_for_months: int,
-     *     keep_yearly_backups_for_years: int,
+     *     keep_daily: int,
+     *     keep_weekly: int,
+     *     keep_monthly: int,
+     *     keep_yearly: int,
+     *     weekly_on: string,
      *     delete_oldest_backups_when_using_more_megabytes_than: int|null
      * }
      */
@@ -59,17 +66,17 @@ final class InstanceBackupRetentionSettings
             return $defaults;
         }
 
-        return $this->normalize(array_merge($defaults, $stored));
+        return $this->normalize($this->migrateLegacyKeys($stored));
     }
 
     /**
      * @param  array<string, mixed>  $input
      * @return array{
-     *     keep_all_backups_for_days: int,
-     *     keep_daily_backups_for_days: int,
-     *     keep_weekly_backups_for_weeks: int,
-     *     keep_monthly_backups_for_months: int,
-     *     keep_yearly_backups_for_years: int,
+     *     keep_daily: int,
+     *     keep_weekly: int,
+     *     keep_monthly: int,
+     *     keep_yearly: int,
+     *     weekly_on: string,
      *     delete_oldest_backups_when_using_more_megabytes_than: int|null
      * }
      */
@@ -77,7 +84,7 @@ final class InstanceBackupRetentionSettings
     {
         if (! $this->tableReady()) {
             throw ValidationException::withMessages([
-                'keep_all_backups_for_days' => __('Instance settings are not available yet. Run migrations and try again.'),
+                'keep_daily' => __('Instance settings are not available yet. Run migrations and try again.'),
             ]);
         }
 
@@ -88,30 +95,24 @@ final class InstanceBackupRetentionSettings
             ['value' => $normalized],
         );
 
-        $this->applyToConfig($normalized);
-
         return $normalized;
-    }
-
-    public function applyToConfig(?array $strategy = null): void
-    {
-        $strategy ??= $this->current();
-        config(['backup.cleanup.default_strategy' => $strategy]);
     }
 
     /**
      * @param  array<string, mixed>  $input
      * @return array{
-     *     keep_all_backups_for_days: int,
-     *     keep_daily_backups_for_days: int,
-     *     keep_weekly_backups_for_weeks: int,
-     *     keep_monthly_backups_for_months: int,
-     *     keep_yearly_backups_for_years: int,
+     *     keep_daily: int,
+     *     keep_weekly: int,
+     *     keep_monthly: int,
+     *     keep_yearly: int,
+     *     weekly_on: string,
      *     delete_oldest_backups_when_using_more_megabytes_than: int|null
      * }
      */
     public function normalize(array $input): array
     {
+        $input = $this->migrateLegacyKeys($input);
+
         $megabytes = $input['delete_oldest_backups_when_using_more_megabytes_than'] ?? null;
         if ($megabytes === '' || $megabytes === null) {
             $megabytes = null;
@@ -122,18 +123,56 @@ final class InstanceBackupRetentionSettings
             }
         }
 
-        $normalized = [
-            'keep_all_backups_for_days' => max(1, min(90, (int) ($input['keep_all_backups_for_days'] ?? 7))),
-            'keep_daily_backups_for_days' => max(0, min(90, (int) ($input['keep_daily_backups_for_days'] ?? 16))),
-            'keep_weekly_backups_for_weeks' => max(0, min(104, (int) ($input['keep_weekly_backups_for_weeks'] ?? 8))),
-            'keep_monthly_backups_for_months' => max(0, min(60, (int) ($input['keep_monthly_backups_for_months'] ?? 4))),
-            'keep_yearly_backups_for_years' => max(0, min(20, (int) ($input['keep_yearly_backups_for_years'] ?? 2))),
+        $weeklyOn = strtolower((string) ($input['weekly_on'] ?? 'sunday'));
+        if (! in_array($weeklyOn, self::WEEKDAYS, true)) {
+            $weeklyOn = 'sunday';
+        }
+
+        return [
+            'keep_daily' => max(1, min(90, (int) ($input['keep_daily'] ?? 7))),
+            'keep_weekly' => max(0, min(104, (int) ($input['keep_weekly'] ?? 8))),
+            'keep_monthly' => max(0, min(60, (int) ($input['keep_monthly'] ?? 4))),
+            'keep_yearly' => max(0, min(20, (int) ($input['keep_yearly'] ?? 2))),
+            'weekly_on' => $weeklyOn,
             'delete_oldest_backups_when_using_more_megabytes_than' => $megabytes === null
                 ? null
                 : max(100, min(200000, $megabytes)),
         ];
+    }
 
-        return $normalized;
+    /**
+     * Map legacy Spatie age-window keys onto count-based retention.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    public function migrateLegacyKeys(array $input): array
+    {
+        if (! array_key_exists('keep_daily', $input) && array_key_exists('keep_all_backups_for_days', $input)) {
+            $input['keep_daily'] = $input['keep_all_backups_for_days'];
+        }
+
+        if (! array_key_exists('keep_weekly', $input) && array_key_exists('keep_weekly_backups_for_weeks', $input)) {
+            $input['keep_weekly'] = $input['keep_weekly_backups_for_weeks'];
+        }
+
+        if (! array_key_exists('keep_monthly', $input) && array_key_exists('keep_monthly_backups_for_months', $input)) {
+            $input['keep_monthly'] = $input['keep_monthly_backups_for_months'];
+        }
+
+        if (! array_key_exists('keep_yearly', $input) && array_key_exists('keep_yearly_backups_for_years', $input)) {
+            $input['keep_yearly'] = $input['keep_yearly_backups_for_years'];
+        }
+
+        unset(
+            $input['keep_all_backups_for_days'],
+            $input['keep_daily_backups_for_days'],
+            $input['keep_weekly_backups_for_weeks'],
+            $input['keep_monthly_backups_for_months'],
+            $input['keep_yearly_backups_for_years'],
+        );
+
+        return $input;
     }
 
     private function tableReady(): bool

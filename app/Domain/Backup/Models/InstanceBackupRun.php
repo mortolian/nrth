@@ -17,6 +17,7 @@ class InstanceBackupRun extends Model
     protected $fillable = [
         'requested_by',
         'status',
+        'types',
         'filename',
         'disk',
         'storage_path',
@@ -32,6 +33,7 @@ class InstanceBackupRun extends Model
     {
         return [
             'status' => InstanceBackupRunStatus::class,
+            'types' => 'array',
             'completed_at' => 'datetime',
         ];
     }
@@ -41,6 +43,28 @@ class InstanceBackupRun extends Model
         return $this->status === InstanceBackupRunStatus::Ready
             && filled($this->filename)
             && filled($this->storage_path);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function typeList(): array
+    {
+        $types = $this->types;
+
+        if (! is_array($types)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $types,
+            static fn (mixed $type): bool => is_string($type) && $type !== '',
+        ));
+    }
+
+    public function hasType(string $type): bool
+    {
+        return in_array($type, $this->typeList(), true);
     }
 
     /**
