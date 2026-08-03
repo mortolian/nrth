@@ -215,109 +215,109 @@
 </table>
 
 @if($hasBankDetails)
-    <div class="section section-banking">
-        <h3>Payment details</h3>
-        <div class="bank-payment-ref">
-            <span class="bank-payment-ref-label">Payment reference</span>
-            <span class="bank-payment-ref-value">{{ $invoice->number }}</span>
-        </div>
-        <table class="bank-grid">
-            <tbody>
-                @foreach(collect($banksForInvoice)->chunk(2) as $bankPair)
-                    <tr>
-                        @foreach($bankPair as $bank)
-                            @php
-                                $hasBankCells = !empty($bank['name'])
-                                    || !empty($bank['holder'])
-                                    || !empty($bank['account'])
-                                    || !empty($bank['swift_code'])
-                                    || !empty($bank['bic'])
-                                    || !empty($bank['iban'])
-                                    || !empty($bank['routing_sort_code'])
-                                    || !empty($bank['address'])
-                                    || !empty($bank['branch'])
-                                    || !empty($bank['type']);
-                            @endphp
-                            <td class="bank-grid-cell {{ $loop->first ? 'bank-grid-cell-left' : 'bank-grid-cell-right' }}">
-                                <div class="bank-card">
-                                    @if(!empty($bank['title']))
-                                        <div class="bank-card-title">{{ $bank['title'] }}</div>
+    {{-- Table wrapper: DomPDF respects page-break-inside on tables more reliably than on divs. --}}
+    <table class="bank-section-wrap">
+        <tr>
+            <td>
+                <div class="section section-banking">
+                    <h3>Payment details</h3>
+                    <p class="bank-payment-ref">
+                        <span class="bank-payment-ref-label">Payment reference</span>
+                        <span class="bank-payment-ref-value">{{ $invoice->number }}</span>
+                    </p>
+                    <table class="bank-grid">
+                        <tbody>
+                            @foreach(collect($banksForInvoice)->chunk(2) as $bankPair)
+                                <tr>
+                                    @foreach($bankPair as $bank)
+                                        @php
+                                            $hasBankCells = !empty($bank['name'])
+                                                || !empty($bank['holder'])
+                                                || !empty($bank['account'])
+                                                || !empty($bank['swift_code'])
+                                                || !empty($bank['bic'])
+                                                || !empty($bank['iban'])
+                                                || !empty($bank['routing_sort_code'])
+                                                || !empty($bank['address'])
+                                                || !empty($bank['branch']);
+                                        @endphp
+                                        <td class="bank-grid-cell {{ $loop->first ? 'bank-grid-cell-left' : 'bank-grid-cell-right' }}">
+                                            <div class="bank-card">
+                                                @if(!empty($bank['title']))
+                                                    <div class="bank-card-title">{{ $bank['title'] }}</div>
+                                                @endif
+                                                @if($hasBankCells)
+                                                    <table class="bank-kv">
+                                                        @if(!empty($bank['name']))
+                                                            <tr>
+                                                                <td class="bank-k">Bank</td>
+                                                                <td class="bank-v">{{ $bank['name'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['holder']))
+                                                            <tr>
+                                                                <td class="bank-k">Account holder</td>
+                                                                <td class="bank-v">{{ $bank['holder'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['account']))
+                                                            <tr>
+                                                                <td class="bank-k">Account no.</td>
+                                                                <td class="bank-v">{{ $bank['account'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['branch']))
+                                                            <tr>
+                                                                <td class="bank-k">Branch</td>
+                                                                <td class="bank-v">{{ $bank['branch'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['swift_code']))
+                                                            <tr>
+                                                                <td class="bank-k">SWIFT</td>
+                                                                <td class="bank-v">{{ $bank['swift_code'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['bic']))
+                                                            <tr>
+                                                                <td class="bank-k">BIC</td>
+                                                                <td class="bank-v">{{ $bank['bic'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['iban']))
+                                                            <tr>
+                                                                <td class="bank-k">IBAN</td>
+                                                                <td class="bank-v">{{ $bank['iban'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['routing_sort_code']))
+                                                            <tr>
+                                                                <td class="bank-k">Routing / sort</td>
+                                                                <td class="bank-v">{{ $bank['routing_sort_code'] }}</td>
+                                                            </tr>
+                                                        @endif
+                                                        @if(!empty($bank['address']))
+                                                            <tr>
+                                                                <td class="bank-k">Bank address</td>
+                                                                <td class="bank-v">{!! nl2br(e($bank['address'])) !!}</td>
+                                                            </tr>
+                                                        @endif
+                                                    </table>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    @endforeach
+                                    @if($bankPair->count() === 1)
+                                        <td class="bank-grid-cell bank-grid-cell-right"></td>
                                     @endif
-                                    @if($hasBankCells)
-                                        <table class="bank-kv">
-                                            @if(!empty($bank['name']))
-                                                <tr>
-                                                    <td class="bank-k">Bank</td>
-                                                    <td class="bank-v">{{ $bank['name'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['holder']))
-                                                <tr>
-                                                    <td class="bank-k">Account holder</td>
-                                                    <td class="bank-v">{{ $bank['holder'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['account']))
-                                                <tr>
-                                                    <td class="bank-k">Account no.</td>
-                                                    <td class="bank-v">{{ $bank['account'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['swift_code']))
-                                                <tr>
-                                                    <td class="bank-k">SWIFT</td>
-                                                    <td class="bank-v">{{ $bank['swift_code'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['bic']))
-                                                <tr>
-                                                    <td class="bank-k">BIC</td>
-                                                    <td class="bank-v">{{ $bank['bic'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['iban']))
-                                                <tr>
-                                                    <td class="bank-k">IBAN</td>
-                                                    <td class="bank-v">{{ $bank['iban'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['routing_sort_code']))
-                                                <tr>
-                                                    <td class="bank-k">Routing / sort</td>
-                                                    <td class="bank-v">{{ $bank['routing_sort_code'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['address']))
-                                                <tr>
-                                                    <td class="bank-k">Bank address</td>
-                                                    <td class="bank-v">{!! nl2br(e($bank['address'])) !!}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['branch']))
-                                                <tr>
-                                                    <td class="bank-k">Branch code</td>
-                                                    <td class="bank-v">{{ $bank['branch'] }}</td>
-                                                </tr>
-                                            @endif
-                                            @if(!empty($bank['type']))
-                                                <tr>
-                                                    <td class="bank-k">Account type</td>
-                                                    <td class="bank-v">{{ ucfirst((string) $bank['type']) }}</td>
-                                                </tr>
-                                            @endif
-                                        </table>
-                                    @endif
-                                </div>
-                            </td>
-                        @endforeach
-                        @if($bankPair->count() === 1)
-                            <td class="bank-grid-cell bank-grid-cell-right"></td>
-                        @endif
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
 @endif
 
 @include('pdf._markdown-section', ['title' => 'Notes', 'html' => $markdown->toHtml($invoice->notes)])

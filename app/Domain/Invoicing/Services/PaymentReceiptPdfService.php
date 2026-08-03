@@ -49,6 +49,7 @@ class PaymentReceiptPdfService
             'payment' => $payment,
             'invoice' => $payment->invoice,
             'totals' => $this->totalsAsOfPayment($payment),
+            'payments_through' => $this->paymentsThroughAsOf($payment),
         ])
             ->setPaper('a4')
             ->setOptions([
@@ -63,6 +64,34 @@ class PaymentReceiptPdfService
     }
 
     /**
+     * Payments on the invoice included in this receipt’s “paid to date” (ordered by date, then id).
+     *
+     * @return list<Payment>
+     */
+    public function paymentsThroughAsOf(Payment $payment): array
+    {
+        $invoice = $payment->invoice;
+        if ($invoice === null) {
+            return [];
+        }
+
+        $paymentDate = optional($payment->payment_date)->toDateString();
+
+        return $invoice->payments()
+            ->where(function ($query) use ($payment, $paymentDate): void {
+                $query->whereDate('payment_date', '<', $paymentDate)
+                    ->orWhere(function ($sameDay) use ($payment, $paymentDate): void {
+                        $sameDay->whereDate('payment_date', $paymentDate)
+                            ->where('id', '<=', $payment->id);
+                    });
+            })
+            ->orderBy('payment_date')
+            ->orderBy('id')
+            ->get()
+            ->all();
+    }
+
+    /**
      * Invoice totals relative to this payment (paid through this receipt, then outstanding).
      *
      * @return array{invoice_total_cents: int, paid_through_cents: int, outstanding_cents: int, payment_cents: int}
@@ -72,17 +101,9 @@ class PaymentReceiptPdfService
         $invoice = $payment->invoice;
         $invoiceTotal = (int) $invoice->getRawOriginal('total_cents');
         $paymentCents = (int) $payment->getRawOriginal('amount_cents');
-        $paymentDate = optional($payment->payment_date)->toDateString();
 
-        $paidThrough = (int) $invoice->payments()
-            ->where(function ($query) use ($payment, $paymentDate): void {
-                $query->whereDate('payment_date', '<', $paymentDate)
-                    ->orWhere(function ($sameDay) use ($payment, $paymentDate): void {
-                        $sameDay->whereDate('payment_date', $paymentDate)
-                            ->where('id', '<=', $payment->id);
-                    });
-            })
-            ->sum('amount_cents');
+        $paidThrough = (int) collect($this->paymentsThroughAsOf($payment))
+            ->sum(fn (Payment $row): int => (int) $row->getRawOriginal('amount_cents'));
 
         return [
             'invoice_total_cents' => $invoiceTotal,

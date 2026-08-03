@@ -50,10 +50,21 @@
         default => strtoupper((string) ($payment->method?->value ?? 'Payment')),
     };
 
+    $paymentMethodLabel = static function ($method): string {
+        return match ($method?->value ?? $method) {
+            'cash' => 'Cash',
+            'eft' => 'EFT / bank transfer',
+            'card' => 'Card',
+            'other' => 'Other',
+            default => strtoupper((string) ($method?->value ?? $method ?? 'Payment')),
+        };
+    };
+
     $invoiceTotal = (int) ($totals['invoice_total_cents'] ?? 0);
     $paymentCents = (int) ($totals['payment_cents'] ?? 0);
     $paidThrough = (int) ($totals['paid_through_cents'] ?? 0);
     $outstanding = (int) ($totals['outstanding_cents'] ?? 0);
+    $paymentsThrough = $payments_through ?? [];
 @endphp
     <title>Payment receipt · {{ $invoice->number }}</title>
     @include('pdf._styles')
@@ -119,6 +130,41 @@
         </td>
     </tr>
 </table>
+
+@if(count($paymentsThrough) > 1)
+    <div class="section section-receipt-payments">
+        <h3>Payments on this invoice</h3>
+        <table class="lines receipt-payments">
+            <thead>
+                <tr>
+                    <th style="width: 18%;">Date</th>
+                    <th style="width: 28%;">Method</th>
+                    <th style="width: 30%;">Reference</th>
+                    <th class="num" style="width: 24%;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($paymentsThrough as $i => $row)
+                    @php
+                        $isCurrent = (int) $row->id === (int) $payment->id;
+                        $rowClass = trim(($i % 2 === 1 ? 'zebra ' : '').($isCurrent ? 'receipt-payment-current' : ''));
+                    @endphp
+                    <tr @if($rowClass !== '') class="{{ $rowClass }}" @endif>
+                        <td>
+                            {{ optional($row->payment_date)->format('d M Y') ?: '—' }}
+                            @if($isCurrent)
+                                <div class="xsmall muted">This receipt</div>
+                            @endif
+                        </td>
+                        <td>{{ $paymentMethodLabel($row->method) }}</td>
+                        <td>{{ $row->reference ?: '—' }}</td>
+                        <td class="num b">{{ $fmtMoney((int) $row->getRawOriginal('amount_cents')) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+@endif
 
 <table class="totals" style="width: 55%;">
     <tr>

@@ -94,6 +94,41 @@ class PaymentReceiptTest extends TestCase
         $this->assertSame(3500, $secondTotals['outstanding_cents']);
     }
 
+    public function test_payments_through_as_of_lists_settlements_in_order(): void
+    {
+        [, $invoice] = $this->seedPaidInvoice(createPayment: false);
+
+        $first = Payment::factory()->for($invoice->team)->for($invoice)->create([
+            'amount_cents' => 4000,
+            'payment_date' => '2026-07-01',
+            'method' => PaymentMethod::Eft,
+            'reference' => 'PAY-1',
+        ]);
+        $second = Payment::factory()->for($invoice->team)->for($invoice)->create([
+            'amount_cents' => 2500,
+            'payment_date' => '2026-07-10',
+            'method' => PaymentMethod::Cash,
+            'reference' => 'PAY-2',
+        ]);
+        Payment::factory()->for($invoice->team)->for($invoice)->create([
+            'amount_cents' => 3500,
+            'payment_date' => '2026-07-20',
+            'method' => PaymentMethod::Card,
+            'reference' => 'PAY-3',
+        ]);
+
+        $service = app(PaymentReceiptPdfService::class);
+
+        $throughFirst = $service->paymentsThroughAsOf($first->fresh(['invoice']));
+        $this->assertCount(1, $throughFirst);
+        $this->assertTrue($throughFirst[0]->is($first));
+
+        $throughSecond = $service->paymentsThroughAsOf($second->fresh(['invoice']));
+        $this->assertCount(2, $throughSecond);
+        $this->assertTrue($throughSecond[0]->is($first));
+        $this->assertTrue($throughSecond[1]->is($second));
+    }
+
     /**
      * @return array{0: User, 1: Invoice, 2?: Payment}
      */

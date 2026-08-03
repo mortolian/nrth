@@ -153,6 +153,27 @@
     }
     .totals .grand .value { color: #0f172a; }
 
+    /* Receipt payment history */
+    .section.section-receipt-payments {
+        margin-top: 14px;
+        margin-bottom: 4px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    .section.section-receipt-payments h3 {
+        margin: 0 0 6px;
+    }
+    table.receipt-payments {
+        margin-bottom: 0;
+    }
+    table.receipt-payments tr.receipt-payment-current td {
+        background: #eef2ff;
+        font-weight: 700;
+    }
+
     /* Sections */
     .section {
         margin-top: 18px;
@@ -229,38 +250,53 @@
         margin: 0;
     }
 
-    /* Banking — light bordered cards + key/value rows */
+    /* Banking — keep the whole block together; DomPDF honors this on tables best */
+    table.bank-section-wrap {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        page-break-before: auto;
+    }
+    table.bank-section-wrap > tr > td {
+        padding: 0;
+        vertical-align: top;
+    }
     .section-banking {
-        margin-top: 14px;
+        margin-top: 10px;
         padding: 0;
         background: transparent;
         border: none;
     }
     .section-banking h3 {
-        margin: 0 0 8px;
+        margin: 0 0 4px;
         font-size: 9px;
         letter-spacing: 0.12em;
         color: #475569;
+        page-break-after: avoid;
     }
     .bank-payment-ref {
-        margin: 0 0 10px;
-        padding: 8px 10px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 4px;
+        margin: 0 0 6px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        font-size: 9px;
+        line-height: 1.3;
+        page-break-after: avoid;
     }
     .bank-payment-ref-label {
-        display: block;
+        display: inline;
         font-size: 8px;
         font-weight: 700;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         color: #64748b;
-        margin-bottom: 2px;
+        margin-right: 6px;
     }
     .bank-payment-ref-value {
-        display: block;
-        font-size: 13px;
+        display: inline;
+        font-size: 11px;
         font-weight: 700;
         color: #0f172a;
     }
@@ -274,51 +310,53 @@
     table.bank-grid > tbody > tr > td.bank-grid-cell {
         width: 50%;
         vertical-align: top;
-        padding-bottom: 10px;
+        padding-bottom: 6px;
     }
     table.bank-grid > tbody > tr > td.bank-grid-cell-left {
-        padding-right: 7px;
+        padding-right: 5px;
     }
     table.bank-grid > tbody > tr > td.bank-grid-cell-right {
-        padding-left: 7px;
+        padding-left: 5px;
     }
     table.bank-grid > tbody > tr:last-child > td.bank-grid-cell {
         padding-bottom: 0;
     }
     .bank-card {
         margin: 0;
-        padding: 8px 10px;
+        padding: 5px 7px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
+        page-break-inside: avoid;
+        break-inside: avoid;
     }
     .bank-card-title {
         font-weight: 800;
-        font-size: 10px;
+        font-size: 9px;
         color: #0f172a;
-        margin: 0 0 6px;
+        margin: 0 0 3px;
         letter-spacing: 0.02em;
     }
     table.bank-kv {
         width: 100%;
         max-width: 100%;
         border-collapse: collapse;
-        font-size: 9px;
-        line-height: 1.35;
+        font-size: 8.5px;
+        line-height: 1.25;
     }
     table.bank-kv td {
-        padding: 3px 10px 3px 0;
+        padding: 1.5px 6px 1.5px 0;
         vertical-align: top;
         border-bottom: 1px solid #e8ecf1;
     }
     table.bank-kv tr:last-child td { border-bottom: none; }
     table.bank-kv td.bank-k {
-        width: 38%;
+        width: 34%;
         max-width: none;
         color: #64748b;
-        font-size: 8px;
+        font-size: 7.5px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.05em;
         white-space: normal;
     }
     table.bank-kv td.bank-v {
