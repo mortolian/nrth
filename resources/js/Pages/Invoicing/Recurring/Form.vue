@@ -7,6 +7,7 @@ import FieldHelp from '@/Components/FieldHelp.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
+import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
 
 type ClientOption = { id: number; name: string; currency: string; payment_terms_days: number };
@@ -200,9 +201,30 @@ const applyItem = (index: number, raw: string) => {
     const line = form.value.line_items[index];
     line.item_id = item.id;
     line.description = (item.description && item.description.trim()) ? item.description : item.name;
-    line.unit_price = (item.unit_price_cents / 100).toFixed(2);
     line.vat_rate = props.charges_vat ? (item.default_vat_rate ?? defaultVat.value) : 0;
+
+    const docCurrency = String(form.value.currency || props.default_currency || 'ZAR').toUpperCase();
+    const catalogCurrency = String(props.default_currency || 'ZAR').toUpperCase();
+    if (docCurrency === catalogCurrency) {
+        line.unit_price = (item.unit_price_cents / 100).toFixed(2);
+        return;
+    }
+
+    toast.warning(
+        `Catalog price is in ${catalogCurrency}. Enter the unit price in ${docCurrency} for this schedule.`,
+    );
 };
+
+const formatTeamCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, props.default_currency || 'ZAR');
+
+const catalogItemSelectOptions = computed(() => [
+    { label: 'Select item…', value: '' },
+    ...props.items.map((item) => ({
+        label: `${item.name} · ${formatTeamCents(item.unit_price_cents)}`,
+        value: String(item.id),
+    })),
+]);
 
 const addLine = () => {
     form.value.line_items.push(emptyLine());
@@ -544,7 +566,7 @@ const submit = () => {
                             <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Item</label>
                             <AppSelect
                                 :model-value="line.item_id ? String(line.item_id) : ''"
-                                :options="[{ label: 'Select item…', value: '' }, ...items.map((i) => ({ label: i.name, value: String(i.id) }))]"
+                                :options="catalogItemSelectOptions"
                                 placeholder="Select item…"
                                 @update:model-value="applyItem(index, String($event ?? ''))"
                             />
@@ -562,7 +584,7 @@ const submit = () => {
                             <AppInput v-model="line.quantity" type="number" step="0.01" min="0" class="!h-8 !px-2 !py-1 text-right tabular-nums" />
                         </div>
                         <div class="w-[6.5rem] shrink-0">
-                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Unit price</label>
+                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Unit price ({{ form.currency }})</label>
                             <AppInput
                                 v-model="line.unit_price"
                                 type="text"

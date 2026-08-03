@@ -37,7 +37,7 @@ const help = {
     name: 'Shown in the item picker and as the default line description if you leave description blank.',
     description: 'Copied onto the invoice or estimate line when you pick this item. You can still edit the line afterward.',
     unit: 'Optional unit from Settings → Business → Items. Display only — quantity stays free on each line.',
-    unitPrice: 'Default unit price in your team currency. Snapshotted onto the line when picked.',
+    unitPrice: 'Default unit price in your team currency. Applied automatically when the invoice uses the same currency; otherwise enter the amount yourself.',
     vat: 'Default VAT % for this item (0 = zero-rated). Overridable per line on the invoice.',
     status: 'Inactive items stay in your catalog but are hidden from invoice and estimate pickers.',
 };
@@ -211,7 +211,7 @@ const submit = () => {
                 <section class="mt-8 border-t border-slate-100 pt-6">
                     <h3 class="text-sm font-semibold text-slate-900">Pricing</h3>
                     <p class="mt-0.5 text-xs text-slate-500">
-                        Defaults in {{ default_currency }} — snapshotted when the item is picked
+                        Defaults in {{ default_currency }}. Applied when the document uses the same currency.
                     </p>
 
                     <div class="mt-4 grid gap-4 md:grid-cols-2">

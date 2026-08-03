@@ -186,7 +186,7 @@ const hasRows = computed(() => props.items.data.length > 0);
                     :columns="[
                         { key: 'name', label: 'Item' },
                         { key: 'unit', label: 'Unit' },
-                        { key: 'price', label: 'Price' },
+                        { key: 'price', label: `Price (${default_currency || 'ZAR'})` },
                         { key: 'vat', label: 'VAT' },
                         { key: 'status', label: 'Status' },
                         { key: 'actions', label: '' },

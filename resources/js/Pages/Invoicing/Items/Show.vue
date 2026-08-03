@@ -78,7 +78,9 @@ const destroyItem = () => {
 
             <div class="grid gap-4 sm:grid-cols-3">
                 <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Unit price</p>
+                    <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Unit price ({{ default_currency || 'ZAR' }})
+                    </p>
                     <p class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">
                         {{ formatCents(item.unit_price_cents) }}
                     </p>

@@ -225,6 +225,17 @@ const estimateSchema = z.object({
 
 const catalogItems = computed(() => props.items ?? []);
 
+const formatTeamCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, props.default_currency || 'ZAR');
+
+const catalogItemSelectOptions = computed(() => [
+    { label: 'Select item…', value: '' },
+    ...catalogItems.value.map((item) => ({
+        label: `${item.name} · ${formatTeamCents(item.unit_price_cents)}`,
+        value: String(item.id),
+    })),
+]);
+
 const lineItems = ref<EstimateLineForm[]>(
     props.estimate?.line_items?.length
         ? props.estimate.line_items.map((row) => mapApiLineToForm(row))
@@ -448,17 +459,29 @@ const applyCatalogItem = (index: number, itemIdRaw: string) => {
     const vatRate = chargesVat.value
         ? (item.default_vat_rate ?? defaultLineVat.value)
         : 0;
+    const estimateCurrency = String(form.value.currency || props.default_currency || 'ZAR').toUpperCase();
+    const catalogCurrency = String(props.default_currency || 'ZAR').toUpperCase();
+    const sameCurrency = estimateCurrency === catalogCurrency;
+
     lineItems.value = lineItems.value.map((line, i) => (
         i === index
             ? {
                 ...line,
                 item_id: item.id,
                 description,
-                unit_price: (item.unit_price_cents / 100).toFixed(2),
+                unit_price: sameCurrency
+                    ? (item.unit_price_cents / 100).toFixed(2)
+                    : line.unit_price,
                 vat_rate: vatRate,
             }
             : line
     ));
+
+    if (!sameCurrency) {
+        toast.warning(
+            `Catalog price is in ${catalogCurrency}. Enter the unit price in ${estimateCurrency} for this estimate.`,
+        );
+    }
 };
 
 const addLine = () => {
@@ -656,13 +679,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             <AppSelect
                                                 size="sm"
                                                 :model-value="line.item_id ? String(line.item_id) : ''"
-                                                :options="[
-                                                    { label: 'Select item…', value: '' },
-                                                    ...catalogItems.map((item) => ({
-                                                        label: item.name,
-                                                        value: String(item.id),
-                                                    })),
-                                                ]"
+                                                :options="catalogItemSelectOptions"
                                                 placeholder="Select item…"
                                                 @update:model-value="applyCatalogItem(index, String($event ?? ''))"
                                             />
@@ -687,7 +704,7 @@ const submit = (submitAction: 'draft' | 'send') => {
                                             />
                                         </div>
                                         <div class="w-[6.5rem] shrink-0">
-                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Unit price</label>
+                                            <label class="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-slate-400">Unit price ({{ form.currency }})</label>
                                             <AppInput
                                                 class="!h-8 !px-2 !py-1 text-right text-sm tabular-nums"
                                                 :model-value="line.unit_price"
