@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import { useAccountingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
@@ -80,7 +80,8 @@ const groupTotals = computed(() =>
     })),
 );
 
-const navigateTo = (url: string) => router.get(url, { from: period.value.from, to: period.value.to });
+const navigateTo = (url: string) =>
+    router.get(url, { from: period.value.from, to: period.value.to, source: 'ledger' });
 </script>
 
 <template>
@@ -89,9 +90,23 @@ const navigateTo = (url: string) => router.get(url, { from: period.value.from, t
         section="journal"
         :tabs="accountingTabs"
         document-title="General Ledger"
-        subtitle="Account-by-account activity and running balances for the selected period"
+        subtitle="Period report — opening, movement, and closing by account"
     >
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900">General Ledger</h2>
+            <p class="mt-1 max-w-3xl text-sm text-slate-600">
+                Read-only activity for the date range below. To add, edit, or archive accounts, use
+                <Link
+                    :href="route('accounting.accounts.index')"
+                    class="font-medium text-brand-700 underline-offset-2 hover:underline"
+                >
+                    Chart of Accounts
+                </Link>.
+            </p>
+        </div>
+
         <AppCard class="mt-5">
+            <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Reporting period</p>
             <div class="flex flex-wrap items-end gap-3">
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">From</label>
@@ -111,7 +126,7 @@ const navigateTo = (url: string) => router.get(url, { from: period.value.from, t
             <AppCard>
                 <EmptyState
                     title="No accounts found"
-                    description="Set up your chart of accounts to see the general ledger."
+                    description="Set up your chart of accounts first — this page only reports period balances for existing accounts."
                 />
             </AppCard>
         </div>
@@ -131,10 +146,10 @@ const navigateTo = (url: string) => router.get(url, { from: period.value.from, t
                     :columns="[
                         { key: 'code', label: 'Code' },
                         { key: 'name', label: 'Account' },
-                        { key: 'opening', label: 'Opening balance' },
-                        { key: 'debits', label: 'Period debits' },
-                        { key: 'credits', label: 'Period credits' },
-                        { key: 'closing', label: 'Closing balance' },
+                        { key: 'opening', label: 'Opening' },
+                        { key: 'debits', label: 'Debits (period)' },
+                        { key: 'credits', label: 'Credits (period)' },
+                        { key: 'closing', label: 'Closing' },
                         { key: 'actions', label: '' },
                     ]"
                 >

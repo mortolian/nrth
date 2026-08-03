@@ -38,6 +38,7 @@ const props = defineProps<{
         debits: number;
         credits: number;
     };
+    source: 'ledger' | 'accounts';
 }>();
 
 const period = ref({
@@ -49,10 +50,40 @@ const selected = ref<number[]>([]);
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
+const parentCrumb = computed(() =>
+    props.source === 'ledger'
+        ? {
+              label: 'General Ledger',
+              href: route('accounting.journal.index', {
+                  from: period.value.from,
+                  to: period.value.to,
+              }),
+          }
+        : {
+              label: 'Chart of Accounts',
+              href: route('accounting.accounts.index'),
+          },
+);
+
+const backLabel = computed(() =>
+    props.source === 'ledger' ? 'Back to general ledger' : 'Back to chart of accounts',
+);
+
+const goBack = () => {
+    if (props.source === 'ledger') {
+        router.visit(route('accounting.journal.index'), {
+            data: { from: period.value.from, to: period.value.to },
+        });
+        return;
+    }
+    router.visit(route('accounting.accounts.index'));
+};
+
 const applyPeriod = (page = 1) => {
     router.get(route('accounting.accounts.statement', props.account.id), {
         from: period.value.from,
         to: period.value.to,
+        source: props.source,
         page,
     }, { preserveScroll: true, preserveState: true, replace: true });
 };
@@ -130,14 +161,21 @@ const exportSelectedCsv = () => {
     <AppLayout
         :title="`${account.code} ${account.name}`"
         :breadcrumbs="[
-            { label: 'Accounting' },
-            { label: 'Account Statement' },
+            { label: 'Accounting', href: route('accounting.transactions.index') },
+            parentCrumb,
+            { label: 'Statement' },
         ]"
     >
         <PageHeader
             :title="`${account.code} - ${account.name}`"
             :subtitle="`${account.type} account`"
-        />
+        >
+            <template #actions>
+                <AppButton variant="secondary" @click="goBack">
+                    {{ backLabel }}
+                </AppButton>
+            </template>
+        </PageHeader>
 
         <AppCard class="mt-5">
             <div class="flex flex-wrap items-end gap-3">

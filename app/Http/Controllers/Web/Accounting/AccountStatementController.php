@@ -81,6 +81,11 @@ class AccountStatementController extends Controller
             ? (int) ($mapped->last()['running_balance'] ?? $openingBalance)
             : $openingBalance;
 
+        $source = $request->string('source')->toString();
+        if (! in_array($source, ['ledger', 'accounts'], true)) {
+            $source = 'accounts';
+        }
+
         return Inertia::render('Accounting/Accounts/Statement', [
             'account' => [
                 'id' => $account->id,
@@ -100,6 +105,7 @@ class AccountStatementController extends Controller
                 'debits' => $totalDebits,
                 'credits' => $totalCredits,
             ],
+            'source' => $source,
         ]);
     }
 

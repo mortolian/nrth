@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useAccountingTabs } from '@/Composables/useFeatureTabs';
@@ -89,7 +89,7 @@ const rowActionItems = (account: AccountRow) => {
 
 const onRowAction = (account: AccountRow, actionId: string) => {
     if (actionId === 'statement') {
-        router.get(route('accounting.accounts.statement', account.id));
+        router.get(route('accounting.accounts.statement', account.id), { source: 'accounts' });
         return;
     }
     if (actionId === 'edit') {
@@ -120,7 +120,7 @@ const seedDefaultChart = () => {
 
 const openAccount = (account: AccountRow) => {
     if (account.is_active) {
-        router.get(route('accounting.accounts.statement', account.id));
+        router.get(route('accounting.accounts.statement', account.id), { source: 'accounts' });
         return;
     }
     if (props.can_manage) {
@@ -141,7 +141,7 @@ const accountColumns = [
     { key: 'code', label: 'Code', widthClass: 'w-[10%] whitespace-nowrap' },
     { key: 'name', label: 'Account', widthClass: 'w-[52%]' },
     { key: 'parent', label: 'Parent', widthClass: 'w-[12%] whitespace-nowrap' },
-    { key: 'balance', label: 'Balance', widthClass: 'w-[18%] whitespace-nowrap text-right tabular-nums' },
+    { key: 'balance', label: 'Current balance', widthClass: 'w-[18%] whitespace-nowrap text-right tabular-nums' },
     { key: 'actions', label: '', widthClass: 'w-[8%] whitespace-nowrap text-right' },
 ];
 </script>
@@ -152,8 +152,22 @@ const accountColumns = [
         section="accounts"
         :tabs="accountingTabs"
         document-title="Chart of Accounts"
-        subtitle="All accounts used in your double-entry bookkeeping"
+        subtitle="Account setup — codes, hierarchy, and what you can post to"
     >
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900">Chart of Accounts</h2>
+            <p class="mt-1 max-w-3xl text-sm text-slate-600">
+                Manage the accounts used for posting. Balances here are lifetime totals — for opening,
+                period movement, and closing, open
+                <Link
+                    :href="route('accounting.journal.index')"
+                    class="font-medium text-brand-700 underline-offset-2 hover:underline"
+                >
+                    General Ledger
+                </Link>.
+            </p>
+        </div>
+
         <div
             v-if="pageErrors?.account"
             class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
@@ -175,6 +189,7 @@ const accountColumns = [
         </div>
 
         <AppCard class="mt-5">
+            <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Find accounts</p>
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex-1 min-w-48">
                     <AppInput v-model="search" placeholder="Search by code or name…" />

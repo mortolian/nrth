@@ -64,8 +64,8 @@ export function useBankingTabs() {
 export function useAccountingTabs() {
     return computed((): AppTabItem[] => [
         { id: 'transactions', label: 'Transactions', href: route('accounting.transactions.index') },
-        { id: 'journal', label: 'General Ledger', href: route('accounting.journal.index') },
-        { id: 'accounts', label: 'Chart of Accounts', href: route('accounting.accounts.index') },
+        { id: 'journal', label: 'Ledger (period)', href: route('accounting.journal.index') },
+        { id: 'accounts', label: 'Accounts (setup)', href: route('accounting.accounts.index') },
     ]);
 }
 
