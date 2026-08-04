@@ -8,6 +8,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useToast } from '@/Composables/useToast';
+import { openTripOnGoogleMaps, tripHasMapLink } from '@/Composables/tripMapUrl';
 
 type VehicleOption = {
     id: number;
@@ -98,6 +99,23 @@ const setFieldValue = (path: string, value: unknown) => {
 };
 
 const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
+
+const mapTripFields = computed(() => ({
+    start_latitude: formValues.value.start_latitude ?? null,
+    start_longitude: formValues.value.start_longitude ?? null,
+    end_latitude: formValues.value.end_latitude ?? null,
+    end_longitude: formValues.value.end_longitude ?? null,
+    from_location: formValues.value.from_location ?? null,
+    to_location: formValues.value.to_location ?? null,
+}));
+
+const canOpenMap = computed(() => tripHasMapLink(mapTripFields.value));
+
+const openMap = () => {
+    if (!openTripOnGoogleMaps(mapTripFields.value)) {
+        toast.error('Add a route or GPS coordinates to open this trip on Google Maps.');
+    }
+};
 
 const computedDurationLabel = computed(() => {
     const start = formValues.value.started_at;
@@ -271,7 +289,13 @@ const vehicleOptions = computed(() =>
         <PageHeader
             :title="isEditing ? 'Edit trip' : 'Log trip'"
             subtitle="Capture the essentials for your travel log book"
-        />
+        >
+            <template v-if="canOpenMap" #actions>
+                <AppButton type="button" variant="secondary" @click="openMap">
+                    View on map
+                </AppButton>
+            </template>
+        </PageHeader>
 
         <FormValidationBanner class="mt-5" :errors="clientErrorMessages" />
 

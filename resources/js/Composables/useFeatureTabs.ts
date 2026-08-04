@@ -71,7 +71,7 @@ export function useTravelTabs() {
             { id: 'trips', label: 'Log book', href: route('vehicles.trips.index') },
             { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
             aiEnabled.value && canTeam('vehicles.manage')
-                ? { id: 'import', label: 'Smart import', href: route('vehicles.trips.import.create') }
+                ? { id: 'import', label: 'Smart AI import', href: route('vehicles.trips.import.create') }
                 : null,
         ].filter(Boolean) as AppTabItem[],
     );

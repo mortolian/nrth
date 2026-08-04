@@ -54,13 +54,13 @@ const submit = () => {
         title="Travel"
         section="import"
         :tabs="travelTabs"
-        document-title="Smart trip import"
+        document-title="Smart AI import"
         subtitle="Import Toyota fleet, GPS, or onboard log-book exports. Stops are merged into journeys and duplicates are skipped."
     >
         <AppCard class="mt-5">
             <form class="grid max-w-xl gap-5" @submit.prevent="submit">
                 <p v-if="!aiEnabled" class="text-sm text-amber-700">
-                    Configure an AI provider in Business settings before using smart import.
+                    Configure an AI provider in Business settings before using smart AI import.
                 </p>
 
                 <div>

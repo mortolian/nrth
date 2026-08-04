@@ -260,6 +260,10 @@ class VehicleController extends Controller
             'estimated_closing_km' => $estimates['closing_km'] ?? null,
             'from_location' => $trip->from_location,
             'to_location' => $trip->to_location,
+            'start_latitude' => $trip->start_latitude !== null ? (float) $trip->start_latitude : null,
+            'start_longitude' => $trip->start_longitude !== null ? (float) $trip->start_longitude : null,
+            'end_latitude' => $trip->end_latitude !== null ? (float) $trip->end_latitude : null,
+            'end_longitude' => $trip->end_longitude !== null ? (float) $trip->end_longitude : null,
             'notes' => $trip->notes,
         ];
     }

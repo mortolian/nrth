@@ -3,6 +3,9 @@ import { computed, ref } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import { openTripOnGoogleMaps, tripHasMapLink } from '@/Composables/tripMapUrl';
+import { useToast } from '@/Composables/useToast';
+import { formatTripDate } from '@/Composables/formatTripDate';
 
 type TripHistoryRow = {
     id: number;
@@ -16,6 +19,10 @@ type TripHistoryRow = {
     estimated_closing_km: number | null;
     from_location: string | null;
     to_location: string | null;
+    start_latitude: number | null;
+    start_longitude: number | null;
+    end_latitude: number | null;
+    end_longitude: number | null;
     notes: string | null;
 };
 
@@ -47,6 +54,7 @@ const props = defineProps<{
 }>();
 
 const page = usePage();
+const toast = useToast();
 const canManage = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) && perms.includes('vehicles.manage');
@@ -93,12 +101,19 @@ const togglePurpose = (trip: TripHistoryRow) => {
     });
 };
 
-const rowActionItems = () => [
+const rowActionItems = (trip: TripHistoryRow) => [
+    ...(tripHasMapLink(trip) ? [{ id: 'map', label: 'View on map' }] : []),
     { id: 'edit', label: 'Edit' },
     { id: 'delete', label: 'Delete' },
 ];
 
 const onRowAction = (trip: TripHistoryRow, actionId: string) => {
+    if (actionId === 'map') {
+        if (!openTripOnGoogleMaps(trip)) {
+            toast.error('This trip has no location to show on a map.');
+        }
+        return;
+    }
     if (actionId === 'edit') {
         router.visit(route('vehicles.trips.edit', trip.id));
         return;
@@ -227,7 +242,7 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                     class="cursor-pointer hover:bg-slate-50"
                     @click="router.visit(route('vehicles.trips.edit', row.id))"
                 >
-                    <td class="whitespace-nowrap px-3 py-2">{{ row.trip_date || '—' }}</td>
+                    <td class="whitespace-nowrap px-3 py-2">{{ formatTripDate(row.trip_date) }}</td>
                     <td class="px-3 py-2 text-slate-600">
                         <span v-if="row.from_location || row.to_location">
                             {{ row.from_location || '—' }} → {{ row.to_location || '—' }}
@@ -258,7 +273,7 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                     <td class="px-3 py-2" @click.stop>
                         <div class="flex justify-end">
                             <InvoiceRowActionsMenu
-                                :actions="rowActionItems()"
+                                :actions="rowActionItems(row)"
                                 :aria-label="`Actions for trip ${row.id}`"
                                 @select="(id) => onRowAction(row, id)"
                             />

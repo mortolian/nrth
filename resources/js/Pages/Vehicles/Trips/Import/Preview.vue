@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import { useTravelTabs } from '@/Composables/useFeatureTabs';
+import { formatTripDate } from '@/Composables/formatTripDate';
 
 const travelTabs = useTravelTabs();
 
@@ -186,7 +187,7 @@ const confirmImport = () => {
                         >
                     </td>
                     <td class="whitespace-nowrap px-3 py-2">
-                        <div>{{ trip.trip_date || '—' }}</div>
+                        <div>{{ formatTripDate(trip.trip_date) }}</div>
                         <div v-if="trip.started_at" class="text-xs text-slate-500">
                             {{ trip.started_at }}
                             <span v-if="trip.ended_at"> → {{ trip.ended_at }}</span>

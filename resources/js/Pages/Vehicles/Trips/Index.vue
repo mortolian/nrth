@@ -4,9 +4,13 @@ import { router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useTravelTabs } from '@/Composables/useFeatureTabs';
+import { openTripOnGoogleMaps, tripHasMapLink } from '@/Composables/tripMapUrl';
+import { useToast } from '@/Composables/useToast';
+import { formatTripDate } from '@/Composables/formatTripDate';
 
 const travelTabs = useTravelTabs();
 const page = usePage();
+const toast = useToast();
 const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
 const canManage = computed(() => {
     const perms = page.props.team_permissions;
@@ -31,6 +35,10 @@ type TripRow = {
     estimated_closing_km: number | null;
     from_location: string | null;
     to_location: string | null;
+    start_latitude: number | null;
+    start_longitude: number | null;
+    end_latitude: number | null;
+    end_longitude: number | null;
     notes: string | null;
     vehicle: {
         id: number;
@@ -114,12 +122,19 @@ const togglePurpose = (trip: TripRow) => {
     });
 };
 
-const rowActionItems = () => [
+const rowActionItems = (trip: TripRow) => [
+    ...(tripHasMapLink(trip) ? [{ id: 'map', label: 'View on map' }] : []),
     { id: 'edit', label: 'Edit' },
     { id: 'delete', label: 'Delete' },
 ];
 
 const onRowAction = (trip: TripRow, actionId: string) => {
+    if (actionId === 'map') {
+        if (!openTripOnGoogleMaps(trip)) {
+            toast.error('This trip has no location to show on a map.');
+        }
+        return;
+    }
     if (actionId === 'edit') {
         router.visit(route('vehicles.trips.edit', trip.id));
         return;
@@ -145,7 +160,7 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                 variant="secondary"
                 @click="router.visit(route('vehicles.trips.import.create'))"
             >
-                Smart import
+                Smart AI import
             </AppButton>
             <AppButton variant="primary" @click="router.visit(route('vehicles.trips.create'))">
                 Log trip
@@ -230,7 +245,7 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                     class="cursor-pointer hover:bg-slate-50"
                     @click="router.visit(route('vehicles.trips.edit', trip.id))"
                 >
-                    <td class="whitespace-nowrap px-3 py-2">{{ trip.trip_date || '—' }}</td>
+                    <td class="whitespace-nowrap px-3 py-2">{{ formatTripDate(trip.trip_date) }}</td>
                     <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
                         {{ trip.vehicle?.name || '—' }}
                     </td>
@@ -264,7 +279,7 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                     <td class="px-3 py-2" @click.stop>
                         <div class="flex justify-end">
                             <InvoiceRowActionsMenu
-                                :actions="rowActionItems()"
+                                :actions="rowActionItems(trip)"
                                 :aria-label="`Actions for trip ${trip.id}`"
                                 @select="(id) => onRowAction(trip, id)"
                             />
