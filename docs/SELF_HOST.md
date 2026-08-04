@@ -46,7 +46,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 1. `APP_DEBUG=false`, `APP_ENV=production`
 2. HTTPS on 443; firewall only 80/443 (not `:8000`, and not Postgres/Redis/Mailpit)
-3. Real `MAIL_*` (Mailpit is for testing — do not expose `:8025` publicly)
+3. Outbound email: configure SMTP under **Settings → Instance → Outbound email**, or set `MAIL_*` in `.env` (Mailpit is for testing — do not expose `:8025` publicly). Instance SMTP overrides `.env` when enabled.
 4. Host-level backups of Postgres + `storage` volumes, plus in-app instance backups
 5. Never commit `.env`
 
@@ -54,7 +54,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 ## Backups
 
-Laravel schedules `nrth:backup-run` (03:00) and `nrth:backup-rotate` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage runs under **Backups & exports → Instance backup**, and operators under **Backups & exports → Instance operators**.
+Laravel schedules `nrth:backup-run` (03:00) and `nrth:backup-rotate` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage runs under **Backups & exports → Instance backup**, and operators under **Settings → Instance → Operators**.
 
 Retention is typed and count-based: each daily zip can also count as weekly (configurable weekday), monthly (month-end), and yearly (31 Dec). Settings under **Backups & exports → Backup retention** control how many of each type to keep; rotation deletes zips that are no longer needed by any type. An optional size cap is also available.
 

@@ -33,7 +33,7 @@ Resolution order for a member: belong to team → if owner, all permissions → 
 - **delete** — destroy, void, and other destructive actions
 - **export** — dedicated export endpoints (e.g. `reports.export`)
 
-Owner-only product areas that stay outside (or beside) the matrix: tax takeout, instance backups / operators (`manageInstanceBackups`). Renaming or deleting a business stays Jetstream `TeamPolicy` (owner). Inviting members, changing roles, and custom role CRUD use `settings.team` (owner by default; grantable on a custom role). Business settings pages use `settings.business` the same way.
+Owner-only product areas that stay outside (or beside) the matrix: tax takeout, instance backups (`manageInstanceBackups`). Instance settings (outbound SMTP, operators) use the same operator gate under **Settings → Instance**. Renaming or deleting a business stays Jetstream `TeamPolicy` (owner). Inviting members, changing roles, and custom role CRUD use `settings.team` (owner by default; grantable on a custom role). Business settings pages use `settings.business` the same way.
 
 **Settings navigation:** Profile is always available. Business and Team members tabs appear only when the signed-in user has `settings.business` / `settings.team` respectively — viewers and accountants should not see those links (and get 403 if they hit the URLs directly).
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Link, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import { useForm } from '@inertiajs/vue3';
+import InstanceSettingsShell from '@/Components/InstanceSettingsShell.vue';
 
 type OperatorRow = {
     id: number | null;
@@ -51,30 +51,11 @@ const operatorSourceLabel = (source: string) => {
 </script>
 
 <template>
-    <AppLayout
-        title="Instance operators"
-        :breadcrumbs="[
-            { label: 'Backups & exports', href: route('backups-exports.index', { section: 'backup' }) },
-            { label: 'Instance operators' },
-        ]"
-    >
-        <PageHeader
-            title="Instance operators"
-            subtitle="Who can manage whole-server backups for this install"
-        >
-            <template #actions>
-                <Link
-                    :href="route('backups-exports.index', { section: 'backup' })"
-                    class="text-sm font-medium text-brand-700 hover:underline"
-                >
-                    Back to instance backup
-                </Link>
-            </template>
-        </PageHeader>
-
-        <AppCard class="mt-5">
+    <InstanceSettingsShell section="operators">
+        <AppCard>
             <p class="text-sm text-slate-600">
                 Separate from business ownership.
+                Operators manage instance settings (email, operators) and whole-server backups.
                 The first registered user is promoted automatically; add others only when you need them.
             </p>
 
@@ -127,5 +108,5 @@ const operatorSourceLabel = (source: string) => {
                 Break-glass emails from NRTH_OPERATOR_EMAILS are active. You can clear that env var once database operators are set.
             </p>
         </AppCard>
-    </AppLayout>
+    </InstanceSettingsShell>
 </template>

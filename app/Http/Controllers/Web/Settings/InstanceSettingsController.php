@@ -4,13 +4,17 @@ namespace App\Http\Controllers\Web\Settings;
 
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
+use App\Domain\Instance\Services\InstanceMailSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class InstanceSettingsController extends Controller
 {
@@ -18,13 +22,42 @@ class InstanceSettingsController extends Controller
         private readonly InstanceOperatorService $operators,
         private readonly InstanceBackupRetentionSettings $backupRetention,
         private readonly InstanceBackupDestinationSettings $backupDestinations,
+        private readonly InstanceMailSettings $mailSettings,
     ) {}
 
-    public function edit(Request $request): RedirectResponse
+    public function edit(): Response
     {
         Gate::authorize('manageInstanceBackups');
 
-        return redirect()->route('backups-exports.index', ['section' => 'backup']);
+        $operatorCount = count($this->operators->listEffectiveOperators());
+
+        return Inertia::render('Settings/Instance/Index', [
+            'mail_summary' => $this->mailSettings->publicProps()['summary'],
+            'operators_summary' => $operatorCount === 1
+                ? '1 operator'
+                : "{$operatorCount} operators",
+        ]);
+    }
+
+    public function mail(): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $this->mailSettings->applyToRuntime();
+
+        return Inertia::render('Settings/Instance/Mail', [
+            'mail' => $this->mailSettings->publicProps(),
+        ]);
+    }
+
+    public function operators(): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        return Inertia::render('Settings/Instance/Operators', [
+            'operators' => $this->operators->listEffectiveOperators(),
+            'env_break_glass_configured' => $this->operators->envOperatorEmails() !== [],
+        ]);
     }
 
     public function updateBackupRetention(Request $request): RedirectResponse
@@ -145,6 +178,77 @@ class InstanceSettingsController extends Controller
             ->with('success', 'Path/NFS offsite connection test succeeded.');
     }
 
+    public function updateMail(Request $request): RedirectResponse
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'host' => ['nullable', 'string', 'max:255'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'scheme' => ['nullable', 'string', Rule::in(['tls', 'smtps', 'null', ''])],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
+            'from_address' => ['nullable', 'string', 'max:255'],
+            'from_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if (($validated['scheme'] ?? null) === 'null' || ($validated['scheme'] ?? null) === '') {
+            $validated['scheme'] = null;
+        }
+
+        $this->mailSettings->update($validated);
+
+        activity()
+            ->causedBy($request->user())
+            ->withProperties([
+                'action' => 'instance_mail_updated',
+                'enabled' => (bool) ($validated['enabled'] ?? false),
+                'host' => $validated['host'] ?? null,
+                'from_address' => $validated['from_address'] ?? null,
+            ])
+            ->log('Updated instance SMTP settings');
+
+        return redirect()
+            ->route('settings.instance.mail')
+            ->with('success', 'Outbound email settings saved.');
+    }
+
+    public function testMail(Request $request): RedirectResponse
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $validated = $request->validate([
+            'host' => ['nullable', 'string', 'max:255'],
+            'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'scheme' => ['nullable', 'string', Rule::in(['tls', 'smtps', 'null', ''])],
+            'username' => ['nullable', 'string', 'max:255'],
+            'password' => ['nullable', 'string', 'max:255'],
+            'from_address' => ['nullable', 'string', 'max:255'],
+            'from_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if (($validated['scheme'] ?? null) === 'null' || ($validated['scheme'] ?? null) === '') {
+            $validated['scheme'] = null;
+        }
+
+        $to = (string) $request->user()->email;
+
+        try {
+            $this->mailSettings->sendTest($to, $validated);
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages([
+                'host' => $e->getMessage() ?: __('SMTP test failed.'),
+            ]);
+        }
+
+        return redirect()
+            ->route('settings.instance.mail')
+            ->with('success', "Test email sent to {$to}.");
+    }
+
     public function addOperator(Request $request): RedirectResponse
     {
         Gate::authorize('manageInstanceBackups');
@@ -162,7 +266,7 @@ class InstanceSettingsController extends Controller
             ->log('Added instance operator');
 
         return redirect()
-            ->route('backups-exports.operators')
+            ->route('settings.instance.operators')
             ->with('success', "Added {$user->email} as an instance operator.");
     }
 
@@ -179,7 +283,7 @@ class InstanceSettingsController extends Controller
             ->log('Removed instance operator');
 
         return redirect()
-            ->route('backups-exports.operators')
+            ->route('settings.instance.operators')
             ->with('success', "Removed {$user->email} as an instance operator.");
     }
 }

@@ -6,7 +6,7 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'profile' | 'business' | 'team' | 'note-templates';
+    section: 'profile' | 'business' | 'team' | 'note-templates' | 'instance';
     title?: string;
     subtitle?: string;
 }>();
@@ -17,6 +17,7 @@ const teamPermissions = computed(() => {
     return Array.isArray(perms) ? (perms as string[]) : [];
 });
 const canTeam = (permission: string) => teamPermissions.value.includes(permission);
+const canManageInstance = computed(() => Boolean(page.props.can_manage_backups));
 
 const sections = computed((): AppTabItem[] => {
     const tabs: AppTabItem[] = [
@@ -30,6 +31,10 @@ const sections = computed((): AppTabItem[] => {
 
     if (canTeam('settings.team')) {
         tabs.push({ id: 'team', label: 'Team members', href: route('settings.team') });
+    }
+
+    if (canManageInstance.value) {
+        tabs.push({ id: 'instance', label: 'Instance', href: route('settings.instance') });
     }
 
     return tabs;
@@ -59,6 +64,8 @@ const headerSubtitle = computed(() => {
             return 'People who can access the currently selected business.';
         case 'note-templates':
             return 'Named markdown snippets for invoice and estimate notes.';
+        case 'instance':
+            return 'Install-wide settings for operators — separate from each business.';
         default:
             return 'Account, business, and access settings.';
     }

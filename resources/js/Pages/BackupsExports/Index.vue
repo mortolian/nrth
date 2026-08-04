@@ -39,7 +39,6 @@ type BackupRunRow = {
 
 type BackupLinks = {
     destinations_summary: string;
-    operators_summary: string;
 };
 
 const props = defineProps<{
@@ -590,7 +589,7 @@ onBeforeUnmount(() => {
                 {{ backup_schedule_hint }}
             </div>
 
-            <div v-if="backup_links" class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div v-if="backup_links" class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <Link :href="route('backups-exports.destinations')" class="block">
                     <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
                         <h3 class="text-sm font-semibold text-slate-900">Offsite destinations</h3>
@@ -609,13 +608,14 @@ onBeforeUnmount(() => {
                         <p class="mt-1 text-xs text-slate-600">Generate a CLI restore script for a ready zip</p>
                     </AppCard>
                 </Link>
-                <Link :href="route('backups-exports.operators')" class="block">
-                    <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
-                        <h3 class="text-sm font-semibold text-slate-900">Instance operators</h3>
-                        <p class="mt-1 text-xs text-slate-600">{{ backup_links.operators_summary }}</p>
-                    </AppCard>
-                </Link>
             </div>
+
+            <p class="mt-4 text-sm text-slate-600">
+                Outbound email and operators live under
+                <Link :href="route('settings.instance')" class="font-medium text-brand-700 hover:underline">
+                    Settings → Instance
+                </Link>.
+            </p>
 
             <AppCard class="mt-5">
                 <div class="mb-3 flex items-center justify-between gap-2">

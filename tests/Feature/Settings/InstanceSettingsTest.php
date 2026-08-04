@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
+use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
+use App\Domain\Instance\Services\InstanceMailSettings;
+use App\Mail\InstanceSmtpTestMail;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class InstanceSettingsTest extends TestCase
@@ -27,7 +32,7 @@ class InstanceSettingsTest extends TestCase
         $this->assertFalse($second->fresh()->is_instance_operator);
     }
 
-    public function test_operator_instance_settings_redirects_to_backups_exports(): void
+    public function test_operator_sees_instance_settings_hub(): void
     {
         $user = User::factory()->withPersonalTeam()->create([
             'is_instance_operator' => true,
@@ -35,7 +40,11 @@ class InstanceSettingsTest extends TestCase
         $this->actingAs($user);
 
         $this->get(route('settings.instance'))
-            ->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Settings/Instance/Index')
+                ->has('mail_summary')
+                ->has('operators_summary'));
     }
 
     public function test_operator_sees_operators_on_operators_page(): void
@@ -45,10 +54,10 @@ class InstanceSettingsTest extends TestCase
         ]);
         $this->actingAs($user);
 
-        $this->get(route('backups-exports.operators'))
+        $this->get(route('settings.instance.operators'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('BackupsExports/Operators')
+                ->component('Settings/Instance/Operators')
                 ->has('operators')
                 ->has('env_break_glass_configured'));
     }
@@ -82,7 +91,7 @@ class InstanceSettingsTest extends TestCase
             'email' => 'colleague@example.com',
         ]);
 
-        $response->assertRedirect(route('backups-exports.operators'));
+        $response->assertRedirect(route('settings.instance.operators'));
         $this->assertTrue($other->fresh()->is_instance_operator);
     }
 
@@ -115,7 +124,7 @@ class InstanceSettingsTest extends TestCase
         $this->actingAs($operator);
         $response = $this->delete(route('settings.instance.operators.destroy', $other));
 
-        $response->assertRedirect(route('backups-exports.operators'));
+        $response->assertRedirect(route('settings.instance.operators'));
         $this->assertFalse($other->fresh()->is_instance_operator);
     }
 
@@ -131,7 +140,8 @@ class InstanceSettingsTest extends TestCase
 
         $this->actingAs($user->fresh());
         $this->get(route('settings.instance'))
-            ->assertRedirect(route('backups-exports.index', ['section' => 'backup']));
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Settings/Instance/Index'));
     }
 
     public function test_operator_sees_backup_retention_on_retention_page(): void
@@ -179,7 +189,7 @@ class InstanceSettingsTest extends TestCase
         $response->assertRedirect(route('backups-exports.retention'));
         $response->assertSessionHas('success');
 
-        $current = app(\App\Domain\Instance\Services\InstanceBackupRetentionSettings::class)->current();
+        $current = app(InstanceBackupRetentionSettings::class)->current();
         $this->assertSame(3, $current['keep_daily']);
         $this->assertSame(12, $current['keep_monthly']);
         $this->assertSame('monday', $current['weekly_on']);
@@ -218,7 +228,7 @@ class InstanceSettingsTest extends TestCase
         $response->assertRedirect(route('backups-exports.destinations'));
         $response->assertSessionHas('success');
 
-        $props = app(\App\Domain\Instance\Services\InstanceBackupDestinationSettings::class)->publicProps();
+        $props = app(InstanceBackupDestinationSettings::class)->publicProps();
         $this->assertTrue($props['s3']['enabled']);
         $this->assertTrue($props['path']['enabled']);
         $this->assertTrue($props['s3']['secret_set']);
@@ -274,6 +284,157 @@ class InstanceSettingsTest extends TestCase
             'weekly_on' => 'monday',
             'delete_oldest_backups_when_using_more_megabytes_than' => 2000,
         ])->assertForbidden();
+    }
+
+    public function test_operator_sees_mail_settings_page(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->get(route('settings.instance.mail'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Settings/Instance/Mail')
+                ->where('mail.enabled', false)
+                ->where('mail.password_set', false)
+                ->where('mail.using_instance', false));
+
+        $this->get(route('backups-exports.mail'))
+            ->assertRedirect('/settings/instance/mail');
+    }
+
+    public function test_operator_can_update_mail_settings(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $response = $this->put(route('settings.instance.mail.update'), [
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'tls',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ]);
+
+        $response->assertRedirect(route('settings.instance.mail'));
+        $response->assertSessionHas('success');
+
+        $props = app(InstanceMailSettings::class)->publicProps();
+        $this->assertTrue($props['enabled']);
+        $this->assertTrue($props['password_set']);
+        $this->assertSame('smtp.example.com', $props['host']);
+        $this->assertSame('smtp', config('mail.default'));
+    }
+
+    public function test_operator_can_send_test_mail(): void
+    {
+        Mail::fake();
+
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'operator@example.com',
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->put(route('settings.instance.mail.update'), [
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'tls',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ])->assertRedirect(route('settings.instance.mail'));
+
+        $response = $this->post(route('settings.instance.mail.test'), [
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'tls',
+            'username' => 'mailer',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ]);
+
+        $response->assertRedirect(route('settings.instance.mail'));
+        $response->assertSessionHas('success');
+        Mail::assertSent(InstanceSmtpTestMail::class, function ($mail) use ($user) {
+            return $mail->hasTo($user->email);
+        });
+    }
+
+    public function test_operator_sees_error_when_test_mail_fails(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'operator@example.com',
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->put(route('settings.instance.mail.update'), [
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'tls',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ])->assertRedirect(route('settings.instance.mail'));
+
+        Mail::shouldReceive('purgeMailers')->zeroOrMoreTimes();
+        Mail::shouldReceive('to')
+            ->once()
+            ->andThrow(new \RuntimeException('Connection refused'));
+
+        $response = $this->from(route('settings.instance.mail'))
+            ->post(route('settings.instance.mail.test'), [
+                'host' => 'smtp.example.com',
+                'port' => 587,
+                'scheme' => 'tls',
+                'username' => 'mailer',
+                'from_address' => 'noreply@example.com',
+                'from_name' => 'nrth',
+            ]);
+
+        $response->assertRedirect(route('settings.instance.mail'));
+        $response->assertSessionHasErrors('host');
+        $this->assertStringContainsString(
+            'Could not send the test email',
+            session('errors')->first('host'),
+        );
+    }
+
+    public function test_non_operator_cannot_update_mail_settings(): void
+    {
+        Config::set('nrth.operator_emails', []);
+
+        $first = User::factory()->withPersonalTeam()->create();
+        $member = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => false,
+        ]);
+        $this->assertTrue($first->fresh()->is_instance_operator);
+
+        $this->actingAs($member);
+        $this->put(route('settings.instance.mail.update'), [
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'tls',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ])->assertForbidden();
+
+        $this->get(route('settings.instance.mail'))->assertForbidden();
     }
 
     public function test_promote_first_operator_command(): void

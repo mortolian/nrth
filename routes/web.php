@@ -94,6 +94,8 @@ Route::middleware([
     Route::post('/team-invitations/{invitation}/resend', [TeamInvitationController::class, 'resend'])
         ->name('team-invitations.resend');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
+    Route::get('/settings/instance/mail', [InstanceSettingsController::class, 'mail'])->name('settings.instance.mail');
+    Route::get('/settings/instance/operators', [InstanceSettingsController::class, 'operators'])->name('settings.instance.operators');
     Route::put('/settings/instance/backup-retention', [InstanceSettingsController::class, 'updateBackupRetention'])
         ->name('settings.instance.backup-retention.update');
     Route::put('/settings/instance/backup-destinations', [InstanceSettingsController::class, 'updateBackupDestinations'])
@@ -102,18 +104,22 @@ Route::middleware([
         ->name('settings.instance.backup-destinations.test-s3');
     Route::post('/settings/instance/backup-destinations/test-path', [InstanceSettingsController::class, 'testBackupPath'])
         ->name('settings.instance.backup-destinations.test-path');
+    Route::put('/settings/instance/mail', [InstanceSettingsController::class, 'updateMail'])
+        ->name('settings.instance.mail.update');
+    Route::post('/settings/instance/mail/test', [InstanceSettingsController::class, 'testMail'])
+        ->name('settings.instance.mail.test');
     Route::post('/settings/instance/operators', [InstanceSettingsController::class, 'addOperator'])->name('settings.instance.operators.store');
     Route::delete('/settings/instance/operators/{user}', [InstanceSettingsController::class, 'removeOperator'])->name('settings.instance.operators.destroy');
     Route::put('/user/preferences', [UserPreferencesController::class, 'update'])->name('user-preferences.update');
     Route::get('/backups-exports', [BackupsExportsController::class, 'index'])->name('backups-exports.index');
     Route::get('/backups-exports/destinations', [BackupsExportsController::class, 'destinations'])
         ->name('backups-exports.destinations');
+    Route::redirect('/backups-exports/mail', '/settings/instance/mail')->name('backups-exports.mail');
     Route::get('/backups-exports/retention', [BackupsExportsController::class, 'retention'])
         ->name('backups-exports.retention');
     Route::get('/backups-exports/restore', [BackupsExportsController::class, 'restore'])
         ->name('backups-exports.restore');
-    Route::get('/backups-exports/operators', [BackupsExportsController::class, 'operators'])
-        ->name('backups-exports.operators');
+    Route::redirect('/backups-exports/operators', '/settings/instance/operators')->name('backups-exports.operators');
     Route::post('/backups-exports/backups', [BackupsExportsController::class, 'storeBackup'])->name('backups-exports.backups.store');
     Route::get('/backups-exports/backups/{instanceBackupRun}/download', [BackupsExportsController::class, 'downloadBackup'])
         ->name('backups-exports.backups.download');

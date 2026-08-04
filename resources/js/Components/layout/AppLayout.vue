@@ -234,6 +234,8 @@ const isTeamSettingsPath = computed(
 const isSettingsSectionActive = computed(
     () => isActivePath(route('profile.show'))
         || isActivePath(route('settings.business'))
+        || pathMatchesPrefix('/settings/instance')
+        || pathMatchesPrefix('/settings/note-templates')
         || isTeamSettingsPath.value,
 );
 

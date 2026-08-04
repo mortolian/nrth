@@ -9,7 +9,6 @@ use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Backup\Services\InstanceBackupTypeResolver;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
-use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Domain\Takeout\Services\TakeoutPreviewService;
@@ -30,7 +29,6 @@ class BackupsExportsController extends Controller
         private readonly TakeoutPeriodResolver $periodResolver,
         private readonly TakeoutPreviewService $previewService,
         private readonly InstanceBackupService $backups,
-        private readonly InstanceOperatorService $operators,
         private readonly InstanceBackupRetentionSettings $backupRetention,
         private readonly InstanceBackupTypeResolver $backupTypes,
         private readonly InstanceBackupDestinationSettings $backupDestinations,
@@ -81,13 +79,12 @@ class BackupsExportsController extends Controller
             $this->backups->syncDiskBackupsIntoRuns();
             $retention = $this->backupRetention->current();
             $destinations = $this->backupDestinations->publicProps();
-            $operatorCount = count($this->operators->listEffectiveOperators());
             $props['recent_backups'] = $this->backupRunProps();
             $props['backup_schedule_hint'] = $this->backupScheduleHint(
                 $retention['weekly_on'],
                 $destinations['active_disks'],
             );
-            $props['backup_links'] = $this->backupLinkSummaries($destinations['active_disks'], $operatorCount);
+            $props['backup_links'] = $this->backupLinkSummaries($destinations['active_disks']);
         }
 
         return Inertia::render('BackupsExports/Index', $props);
@@ -139,16 +136,6 @@ class BackupsExportsController extends Controller
             'restore_guide' => $this->backups->restoreGuideProps(),
             'ready_filenames' => $readyFilenames,
             'selected_filename' => $selected,
-        ]);
-    }
-
-    public function operators(): Response
-    {
-        Gate::authorize('manageInstanceBackups');
-
-        return Inertia::render('BackupsExports/Operators', [
-            'operators' => $this->operators->listEffectiveOperators(),
-            'env_break_glass_configured' => $this->operators->envOperatorEmails() !== [],
         ]);
     }
 
@@ -260,12 +247,9 @@ class BackupsExportsController extends Controller
 
     /**
      * @param  list<string>  $activeDisks
-     * @return array{
-     *     destinations_summary: string,
-     *     operators_summary: string
-     * }
+     * @return array{destinations_summary: string}
      */
-    private function backupLinkSummaries(array $activeDisks, int $operatorCount): array
+    private function backupLinkSummaries(array $activeDisks): array
     {
         $offsite = array_values(array_filter($activeDisks, static fn (string $disk): bool => $disk !== 'local'));
         $destinationsSummary = $offsite === []
@@ -274,9 +258,6 @@ class BackupsExportsController extends Controller
 
         return [
             'destinations_summary' => $destinationsSummary,
-            'operators_summary' => $operatorCount === 1
-                ? '1 operator'
-                : "{$operatorCount} operators",
         ];
     }
 
