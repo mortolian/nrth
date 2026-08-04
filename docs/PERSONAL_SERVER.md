@@ -42,7 +42,7 @@ cd /opt/nrth
 
 1. Resets the tree to `origin/master` and prints the commit
 2. Rebuilds Vite assets (`npm run build`)
-3. Stops dev-only services and removes any stale `public/hot`
+3. Removes dev-only services and any stale `public/hot`
 4. Refreshes Laravel config/route/view caches
 5. Restarts the app container
 6. Verifies `expenses.parse-receipt` exists and the Vite manifest is present

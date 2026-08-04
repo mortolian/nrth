@@ -163,8 +163,8 @@ run_app() {
 }
 
 disable_dev_services() {
-    echo "==> Serving built frontend assets (stopping dev-only services)"
-    $COMPOSE stop vite mailpit 2>/dev/null || true
+    echo "==> Serving built frontend assets (removing dev-only services)"
+    $COMPOSE rm -sf vite mailpit 2>/dev/null || true
     rm -f "$ROOT_DIR/public/hot"
 }
 

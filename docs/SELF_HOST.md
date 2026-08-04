@@ -119,7 +119,7 @@ cd /opt/nrth
 ```
 
 Data-safe: no volume wipe, incremental migrate only. The updater rebuilds `public/build`,
-stops dev-only Compose services, removes any stale `public/hot`, and restarts Octane so
+removes dev-only Compose services, removes any stale `public/hot`, and restarts Octane so
 deployed browsers use the freshly built versioned assets. Vite HMR and Mailpit are behind the
 optional `dev` profile, so self-hosted stacks do not start them unless you opt in. See
 [INSTALL.md](INSTALL.md).
@@ -133,7 +133,7 @@ optional `dev` profile, so self-hosted stacks do not start them unless you opt i
 | Won’t start / wrong URL / HTTPS | `./scripts/repair.sh --ip YOUR_IP` |
 | Wipe and reinstall | `./scripts/reset.sh --force` |
 | `https://IP:8000` fails | Use `https://IP/` (Caddy) or temporary `http://IP:8000` with `--lan` |
-| UI still looks old after update | Re-run `./scripts/update` on the latest code so it rebuilds assets, stops dev-only services, and removes any stale `public/hot` file |
+| UI still looks old after update | Re-run `./scripts/update` on the latest code so it rebuilds assets, removes dev-only services, and removes any stale `public/hot` file |
 | Docker permission denied | `./scripts/compose.sh …` or `newgrp docker` |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Queues stuck | `./scripts/compose.sh restart horizon` |

@@ -215,8 +215,8 @@ configure_https_access() {
 }
 
 disable_dev_services() {
-    log "Stopping dev-only services and removing stale Vite hot file"
-    $COMPOSE stop vite mailpit 2>/dev/null || true
+    log "Removing dev-only services and stale Vite hot file"
+    $COMPOSE rm -sf vite mailpit 2>/dev/null || true
     rm -f "$ROOT_DIR/public/hot"
 }
 
