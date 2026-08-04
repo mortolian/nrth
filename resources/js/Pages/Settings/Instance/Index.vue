@@ -24,16 +24,5 @@ defineProps<{
                 </AppCard>
             </Link>
         </div>
-
-        <p class="mt-6 text-sm text-slate-600">
-            Whole-server backups stay under
-            <Link
-                :href="route('backups-exports.index', { section: 'backup' })"
-                class="font-medium text-brand-700 hover:underline"
-            >
-                Backups &amp; exports
-            </Link>
-            (destinations, retention, and restore).
-        </p>
     </InstanceSettingsShell>
 </template>
