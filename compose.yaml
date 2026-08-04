@@ -64,7 +64,7 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "${FORWARD_DB_PORT:-5432}:5432"
+      - "127.0.0.1:${FORWARD_DB_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
@@ -82,7 +82,7 @@ services:
     image: redis:7-alpine
     command: redis-server --appendonly yes
     ports:
-      - "${FORWARD_REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -94,9 +94,11 @@ services:
 
   mailpit:
     image: axllent/mailpit:latest
+    profiles:
+      - dev
     ports:
-      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
-      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+      - "127.0.0.1:${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "127.0.0.1:${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
 
   app:
     build:
@@ -112,9 +114,6 @@ services:
       <<: *laravel-env
       DB_HOST: postgres
       REDIS_HOST: redis
-      MAIL_HOST: mailpit
-      MAIL_PORT: '1025'
-      MAIL_MAILER: smtp
       DOCKER_ROLE: app
       LARAVEL_SAIL: '1'
       # Octane's file-watcher.cjs runs under vendor/laravel/octane/bin; NODE_PATH guarantees
@@ -125,8 +124,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      mailpit:
-        condition: service_started
     volumes:
       # Host source (hot reload for PHP/Vue) + Linux vendor/node_modules in named volumes.
       - .:/var/www/html
@@ -174,9 +171,6 @@ services:
       <<: *laravel-env
       DB_HOST: postgres
       REDIS_HOST: redis
-      MAIL_HOST: mailpit
-      MAIL_PORT: '1025'
-      MAIL_MAILER: smtp
       DOCKER_ROLE: horizon
     depends_on:
       postgres:
@@ -206,9 +200,6 @@ services:
       <<: *laravel-env
       DB_HOST: postgres
       REDIS_HOST: redis
-      MAIL_HOST: mailpit
-      MAIL_PORT: '1025'
-      MAIL_MAILER: smtp
       DOCKER_ROLE: scheduler
     depends_on:
       postgres:

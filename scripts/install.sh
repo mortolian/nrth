@@ -17,15 +17,15 @@
 #   --repo-url URL       Git remote (default: https://github.com/mortolian/nrth.git)
 #   --install-dir PATH   Install location (default: repo root or /opt/nrth when piping)
 #   --branch NAME        Git branch (default: master)
-#   --production         APP_ENV=production, APP_DEBUG=false
-#   --dev                Dev/LAN defaults: HTTP on :8000, no Caddy (default)
+#   --production         Self-hosted production: APP_ENV=production, APP_DEBUG=false
+#   --dev                Contributor defaults: APP_ENV=local, HMR + Mailpit via dev profile
 #   --with-caddy         Enable Compose Caddy TLS proxy (default for --production)
 #   --no-caddy           Do not start the optional Caddy reverse proxy
 #   --auto-deploy        Set up GitHub Actions self-hosted runner (label: nrth-server); uses deploy-server.yml
 #   --non-interactive    Skip env prompts; use generated defaults
 #   --accept-data-risk   Acknowledge backup responsibility (required with --non-interactive)
-#   --allow-http         Permit plain HTTP (default for --dev; sets APP_ALLOW_HTTP=true)
-#   --lan                Shorthand for default dev install (same as plain --dev today)
+#   --allow-http         Permit plain HTTP (default for --dev and --lan; sets APP_ALLOW_HTTP=true)
+#   --lan                Self-hosted LAN install: APP_ENV=production over HTTP on :8000 (default)
 #   --lan-ip ADDR        LAN IP for APP_URL (with --lan or --allow-http)
 #   --repair             Delegate to scripts/repair.sh (non-destructive fix)
 #   -h, --help           Show help
@@ -51,7 +51,7 @@ RUNNER_NAME="$DEFAULT_RUNNER_NAME"
 RUNNER_LABEL="$DEFAULT_RUNNER_LABEL"
 INSTALL_DIR=""
 BRANCH="$DEFAULT_BRANCH"
-MODE="dev"
+MODE="lan"
 AUTO_DEPLOY=0
 NON_INTERACTIVE=0
 ACCEPT_DATA_RISK=0
@@ -146,7 +146,7 @@ parse_args() {
                 shift
                 ;;
             --lan)
-                MODE="dev"
+                MODE="lan"
                 ALLOW_HTTP=1
                 WITH_CADDY=0
                 shift
@@ -228,6 +228,12 @@ set_env_var() {
     fi
 }
 
+unset_env_var() {
+    local key="$1"
+    local file="$2"
+    sed -i "/^${key}=/d" "$file" 2>/dev/null || true
+}
+
 read_env_var() {
     local key="$1"
     local file="$2"
@@ -291,7 +297,7 @@ normalize_app_url() {
             return 0
         fi
         if [[ "$MODE" == "production" ]]; then
-            die "APP_URL must use https:// — plain HTTP is not permitted for production (use --allow-http only for LAN dev)"
+            die "APP_URL must use https:// — plain HTTP is not permitted for production (use --allow-http only for a trusted LAN install)"
         fi
         echo "warning: converting http:// APP_URL to https:// (pass --allow-http for plain HTTP on LAN)" >&2
         url="https://${url#http://}"
@@ -345,7 +351,6 @@ configure_caddy_proxy() {
     app_url="$(strip_app_url_port_for_proxy "$app_url")"
 
     set_env_var APP_URL "$app_url" "$env_file"
-    set_env_var COMPOSE_PROFILES proxy "$env_file"
     set_env_var CADDY_SITE "$host" "$env_file"
     if is_ip_address "$host"; then
         set_env_var CADDY_TLS internal "$env_file"
@@ -367,11 +372,16 @@ resolve_with_caddy_default() {
     fi
 }
 
-# Dev installs target pragmatic LAN access (HTTP on :8000). Production keeps HTTPS + Caddy.
+# Self-hosted LAN installs stay production-like (APP_ENV=production) but allow plain HTTP.
 resolve_access_defaults() {
     resolve_with_caddy_default
     if [[ "$MODE" == "production" ]]; then
         ALLOW_HTTP=0
+        return 0
+    fi
+    if [[ "$MODE" == "lan" ]]; then
+        ALLOW_HTTP=1
+        WITH_CADDY=0
         return 0
     fi
     if [[ "$WITH_CADDY" -eq 1 ]]; then
@@ -379,6 +389,38 @@ resolve_access_defaults() {
     else
         ALLOW_HTTP=1
         WITH_CADDY=0
+    fi
+}
+
+configure_compose_profiles() {
+    local env_file="$1"
+    local profiles=()
+    local joined=""
+
+    if [[ "$MODE" == "dev" ]]; then
+        profiles+=("dev")
+    fi
+    if [[ "$WITH_CADDY" -eq 1 ]]; then
+        profiles+=("proxy")
+    fi
+
+    if [[ "${#profiles[@]}" -eq 0 ]]; then
+        unset_env_var COMPOSE_PROFILES "$env_file"
+        return 0
+    fi
+
+    local IFS=,
+    joined="${profiles[*]}"
+    set_env_var COMPOSE_PROFILES "$joined" "$env_file"
+}
+
+configure_mail_defaults() {
+    local env_file="$1"
+
+    if [[ "$MODE" == "dev" ]]; then
+        set_env_var MAIL_MAILER smtp "$env_file"
+        set_env_var MAIL_HOST mailpit "$env_file"
+        set_env_var MAIL_PORT 1025 "$env_file"
     fi
 }
 
@@ -510,40 +552,35 @@ configure_env() {
 
     resolve_access_defaults
 
-    if [[ "$MODE" == "production" ]]; then
+    if [[ "$MODE" == "production" || "$MODE" == "lan" ]]; then
         set_env_var APP_ENV production "$env_file"
         set_env_var APP_DEBUG false "$env_file"
-        if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
-            if [[ "$WITH_CADDY" -eq 1 ]]; then
-                app_url="https://localhost"
-            else
-                app_url="https://localhost:8000"
-            fi
-        else
-            read -r -p "Public APP_URL [https://books.example.com]: " app_url
-            app_url="${app_url:-https://books.example.com}"
-        fi
     else
         set_env_var APP_ENV local "$env_file"
         set_env_var APP_DEBUG true "$env_file"
-        if [[ "$ALLOW_HTTP" -eq 1 ]]; then
-            local lan_ip
-            lan_ip="$(detect_lan_ip)"
-            if [[ -n "$lan_ip" ]]; then
-                app_url="http://${lan_ip}:8000"
-            else
-                app_url="http://localhost:8000"
-            fi
-            if [[ "$NON_INTERACTIVE" -eq 0 ]]; then
-                read -r -p "APP_URL [${app_url}]: " custom_url
-                app_url="${custom_url:-$app_url}"
-            fi
-        elif [[ "$NON_INTERACTIVE" -eq 1 ]]; then
-            app_url="https://localhost:8000"
+    fi
+
+    if [[ "$ALLOW_HTTP" -eq 1 ]]; then
+        local lan_ip
+        lan_ip="$(detect_lan_ip)"
+        if [[ -n "$lan_ip" ]]; then
+            app_url="http://${lan_ip}:8000"
         else
-            read -r -p "APP_URL [https://localhost:8000]: " app_url
-            app_url="${app_url:-https://localhost:8000}"
+            app_url="http://localhost:8000"
         fi
+        if [[ "$NON_INTERACTIVE" -eq 0 ]]; then
+            read -r -p "APP_URL [${app_url}]: " custom_url
+            app_url="${custom_url:-$app_url}"
+        fi
+    elif [[ "$NON_INTERACTIVE" -eq 1 ]]; then
+        if [[ "$WITH_CADDY" -eq 1 ]]; then
+            app_url="https://localhost"
+        else
+            app_url="https://localhost:8000"
+        fi
+    else
+        read -r -p "Public APP_URL [https://books.example.com]: " app_url
+        app_url="${app_url:-https://books.example.com}"
     fi
 
     local url_scheme="https"
@@ -555,11 +592,12 @@ configure_env() {
     else
         set_env_var APP_URL "$app_url" "$env_file"
     fi
+    configure_compose_profiles "$env_file"
     if [[ "$ALLOW_HTTP" -eq 1 ]]; then
         set_env_var APP_ALLOW_HTTP true "$env_file"
         set_env_var APP_FORCE_HTTPS false "$env_file"
-        sed -i '/^SESSION_SECURE_COOKIE=/d' "$env_file" 2>/dev/null || true
-        sed -i '/^SESSION_DOMAIN=/d' "$env_file" 2>/dev/null || true
+        unset_env_var SESSION_SECURE_COOKIE "$env_file"
+        unset_env_var SESSION_DOMAIN "$env_file"
     else
         set_env_var APP_FORCE_HTTPS true "$env_file"
         set_env_var APP_ALLOW_HTTP false "$env_file"
@@ -576,6 +614,7 @@ configure_env() {
     set_env_var SESSION_DRIVER redis "$env_file"
     set_env_var REDIS_HOST 127.0.0.1 "$env_file"
     set_env_var REDIS_PORT 6379 "$env_file"
+    configure_mail_defaults "$env_file"
 
     log "Configured .env for Docker Compose (${MODE} mode)"
 }

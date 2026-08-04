@@ -30,8 +30,8 @@ The installer installs Docker if needed, writes `.env`, starts Compose, and runs
 
 Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance.
 
-For safety, self-hosted installs do **not** start the optional Vite HMR service by default.
-Deployed instances should serve built assets from `public/build`, not `http://...:5173`.
+For safety, self-hosted installs do **not** start the optional Vite HMR or Mailpit services by default.
+Deployed instances should serve built assets from `public/build`, and Postgres/Redis host ports bind to `127.0.0.1`.
 
 If the admin wizard did not run (non-interactive install):
 
@@ -51,7 +51,7 @@ cd /opt/nrth
 ./scripts/update
 ```
 
-Mode defaults to a **full** update (migrate, caches, asset build, verify). With `APP_ENV=production`, it also runs `app:update` (maintenance mode). Optional: `./scripts/update production` or `./scripts/update dev`.
+Mode defaults to a **full** update (migrate, caches, asset build, verify). With `APP_ENV=production`, it also runs `app:update` (maintenance mode). On self-hosted installs, it also warns if the instance still looks like contributor mode (`APP_ENV=local`). Optional: `./scripts/update production` or `./scripts/update dev`.
 
 `./scripts/deploy.sh` still works as an alias.
 
@@ -69,8 +69,9 @@ Install a self-hosted runner once (`install.sh --auto-deploy`, label `nrth-serve
 
 | Flag | Purpose |
 |------|---------|
-| `--production` | Production env + Caddy TLS (use this if the host is reachable beyond a trusted LAN) |
-| `--lan` | Trusted LAN only: HTTP on :8000, no Caddy — not internet-safe |
+| `--production` | Self-hosted production: APP_ENV=production + Caddy TLS |
+| `--lan` | Trusted LAN self-host: APP_ENV=production over HTTP on :8000, no Caddy |
+| `--dev` | Contributor stack: APP_ENV=local with dev profile services like Vite HMR and Mailpit |
 | `--install-dir PATH` | Default `/opt/nrth` when piping |
 | `--accept-data-risk` | Required for piped / non-interactive |
 | `--auto-deploy` | Register GitHub Actions runner (`nrth-server`) |

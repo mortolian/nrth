@@ -45,6 +45,37 @@ read_app_env() {
     grep -E '^APP_ENV=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true
 }
 
+read_env_var() {
+    local key="$1"
+    if [[ ! -f .env ]]; then
+        echo ""
+        return
+    fi
+    grep -E "^${key}=" .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" || true
+}
+
+self_host_should_use_production_env() {
+    local profiles app_url host
+    profiles="$(read_env_var COMPOSE_PROFILES)"
+    app_url="$(read_env_var APP_URL)"
+
+    if [[ "$profiles" == *dev* ]]; then
+        return 1
+    fi
+
+    host="${app_url#*://}"
+    host="${host%%/*}"
+    host="${host%%:*}"
+
+    case "$host" in
+        ""|localhost|127.0.0.1)
+            return 1
+            ;;
+    esac
+
+    return 0
+}
+
 resolve_mode() {
     local arg="${1:-}"
     case "$arg" in
@@ -131,9 +162,9 @@ run_app() {
     $COMPOSE exec -T app "$@"
 }
 
-disable_vite_dev_server() {
-    echo "==> Serving built frontend assets (stopping Vite dev server)"
-    $COMPOSE stop vite 2>/dev/null || true
+disable_dev_services() {
+    echo "==> Serving built frontend assets (stopping dev-only services)"
+    $COMPOSE stop vite mailpit 2>/dev/null || true
     rm -f "$ROOT_DIR/public/hot"
 }
 
@@ -176,7 +207,7 @@ if ! run_app test -f public/build/manifest.json 2>/dev/null; then
 fi
 
 if [[ "$MODE" != "dev" ]]; then
-    disable_vite_dev_server
+    disable_dev_services
 fi
 
 refresh_caches() {
@@ -207,6 +238,7 @@ $COMPOSE restart app
 
 echo "==> Verifying deploy"
 VERIFY_OK=1
+ENV_WARNING=0
 if ! run_app php artisan route:list --name=expenses.parse-receipt --json 2>/dev/null | grep -q parse-receipt; then
     # Fallback without --json for older artisan output
     if ! run_app php artisan route:list --name=expenses.parse-receipt 2>/dev/null | grep -q parse-receipt; then
@@ -235,6 +267,17 @@ if [[ "$MODE" != "dev" ]]; then
     fi
 fi
 
+if [[ "$MODE" != "dev" ]] && self_host_should_use_production_env; then
+    if [[ "$(read_app_env)" == "production" ]]; then
+        echo "    OK: self-host install uses APP_ENV=production"
+    else
+        echo "    WARN: self-host install still uses APP_ENV=$(read_app_env)"
+        echo "          Run ./scripts/repair.sh --mode http --ip YOUR_LAN_IP"
+        echo "          or ./scripts/repair.sh --mode https --ip YOUR_LAN_IP"
+        ENV_WARNING=1
+    fi
+fi
+
 echo ""
 echo "Update finished ($(date -u +"%Y-%m-%d %H:%M:%S UTC"))."
 echo "  Mode: ${MODE} (APP_ENV=$(read_app_env))"
@@ -242,6 +285,9 @@ echo "  Commit: ${AFTER_SHORT} — ${AFTER_SUBJECT}"
 echo "  Matches origin/${GIT_BRANCH}: yes"
 echo "  Assets rebuilt: $([[ "$BUILT_ASSETS" -eq 1 ]] && echo yes || echo no)"
 echo "  Data: volumes and database preserved; pending migrations applied only"
+if [[ "$ENV_WARNING" -eq 1 ]]; then
+    echo "  Environment: warning (self-host install still uses contributor APP_ENV)"
+fi
 
 if [[ "$VERIFY_OK" -ne 1 ]]; then
     echo "" >&2

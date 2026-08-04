@@ -14,7 +14,8 @@ nrth is a financial app — do not expose plain HTTP long-term.
 - Browsers should use **HTTPS on 443** via Compose Caddy (`--production`) or a host reverse proxy.
 - Set `APP_URL` to the public `https://…` URL (**no** `:8000` when using Caddy on 443).
 - Never open `https://host:8000` — nothing speaks TLS on that port.
-- `--lan` / HTTP on `:8000` is **trusted private network only**. Do not port-forward the app (or Postgres/Redis/Mailpit) to the internet.
+- `--lan` / HTTP on `:8000` is **trusted private network only**. Do not port-forward the app to the internet.
+- Postgres and Redis host ports bind to `127.0.0.1` by default. Vite HMR and Mailpit are dev-only services behind the optional `dev` Compose profile.
 - Production: do not publish Postgres, Redis, or Mailpit on `0.0.0.0`; firewall should allow **80/443 only** to the host.
 
 ### LAN IP (self-signed)
@@ -118,10 +119,10 @@ cd /opt/nrth
 ```
 
 Data-safe: no volume wipe, incremental migrate only. The updater rebuilds `public/build`,
-stops the Compose `vite` dev server, removes any stale `public/hot`, and restarts Octane so
-deployed browsers use the freshly built versioned assets. The Compose `vite` service is also
-behind the optional `dev` profile, so self-hosted stacks do not start HMR unless you opt in.
-See [INSTALL.md](INSTALL.md).
+stops dev-only Compose services, removes any stale `public/hot`, and restarts Octane so
+deployed browsers use the freshly built versioned assets. Vite HMR and Mailpit are behind the
+optional `dev` profile, so self-hosted stacks do not start them unless you opt in. See
+[INSTALL.md](INSTALL.md).
 
 ---
 
@@ -132,7 +133,7 @@ See [INSTALL.md](INSTALL.md).
 | Won’t start / wrong URL / HTTPS | `./scripts/repair.sh --ip YOUR_IP` |
 | Wipe and reinstall | `./scripts/reset.sh --force` |
 | `https://IP:8000` fails | Use `https://IP/` (Caddy) or temporary `http://IP:8000` with `--lan` |
-| UI still looks old after update | Re-run `./scripts/update` on the latest code so it rebuilds assets, stops `vite`, and removes any stale `public/hot` file |
+| UI still looks old after update | Re-run `./scripts/update` on the latest code so it rebuilds assets, stops dev-only services, and removes any stale `public/hot` file |
 | Docker permission denied | `./scripts/compose.sh …` or `newgrp docker` |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Queues stuck | `./scripts/compose.sh restart horizon` |

@@ -4,7 +4,7 @@
 
 Self-host users: follow [INSTALL.md](INSTALL.md) — same install and `./scripts/update` commands.
 
-**Security:** the default below is `--lan` (plain HTTP on `:8000`). That is fine only on a **trusted private LAN**. It is not secure on the public internet. Compose may also publish Postgres, Redis, and Mailpit on the host — keep those off the internet (no port-forward; firewall if unsure). For HTTPS on the same box, switch to the Caddy/`proxy` setup in [SELF_HOST.md](SELF_HOST.md).
+**Security:** the default below is `--lan` (plain HTTP on `:8000`). That is fine only on a **trusted private LAN**. It is not secure on the public internet. Postgres and Redis bind to `127.0.0.1` on the host, while Vite HMR and Mailpit stay behind the optional `dev` profile. For HTTPS on the same box, switch to the Caddy/`proxy` setup in [SELF_HOST.md](SELF_HOST.md).
 
 ---
 
@@ -42,9 +42,10 @@ cd /opt/nrth
 
 1. Resets the tree to `origin/master` and prints the commit
 2. Rebuilds Vite assets (`npm run build`)
-3. Refreshes Laravel config/route/view caches (even when `APP_ENV=local` from a `--lan` install)
-4. Restarts the app container
-5. Verifies `expenses.parse-receipt` exists and the Vite manifest is present
+3. Stops dev-only services and removes any stale `public/hot`
+4. Refreshes Laravel config/route/view caches
+5. Restarts the app container
+6. Verifies `expenses.parse-receipt` exists and the Vite manifest is present
 
 If verification fails, the script exits non-zero. Use `SKIP_ASSETS=1` only when you intentionally skip the frontend build.
 

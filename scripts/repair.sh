@@ -6,13 +6,13 @@
 # missing Vite manifest, docker.sock permissions, and stale deploy caches.
 #
 # Usage:
-#   ./scripts/repair.sh                          # LAN HTTP (fastest path to working app)
+#   ./scripts/repair.sh                          # LAN HTTP (production-like self-host, no data wipe)
 #   ./scripts/repair.sh --mode https --ip 192.168.1.204
 #   ./scripts/repair.sh --install-dir /opt/nrth --sync-db-password --rebuild-assets
 #
 # Options:
 #   --install-dir PATH   Install location (default: repo root or /opt/nrth)
-#   --mode http|https    Browser access mode (default: http for pragmatic LAN dev)
+#   --mode http|https    Browser access mode (default: http for pragmatic LAN self-host)
 #   --ip ADDR            LAN IP for APP_URL (default: auto-detect)
 #   --sync-db-password   Align Postgres password with .env (safe, keeps data)
 #   --rebuild-assets     Force npm ci && npm run build
@@ -141,6 +141,12 @@ set_env_var() {
     fi
 }
 
+unset_env_var() {
+    local key="$1"
+    local file="$2"
+    sed -i "/^${key}=/d" "$file" 2>/dev/null || true
+}
+
 read_env_var() {
     local key="$1"
     local file="$2"
@@ -178,16 +184,18 @@ configure_http_access() {
     local ip="$2"
 
     log "Configuring pragmatic LAN HTTP access (APP_URL=http://${ip}:8000)"
+    set_env_var APP_ENV production "$env_file"
+    set_env_var APP_DEBUG false "$env_file"
     set_env_var APP_URL "http://${ip}:8000" "$env_file"
     set_env_var APP_ALLOW_HTTP true "$env_file"
     set_env_var APP_FORCE_HTTPS false "$env_file"
     set_env_var TRUSTED_PROXIES "*" "$env_file"
     # Unset so config/session.php derives secure=false from APP_ALLOW_HTTP.
-    sed -i '/^SESSION_SECURE_COOKIE=/d' "$env_file" 2>/dev/null || true
-    sed -i '/^SESSION_DOMAIN=/d' "$env_file" 2>/dev/null || true
-    sed -i '/^COMPOSE_PROFILES=/d' "$env_file" 2>/dev/null || true
-    sed -i '/^CADDY_SITE=/d' "$env_file" 2>/dev/null || true
-    sed -i '/^CADDY_TLS=/d' "$env_file" 2>/dev/null || true
+    unset_env_var SESSION_SECURE_COOKIE "$env_file"
+    unset_env_var SESSION_DOMAIN "$env_file"
+    unset_env_var COMPOSE_PROFILES "$env_file"
+    unset_env_var CADDY_SITE "$env_file"
+    unset_env_var CADDY_TLS "$env_file"
 }
 
 configure_https_access() {
@@ -195,6 +203,8 @@ configure_https_access() {
     local ip="$2"
 
     log "Configuring Caddy HTTPS with self-signed cert (APP_URL=https://${ip})"
+    set_env_var APP_ENV production "$env_file"
+    set_env_var APP_DEBUG false "$env_file"
     set_env_var APP_URL "https://${ip}" "$env_file"
     set_env_var APP_ALLOW_HTTP false "$env_file"
     set_env_var APP_FORCE_HTTPS true "$env_file"
@@ -202,6 +212,12 @@ configure_https_access() {
     set_env_var COMPOSE_PROFILES proxy "$env_file"
     set_env_var CADDY_SITE "$ip" "$env_file"
     set_env_var CADDY_TLS internal "$env_file"
+}
+
+disable_dev_services() {
+    log "Stopping dev-only services and removing stale Vite hot file"
+    $COMPOSE stop vite mailpit 2>/dev/null || true
+    rm -f "$ROOT_DIR/public/hot"
 }
 
 sync_db_password() {
@@ -383,9 +399,10 @@ main() {
     fi
 
     rebuild_assets_if_needed "$REBUILD_ASSETS"
+    disable_dev_services
 
     log "Restarting app and services to pick up .env changes"
-    $COMPOSE restart app horizon scheduler vite 2>/dev/null || $COMPOSE restart app
+    $COMPOSE restart app horizon scheduler 2>/dev/null || $COMPOSE restart app
 
     wait_for_app_health
     print_result "$ROOT_DIR/.env"
