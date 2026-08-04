@@ -147,6 +147,8 @@ services:
 
   vite:
     image: nrth:local
+    profiles:
+      - dev
     working_dir: /var/www/html
     ports:
       - "${VITE_PORT:-5173}:5173"

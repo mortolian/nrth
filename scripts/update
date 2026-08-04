@@ -131,6 +131,12 @@ run_app() {
     $COMPOSE exec -T app "$@"
 }
 
+disable_vite_dev_server() {
+    echo "==> Serving built frontend assets (stopping Vite dev server)"
+    $COMPOSE stop vite 2>/dev/null || true
+    rm -f "$ROOT_DIR/public/hot"
+}
+
 STATE_DIR="$ROOT_DIR/storage/framework"
 mkdir -p "$STATE_DIR"
 COMPOSER_HASH_FILE="$STATE_DIR/.deploy-composer-hash"
@@ -167,6 +173,10 @@ fi
 if ! run_app test -f public/build/manifest.json 2>/dev/null; then
     echo "error: public/build/manifest.json missing after update. Frontend assets were not built." >&2
     exit 1
+fi
+
+if [[ "$MODE" != "dev" ]]; then
+    disable_vite_dev_server
 fi
 
 refresh_caches() {
@@ -214,6 +224,15 @@ if run_app test -f public/build/manifest.json 2>/dev/null; then
 else
     echo "    FAIL: Vite manifest missing"
     VERIFY_OK=0
+fi
+
+if [[ "$MODE" != "dev" ]]; then
+    if run_app test -f public/hot 2>/dev/null; then
+        echo "    FAIL: stale Vite hot file still present"
+        VERIFY_OK=0
+    else
+        echo "    OK: Vite hot file removed"
+    fi
 fi
 
 echo ""

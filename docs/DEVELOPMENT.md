@@ -83,8 +83,15 @@ Sail wrapper (uses `compose.yaml`):
 ./vendor/bin/sail artisan migrate
 ```
 
-`vite` and `horizon` start automatically with the stack. Vite HMR is available at
-`http://localhost:5173`; use `./vendor/bin/sail logs -f vite` or
+The `vite` service is behind the optional Compose `dev` profile so self-hosted stacks do not
+expose HMR by default. For contributor Docker workflows, enable it explicitly:
+
+```bash
+COMPOSE_PROFILES=dev ./vendor/bin/sail up -d
+```
+
+Or add `COMPOSE_PROFILES=dev` to `.env` before starting the stack. Then Vite HMR is available
+at `http://localhost:5173`; use `./vendor/bin/sail logs -f vite` or
 `./vendor/bin/sail logs -f horizon` to inspect either service. See `.env.example` for
 Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
 

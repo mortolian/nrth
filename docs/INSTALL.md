@@ -30,6 +30,9 @@ The installer installs Docker if needed, writes `.env`, starts Compose, and runs
 
 Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance.
 
+For safety, self-hosted installs do **not** start the optional Vite HMR service by default.
+Deployed instances should serve built assets from `public/build`, not `http://...:5173`.
+
 If the admin wizard did not run (non-interactive install):
 
 ```bash

@@ -117,7 +117,11 @@ cd /opt/nrth
 ./scripts/update
 ```
 
-Data-safe: no volume wipe, incremental migrate only. See [INSTALL.md](INSTALL.md).
+Data-safe: no volume wipe, incremental migrate only. The updater rebuilds `public/build`,
+stops the Compose `vite` dev server, removes any stale `public/hot`, and restarts Octane so
+deployed browsers use the freshly built versioned assets. The Compose `vite` service is also
+behind the optional `dev` profile, so self-hosted stacks do not start HMR unless you opt in.
+See [INSTALL.md](INSTALL.md).
 
 ---
 
@@ -128,6 +132,7 @@ Data-safe: no volume wipe, incremental migrate only. See [INSTALL.md](INSTALL.md
 | Won’t start / wrong URL / HTTPS | `./scripts/repair.sh --ip YOUR_IP` |
 | Wipe and reinstall | `./scripts/reset.sh --force` |
 | `https://IP:8000` fails | Use `https://IP/` (Caddy) or temporary `http://IP:8000` with `--lan` |
+| UI still looks old after update | Re-run `./scripts/update` on the latest code so it rebuilds assets, stops `vite`, and removes any stale `public/hot` file |
 | Docker permission denied | `./scripts/compose.sh …` or `newgrp docker` |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Queues stuck | `./scripts/compose.sh restart horizon` |
