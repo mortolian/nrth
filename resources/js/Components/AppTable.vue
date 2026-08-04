@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { ArrowUpDown } from 'lucide-vue-next';
+import { cn } from '@/lib/utils';
 
 export type TableColumn = {
     key: string;
@@ -55,6 +56,8 @@ const normalizedColumns = computed<TableColumn[]>(() => {
     return props.columns as TableColumn[];
 });
 
+const tableClassName = computed(() => cn('min-w-full divide-y divide-slate-200', props.tableClass));
+
 const onSort = (column: TableColumn) => {
     if (!column.sortable) return;
     if (sortBy.value === column.key) {
@@ -83,7 +86,7 @@ const prevPage = () => {
         ]"
     >
         <div class="overflow-x-auto">
-            <table :class="['min-w-full divide-y divide-slate-200', tableClass]">
+            <table :class="tableClassName">
                 <thead v-if="normalizedColumns.length" class="bg-slate-50">
                     <tr>
                         <th

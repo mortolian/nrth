@@ -74,6 +74,27 @@ const filters = ref({
 const formatKm = (km: number | null | undefined) =>
     km == null ? '—' : `${Number(km).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`;
 
+const routeLabel = (trip: TripRow) => {
+    if (!trip.from_location && !trip.to_location) return null;
+    return `${trip.from_location || '—'} → ${trip.to_location || '—'}`;
+};
+
+const isBusiness = (trip: TripRow) => trip.purpose === 'business';
+
+const tripCardClass = (trip: TripRow) =>
+    isBusiness(trip)
+        ? 'border-sky-300 bg-sky-100/80 active:bg-sky-100'
+        : 'border-slate-200 bg-white active:bg-slate-50';
+
+const tripRowClass = (trip: TripRow) =>
+    isBusiness(trip)
+        ? 'border-l-2 border-l-sky-400 bg-sky-100/60 hover:bg-sky-100'
+        : 'hover:bg-slate-50';
+
+const openTrip = (trip: TripRow) => {
+    router.visit(route('vehicles.trips.edit', trip.id));
+};
+
 const filterQuery = () => ({
     search: filters.value.search || undefined,
     purpose: filters.value.purpose === 'all' ? undefined : filters.value.purpose,
@@ -136,7 +157,7 @@ const onRowAction = (trip: TripRow, actionId: string) => {
         return;
     }
     if (actionId === 'edit') {
-        router.visit(route('vehicles.trips.edit', trip.id));
+        openTrip(trip);
         return;
     }
     if (actionId === 'delete') {
@@ -227,78 +248,172 @@ const onRowAction = (trip: TripRow, actionId: string) => {
         </AppCard>
 
         <AppCard class="mt-5">
-            <AppTable
-                table-class="text-sm"
-                :columns="[
-                    { key: 'date', label: 'Date' },
-                    { key: 'vehicle', label: 'Vehicle' },
-                    { key: 'route', label: 'Route' },
-                    { key: 'purpose', label: 'Purpose' },
-                    { key: 'opening', label: 'Opening (est.)' },
-                    { key: 'closing', label: 'Closing (est.)' },
-                    { key: 'distance', label: 'Distance' },
-                    { key: 'actions', label: '' },
-                ]"
-                :page="trips.current_page"
-                :last-page="trips.last_page"
-                @page-change="applyFilters"
-            >
-                <tr
+            <!-- Narrow / medium screens: stacked cards (wide table squeezes the route column) -->
+            <div class="space-y-3 lg:hidden">
+                <div
                     v-for="trip in trips.data"
-                    :key="trip.id"
-                    class="cursor-pointer hover:bg-slate-50"
-                    @click="router.visit(route('vehicles.trips.edit', trip.id))"
+                    :key="`mobile-${trip.id}`"
+                    role="button"
+                    tabindex="0"
+                    class="w-full cursor-pointer rounded-xl border p-4 text-left shadow-sm"
+                    :class="tripCardClass(trip)"
+                    @click="openTrip(trip)"
+                    @keydown.enter.prevent="openTrip(trip)"
                 >
-                    <td class="whitespace-nowrap px-3 py-2">{{ formatTripDate(trip.trip_date) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
-                        {{ trip.vehicle?.name || '—' }}
-                    </td>
-                    <td class="px-3 py-2 text-slate-600">
-                        <span v-if="trip.from_location || trip.to_location">
-                            {{ trip.from_location || '—' }} → {{ trip.to_location || '—' }}
-                        </span>
-                        <span v-else class="text-slate-400">—</span>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2" @click.stop>
-                        <button
-                            v-if="canManage"
-                            type="button"
-                            class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:scale-[0.98]"
-                            :disabled="togglingPurposeIds.has(trip.id)"
-                            :title="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
-                            :aria-label="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
-                            @click="togglePurpose(trip)"
-                        >
-                            <AppBadge :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <p class="font-semibold text-slate-900">{{ formatTripDate(trip.trip_date) }}</p>
+                            <p class="truncate text-sm text-slate-600">{{ trip.vehicle?.name || '—' }}</p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-1.5" @click.stop>
+                            <button
+                                v-if="canManage"
+                                type="button"
+                                class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:scale-[0.98]"
+                                :disabled="togglingPurposeIds.has(trip.id)"
+                                :title="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                                :aria-label="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                                @click="togglePurpose(trip)"
+                            >
+                                <AppBadge :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
+                                    {{ trip.purpose }}
+                                </AppBadge>
+                            </button>
+                            <AppBadge v-else :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
                                 {{ trip.purpose }}
                             </AppBadge>
-                        </button>
-                        <AppBadge v-else :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
-                            {{ trip.purpose }}
-                        </AppBadge>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.estimated_opening_km) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.estimated_closing_km) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.distance_km) }}</td>
-                    <td class="px-3 py-2" @click.stop>
-                        <div class="flex justify-end">
                             <InvoiceRowActionsMenu
                                 :actions="rowActionItems(trip)"
                                 :aria-label="`Actions for trip ${trip.id}`"
                                 @select="(id) => onRowAction(trip, id)"
                             />
                         </div>
-                    </td>
-                </tr>
-                <tr v-if="!trips.data.length">
-                    <td colspan="8" class="px-4 py-6">
-                        <EmptyState
-                            title="No trips yet"
-                            description="Log business and private trips to build your travel log book."
-                        />
-                    </td>
-                </tr>
-            </AppTable>
+                    </div>
+                    <p
+                        class="mt-3 break-words text-sm text-slate-600"
+                        :class="{ 'text-slate-400': !routeLabel(trip) }"
+                    >
+                        {{ routeLabel(trip) || '—' }}
+                    </p>
+                    <div class="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 text-sm">
+                        <div class="min-w-0 text-xs text-slate-500">
+                            <p>
+                                <span class="tabular-nums">{{ formatKm(trip.estimated_opening_km) }}</span>
+                                →
+                                <span class="tabular-nums">{{ formatKm(trip.estimated_closing_km) }}</span>
+                            </p>
+                            <p class="mt-0.5">Opening → closing (est.)</p>
+                        </div>
+                        <p class="shrink-0 font-semibold tabular-nums text-slate-900">
+                            {{ formatKm(trip.distance_km) }}
+                        </p>
+                    </div>
+                </div>
+                <EmptyState
+                    v-if="!trips.data.length"
+                    title="No trips yet"
+                    description="Log business and private trips to build your travel log book."
+                />
+                <div
+                    v-if="trips.last_page > 1"
+                    class="flex items-center justify-between border-t border-slate-200 pt-3 text-xs text-slate-500"
+                >
+                    <p>Page {{ trips.current_page }} of {{ trips.last_page }}</p>
+                    <div class="flex items-center gap-2">
+                        <button
+                            type="button"
+                            class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                            :disabled="trips.current_page <= 1"
+                            @click="applyFilters(trips.current_page - 1)"
+                        >
+                            Previous
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                            :disabled="trips.current_page >= trips.last_page"
+                            @click="applyFilters(trips.current_page + 1)"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hidden lg:block">
+                <AppTable
+                    embedded
+                    table-class="min-w-[1120px] text-sm"
+                    :columns="[
+                        { key: 'date', label: 'Date', widthClass: 'whitespace-nowrap' },
+                        { key: 'vehicle', label: 'Vehicle', widthClass: 'whitespace-nowrap' },
+                        { key: 'route', label: 'Route', widthClass: 'min-w-[18rem]' },
+                        { key: 'purpose', label: 'Purpose', widthClass: 'whitespace-nowrap' },
+                        { key: 'opening', label: 'Opening (est.)', widthClass: 'whitespace-nowrap' },
+                        { key: 'closing', label: 'Closing (est.)', widthClass: 'whitespace-nowrap' },
+                        { key: 'distance', label: 'Distance', widthClass: 'whitespace-nowrap' },
+                        { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
+                    ]"
+                    :page="trips.current_page"
+                    :last-page="trips.last_page"
+                    @page-change="applyFilters"
+                >
+                    <tr
+                        v-for="trip in trips.data"
+                        :key="trip.id"
+                        class="cursor-pointer"
+                        :class="tripRowClass(trip)"
+                        @click="openTrip(trip)"
+                    >
+                        <td class="whitespace-nowrap px-3 py-2">{{ formatTripDate(trip.trip_date) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
+                            {{ trip.vehicle?.name || '—' }}
+                        </td>
+                        <td class="min-w-[18rem] max-w-[28rem] px-3 py-2 text-slate-600">
+                            <span v-if="routeLabel(trip)" class="break-words">{{ routeLabel(trip) }}</span>
+                            <span v-else class="text-slate-400">—</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2" @click.stop>
+                            <button
+                                v-if="canManage"
+                                type="button"
+                                class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:scale-[0.98]"
+                                :disabled="togglingPurposeIds.has(trip.id)"
+                                :title="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                                :aria-label="trip.purpose === 'business' ? 'Switch to private' : 'Switch to business'"
+                                @click="togglePurpose(trip)"
+                            >
+                                <AppBadge :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
+                                    {{ trip.purpose }}
+                                </AppBadge>
+                            </button>
+                            <AppBadge v-else :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
+                                {{ trip.purpose }}
+                            </AppBadge>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.estimated_opening_km) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.estimated_closing_km) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.distance_km) }}</td>
+                        <td class="px-3 py-2" @click.stop>
+                            <div class="flex justify-end">
+                                <InvoiceRowActionsMenu
+                                    :actions="rowActionItems(trip)"
+                                    :aria-label="`Actions for trip ${trip.id}`"
+                                    @select="(id) => onRowAction(trip, id)"
+                                />
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="!trips.data.length">
+                        <td colspan="8" class="px-4 py-6">
+                            <EmptyState
+                                title="No trips yet"
+                                description="Log business and private trips to build your travel log book."
+                            />
+                        </td>
+                    </tr>
+                </AppTable>
+            </div>
         </AppCard>
     </FeatureShell>
 </template>
