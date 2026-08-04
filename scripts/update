@@ -167,6 +167,8 @@ if [[ -n "$BEFORE_COMMIT" && "$BEFORE_COMMIT" != "$AFTER_SHORT" ]]; then
 fi
 
 echo "==> Ensuring stack is up (applies compose/.env changes; volumes preserved)"
+echo "    If Docker reports orphan containers, run from ${ROOT_DIR}:"
+echo "      ./scripts/compose.sh up -d --remove-orphans"
 $COMPOSE up -d
 
 run_app() {

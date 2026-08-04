@@ -391,6 +391,8 @@ main() {
     fi
 
     log "Starting / rebuilding stack (volumes preserved)"
+    echo "    If Docker reports orphan containers, run from ${ROOT_DIR}:"
+    echo "      ./scripts/compose.sh up -d --remove-orphans"
     $COMPOSE up -d --build
 
     if [[ "$SYNC_DB" -eq 1 ]]; then
