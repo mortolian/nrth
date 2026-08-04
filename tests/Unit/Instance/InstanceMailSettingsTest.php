@@ -21,7 +21,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'super-secret',
             'from_address' => 'noreply@example.com',
@@ -46,7 +46,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'first-secret',
             'from_address' => 'noreply@example.com',
@@ -82,7 +82,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',
@@ -92,11 +92,34 @@ class InstanceMailSettingsTest extends TestCase
         $this->assertSame('smtp', config('mail.default'));
         $this->assertSame('smtp.example.com', config('mail.mailers.smtp.host'));
         $this->assertSame(587, config('mail.mailers.smtp.port'));
-        $this->assertSame('tls', config('mail.mailers.smtp.scheme'));
+        $this->assertSame('smtp', config('mail.mailers.smtp.scheme'));
         $this->assertSame('mailer', config('mail.mailers.smtp.username'));
         $this->assertSame('secret', config('mail.mailers.smtp.password'));
         $this->assertSame('noreply@example.com', config('mail.from.address'));
         $this->assertSame('nrth', config('mail.from.name'));
+    }
+
+    public function test_legacy_tls_scheme_maps_to_smtp(): void
+    {
+        InstanceSetting::query()->updateOrCreate(
+            ['key' => InstanceMailSettings::SETTING_KEY],
+            ['value' => [
+                'enabled' => true,
+                'host' => 'smtp.example.com',
+                'port' => 587,
+                'scheme' => 'tls',
+                'username' => 'mailer',
+                'password_encrypted' => Crypt::encryptString('secret'),
+                'from_address' => 'noreply@example.com',
+                'from_name' => 'nrth',
+            ]],
+        );
+
+        $settings = app(InstanceMailSettings::class);
+        $this->assertSame('smtp', $settings->current()['scheme']);
+
+        $settings->applyToRuntime();
+        $this->assertSame('smtp', config('mail.mailers.smtp.scheme'));
     }
 
     public function test_disabled_does_not_override_mail_default(): void
@@ -107,7 +130,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => false,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => '',
             'password' => '',
             'from_address' => '',
@@ -128,7 +151,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => true,
             'host' => '',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => '',
             'password' => '',
             'from_address' => 'not-an-email',
@@ -144,7 +167,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',
@@ -169,7 +192,7 @@ class InstanceMailSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',

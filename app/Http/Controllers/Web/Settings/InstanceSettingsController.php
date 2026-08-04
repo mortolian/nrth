@@ -39,7 +39,7 @@ class InstanceSettingsController extends Controller
         ]);
     }
 
-    public function mail(): Response
+    public function mail(Request $request): Response
     {
         Gate::authorize('manageInstanceBackups');
 
@@ -47,6 +47,7 @@ class InstanceSettingsController extends Controller
 
         return Inertia::render('Settings/Instance/Mail', [
             'mail' => $this->mailSettings->publicProps(),
+            'test_to_default' => (string) $request->user()->email,
         ]);
     }
 
@@ -186,7 +187,7 @@ class InstanceSettingsController extends Controller
             'enabled' => ['required', 'boolean'],
             'host' => ['nullable', 'string', 'max:255'],
             'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
-            'scheme' => ['nullable', 'string', Rule::in(['tls', 'smtps', 'null', ''])],
+            'scheme' => ['nullable', 'string', Rule::in(['smtp', 'smtps', 'tls', 'null', ''])],
             'username' => ['nullable', 'string', 'max:255'],
             'password' => ['nullable', 'string', 'max:255'],
             'from_address' => ['nullable', 'string', 'max:255'],
@@ -219,9 +220,10 @@ class InstanceSettingsController extends Controller
         Gate::authorize('manageInstanceBackups');
 
         $validated = $request->validate([
+            'to' => ['nullable', 'email', 'max:255'],
             'host' => ['nullable', 'string', 'max:255'],
             'port' => ['nullable', 'integer', 'min:1', 'max:65535'],
-            'scheme' => ['nullable', 'string', Rule::in(['tls', 'smtps', 'null', ''])],
+            'scheme' => ['nullable', 'string', Rule::in(['smtp', 'smtps', 'tls', 'null', ''])],
             'username' => ['nullable', 'string', 'max:255'],
             'password' => ['nullable', 'string', 'max:255'],
             'from_address' => ['nullable', 'string', 'max:255'],
@@ -232,7 +234,11 @@ class InstanceSettingsController extends Controller
             $validated['scheme'] = null;
         }
 
-        $to = (string) $request->user()->email;
+        $to = trim((string) ($validated['to'] ?? ''));
+        if ($to === '') {
+            $to = (string) $request->user()->email;
+        }
+        unset($validated['to']);
 
         try {
             $this->mailSettings->sendTest($to, $validated);

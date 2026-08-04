@@ -299,7 +299,8 @@ class InstanceSettingsTest extends TestCase
                 ->component('Settings/Instance/Mail')
                 ->where('mail.enabled', false)
                 ->where('mail.password_set', false)
-                ->where('mail.using_instance', false));
+                ->where('mail.using_instance', false)
+                ->where('test_to_default', $user->email));
 
         $this->get(route('backups-exports.mail'))
             ->assertRedirect('/settings/instance/mail');
@@ -316,7 +317,7 @@ class InstanceSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',
@@ -347,7 +348,7 @@ class InstanceSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',
@@ -355,18 +356,19 @@ class InstanceSettingsTest extends TestCase
         ])->assertRedirect(route('settings.instance.mail'));
 
         $response = $this->post(route('settings.instance.mail.test'), [
+            'to' => 'elsewhere@example.com',
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'from_address' => 'noreply@example.com',
             'from_name' => 'nrth',
         ]);
 
         $response->assertRedirect(route('settings.instance.mail'));
-        $response->assertSessionHas('success');
-        Mail::assertSent(InstanceSmtpTestMail::class, function ($mail) use ($user) {
-            return $mail->hasTo($user->email);
+        $response->assertSessionHas('success', 'Test email sent to elsewhere@example.com.');
+        Mail::assertSent(InstanceSmtpTestMail::class, function ($mail) {
+            return $mail->hasTo('elsewhere@example.com');
         });
     }
 
@@ -382,7 +384,7 @@ class InstanceSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',
@@ -398,7 +400,7 @@ class InstanceSettingsTest extends TestCase
             ->post(route('settings.instance.mail.test'), [
                 'host' => 'smtp.example.com',
                 'port' => 587,
-                'scheme' => 'tls',
+                'scheme' => 'smtp',
                 'username' => 'mailer',
                 'from_address' => 'noreply@example.com',
                 'from_name' => 'nrth',
@@ -427,7 +429,7 @@ class InstanceSettingsTest extends TestCase
             'enabled' => true,
             'host' => 'smtp.example.com',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => 'mailer',
             'password' => 'secret',
             'from_address' => 'noreply@example.com',

@@ -32,7 +32,7 @@ final class InstanceMailSettings
             'enabled' => false,
             'host' => '',
             'port' => 587,
-            'scheme' => 'tls',
+            'scheme' => 'smtp',
             'username' => '',
             'password' => '',
             'from_address' => '',
@@ -357,7 +357,12 @@ final class InstanceMailSettings
 
         $scheme = strtolower(trim((string) $value));
 
-        return in_array($scheme, ['tls', 'smtps'], true) ? $scheme : null;
+        // Legacy UI stored STARTTLS as "tls"; Symfony Mailer only accepts smtp | smtps.
+        if ($scheme === 'tls') {
+            return 'smtp';
+        }
+
+        return in_array($scheme, ['smtp', 'smtps'], true) ? $scheme : null;
     }
 
     /**
