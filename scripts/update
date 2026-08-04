@@ -177,7 +177,10 @@ run_app() {
 
 disable_dev_services() {
     echo "==> Serving built frontend assets (removing dev-only services)"
-    $COMPOSE rm -sf vite mailpit 2>/dev/null || true
+    # mailpit/vite are behind the `dev` profile; Compose ignores them unless the profile is set.
+    COMPOSE_PROFILES=dev $COMPOSE rm -sf vite mailpit 2>/dev/null || true
+    # Fallback if an old container name is still attached to this project.
+    docker rm -f nrth-mailpit-1 nrth-vite-1 2>/dev/null || true
     rm -f "$ROOT_DIR/public/hot"
 }
 
@@ -277,6 +280,16 @@ if [[ "$MODE" != "dev" ]]; then
         VERIFY_OK=0
     else
         echo "    OK: Vite hot file removed"
+    fi
+
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Eq '^(nrth-mailpit-1|nrth-vite-1)$'; then
+        echo "    FAIL: leftover mailpit/vite container still running"
+        echo "          From ${ROOT_DIR}, run:"
+        echo "            COMPOSE_PROFILES=dev ./scripts/compose.sh rm -sf mailpit vite"
+        echo "            # or: docker rm -f nrth-mailpit-1 nrth-vite-1"
+        VERIFY_OK=0
+    else
+        echo "    OK: no leftover mailpit/vite containers"
     fi
 fi
 

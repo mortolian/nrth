@@ -216,7 +216,10 @@ configure_https_access() {
 
 disable_dev_services() {
     log "Removing dev-only services and stale Vite hot file"
-    $COMPOSE rm -sf vite mailpit 2>/dev/null || true
+    # mailpit/vite are behind the `dev` profile; Compose ignores them unless the profile is set.
+    COMPOSE_PROFILES=dev $COMPOSE rm -sf vite mailpit 2>/dev/null || true
+    # Fallback if an old container name is still attached to this project.
+    docker rm -f nrth-mailpit-1 nrth-vite-1 2>/dev/null || true
     rm -f "$ROOT_DIR/public/hot"
 }
 
