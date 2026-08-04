@@ -25,9 +25,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+usage() {
+    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+}
+
 GIT_BRANCH="${GIT_BRANCH:-master}"
 COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
 SKIP_ASSETS="${SKIP_ASSETS:-0}"
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
 
 hash_file() {
     if command -v sha256sum >/dev/null 2>&1; then

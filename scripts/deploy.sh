@@ -4,6 +4,7 @@
 #
 # Prefer: ./scripts/update
 # Still accepted: ./scripts/deploy.sh [production|dev]
+# Help: ./scripts/deploy.sh --help
 
 set -euo pipefail
 

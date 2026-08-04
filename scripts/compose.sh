@@ -15,6 +15,17 @@
 
 set -euo pipefail
 
+usage() {
+    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
 compose_down_removes_volumes() {
     local arg
     for arg in "$@"; do
