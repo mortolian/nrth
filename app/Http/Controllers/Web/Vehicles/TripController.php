@@ -263,10 +263,21 @@ class TripController extends Controller
 
         if ($filters['search'] !== '') {
             $search = $filters['search'];
-            $query->where(function ($q) use ($search): void {
-                $q->where('from_location', 'like', '%'.$search.'%')
-                    ->orWhere('to_location', 'like', '%'.$search.'%')
-                    ->orWhere('notes', 'like', '%'.$search.'%');
+            $pattern = '%'.mb_strtolower($search).'%';
+            $query->where(function ($q) use ($search, $pattern): void {
+                $q->whereRaw('LOWER(from_location) LIKE ?', [$pattern])
+                    ->orWhereRaw('LOWER(to_location) LIKE ?', [$pattern])
+                    ->orWhereRaw('LOWER(notes) LIKE ?', [$pattern]);
+
+                // Match the UI "From → To" route cell when the full display string is pasted.
+                if (preg_match('/^(.+?)\s*(?:→|->)\s*(.+)$/u', $search, $parts) === 1) {
+                    $fromPattern = '%'.mb_strtolower(trim($parts[1])).'%';
+                    $toPattern = '%'.mb_strtolower(trim($parts[2])).'%';
+                    $q->orWhere(function ($route) use ($fromPattern, $toPattern): void {
+                        $route->whereRaw('LOWER(from_location) LIKE ?', [$fromPattern])
+                            ->whereRaw('LOWER(to_location) LIKE ?', [$toPattern]);
+                    });
+                }
             });
         }
 

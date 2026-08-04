@@ -194,6 +194,45 @@ class VehicleTripTest extends TestCase
         $this->assertSame(10000.0, (float) $vehicle->fresh()->starting_odometer_km);
     }
 
+    public function test_trip_index_search_matches_route_locations_case_insensitively(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $vehicle = Vehicle::factory()->for($team)->create();
+        $match = Trip::factory()->forVehicle($vehicle)->create([
+            'from_location' => 'Cape Town CBD',
+            'to_location' => 'Stellenbosch Office',
+            'notes' => 'Quarterly review',
+        ]);
+        Trip::factory()->forVehicle($vehicle)->create([
+            'from_location' => 'Home',
+            'to_location' => 'Gym',
+            'notes' => null,
+        ]);
+
+        $this->get(route('vehicles.trips.index', ['search' => 'stellenbosch']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Vehicles/Trips/Index')
+                ->has('trips.data', 1)
+                ->where('trips.data.0.id', $match->id));
+
+        $this->get(route('vehicles.trips.index', ['search' => 'Cape Town CBD → Stellenbosch Office']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('trips.data', 1)
+                ->where('trips.data.0.id', $match->id));
+
+        $this->get(route('vehicles.trips.index', ['search' => 'quarterly']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('trips.data', 1)
+                ->where('trips.data.0.id', $match->id));
+    }
+
     public function test_other_team_cannot_view_vehicle_or_trip(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();

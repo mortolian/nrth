@@ -171,7 +171,11 @@ const onRowAction = (trip: TripRow, actionId: string) => {
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div class="xl:col-span-2">
                     <label class="mb-1 block text-xs font-medium text-slate-500">Search</label>
-                    <AppInput v-model="filters.search" placeholder="From, to, or notes…" />
+                    <AppInput
+                        v-model="filters.search"
+                        placeholder="Route or notes…"
+                        @keydown.enter="applyFilters()"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Purpose</label>
