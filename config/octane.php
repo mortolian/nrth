@@ -1,5 +1,6 @@
 <?php
 
+use App\Listeners\ApplyInstanceRuntimeSettings;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\Events\RequestHandled;
 use Laravel\Octane\Events\RequestReceived;
@@ -73,7 +74,9 @@ return [
         RequestReceived::class => [
             ...Octane::prepareApplicationForNextOperation(),
             ...Octane::prepareApplicationForNextRequest(),
-            //
+            // After Octane resets config to the boot clone, re-apply Settings → Instance
+            // overrides (SMTP, backup disks) so they stay current without a worker restart.
+            ApplyInstanceRuntimeSettings::class,
         ],
 
         RequestHandled::class => [

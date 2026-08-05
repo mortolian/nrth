@@ -15,6 +15,14 @@ final class InstanceMailSettings
     public const SETTING_KEY = 'mail.smtp';
 
     /**
+     * Snapshot of env-backed mail config before any instance override.
+     * Kept as a static so Octane/Horizon can restore .env when SMTP is disabled.
+     *
+     * @var array<string, mixed>|null
+     */
+    private static ?array $envMailBaseline = null;
+
+    /**
      * @return array{
      *     enabled: bool,
      *     host: string,
@@ -143,7 +151,10 @@ final class InstanceMailSettings
     }
 
     /**
-     * Apply instance SMTP to Laravel mail config when enabled; otherwise leave env config alone.
+     * Apply instance SMTP to Laravel mail config when enabled; otherwise restore env mail config.
+     *
+     * Must be safe to call on every Octane request and Horizon job: those workers
+     * otherwise keep boot-time (or previous-job) mail config forever.
      *
      * @param  array{
      *     enabled: bool,
@@ -158,9 +169,16 @@ final class InstanceMailSettings
      */
     public function applyToRuntime(?array $settings = null): void
     {
+        $this->rememberEnvMailBaseline();
+
         $settings ??= $this->current();
 
         if (! $settings['enabled']) {
+            if (self::$envMailBaseline !== null) {
+                config(['mail' => self::$envMailBaseline]);
+                $this->purgeMailers();
+            }
+
             return;
         }
 
@@ -185,6 +203,23 @@ final class InstanceMailSettings
                 : config('app.name'),
         ]);
 
+        $this->purgeMailers();
+    }
+
+    private function rememberEnvMailBaseline(): void
+    {
+        if (self::$envMailBaseline !== null) {
+            return;
+        }
+
+        $mail = config('mail');
+        self::$envMailBaseline = is_array($mail)
+            ? json_decode(json_encode($mail), true)
+            : null;
+    }
+
+    private function purgeMailers(): void
+    {
         try {
             Mail::purgeMailers();
         } catch (Throwable) {

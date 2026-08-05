@@ -3,6 +3,7 @@
 namespace Tests\Unit\Instance;
 
 use App\Domain\Instance\Services\InstanceMailSettings;
+use App\Listeners\ApplyInstanceRuntimeSettings;
 use App\Mail\InstanceSmtpTestMail;
 use App\Models\InstanceSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,6 +15,16 @@ use Tests\TestCase;
 class InstanceMailSettingsTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // AppServiceProvider applies mail settings at boot and captures a baseline;
+        // clear it so each test can establish its own env snapshot.
+        $property = (new \ReflectionClass(InstanceMailSettings::class))->getProperty('envMailBaseline');
+        $property->setValue(null, null);
+    }
 
     public function test_public_props_never_expose_password(): void
     {
@@ -141,6 +152,80 @@ class InstanceMailSettingsTest extends TestCase
 
         $this->assertSame('log', config('mail.default'));
         $this->assertStringContainsString('.env', app(InstanceMailSettings::class)->publicProps()['summary']);
+    }
+
+    public function test_disabling_restores_env_mail_after_override(): void
+    {
+        config([
+            'mail.default' => 'log',
+            'mail.mailers.smtp.host' => '127.0.0.1',
+            'mail.from.address' => 'env@example.com',
+        ]);
+
+        $settings = app(InstanceMailSettings::class);
+        // Capture the test's env snapshot before overriding.
+        $settings->applyToRuntime();
+
+        $settings->update([
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'smtp',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ]);
+
+        $this->assertSame('smtp.example.com', config('mail.mailers.smtp.host'));
+
+        $settings->update([
+            'enabled' => false,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'smtp',
+            'username' => '',
+            'password' => '',
+            'from_address' => '',
+            'from_name' => '',
+        ]);
+
+        $this->assertSame('log', config('mail.default'));
+        $this->assertSame('127.0.0.1', config('mail.mailers.smtp.host'));
+        $this->assertSame('env@example.com', config('mail.from.address'));
+    }
+
+    public function test_apply_instance_runtime_settings_listener_reapplies_mail_for_queue_workers(): void
+    {
+        config([
+            'mail.default' => 'log',
+            'mail.mailers.smtp.host' => 'mailpit',
+        ]);
+        app(InstanceMailSettings::class)->applyToRuntime();
+
+        app(InstanceMailSettings::class)->update([
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'smtp',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@example.com',
+            'from_name' => 'nrth',
+        ]);
+
+        // Simulate a Horizon worker that still has boot-time .env mail config.
+        config([
+            'mail.default' => 'log',
+            'mail.mailers.smtp.host' => 'mailpit',
+        ]);
+
+        app(ApplyInstanceRuntimeSettings::class)->handle();
+
+        $this->assertSame('smtp', config('mail.default'));
+        $this->assertSame('smtp.example.com', config('mail.mailers.smtp.host'));
+        $this->assertSame(587, config('mail.mailers.smtp.port'));
+        $this->assertSame('noreply@example.com', config('mail.from.address'));
     }
 
     public function test_enabled_requires_host_and_from(): void

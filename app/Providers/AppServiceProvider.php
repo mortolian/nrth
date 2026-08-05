@@ -20,12 +20,14 @@ use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\Jetstream\TeamInvitationController as AppTeamInvitationController;
 use App\Http\Controllers\Web\Jetstream\TeamMemberController as AppTeamMemberController;
 use App\Http\Controllers\Web\UserProfileController;
+use App\Listeners\ApplyInstanceRuntimeSettings;
 use App\Models\User;
 use App\Policies\TakeoutRunPolicy;
 use App\Support\DestructiveDatabaseResetGuard;
 use App\Support\EnsureTeamSpatieRoles;
 use App\Support\Https;
 use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -114,6 +116,10 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable) {
             // DB may be unavailable during early install / migrate.
         }
+
+        // Horizon (and any queue worker) keeps boot-time config; re-apply per job so
+        // instance SMTP / offsite disks match Settings after workers have started.
+        Event::listen(JobProcessing::class, ApplyInstanceRuntimeSettings::class);
 
         // After Jetstream registers Fortify views, enrich login for invitation joins.
         $this->app->booted(function (): void {
