@@ -258,10 +258,13 @@ const testMail = () => {
                                 v-model="mailForm.from_address"
                                 type="email"
                                 autocomplete="off"
-                                placeholder="noreply@example.com"
+                                placeholder="noreply@your-domain.com"
                                 :disabled="!smtpEnabled"
                             />
                             <p v-if="fieldError('from_address')" class="mt-1 text-xs text-rose-600">{{ fieldError('from_address') }}</p>
+                            <p v-else class="mt-1 text-xs text-slate-500">
+                                Must be an address or domain verified with your SMTP provider. Also used for instance backup status emails.
+                            </p>
                         </div>
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-slate-500" for="instance-smtp-from-name">From name</label>

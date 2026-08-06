@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Spatie\Backup\Config\Config as SpatieBackupConfig;
 use Throwable;
 
 final class InstanceMailSettings
@@ -21,6 +22,13 @@ final class InstanceMailSettings
      * @var array<string, mixed>|null
      */
     private static ?array $envMailBaseline = null;
+
+    /**
+     * Snapshot of Spatie backup notification mail (from/to) before instance override.
+     *
+     * @var array{to: mixed, from: mixed}|null
+     */
+    private static ?array $envBackupNotificationMailBaseline = null;
 
     /**
      * @return array{
@@ -179,6 +187,10 @@ final class InstanceMailSettings
                 $this->purgeMailers();
             }
 
+            $this->restoreBackupNotificationMailBaseline();
+            $this->syncBackupNotificationRecipients();
+            $this->rebindSpatieBackupConfig();
+
             return;
         }
 
@@ -194,15 +206,22 @@ final class InstanceMailSettings
 
         $mailers['smtp'] = $smtp;
 
+        $fromName = $settings['from_name'] !== ''
+            ? $settings['from_name']
+            : (string) config('app.name');
+
         config([
             'mail.default' => 'smtp',
             'mail.mailers' => $mailers,
             'mail.from.address' => $settings['from_address'],
-            'mail.from.name' => $settings['from_name'] !== ''
-                ? $settings['from_name']
-                : config('app.name'),
+            'mail.from.name' => $fromName,
+            // Spatie backup notifications read this path, not mail.from.
+            'backup.notifications.mail.from.address' => $settings['from_address'],
+            'backup.notifications.mail.from.name' => $fromName,
         ]);
 
+        $this->syncBackupNotificationRecipients();
+        $this->rebindSpatieBackupConfig();
         $this->purgeMailers();
     }
 
@@ -216,6 +235,58 @@ final class InstanceMailSettings
         self::$envMailBaseline = is_array($mail)
             ? json_decode(json_encode($mail), true)
             : null;
+
+        self::$envBackupNotificationMailBaseline = [
+            'to' => config('backup.notifications.mail.to'),
+            'from' => config('backup.notifications.mail.from'),
+        ];
+    }
+
+    private function restoreBackupNotificationMailBaseline(): void
+    {
+        if (self::$envBackupNotificationMailBaseline === null) {
+            return;
+        }
+
+        config([
+            'backup.notifications.mail.to' => self::$envBackupNotificationMailBaseline['to'],
+            'backup.notifications.mail.from' => self::$envBackupNotificationMailBaseline['from'],
+        ]);
+    }
+
+    /**
+     * Point Spatie backup status emails at instance operators when any are configured.
+     */
+    private function syncBackupNotificationRecipients(): void
+    {
+        try {
+            $emails = collect(app(InstanceOperatorService::class)->listEffectiveOperators())
+                ->pluck('email')
+                ->filter(static fn (mixed $email): bool => is_string($email) && filter_var($email, FILTER_VALIDATE_EMAIL))
+                ->unique()
+                ->values()
+                ->all();
+        } catch (Throwable) {
+            return;
+        }
+
+        if ($emails === []) {
+            return;
+        }
+
+        config([
+            'backup.notifications.mail.to' => count($emails) === 1 ? $emails[0] : $emails,
+        ]);
+    }
+
+    private function rebindSpatieBackupConfig(): void
+    {
+        try {
+            SpatieBackupConfig::rebind();
+            app()->forgetInstance(SpatieBackupConfig::class);
+        } catch (Throwable) {
+            // Package may be unavailable during early install.
+        }
     }
 
     private function purgeMailers(): void

@@ -5,11 +5,15 @@ namespace App\Domain\Backup\Jobs;
 use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
+use App\Domain\Instance\Services\InstanceMailSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Spatie\Backup\Events\BackupHasFailed;
+use Spatie\Backup\Events\BackupWasSuccessful;
+use Spatie\Backup\Notifications\EventHandler as BackupEventHandler;
 use Throwable;
 
 class RunInstanceBackupJob implements ShouldQueue
@@ -44,10 +48,22 @@ class RunInstanceBackupJob implements ShouldQueue
         $backups->markRunning();
         $backups->clearLastError();
 
+        // Ensure instance SMTP From is applied to Spatie backup mail before backup:run
+        // (Horizon workers can otherwise keep boot-time MAIL_FROM_ADDRESS=…@example.com).
+        try {
+            app(InstanceMailSettings::class)->applyToRuntime();
+        } catch (Throwable) {
+            //
+        }
+
         $filenamesBefore = $backups->backupFilenames();
+        $backupName = (string) config('backup.backup.name', config('app.name', 'nrth'));
 
         try {
-            $exitCode = Artisan::call('backup:run');
+            // Mail transport errors must not fail the zip. Spatie's default handler aborts
+            // backup:run when status mail is rejected (e.g. unverified From domain).
+            $exitCode = Artisan::call('backup:run', ['--disable-notifications' => true]);
+            BackupEventHandler::enable();
             $output = trim(Artisan::output());
 
             if ($exitCode !== 0) {
@@ -62,6 +78,7 @@ class RunInstanceBackupJob implements ShouldQueue
                 ]);
 
                 $this->markFailed($run, $backups, $message);
+                $this->notifyBackupFinished(success: false, backupName: $backupName, failure: new RuntimeException($message));
 
                 throw new RuntimeException($message);
             }
@@ -80,6 +97,7 @@ class RunInstanceBackupJob implements ShouldQueue
             if ($match === null) {
                 $message = 'Backup command finished but no backup zip was found on the local disk.';
                 $this->markFailed($run, $backups, $message);
+                $this->notifyBackupFinished(success: false, backupName: $backupName, failure: new RuntimeException($message));
 
                 throw new RuntimeException($message);
             }
@@ -101,7 +119,11 @@ class RunInstanceBackupJob implements ShouldQueue
                     ? \Illuminate\Support\Carbon::parse($match['date'])
                     : now(),
             ])->save();
+
+            $this->notifyBackupFinished(success: true, backupName: $backupName);
         } catch (Throwable $e) {
+            BackupEventHandler::enable();
+
             $freshRun = $run->fresh();
             if ($freshRun !== null && $freshRun->status !== InstanceBackupRunStatus::Failed) {
                 $this->markFailed($freshRun, $backups, $e->getMessage());
@@ -114,12 +136,15 @@ class RunInstanceBackupJob implements ShouldQueue
 
             throw $e;
         } finally {
+            BackupEventHandler::enable();
             $backups->markFinished();
         }
     }
 
     public function failed(?Throwable $e): void
     {
+        BackupEventHandler::enable();
+
         $backups = app(InstanceBackupService::class);
         $backups->markFinished();
 
@@ -148,6 +173,29 @@ class RunInstanceBackupJob implements ShouldQueue
             'error_message' => $message,
             'completed_at' => now(),
         ])->save();
+    }
+
+    private function notifyBackupFinished(bool $success, string $backupName, ?Throwable $failure = null): void
+    {
+        BackupEventHandler::enable();
+
+        try {
+            if ($success) {
+                event(new BackupWasSuccessful('local', $backupName));
+
+                return;
+            }
+
+            event(new BackupHasFailed(
+                $failure instanceof \Exception
+                    ? $failure
+                    : new RuntimeException($failure?->getMessage() ?: 'Instance backup failed.'),
+            ));
+        } catch (Throwable $e) {
+            Log::warning('Instance backup status notification could not be sent.', [
+                'message' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function summarizeBackupOutput(string $output): string

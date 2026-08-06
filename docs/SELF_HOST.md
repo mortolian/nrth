@@ -46,7 +46,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 1. `APP_DEBUG=false`, `APP_ENV=production`
 2. HTTPS on 443; firewall only 80/443 (not `:8000`, and not Postgres/Redis/Mailpit)
-3. Outbound email: configure SMTP under **Settings → Instance → Outbound email**, or set `MAIL_*` in `.env` (Mailpit is for testing — do not expose `:8025` publicly). Instance SMTP overrides `.env` when enabled (applied on each Octane request and Horizon job — no worker restart required after saving).
+3. Outbound email: configure SMTP under **Settings → Instance → Outbound email**, or set `MAIL_*` in `.env` (Mailpit is for testing — do not expose `:8025` publicly). Instance SMTP overrides `.env` when enabled (applied on each Octane request and Horizon job — no worker restart required after saving). Use a **From** address on a domain your provider has verified (not `example.com`); that From is also used for instance backup status emails, which go to instance operators. A backup zip is still marked Ready if the status email fails to send.
 4. Host-level backups of Postgres + `storage` volumes, plus in-app instance backups
 5. Never commit `.env`
 

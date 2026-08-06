@@ -493,8 +493,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                                             </p>
                                         </div>
                                         <div class="py-1">
+                                            <DropdownLink :href="route('profile.show')">Profile settings</DropdownLink>
                                             <DropdownLink v-if="$page.props.jetstream.hasApiFeatures" :href="route('api-tokens.index')">API Tokens</DropdownLink>
-                                            <div v-if="$page.props.jetstream.hasApiFeatures" class="my-1 border-t border-slate-200" />
+                                            <div class="my-1 border-t border-slate-200" />
                                             <form @submit.prevent="logout">
                                                 <DropdownLink as="button">Log Out</DropdownLink>
                                             </form>

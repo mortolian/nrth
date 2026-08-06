@@ -22,8 +22,9 @@ class InstanceMailSettingsTest extends TestCase
 
         // AppServiceProvider applies mail settings at boot and captures a baseline;
         // clear it so each test can establish its own env snapshot.
-        $property = (new \ReflectionClass(InstanceMailSettings::class))->getProperty('envMailBaseline');
-        $property->setValue(null, null);
+        $reflection = new \ReflectionClass(InstanceMailSettings::class);
+        $reflection->getProperty('envMailBaseline')->setValue(null, null);
+        $reflection->getProperty('envBackupNotificationMailBaseline')->setValue(null, null);
     }
 
     public function test_public_props_never_expose_password(): void
@@ -108,6 +109,12 @@ class InstanceMailSettingsTest extends TestCase
         $this->assertSame('secret', config('mail.mailers.smtp.password'));
         $this->assertSame('noreply@example.com', config('mail.from.address'));
         $this->assertSame('nrth', config('mail.from.name'));
+        $this->assertSame('noreply@example.com', config('backup.notifications.mail.from.address'));
+        $this->assertSame('nrth', config('backup.notifications.mail.from.name'));
+        $this->assertSame(
+            'noreply@example.com',
+            app(\Spatie\Backup\Config\Config::class)->notifications->mail->from->address,
+        );
     }
 
     public function test_legacy_tls_scheme_maps_to_smtp(): void
@@ -160,6 +167,8 @@ class InstanceMailSettingsTest extends TestCase
             'mail.default' => 'log',
             'mail.mailers.smtp.host' => '127.0.0.1',
             'mail.from.address' => 'env@example.com',
+            'backup.notifications.mail.from.address' => 'env@example.com',
+            'backup.notifications.mail.from.name' => 'Env',
         ]);
 
         $settings = app(InstanceMailSettings::class);
@@ -178,6 +187,7 @@ class InstanceMailSettingsTest extends TestCase
         ]);
 
         $this->assertSame('smtp.example.com', config('mail.mailers.smtp.host'));
+        $this->assertSame('noreply@example.com', config('backup.notifications.mail.from.address'));
 
         $settings->update([
             'enabled' => false,
@@ -193,6 +203,7 @@ class InstanceMailSettingsTest extends TestCase
         $this->assertSame('log', config('mail.default'));
         $this->assertSame('127.0.0.1', config('mail.mailers.smtp.host'));
         $this->assertSame('env@example.com', config('mail.from.address'));
+        $this->assertSame('env@example.com', config('backup.notifications.mail.from.address'));
     }
 
     public function test_apply_instance_runtime_settings_listener_reapplies_mail_for_queue_workers(): void
@@ -226,6 +237,36 @@ class InstanceMailSettingsTest extends TestCase
         $this->assertSame('smtp.example.com', config('mail.mailers.smtp.host'));
         $this->assertSame(587, config('mail.mailers.smtp.port'));
         $this->assertSame('noreply@example.com', config('mail.from.address'));
+    }
+
+    public function test_apply_to_runtime_routes_backup_notifications_to_operators(): void
+    {
+        config([
+            'nrth.operator_emails' => [],
+            'backup.notifications.mail.to' => 'your@example.com',
+        ]);
+
+        \App\Models\User::factory()->create([
+            'email' => 'ops@books.test',
+            'is_instance_operator' => true,
+        ]);
+
+        app(InstanceMailSettings::class)->update([
+            'enabled' => true,
+            'host' => 'smtp.example.com',
+            'port' => 587,
+            'scheme' => 'smtp',
+            'username' => 'mailer',
+            'password' => 'secret',
+            'from_address' => 'noreply@books.test',
+            'from_name' => 'nrth',
+        ]);
+
+        $this->assertSame('ops@books.test', config('backup.notifications.mail.to'));
+        $this->assertSame(
+            'ops@books.test',
+            app(\Spatie\Backup\Config\Config::class)->notifications->mail->to,
+        );
     }
 
     public function test_enabled_requires_host_and_from(): void

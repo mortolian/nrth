@@ -217,7 +217,7 @@ class BackupsExportsControllerTest extends TestCase
             'status' => InstanceBackupRunStatus::Queued,
         ]);
 
-        Artisan::shouldReceive('call')->once()->with('backup:run')->andReturn(1);
+        Artisan::shouldReceive('call')->once()->with('backup:run', ['--disable-notifications' => true])->andReturn(1);
         Artisan::shouldReceive('output')->once()->andReturn("Backup failed because: pg_dump missing\n");
 
         try {
@@ -245,7 +245,7 @@ class BackupsExportsControllerTest extends TestCase
         $backups->shouldReceive('recordFailure')->never();
         $backups->shouldReceive('markFinished')->once();
 
-        Artisan::shouldReceive('call')->once()->with('backup:run')->andReturnUsing(function () use ($run): never {
+        Artisan::shouldReceive('call')->once()->with('backup:run', ['--disable-notifications' => true])->andReturnUsing(function () use ($run): never {
             $run->delete();
 
             throw new \RuntimeException('Backup process crashed.');

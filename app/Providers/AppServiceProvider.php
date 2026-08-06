@@ -12,6 +12,7 @@ use App\Domain\Ai\OpenAiCompatibleProvider;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
+use App\Domain\Backup\Notifications\SafeBackupEventHandler;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
@@ -40,6 +41,7 @@ use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamCo
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamMemberController as JetstreamTeamMemberController;
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
 use Laravel\Jetstream\Http\Controllers\TeamInvitationController as JetstreamTeamInvitationController;
+use Spatie\Backup\Notifications\EventHandler as SpatieBackupEventHandler;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -48,6 +50,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Resolve before Spatie backup boots so notification SMTP errors do not fail backup:run.
+        $this->app->bind(SpatieBackupEventHandler::class, SafeBackupEventHandler::class);
+
         $this->app->bind(JetstreamUserProfileController::class, UserProfileController::class);
         $this->app->bind(JetstreamTeamController::class, AppTeamController::class);
         $this->app->bind(JetstreamTeamMemberController::class, AppTeamMemberController::class);
