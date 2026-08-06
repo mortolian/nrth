@@ -157,128 +157,156 @@ const submit = () => {
 
         <FormValidationBanner class="mt-5" :errors="clientErrorMessages" />
 
-        <AppCard class="mt-5">
+        <AppCard class="mt-5 overflow-hidden">
             <form @submit.prevent="submit">
-                <div class="grid gap-4 md:grid-cols-2">
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">
-                            Name <span class="text-rose-600">*</span>
-                        </label>
-                        <AppInput
-                            :model-value="formValues.name"
-                            placeholder="e.g. Work bakkie"
-                            required
-                            @update:model-value="setFieldValue('name', $event)"
-                        />
-                        <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">
-                            Registration <span class="text-rose-600">*</span>
-                        </label>
-                        <AppInput
-                            :model-value="formValues.registration_number"
-                            placeholder="e.g. ABC 123 GP"
-                            required
-                            @update:model-value="setFieldValue('registration_number', $event)"
-                        />
-                        <p v-if="fieldErrors.registration_number" class="mt-1 text-xs text-rose-600">
-                            {{ fieldErrors.registration_number }}
-                        </p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">VIN</label>
-                        <AppInput
-                            :model-value="formValues.vin"
-                            placeholder="Optional"
-                            @update:model-value="setFieldValue('vin', $event)"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Licence disc expiry</label>
-                        <AppInput
-                            :model-value="formValues.license_disk_expires_on"
-                            type="date"
-                            @update:model-value="setFieldValue('license_disk_expires_on', $event)"
-                        />
-                        <p class="mt-1 text-xs text-slate-500">
-                            nrth emails a reminder about one month before this date.
-                        </p>
-                        <p v-if="fieldErrors.license_disk_expires_on" class="mt-1 text-xs text-rose-600">
-                            {{ fieldErrors.license_disk_expires_on }}
-                        </p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
-                        <AppSelect
-                            :model-value="formValues.is_active ? 'active' : 'inactive'"
-                            :options="[
-                                { label: 'Active', value: 'active' },
-                                { label: 'Inactive', value: 'inactive' },
-                            ]"
-                            @update:model-value="setFieldValue('is_active', $event === 'active')"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Make</label>
-                        <AppInput
-                            :model-value="formValues.make"
-                            placeholder="e.g. Toyota"
-                            @update:model-value="setFieldValue('make', $event)"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Model</label>
-                        <AppInput
-                            :model-value="formValues.model"
-                            placeholder="e.g. Hilux"
-                            @update:model-value="setFieldValue('model', $event)"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Year</label>
-                        <AppInput
-                            :model-value="formValues.year == null ? '' : String(formValues.year)"
-                            type="number"
-                            min="1900"
-                            max="2100"
-                            placeholder="Optional"
-                            @update:model-value="
-                                setFieldValue('year', $event === '' ? null : Number($event))
-                            "
-                        />
-                        <p v-if="fieldErrors.year" class="mt-1 text-xs text-rose-600">{{ fieldErrors.year }}</p>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Starting odometer (km)</label>
-                        <AppInput
-                            :model-value="
-                                formValues.starting_odometer_km == null
-                                    ? ''
-                                    : String(formValues.starting_odometer_km)
-                            "
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            placeholder="At purchase"
-                            @update:model-value="
-                                setFieldValue('starting_odometer_km', $event === '' ? null : Number($event))
-                            "
-                        />
-                        <p class="mt-1 text-xs text-slate-500">Odometer reading when the vehicle was purchased.</p>
-                        <p v-if="fieldErrors.starting_odometer_km" class="mt-1 text-xs text-rose-600">
-                            {{ fieldErrors.starting_odometer_km }}
-                        </p>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                        <textarea
-                            :value="formValues.notes"
-                            rows="3"
-                            class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                            @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
-                        />
-                    </div>
+                <div class="space-y-6 p-5 md:p-6">
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900">Vehicle identity</h3>
+                            <p class="mt-1 text-sm text-slate-500">The basics you use to recognise this vehicle in your trip log.</p>
+                        </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">
+                                    Name <span class="text-rose-600">*</span>
+                                </label>
+                                <AppInput
+                                    :model-value="formValues.name"
+                                    placeholder="e.g. Work bakkie"
+                                    required
+                                    @update:model-value="setFieldValue('name', $event)"
+                                />
+                                <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">
+                                    Registration <span class="text-rose-600">*</span>
+                                </label>
+                                <AppInput
+                                    :model-value="formValues.registration_number"
+                                    placeholder="e.g. ABC 123 GP"
+                                    required
+                                    @update:model-value="setFieldValue('registration_number', $event)"
+                                />
+                                <p v-if="fieldErrors.registration_number" class="mt-1 text-xs text-rose-600">
+                                    {{ fieldErrors.registration_number }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">VIN</label>
+                                <AppInput
+                                    :model-value="formValues.vin"
+                                    placeholder="Optional"
+                                    @update:model-value="setFieldValue('vin', $event)"
+                                />
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="space-y-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900">Vehicle profile</h3>
+                            <p class="mt-1 text-sm text-slate-500">Optional details that make reports and history easier to read later.</p>
+                        </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Make</label>
+                                <AppInput
+                                    :model-value="formValues.make"
+                                    placeholder="e.g. Toyota"
+                                    @update:model-value="setFieldValue('make', $event)"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Model</label>
+                                <AppInput
+                                    :model-value="formValues.model"
+                                    placeholder="e.g. Hilux"
+                                    @update:model-value="setFieldValue('model', $event)"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Year</label>
+                                <AppInput
+                                    :model-value="formValues.year == null ? '' : String(formValues.year)"
+                                    type="number"
+                                    min="1900"
+                                    max="2100"
+                                    placeholder="Optional"
+                                    @update:model-value="
+                                        setFieldValue('year', $event === '' ? null : Number($event))
+                                    "
+                                />
+                                <p v-if="fieldErrors.year" class="mt-1 text-xs text-rose-600">{{ fieldErrors.year }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Starting odometer (km)</label>
+                                <AppInput
+                                    :model-value="
+                                        formValues.starting_odometer_km == null
+                                            ? ''
+                                            : String(formValues.starting_odometer_km)
+                                    "
+                                    type="number"
+                                    step="0.1"
+                                    min="0"
+                                    placeholder="At purchase"
+                                    @update:model-value="
+                                        setFieldValue('starting_odometer_km', $event === '' ? null : Number($event))
+                                    "
+                                />
+                                <p class="mt-1 text-xs text-slate-500">Odometer reading when the vehicle was purchased.</p>
+                                <p v-if="fieldErrors.starting_odometer_km" class="mt-1 text-xs text-rose-600">
+                                    {{ fieldErrors.starting_odometer_km }}
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 md:p-5">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900">Compliance</h3>
+                            <p class="mt-1 text-sm text-slate-500">Track the licence disc renewal date so nrth can warn you ahead of time.</p>
+                        </div>
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Licence disc expiry</label>
+                                <AppInput
+                                    :model-value="formValues.license_disk_expires_on"
+                                    type="date"
+                                    @update:model-value="setFieldValue('license_disk_expires_on', $event)"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">
+                                    nrth emails a reminder about one month before this date.
+                                </p>
+                                <p v-if="fieldErrors.license_disk_expires_on" class="mt-1 text-xs text-rose-600">
+                                    {{ fieldErrors.license_disk_expires_on }}
+                                </p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                                <AppSelect
+                                    :model-value="formValues.is_active ? 'active' : 'inactive'"
+                                    :options="[
+                                        { label: 'Active', value: 'active' },
+                                        { label: 'Inactive', value: 'inactive' },
+                                    ]"
+                                    @update:model-value="setFieldValue('is_active', $event === 'active')"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">Inactive vehicles stay on record but won’t get reminder emails.</p>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
+                                <textarea
+                                    :value="formValues.notes"
+                                    rows="4"
+                                    class="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                                    placeholder="Anything worth remembering about this vehicle"
+                                    @input="setFieldValue('notes', ($event.target as HTMLTextAreaElement).value)"
+                                />
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
                 <FormActions bordered>
