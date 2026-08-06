@@ -13,6 +13,7 @@ type VehicleRow = {
     model: string | null;
     year: number | null;
     registration_number: string | null;
+    license_disk_expires_on: string | null;
     starting_odometer_km: number | null;
     status: 'active' | 'inactive';
     trip_count: number;
@@ -38,6 +39,25 @@ const filters = ref({
 
 const formatKm = (km: number | null) =>
     km == null ? '—' : `${Number(km).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`;
+
+const formatDate = (value: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const licenseDiskBadge = (value: string | null) => {
+    if (!value) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expires = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(expires.getTime())) return null;
+    const days = Math.round((expires.getTime() - today.getTime()) / 86400000);
+    if (days < 0) return { label: 'expired', variant: 'danger' as const };
+    if (days <= 30) return { label: 'soon', variant: 'warning' as const };
+    return null;
+};
 
 const applyFilters = (page = 1) => {
     router.get(
@@ -107,6 +127,7 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
                 :columns="[
                     { key: 'name', label: 'Vehicle' },
                     { key: 'registration', label: 'Registration' },
+                    { key: 'licence', label: 'Licence disc' },
                     { key: 'odometer', label: 'Starting odo' },
                     { key: 'trips', label: 'Trips' },
                     { key: 'last_trip', label: 'Last trip' },
@@ -129,6 +150,19 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
                         </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2">{{ vehicle.registration_number || '—' }}</td>
+                    <td class="whitespace-nowrap px-3 py-2">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span>{{ formatDate(vehicle.license_disk_expires_on) }}</span>
+                            <template
+                                v-for="badge in [licenseDiskBadge(vehicle.license_disk_expires_on)]"
+                                :key="`${vehicle.id}-licence`"
+                            >
+                                <AppBadge v-if="badge" :variant="badge.variant">
+                                    {{ badge.label }}
+                                </AppBadge>
+                            </template>
+                        </div>
+                    </td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">
                         {{ formatKm(vehicle.starting_odometer_km) }}
                     </td>
@@ -141,7 +175,7 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
                     </td>
                 </tr>
                 <tr v-if="!vehicles.data.length">
-                    <td colspan="6" class="px-4 py-6">
+                    <td colspan="7" class="px-4 py-6">
                         <EmptyState
                             title="No vehicles yet"
                             description="Add a vehicle you use for business so you can start the log book."

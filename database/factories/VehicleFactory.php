@@ -29,6 +29,8 @@ class VehicleFactory extends Factory
             'year' => fake()->numberBetween(2015, 2026),
             'registration_number' => strtoupper(fake()->bothify('?? ## ?? GP')),
             'vin' => strtoupper(fake()->bothify('????#########???##')),
+            'license_disk_expires_on' => fake()->optional(0.7)->dateTimeBetween('+1 month', '+14 months')?->format('Y-m-d'),
+            'license_disk_reminder_sent_for' => null,
             'starting_odometer_km' => fake()->randomFloat(1, 0, 50000),
             'notes' => fake()->optional()->sentence(),
             'is_active' => true,

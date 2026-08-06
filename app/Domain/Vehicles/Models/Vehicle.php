@@ -25,6 +25,8 @@ class Vehicle extends Model
         'year',
         'registration_number',
         'vin',
+        'license_disk_expires_on',
+        'license_disk_reminder_sent_for',
         'starting_odometer_km',
         'notes',
         'is_active',
@@ -37,6 +39,8 @@ class Vehicle extends Model
     {
         return [
             'year' => 'integer',
+            'license_disk_expires_on' => 'date',
+            'license_disk_reminder_sent_for' => 'date',
             'starting_odometer_km' => 'decimal:1',
             'is_active' => 'boolean',
         ];

@@ -18,6 +18,7 @@ const props = defineProps<{
         year: number | null;
         registration_number: string | null;
         vin: string | null;
+        license_disk_expires_on: string | null;
         starting_odometer_km: number | null;
         notes: string | null;
         is_active: boolean;
@@ -53,6 +54,7 @@ const { values, setFieldValue: setVeeFieldValue } = useForm({
         year: props.vehicle?.year ?? (null as number | null),
         registration_number: props.vehicle?.registration_number ?? '',
         vin: props.vehicle?.vin ?? '',
+        license_disk_expires_on: props.vehicle?.license_disk_expires_on ?? '',
         starting_odometer_km: props.vehicle?.starting_odometer_km ?? (null as number | null),
         notes: props.vehicle?.notes ?? '',
         is_active: props.vehicle?.is_active ?? true,
@@ -73,6 +75,10 @@ const schema = z.object({
     year: optionalInt(1900, 2100, 'Enter a year between 1900 and 2100'),
     registration_number: z.string().trim().min(1, 'Registration is required'),
     vin: z.string().optional(),
+    license_disk_expires_on: z.preprocess(
+        emptyToNull,
+        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid expiry date').nullable(),
+    ),
     starting_odometer_km: optionalNonNegative('Starting odometer cannot be negative'),
     notes: z.string().optional(),
     is_active: z.boolean(),
@@ -84,6 +90,7 @@ const submit = () => {
     const parsed = schema.safeParse({
         ...formValues.value,
         year: emptyToNull(formValues.value.year),
+        license_disk_expires_on: emptyToNull(formValues.value.license_disk_expires_on),
         starting_odometer_km: emptyToNull(formValues.value.starting_odometer_km),
     });
 
@@ -101,6 +108,7 @@ const submit = () => {
         year: parsed.data.year,
         registration_number: parsed.data.registration_number,
         vin: parsed.data.vin?.trim() || null,
+        license_disk_expires_on: parsed.data.license_disk_expires_on,
         starting_odometer_km: parsed.data.starting_odometer_km,
         notes: parsed.data.notes?.trim() || null,
         is_active: parsed.data.is_active,
@@ -185,6 +193,20 @@ const submit = () => {
                             placeholder="Optional"
                             @update:model-value="setFieldValue('vin', $event)"
                         />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Licence disc expiry</label>
+                        <AppInput
+                            :model-value="formValues.license_disk_expires_on"
+                            type="date"
+                            @update:model-value="setFieldValue('license_disk_expires_on', $event)"
+                        />
+                        <p class="mt-1 text-xs text-slate-500">
+                            nrth emails a reminder about one month before this date.
+                        </p>
+                        <p v-if="fieldErrors.license_disk_expires_on" class="mt-1 text-xs text-rose-600">
+                            {{ fieldErrors.license_disk_expires_on }}
+                        </p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>

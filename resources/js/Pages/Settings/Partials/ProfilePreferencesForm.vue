@@ -9,6 +9,7 @@ const props = defineProps<{
         notify_invoice_overdue: boolean;
         notify_vat_due: boolean;
         notify_provisional_tax: boolean;
+        notify_license_disk: boolean;
         date_format: string;
         theme: string;
     };
@@ -20,6 +21,7 @@ const form = useForm({
     notify_invoice_overdue: props.preferences.notify_invoice_overdue,
     notify_vat_due: props.preferences.notify_vat_due,
     notify_provisional_tax: props.preferences.notify_provisional_tax,
+    notify_license_disk: props.preferences.notify_license_disk,
     date_format: props.preferences.date_format,
     theme: props.preferences.theme,
 });
@@ -40,7 +42,7 @@ const submit = () => {
     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
         <h4 class="text-sm font-semibold text-slate-900">Notifications &amp; display</h4>
         <p class="mt-0.5 text-xs text-slate-500">
-            Email reminders for tax and invoicing deadlines, plus how dates and theme appear in the app.
+            Email reminders for tax, invoicing, and vehicle deadlines, plus how dates and theme appear in the app.
         </p>
 
         <form class="mt-4" @submit.prevent="submit">
@@ -69,6 +71,14 @@ const submit = () => {
                             class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                         >
                         Provisional tax due reminders
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                        <input
+                            v-model="form.notify_license_disk"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        >
+                        Vehicle licence disc expiry reminders
                     </label>
                 </div>
 

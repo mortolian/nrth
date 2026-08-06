@@ -35,6 +35,7 @@ const props = defineProps<{
         year: number | null;
         registration_number: string | null;
         vin: string | null;
+        license_disk_expires_on: string | null;
         starting_odometer_km: number | null;
         notes: string | null;
         is_active: boolean;
@@ -62,6 +63,26 @@ const canManage = computed(() => {
 
 const formatKm = (km: number | null) =>
     km == null ? '—' : `${Number(km).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`;
+
+const formatDate = (value: string | null) => {
+    if (!value) return '—';
+    const parsed = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const licenseDiskExpiryState = computed(() => {
+    const value = props.vehicle.license_disk_expires_on;
+    if (!value) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expires = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(expires.getTime())) return null;
+    const days = Math.round((expires.getTime() - today.getTime()) / 86400000);
+    if (days < 0) return { label: 'expired', variant: 'danger' as const };
+    if (days <= 30) return { label: 'renew soon', variant: 'warning' as const };
+    return null;
+});
 
 const vehicleSubtitle = computed(() =>
     [props.vehicle.make, props.vehicle.model, props.vehicle.year].filter(Boolean).join(' '),
@@ -166,6 +187,15 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                     <div>
                         <dt class="text-slate-500">VIN</dt>
                         <dd class="font-medium text-slate-900">{{ vehicle.vin || '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Licence disc expiry</dt>
+                        <dd class="flex flex-wrap items-center gap-2 font-medium text-slate-900">
+                            <span>{{ formatDate(vehicle.license_disk_expires_on) }}</span>
+                            <AppBadge v-if="licenseDiskExpiryState" :variant="licenseDiskExpiryState.variant">
+                                {{ licenseDiskExpiryState.label }}
+                            </AppBadge>
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-slate-500">Starting odometer</dt>

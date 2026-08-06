@@ -57,6 +57,7 @@ class VehicleController extends Controller
                 'model' => $vehicle->model,
                 'year' => $vehicle->year,
                 'registration_number' => $vehicle->registration_number,
+                'license_disk_expires_on' => optional($vehicle->license_disk_expires_on)?->toDateString(),
                 'starting_odometer_km' => $vehicle->starting_odometer_km !== null
                     ? (float) $vehicle->starting_odometer_km
                     : null,
@@ -95,7 +96,7 @@ class VehicleController extends Controller
 
         $vehicle = Vehicle::queryWithoutTeamScope()->create([
             'team_id' => $teamId,
-            ...$payload,
+            ...$this->vehicleAttributesFromValidated($payload),
         ]);
 
         return to_route('vehicles.show', $vehicle)
@@ -173,7 +174,10 @@ class VehicleController extends Controller
         $this->authorizeTeam('vehicles.manage', $request);
         abort_unless($vehicle->team_id === $request->user()->current_team_id, 403);
 
-        $vehicle->update($this->validateVehicle($request));
+        $payload = $this->validateVehicle($request);
+        $attributes = $this->vehicleAttributesFromValidated($payload, $vehicle);
+
+        $vehicle->update($attributes);
 
         return to_route('vehicles.show', $vehicle)
             ->with('success', __('Vehicle updated.'));
@@ -209,6 +213,7 @@ class VehicleController extends Controller
             'year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'registration_number' => ['required', 'string', 'max:50'],
             'vin' => ['nullable', 'string', 'max:32'],
+            'license_disk_expires_on' => ['nullable', 'date'],
             'starting_odometer_km' => ['nullable', 'numeric', 'min:0', 'max:9999999'],
             'notes' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
@@ -216,6 +221,22 @@ class VehicleController extends Controller
 
         if (array_key_exists('starting_odometer_km', $validated) && $validated['starting_odometer_km'] !== null) {
             $validated['starting_odometer_km'] = round((float) $validated['starting_odometer_km'], 1);
+        }
+
+        return $validated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function vehicleAttributesFromValidated(array $validated, ?Vehicle $existing = null): array
+    {
+        $expiresOn = $validated['license_disk_expires_on'] ?? null;
+        $previousExpiry = optional($existing?->license_disk_expires_on)?->toDateString();
+
+        if ($expiresOn !== $previousExpiry) {
+            $validated['license_disk_reminder_sent_for'] = null;
         }
 
         return $validated;
@@ -234,6 +255,7 @@ class VehicleController extends Controller
             'year' => $vehicle->year,
             'registration_number' => $vehicle->registration_number,
             'vin' => $vehicle->vin,
+            'license_disk_expires_on' => optional($vehicle->license_disk_expires_on)?->toDateString(),
             'starting_odometer_km' => $vehicle->starting_odometer_km !== null
                 ? (float) $vehicle->starting_odometer_km
                 : null,

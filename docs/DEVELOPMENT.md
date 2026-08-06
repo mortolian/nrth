@@ -127,6 +127,7 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 - UI: Inertia + Vue 3 in `resources/js/Pages/`.
 - Ledger amounts use `brick/money` and cents; bank import lines use decimal columns separately.
 - Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
+- Licence disc reminders: the same scheduler runs `vehicles:send-license-disk-reminders` daily at 01:15 for active vehicles whose disc expires within 30 days (opt out under Profile → Notifications).
 - Sending or marking an invoice as sent posts an accrual journal (Dr AR, Cr income accounts + VAT). Subsequent payments clear AR only when that accrual exists.
 - **Note templates** (Settings → Note templates, or command palette “Note Templates”): create named markdown snippets such as “International Banking Details”. Attach them on a client to prefill new invoices/estimates, or insert them while editing a document. Footers/terms stay freeform per document (markdown editor, no shared templates). Example body:
 
