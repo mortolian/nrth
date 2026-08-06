@@ -114,6 +114,35 @@ class InvoiceSendAndRemindTest extends TestCase
         Mail::assertQueued(InvoiceMailer::class);
     }
 
+    public function test_resend_allows_paid_invoice(): void
+    {
+        Mail::fake();
+        $this->mockPdfService();
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $client = Client::factory()->for($team)->create(['email' => 'client@example.com']);
+        $invoice = Invoice::factory()->create([
+            'team_id' => $team->id,
+            'client_id' => $client->id,
+            'status' => InvoiceStatus::Paid,
+            'sent_at' => now()->subDays(2),
+            'paid_at' => now()->subDay(),
+            'total_cents' => 100_00,
+            'amount_paid_cents' => 100_00,
+        ]);
+
+        $response = $this->post(route('invoicing.invoices.send', $invoice));
+
+        $response->assertRedirect(route('invoicing.invoices.show', $invoice));
+        $response->assertSessionHas('success');
+        $this->assertSame(InvoiceStatus::Paid, $invoice->fresh()->status);
+        Mail::assertQueued(InvoiceMailer::class);
+    }
+
     public function test_remind_queues_reminder_mail(): void
     {
         Mail::fake();

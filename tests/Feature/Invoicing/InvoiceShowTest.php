@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Invoicing;
 
+use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,5 +29,27 @@ class InvoiceShowTest extends TestCase
                 ->has('invoice.id')
                 ->has('online_payment_providers')
                 ->has('charges_vat'));
+    }
+
+    public function test_invoice_show_allows_resend_for_paid_invoice(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $user->forceFill(['current_team_id' => $team->id])->save();
+        $this->actingAs($user);
+
+        $invoice = Invoice::factory()->for($team)->create([
+            'status' => InvoiceStatus::Paid,
+            'paid_at' => now(),
+            'sent_at' => now()->subDay(),
+        ]);
+
+        $this->get(route('invoicing.invoices.show', $invoice))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Invoicing/Invoices/Show')
+                ->where('can.send', true)
+                ->where('can.remind', false));
     }
 }

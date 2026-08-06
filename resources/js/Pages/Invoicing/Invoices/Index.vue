@@ -196,8 +196,10 @@ const rowActionItems = (invoice: InvoiceRow) => {
         actions.push({ id: 'send', label: 'Send' });
         actions.push({ id: 'mark_sent', label: 'Mark as sent' });
     }
-    if (['sent', 'viewed', 'partial', 'overdue'].includes(invoice.status)) {
+    if (['sent', 'viewed', 'partial', 'overdue', 'paid'].includes(invoice.status)) {
         actions.push({ id: 'resend', label: 'Resend' });
+    }
+    if (['sent', 'viewed', 'partial', 'overdue'].includes(invoice.status)) {
         actions.push({ id: 'remind', label: 'Send reminder' });
     }
     if (invoice.status !== 'paid' && invoice.status !== 'void') actions.push({ id: 'record_payment', label: 'Record Payment' });

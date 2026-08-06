@@ -670,6 +670,7 @@ class InvoiceController extends Controller
                     InvoiceStatus::Viewed,
                     InvoiceStatus::Partial,
                     InvoiceStatus::Overdue,
+                    InvoiceStatus::Paid,
                 ], true),
                 'remind' => in_array($invoice->status, [
                     InvoiceStatus::Sent,

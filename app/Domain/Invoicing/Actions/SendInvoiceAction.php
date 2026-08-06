@@ -28,12 +28,6 @@ class SendInvoiceAction
             ]);
         }
 
-        if ($invoice->status === InvoiceStatus::Paid) {
-            throw ValidationException::withMessages([
-                'status' => __('Cannot email a paid invoice. Download the PDF instead.'),
-            ]);
-        }
-
         $invoice->loadMissing(['client', 'team', 'lineItems']);
 
         $email = trim((string) ($invoice->client?->email ?? ''));
