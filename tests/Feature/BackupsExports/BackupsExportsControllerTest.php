@@ -30,6 +30,11 @@ class BackupsExportsControllerTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        // Avoid syncing real Sail/host backup zips into Ready runs during these tests.
+        Config::set('backup.backup.name', 'nrth');
+        Config::set('backup.backup.destination.disks', ['local']);
+        Storage::fake('local');
     }
 
     private function actingAsTeamOwner(User $user, Team $team): void

@@ -44,7 +44,7 @@ php artisan test
 ./vendor/bin/sail test
 ```
 
-PHPUnit forces SQLite in-memory via `phpunit.xml` and `tests/bootstrap.php` (hard-overrides Docker `DB_*` in `$_SERVER`). `RefreshDatabase` is additionally blocked from running `migrate:fresh` / `db:wipe` against anything except sqlite `:memory:` unless `NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET=1`. Vite is stubbed in `tests/TestCase.php` — a production asset build is not required for PHPUnit.
+PHPUnit forces SQLite in-memory via `phpunit.xml` and `tests/bootstrap.php` (hard-overrides Docker `DB_*` in `$_SERVER`). `phpunit.xml` also raises `memory_limit` to `512M` so the full suite does not OOM during Spatie media MIME detection under Sail’s default 128M. `RefreshDatabase` is additionally blocked from running `migrate:fresh` / `db:wipe` against anything except sqlite `:memory:` unless `NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET=1`. Vite is stubbed in `tests/TestCase.php` — a production asset build is not required for PHPUnit.
 
 Destructive reset commands are blocked outside `APP_ENV=testing`, including when invoked through `./scripts/compose.sh`. If you truly mean to wipe your current DB, opt in explicitly for that shell only:
 
