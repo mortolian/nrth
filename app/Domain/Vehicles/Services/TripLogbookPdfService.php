@@ -40,7 +40,7 @@ final class TripLogbookPdfService
         }
 
         $trips = $filteredQuery
-            ->with('vehicle:id,name,registration_number,vin,make,model,year,starting_odometer_km')
+            ->with('vehicle:id,name,registration_number,vin,make,model,year')
             ->orderBy('trip_date')
             ->orderBy('id')
             ->limit(self::MAX_TRIPS)
@@ -189,9 +189,6 @@ final class TripLogbookPdfService
                     'make' => $vehicle->make,
                     'model' => $vehicle->model,
                     'year' => $vehicle->year !== null ? (int) $vehicle->year : null,
-                    'starting_odometer_km' => $vehicle->starting_odometer_km !== null
-                        ? (float) $vehicle->starting_odometer_km
-                        : null,
                 ],
                 'trips' => $rows,
                 'totals' => [

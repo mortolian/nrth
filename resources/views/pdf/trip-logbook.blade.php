@@ -253,19 +253,15 @@
                         {{ $desc !== '' ? $desc : '—' }}
                     </div>
                 </td>
-                <td style="width: 20%;">
+                <td style="width: 28%;">
                     <div class="label">Registration</div>
                     <div class="value">{{ $section['vehicle']['registration_number'] ?: '—' }}</div>
                 </td>
-                <td style="width: 28%;">
+                <td style="width: 30%;">
                     <div class="label">VIN</div>
                     <div class="value">{{ $section['vehicle']['vin'] ?: '—' }}</div>
                 </td>
-                <td style="width: 15%;">
-                    <div class="label">Starting odometer</div>
-                    <div class="value">{{ $fmtKm($section['vehicle']['starting_odometer_km']) }}</div>
-                </td>
-                <td style="width: 20%;">
+                <td style="width: 14%;">
                     <div class="label">Trips in period</div>
                     <div class="value">{{ number_format($section['totals']['trips']) }}</div>
                 </td>
@@ -325,8 +321,7 @@
 <div class="disclaimer">
     This document was generated from the electronic vehicle log book maintained by {{ $businessName }}.
     It is intended as supporting documentation for accounting and tax purposes.
-    Distances are as recorded in the log book. Where shown, starting odometer is the vehicle’s recorded
-    purchase/starting reading and is not derived from individual trips.
+    Distances are as recorded in the log book.
     Generated on {{ $generatedAt->timezone(config('app.timezone'))->format('Y-m-d H:i T') }}.
 </div>
 
