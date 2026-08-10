@@ -22,6 +22,8 @@ npm install
 npm run dev
 ```
 
+`composer.json` pins `config.platform.php` to `8.3.0` so `composer update` on newer PHP (8.4/8.5) still resolves a lock file that installs on CI’s PHP 8.3 job. Do not remove that pin without raising the minimum PHP version in `require.php` and the test matrix.
+
 In another terminal:
 
 ```bash
