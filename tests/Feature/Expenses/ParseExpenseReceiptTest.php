@@ -36,7 +36,7 @@ class ParseExpenseReceiptTest extends TestCase
     }
 
     /**
-     * @param  array{provider?: string, api_key?: string, model?: string, base_url?: string}  $ai
+     * @param  array{enabled?: bool, provider?: string, api_key?: string|null, model?: string, base_url?: string|null}  $ai
      */
     private function configureAi(Team $team, array $ai = []): void
     {
@@ -45,6 +45,7 @@ class ParseExpenseReceiptTest extends TestCase
                 is_array($team->business_settings) ? $team->business_settings : [],
                 [
                     'ai' => array_merge([
+                        'enabled' => true,
                         'provider' => 'openai',
                         'api_key' => 'sk-test',
                         'model' => 'gpt-4o-mini',
@@ -474,7 +475,9 @@ class ParseExpenseReceiptTest extends TestCase
             'services.openai.model' => 'gpt-4o-mini',
         ]);
 
-        $this->actingTeam();
+        [, $team] = $this->actingTeam();
+        // AI must be enabled in business settings; env fills an empty team API key.
+        $this->configureAi($team, ['api_key' => null]);
 
         Http::fake([
             'api.openai.com/v1/chat/completions' => Http::response([
