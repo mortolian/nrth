@@ -8,6 +8,8 @@ export type TableColumn = {
     label: string;
     sortable?: boolean;
     widthClass?: string;
+    /** Horizontal alignment for the header (and a cue for matching body cells). */
+    align?: 'left' | 'right' | 'center';
 };
 
 const props = withDefaults(defineProps<{
@@ -22,6 +24,8 @@ const props = withDefaults(defineProps<{
     showPagination?: boolean;
     /** Drop outer border/radius when nested inside an AppCard (or similar) that already frames the list. */
     embedded?: boolean;
+    /** Tighter header padding (`px-3 py-2`) to match money-out / dense body cells. */
+    dense?: boolean;
     /** Called with the data `<tbody>` when the slot body is mounted (or `null` when unmounted). For row Sortable. */
     tbodyRefFn?: (el: HTMLTableSectionElement | null) => void;
 }>(), {
@@ -33,6 +37,7 @@ const props = withDefaults(defineProps<{
     tableClass: '',
     showPagination: true,
     embedded: false,
+    dense: false,
 });
 
 function setDataTbodyRef(el: unknown) {
@@ -57,6 +62,15 @@ const normalizedColumns = computed<TableColumn[]>(() => {
 });
 
 const tableClassName = computed(() => cn('min-w-full divide-y divide-slate-200', props.tableClass));
+
+const headerPadClass = computed(() => (props.dense ? 'px-3 py-2' : 'px-4 py-3'));
+const skeletonPadClass = computed(() => (props.dense ? 'px-3 py-2' : 'px-4 py-3'));
+
+function headerAlignClass(column: TableColumn): string {
+    if (column.align === 'right') return 'text-right';
+    if (column.align === 'center') return 'text-center';
+    return 'text-left';
+}
 
 const onSort = (column: TableColumn) => {
     if (!column.sortable) return;
@@ -92,13 +106,19 @@ const prevPage = () => {
                         <th
                             v-for="column in normalizedColumns"
                             :key="column.key"
-                            :class="[column.widthClass ?? '', 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500']"
+                            :class="[
+                                column.widthClass ?? '',
+                                headerPadClass,
+                                headerAlignClass(column),
+                                'text-xs font-semibold uppercase tracking-wide text-slate-500',
+                            ]"
                         >
                             <slot :name="`header-${column.key}`" :column="column">
                                 <button
                                     v-if="column.sortable"
                                     type="button"
                                     class="inline-flex items-center gap-1 hover:text-slate-700"
+                                    :class="column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : ''"
                                     @click="onSort(column)"
                                 >
                                     {{ column.label }}
@@ -114,7 +134,7 @@ const prevPage = () => {
                         <td
                             v-for="column in Math.max(1, normalizedColumns.length)"
                             :key="`skeleton-${row}-${column}`"
-                            class="px-4 py-3"
+                            :class="skeletonPadClass"
                         >
                             <div class="h-4 animate-pulse rounded bg-slate-100" />
                         </td>

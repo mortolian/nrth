@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { ChevronDown } from 'lucide-vue-next';
 import {
     SelectContent,
@@ -29,6 +29,27 @@ const props = withDefaults(defineProps<{
 
 const model = defineModel<string>();
 const EMPTY_SENTINEL = '__appselect_empty__';
+
+/**
+ * Native <dialog showModal()> uses the browser top layer. Portaling to body
+ * always paints behind it no matter the z-index — target the open dialog instead.
+ */
+const portalTo = ref<HTMLElement | string>('body');
+
+function syncPortalTarget(): void {
+    const openDialog = document.querySelector('dialog[open]');
+    portalTo.value = openDialog instanceof HTMLElement ? openDialog : 'body';
+}
+
+onMounted(() => {
+    syncPortalTarget();
+});
+
+const onOpenChange = (open: boolean) => {
+    if (open) {
+        syncPortalTarget();
+    }
+};
 
 const hasEmptyOption = computed(() => props.options.some((option) => option.value === ''));
 
@@ -66,14 +87,14 @@ const triggerClass = computed(() =>
 </script>
 
 <template>
-    <SelectRoot v-model="selectModel" :disabled="props.disabled">
+    <SelectRoot v-model="selectModel" :disabled="props.disabled" @update:open="onOpenChange">
         <SelectTrigger
             :class="[triggerClass, props.disabled ? 'cursor-not-allowed opacity-60' : '']"
         >
             <SelectValue :placeholder="props.placeholder" class="min-w-0 flex-1 truncate text-left" />
             <ChevronDown class="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
         </SelectTrigger>
-        <SelectPortal>
+        <SelectPortal :to="portalTo">
             <SelectContent class="z-[200] min-w-[10rem] rounded-md border border-slate-200 bg-white p-1 shadow-sm">
                 <SelectViewport>
                     <SelectItem

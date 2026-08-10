@@ -20,7 +20,17 @@ class ExchangeRateController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
-        $this->authorizeTeam('invoices.manage', $request);
+        $user = $request->user();
+        $team = $user?->currentTeam;
+        abort_unless(
+            $user !== null
+            && $team !== null
+            && (
+                $user->canOnTeam('invoices.manage', $team)
+                || $user->canOnTeam('budgets.manage', $team)
+            ),
+            403
+        );
 
         $validated = $request->validate([
             'from' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
