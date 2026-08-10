@@ -15,8 +15,6 @@ type TripHistoryRow = {
     duration_seconds: number | null;
     distance_km: number;
     purpose: 'business' | 'private';
-    estimated_opening_km: number | null;
-    estimated_closing_km: number | null;
     from_location: string | null;
     to_location: string | null;
     start_latitude: number | null;
@@ -257,8 +255,6 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                     { key: 'date', label: 'Date' },
                     { key: 'route', label: 'Route' },
                     { key: 'purpose', label: 'Purpose' },
-                    { key: 'opening', label: 'Opening (est.)' },
-                    { key: 'closing', label: 'Closing (est.)' },
                     { key: 'distance', label: 'Distance' },
                     { key: 'actions', label: '' },
                 ]"
@@ -297,8 +293,6 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                             {{ row.purpose }}
                         </AppBadge>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(row.estimated_opening_km) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(row.estimated_closing_km) }}</td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(row.distance_km) }}</td>
                     <td class="px-3 py-2" @click.stop>
                         <div class="flex justify-end">
@@ -311,7 +305,7 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                     </td>
                 </tr>
                 <tr v-if="!trip_history.data.length">
-                    <td colspan="7" class="px-4 py-6">
+                    <td colspan="5" class="px-4 py-6">
                         <EmptyState
                             title="No trips yet"
                             description="Trips logged against this vehicle will show up here."

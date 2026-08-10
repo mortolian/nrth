@@ -35,8 +35,6 @@ type TripRow = {
     duration_seconds: number | null;
     distance_km: number;
     purpose: 'business' | 'private';
-    estimated_opening_km: number | null;
-    estimated_closing_km: number | null;
     from_location: string | null;
     to_location: string | null;
     start_latitude: number | null;
@@ -107,6 +105,26 @@ const filterQuery = () => ({
     to: filters.value.to || undefined,
 });
 
+const appliedFilterQuery = () => ({
+    search: props.filters.search || undefined,
+    purpose: props.filters.purpose && props.filters.purpose !== 'all'
+        ? props.filters.purpose
+        : undefined,
+    vehicle_id: props.filters.vehicle_id ? String(props.filters.vehicle_id) : undefined,
+    from: props.filters.from || undefined,
+    to: props.filters.to || undefined,
+});
+
+const hasActiveFilters = computed(() => Boolean(
+    props.filters.search
+    || (props.filters.purpose && props.filters.purpose !== 'all')
+    || props.filters.vehicle_id
+    || props.filters.from
+    || props.filters.to,
+));
+
+const pdfTripLimit = 1500;
+
 const applyFilters = (page = 1) => {
     router.get(route('vehicles.trips.index'), { ...filterQuery(), page }, {
         preserveState: true,
@@ -121,7 +139,15 @@ const clearFilters = () => {
 };
 
 const exportCsv = () => {
-    window.location.href = route('vehicles.trips.export', filterQuery());
+    window.location.href = route('vehicles.trips.export', appliedFilterQuery());
+};
+
+const exportPdf = () => {
+    if (!props.filters.from || !props.filters.to) {
+        toast.error('Choose both a from and to date, then Apply, before exporting a PDF log book.');
+        return;
+    }
+    window.location.href = route('vehicles.trips.export-pdf', appliedFilterQuery());
 };
 
 const confirmDelete = (trip: TripRow) => {
@@ -229,8 +255,6 @@ const tableColumns = computed(() => [
     { key: 'vehicle', label: 'Vehicle', widthClass: 'whitespace-nowrap' },
     { key: 'route', label: 'Route', widthClass: 'min-w-[18rem]' },
     { key: 'purpose', label: 'Purpose', widthClass: 'whitespace-nowrap' },
-    { key: 'opening', label: 'Opening (est.)', widthClass: 'whitespace-nowrap' },
-    { key: 'closing', label: 'Closing (est.)', widthClass: 'whitespace-nowrap' },
     { key: 'distance', label: 'Distance', widthClass: 'whitespace-nowrap' },
     { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
 ]);
@@ -247,7 +271,6 @@ const emptyColspan = computed(() => tableColumns.value.length);
         subtitle="Business and private travel log book"
     >
         <template #actions>
-            <AppButton variant="secondary" @click="exportCsv">Export CSV</AppButton>
             <AppButton
                 v-if="aiEnabled && canManage"
                 variant="secondary"
@@ -309,13 +332,20 @@ const emptyColspan = computed(() => tableColumns.value.length);
                     </div>
                 </div>
             </div>
-            <div class="mt-3 flex gap-2">
+            <div class="mt-3 flex flex-wrap items-center gap-2">
                 <AppButton variant="secondary" @click="applyFilters()">Apply</AppButton>
                 <AppButton variant="ghost" @click="clearFilters">Clear</AppButton>
+                <AppButton variant="secondary" @click="exportCsv">
+                    {{ hasActiveFilters ? 'Export filtered CSV' : 'Export CSV' }}
+                </AppButton>
+                <AppButton variant="secondary" @click="exportPdf">
+                    {{ hasActiveFilters ? 'Export filtered PDF' : 'Export PDF' }}
+                </AppButton>
             </div>
             <p class="mt-3 text-xs text-slate-500">
-                Opening/closing odometer are estimated from each vehicle’s starting (purchase) reading and trip
-                distances. Use date filters, then Export CSV for a tax-period log book.
+                CSV and PDF exports use the filters currently applied to the list (all matching trips, not just this
+                page). PDF requires a from/to date range and is capped at
+                {{ pdfTripLimit.toLocaleString() }} trips — narrow filters or use CSV for larger extracts.
             </p>
         </AppCard>
 
@@ -406,14 +436,9 @@ const emptyColspan = computed(() => tableColumns.value.length);
                         {{ routeLabel(trip) || '—' }}
                     </p>
                     <div class="mt-3 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 text-sm">
-                        <div class="min-w-0 text-xs text-slate-500">
-                            <p>
-                                <span class="tabular-nums">{{ formatKm(trip.estimated_opening_km) }}</span>
-                                →
-                                <span class="tabular-nums">{{ formatKm(trip.estimated_closing_km) }}</span>
-                            </p>
-                            <p class="mt-0.5">Opening → closing (est.)</p>
-                        </div>
+                        <p class="min-w-0 text-xs text-slate-500">
+                            {{ trip.notes || '—' }}
+                        </p>
                         <p class="shrink-0 font-semibold tabular-nums text-slate-900">
                             {{ formatKm(trip.distance_km) }}
                         </p>
@@ -512,8 +537,6 @@ const emptyColspan = computed(() => tableColumns.value.length);
                                 {{ trip.purpose }}
                             </AppBadge>
                         </td>
-                        <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.estimated_opening_km) }}</td>
-                        <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.estimated_closing_km) }}</td>
                         <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.distance_km) }}</td>
                         <td class="px-3 py-2" @click.stop>
                             <div class="flex justify-end">

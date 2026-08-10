@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Web\Vehicles;
 use App\Domain\Vehicles\Enums\TripPurpose;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
-use App\Domain\Vehicles\Services\TripOdometerEstimator;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,10 +13,6 @@ use Inertia\Response;
 
 class VehicleController extends Controller
 {
-    public function __construct(
-        private readonly TripOdometerEstimator $odometerEstimator,
-    ) {}
-
     public function index(Request $request): Response
     {
         $this->authorizeTeam('vehicles.view', $request);
@@ -111,16 +106,6 @@ class VehicleController extends Controller
         $teamId = (int) $vehicle->team_id;
         $yearStart = now()->startOfYear()->toDateString();
 
-        $allTrips = Trip::queryWithoutTeamScope()
-            ->where('team_id', $teamId)
-            ->where('vehicle_id', $vehicle->id)
-            ->get();
-
-        $estimates = $this->odometerEstimator->estimate(
-            $vehicle,
-            $this->odometerEstimator->chronological($allTrips),
-        );
-
         $tripHistory = Trip::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('vehicle_id', $vehicle->id)
@@ -128,22 +113,25 @@ class VehicleController extends Controller
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString()
-            ->through(fn (Trip $trip): array => $this->serializeTrip(
-                $trip,
-                $estimates[(int) $trip->id] ?? null,
-            ));
+            ->through(fn (Trip $trip): array => $this->serializeTrip($trip));
 
-        $ytdTrips = $allTrips->filter(
-            fn (Trip $trip) => optional($trip->trip_date)?->toDateString() >= $yearStart
-        );
+        $ytdByPurpose = Trip::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('vehicle_id', $vehicle->id)
+            ->whereDate('trip_date', '>=', $yearStart)
+            ->selectRaw('purpose, COUNT(*) as trip_count, COALESCE(SUM(distance_km), 0) as total_km')
+            ->groupBy('purpose')
+            ->get()
+            ->keyBy(function ($row): string {
+                $purpose = $row->purpose;
 
-        $businessKmYtd = (float) $ytdTrips
-            ->filter(fn (Trip $trip) => $trip->purpose === TripPurpose::Business)
-            ->sum(fn (Trip $trip) => (float) $trip->distance_km);
+                return $purpose instanceof TripPurpose ? $purpose->value : (string) $purpose;
+            });
 
-        $privateKmYtd = (float) $ytdTrips
-            ->filter(fn (Trip $trip) => $trip->purpose === TripPurpose::Private)
-            ->sum(fn (Trip $trip) => (float) $trip->distance_km);
+        $businessKmYtd = (float) ($ytdByPurpose[TripPurpose::Business->value]->total_km ?? 0);
+        $privateKmYtd = (float) ($ytdByPurpose[TripPurpose::Private->value]->total_km ?? 0);
+        $tripCountYtd = (int) ($ytdByPurpose[TripPurpose::Business->value]->trip_count ?? 0)
+            + (int) ($ytdByPurpose[TripPurpose::Private->value]->trip_count ?? 0);
 
         return Inertia::render('Vehicles/Show', [
             'vehicle' => $this->serializeVehicle($vehicle),
@@ -152,8 +140,11 @@ class VehicleController extends Controller
                 'business_km_ytd' => round($businessKmYtd, 1),
                 'private_km_ytd' => round($privateKmYtd, 1),
                 'total_km_ytd' => round($businessKmYtd + $privateKmYtd, 1),
-                'trip_count' => $allTrips->count(),
-                'trip_count_ytd' => $ytdTrips->count(),
+                'trip_count' => (int) Trip::queryWithoutTeamScope()
+                    ->where('team_id', $teamId)
+                    ->where('vehicle_id', $vehicle->id)
+                    ->count(),
+                'trip_count_ytd' => $tripCountYtd,
             ],
         ]);
     }
@@ -265,10 +256,9 @@ class VehicleController extends Controller
     }
 
     /**
-     * @param  array{opening_km: float|null, closing_km: float|null}|null  $estimates
      * @return array<string, mixed>
      */
-    private function serializeTrip(Trip $trip, ?array $estimates = null): array
+    private function serializeTrip(Trip $trip): array
     {
         return [
             'id' => $trip->id,
@@ -278,8 +268,6 @@ class VehicleController extends Controller
             'duration_seconds' => $trip->duration_seconds,
             'distance_km' => (float) $trip->distance_km,
             'purpose' => $trip->purpose->value,
-            'estimated_opening_km' => $estimates['opening_km'] ?? null,
-            'estimated_closing_km' => $estimates['closing_km'] ?? null,
             'from_location' => $trip->from_location,
             'to_location' => $trip->to_location,
             'start_latitude' => $trip->start_latitude !== null ? (float) $trip->start_latitude : null,

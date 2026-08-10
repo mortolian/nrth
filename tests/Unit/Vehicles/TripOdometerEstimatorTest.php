@@ -59,4 +59,22 @@ class TripOdometerEstimatorTest extends TestCase
         $this->assertNull($estimates[$trip->id]['opening_km']);
         $this->assertNull($estimates[$trip->id]['closing_km']);
     }
+
+    public function test_estimate_from_opening_baseline_applies_prior_distance(): void
+    {
+        $team = Team::factory()->create();
+        $vehicle = Vehicle::factory()->for($team)->create([
+            'starting_odometer_km' => 1000,
+        ]);
+        $trip = Trip::factory()->forVehicle($vehicle)->create([
+            'trip_date' => '2026-03-01',
+            'distance_km' => 25,
+        ]);
+
+        $estimator = new TripOdometerEstimator;
+        $estimates = $estimator->estimateFromOpeningBaseline($vehicle, collect([$trip]), 100.0);
+
+        $this->assertSame(1100.0, $estimates[$trip->id]['opening_km']);
+        $this->assertSame(1125.0, $estimates[$trip->id]['closing_km']);
+    }
 }

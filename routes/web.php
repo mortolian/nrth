@@ -210,6 +210,7 @@ Route::middleware([
     Route::prefix('vehicles')->name('vehicles.')->group(function () {
         Route::get('/trips', [TripController::class, 'index'])->name('trips.index');
         Route::get('/trips/export', [TripController::class, 'exportCsv'])->name('trips.export');
+        Route::get('/trips/export-pdf', [TripController::class, 'exportPdf'])->name('trips.export-pdf');
         Route::delete('/trips/bulk', [TripController::class, 'bulkDestroy'])->name('trips.bulk-destroy');
         Route::get('/trips/imports', [TripImportController::class, 'index'])->name('trips.imports.index');
         Route::post('/trips/imports/{import}/undo', [TripImportController::class, 'undo'])->name('trips.imports.undo');

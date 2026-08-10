@@ -51,6 +51,51 @@ class TripOdometerEstimator
     }
 
     /**
+     * Estimate opening/closing for a filtered chronological trip set, given the
+     * odometer already accumulated before the first trip (SQL sum of prior distances).
+     *
+     * Avoids loading the vehicle's full trip history into memory.
+     *
+     * @param  Collection<int, Trip>  $filteredTripsChronological
+     * @return array<int, array{opening_km: float|null, closing_km: float|null}>
+     */
+    public function estimateFromOpeningBaseline(
+        Vehicle $vehicle,
+        Collection $filteredTripsChronological,
+        float $priorDistanceKm = 0.0,
+    ): array {
+        $estimates = [];
+
+        foreach ($filteredTripsChronological as $trip) {
+            $estimates[(int) $trip->id] = [
+                'opening_km' => null,
+                'closing_km' => null,
+            ];
+        }
+
+        if ($vehicle->starting_odometer_km === null || $filteredTripsChronological->isEmpty()) {
+            return $estimates;
+        }
+
+        $running = round((float) $vehicle->starting_odometer_km + max(0, $priorDistanceKm), 1);
+
+        foreach ($filteredTripsChronological as $trip) {
+            $distance = round((float) $trip->distance_km, 1);
+            $opening = $running;
+            $closing = round($running + $distance, 1);
+
+            $estimates[(int) $trip->id] = [
+                'opening_km' => $opening,
+                'closing_km' => $closing,
+            ];
+
+            $running = $closing;
+        }
+
+        return $estimates;
+    }
+
+    /**
      * @param  Collection<int, Trip>  $trips
      * @return Collection<int, Trip>
      */

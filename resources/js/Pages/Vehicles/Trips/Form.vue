@@ -29,8 +29,6 @@ const props = defineProps<{
         duration_seconds: number | null;
         distance_km: number;
         purpose: 'business' | 'private';
-        estimated_opening_km: number | null;
-        estimated_closing_km: number | null;
         from_location: string | null;
         to_location: string | null;
         start_latitude: number | null;
@@ -264,9 +262,6 @@ const submit = () => {
     router.post(route('vehicles.trips.store'), payload, visitOptions);
 };
 
-const formatKm = (km: number | null | undefined) =>
-    km == null ? '—' : `${Number(km).toLocaleString(undefined, { maximumFractionDigits: 1 })} km`;
-
 const vehicleOptions = computed(() =>
     props.vehicles.map((vehicle) => ({
         label: vehicle.registration_number
@@ -384,26 +379,6 @@ const vehicleOptions = computed(() =>
                         </div>
                     </div>
 
-                    <div
-                        v-if="isEditing"
-                        class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
-                    >
-                        <div>
-                            <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Opening (est.)</p>
-                            <p class="mt-0.5 font-medium tabular-nums text-slate-900">
-                                {{ formatKm(trip?.estimated_opening_km) }}
-                            </p>
-                        </div>
-                        <div>
-                            <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Closing (est.)</p>
-                            <p class="mt-0.5 font-medium tabular-nums text-slate-900">
-                                {{ formatKm(trip?.estimated_closing_km) }}
-                            </p>
-                        </div>
-                        <p class="text-xs text-slate-500 sm:ml-auto">
-                            From starting odometer and logged distances
-                        </p>
-                    </div>
                 </section>
             </AppCard>
 

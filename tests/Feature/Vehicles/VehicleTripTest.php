@@ -5,11 +5,13 @@ namespace Tests\Feature\Vehicles;
 use App\Domain\Vehicles\Enums\TripPurpose;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
+use App\Domain\Vehicles\Services\TripLogbookPdfService;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use App\Support\TeamAccess\RolePresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class VehicleTripTest extends TestCase
@@ -101,7 +103,7 @@ class VehicleTripTest extends TestCase
         $this->assertNotNull(Vehicle::queryWithoutTeamScope()->find($vehicle->id));
     }
 
-    public function test_trip_log_create_update_delete_estimates_odometer_and_exports(): void
+    public function test_trip_log_create_update_delete_and_exports(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
@@ -153,8 +155,8 @@ class VehicleTripTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Vehicles/Trips/Index')
-                ->where('trips.data.0.estimated_opening_km', 10000)
-                ->where('trips.data.0.estimated_closing_km', 10025));
+                ->where('trips.data.0.distance_km', 25)
+                ->where('trips.data.0.purpose', TripPurpose::Business->value));
 
         $this->put(route('vehicles.trips.update', $trip), [
             'vehicle_id' => $vehicle->id,
@@ -184,9 +186,23 @@ class VehicleTripTest extends TestCase
             'to' => now()->toDateString(),
         ]));
         $export->assertOk();
-        $this->assertStringContainsString('Opening odometer (km)', $export->streamedContent());
-        $this->assertStringContainsString('10000.0', $export->streamedContent());
-        $this->assertStringContainsString('10040.0', $export->streamedContent());
+        $this->assertStringContainsString('Distance (km)', $export->streamedContent());
+        $this->assertStringContainsString('40.0', $export->streamedContent());
+        $this->assertStringNotContainsString('Opening odometer', $export->streamedContent());
+
+        $pdf = $this->get(route('vehicles.trips.export-pdf', [
+            'vehicle_id' => $vehicle->id,
+            'from' => now()->toDateString(),
+            'to' => now()->toDateString(),
+        ]));
+        $pdf->assertOk();
+        $this->assertStringContainsString('application/pdf', (string) $pdf->headers->get('content-type'));
+        $this->assertGreaterThan(1000, strlen($pdf->getContent()));
+
+        $this->from(route('vehicles.trips.index'))
+            ->get(route('vehicles.trips.export-pdf', ['vehicle_id' => $vehicle->id]))
+            ->assertRedirect()
+            ->assertSessionHas('error');
 
         $this->delete(route('vehicles.trips.destroy', $trip))
             ->assertRedirect()
@@ -314,5 +330,64 @@ class VehicleTripTest extends TestCase
         ])->assertForbidden();
 
         $this->assertNotNull(Trip::queryWithoutTeamScope()->find($trip->id));
+    }
+
+    public function test_pdf_export_rejects_when_too_many_trips(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $vehicle = Vehicle::factory()->for($team)->create([
+            'starting_odometer_km' => 1000,
+        ]);
+
+        $from = now()->subDays(10)->toDateString();
+        $to = now()->toDateString();
+        $limit = TripLogbookPdfService::MAX_TRIPS;
+
+        $rows = [];
+        for ($i = 0; $i < $limit + 1; $i++) {
+            $rows[] = [
+                'team_id' => $team->id,
+                'vehicle_id' => $vehicle->id,
+                'trip_date' => $from,
+                'started_at' => null,
+                'ended_at' => null,
+                'duration_seconds' => null,
+                'distance_km' => 1.0,
+                'purpose' => TripPurpose::Business->value,
+                'start_odometer_km' => null,
+                'end_odometer_km' => null,
+                'from_location' => 'A',
+                'to_location' => 'B',
+                'start_latitude' => null,
+                'start_longitude' => null,
+                'end_latitude' => null,
+                'end_longitude' => null,
+                'notes' => null,
+                'trip_import_id' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            DB::table('trips')->insert($chunk);
+        }
+
+        $this->from(route('vehicles.trips.index', [
+            'vehicle_id' => $vehicle->id,
+            'from' => $from,
+            'to' => $to,
+        ]))
+            ->get(route('vehicles.trips.export-pdf', [
+                'vehicle_id' => $vehicle->id,
+                'from' => $from,
+                'to' => $to,
+            ]))
+            ->assertRedirect()
+            ->assertSessionHas('error');
     }
 }

@@ -5,23 +5,23 @@ namespace App\Http\Controllers\Web\Vehicles;
 use App\Domain\Vehicles\Enums\TripPurpose;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
-use App\Domain\Vehicles\Services\TripOdometerEstimator;
+use App\Domain\Vehicles\Services\TripLogbookPdfService;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TripController extends Controller
 {
     public function __construct(
-        private readonly TripOdometerEstimator $odometerEstimator,
+        private readonly TripLogbookPdfService $logbookPdfService,
     ) {}
 
     public function index(Request $request): Response
@@ -32,7 +32,7 @@ class TripController extends Controller
         $filters = $this->filtersFromRequest($request);
 
         $query = $this->filteredTripsQuery($teamId, $filters)
-            ->with('vehicle:id,name,registration_number,starting_odometer_km');
+            ->with('vehicle:id,name,registration_number');
 
         $trips = $query
             ->orderByDesc('trip_date')
@@ -40,14 +40,9 @@ class TripController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        $estimatesByVehicle = $this->estimatesForPage($teamId, $trips->getCollection());
-
         $trips->setCollection(
             $trips->getCollection()->map(
-                fn (Trip $trip): array => $this->serializeTrip(
-                    $trip,
-                    estimates: $estimatesByVehicle[(int) $trip->vehicle_id][(int) $trip->id] ?? null,
-                )
+                fn (Trip $trip): array => $this->serializeTrip($trip)
             )
         );
 
@@ -72,16 +67,14 @@ class TripController extends Controller
         $filters = $this->filtersFromRequest($request);
 
         $trips = $this->filteredTripsQuery($teamId, $filters)
-            ->with('vehicle:id,name,registration_number,vin,starting_odometer_km')
+            ->with('vehicle:id,name,registration_number,vin')
             ->orderBy('trip_date')
             ->orderBy('id')
             ->get();
 
-        $estimatesByVehicle = $this->estimatesForPage($teamId, $trips);
-
         $filename = 'travel-log-'.now()->format('Y-m-d-His').'.csv';
 
-        return response()->streamDownload(function () use ($trips, $estimatesByVehicle): void {
+        return response()->streamDownload(function () use ($trips): void {
             $handle = fopen('php://output', 'w');
             if ($handle === false) {
                 return;
@@ -100,8 +93,6 @@ class TripController extends Controller
                 'Purpose',
                 'From',
                 'To',
-                'Opening odometer (km)',
-                'Closing odometer (km)',
                 'Distance (km)',
                 'Start latitude',
                 'Start longitude',
@@ -111,7 +102,6 @@ class TripController extends Controller
             ]);
 
             foreach ($trips as $trip) {
-                $estimate = $estimatesByVehicle[(int) $trip->vehicle_id][(int) $trip->id] ?? null;
                 $durationMinutes = $trip->duration_seconds !== null
                     ? round(((int) $trip->duration_seconds) / 60, 2)
                     : null;
@@ -127,8 +117,6 @@ class TripController extends Controller
                     $trip->purpose->value,
                     (string) ($trip->from_location ?? ''),
                     (string) ($trip->to_location ?? ''),
-                    $estimate['opening_km'] !== null ? number_format($estimate['opening_km'], 1, '.', '') : '',
-                    $estimate['closing_km'] !== null ? number_format($estimate['closing_km'], 1, '.', '') : '',
                     number_format((float) $trip->distance_km, 1, '.', ''),
                     $trip->start_latitude !== null ? (string) $trip->start_latitude : '',
                     $trip->start_longitude !== null ? (string) $trip->start_longitude : '',
@@ -142,6 +130,23 @@ class TripController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    public function exportPdf(Request $request): SymfonyResponse|RedirectResponse
+    {
+        $this->authorizeTeam('vehicles.view', $request);
+
+        $team = $request->user()->currentTeam;
+        abort_if($team === null, 403);
+
+        $filters = $this->filtersFromRequest($request);
+        $query = $this->filteredTripsQuery((int) $team->id, $filters);
+
+        try {
+            return $this->logbookPdfService->downloadForFilters($team, $filters, $query);
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first() ?: __('Could not export PDF.'));
+        }
     }
 
     public function create(Request $request): Response
@@ -183,17 +188,11 @@ class TripController extends Controller
         abort_unless($trip->team_id === $request->user()->current_team_id, 403);
 
         $teamId = (int) $trip->team_id;
-        $trip->load('vehicle:id,name,registration_number,starting_odometer_km');
-
-        $estimates = $this->estimatesForPage($teamId, collect([$trip]));
+        $trip->load('vehicle:id,name,registration_number');
 
         return Inertia::render('Vehicles/Trips/Form', [
             'isEditing' => true,
-            'trip' => $this->serializeTrip(
-                $trip,
-                includeVehicleId: true,
-                estimates: $estimates[(int) $trip->vehicle_id][(int) $trip->id] ?? null,
-            ),
+            'trip' => $this->serializeTrip($trip, includeVehicleId: true),
             'vehicles' => $this->vehicleOptions($teamId),
             'prefill' => null,
         ]);
@@ -325,43 +324,6 @@ class TripController extends Controller
     }
 
     /**
-     * @param  Collection<int, Trip>  $pageTrips
-     * @return array<int, array<int, array{opening_km: float|null, closing_km: float|null}>>
-     */
-    private function estimatesForPage(int $teamId, Collection $pageTrips): array
-    {
-        $vehicleIds = $pageTrips->pluck('vehicle_id')->unique()->filter()->map(fn ($id) => (int) $id)->all();
-        if ($vehicleIds === []) {
-            return [];
-        }
-
-        $vehicles = Vehicle::queryWithoutTeamScope()
-            ->where('team_id', $teamId)
-            ->whereIn('id', $vehicleIds)
-            ->get()
-            ->keyBy('id');
-
-        $allTrips = Trip::queryWithoutTeamScope()
-            ->where('team_id', $teamId)
-            ->whereIn('vehicle_id', $vehicleIds)
-            ->get()
-            ->groupBy('vehicle_id');
-
-        $byVehicle = [];
-        foreach ($vehicleIds as $vehicleId) {
-            $vehicle = $vehicles->get($vehicleId);
-            if ($vehicle === null) {
-                continue;
-            }
-
-            $chrono = $this->odometerEstimator->chronological($allTrips->get($vehicleId, collect()));
-            $byVehicle[$vehicleId] = $this->odometerEstimator->estimate($vehicle, $chrono);
-        }
-
-        return $byVehicle;
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function validateTrip(Request $request, int $teamId): array
@@ -430,7 +392,7 @@ class TripController extends Controller
     }
 
     /**
-     * @return list<array{id: int, name: string, registration_number: string|null, starting_odometer_km: float|null, is_active: bool}>
+     * @return list<array{id: int, name: string, registration_number: string|null, is_active: bool}>
      */
     private function vehicleOptions(int $teamId, bool $activeOnly = false): array
     {
@@ -443,24 +405,20 @@ class TripController extends Controller
         }
 
         return $query
-            ->get(['id', 'name', 'registration_number', 'starting_odometer_km', 'is_active'])
+            ->get(['id', 'name', 'registration_number', 'is_active'])
             ->map(fn (Vehicle $vehicle): array => [
                 'id' => $vehicle->id,
                 'name' => $vehicle->name,
                 'registration_number' => $vehicle->registration_number,
-                'starting_odometer_km' => $vehicle->starting_odometer_km !== null
-                    ? (float) $vehicle->starting_odometer_km
-                    : null,
                 'is_active' => (bool) $vehicle->is_active,
             ])
             ->all();
     }
 
     /**
-     * @param  array{opening_km: float|null, closing_km: float|null}|null  $estimates
      * @return array<string, mixed>
      */
-    private function serializeTrip(Trip $trip, bool $includeVehicleId = false, ?array $estimates = null): array
+    private function serializeTrip(Trip $trip, bool $includeVehicleId = false): array
     {
         $row = [
             'id' => $trip->id,
@@ -470,8 +428,6 @@ class TripController extends Controller
             'duration_seconds' => $trip->duration_seconds,
             'distance_km' => (float) $trip->distance_km,
             'purpose' => $trip->purpose->value,
-            'estimated_opening_km' => $estimates['opening_km'] ?? null,
-            'estimated_closing_km' => $estimates['closing_km'] ?? null,
             'from_location' => $trip->from_location,
             'to_location' => $trip->to_location,
             'start_latitude' => $trip->start_latitude !== null ? (float) $trip->start_latitude : null,
