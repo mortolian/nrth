@@ -20,6 +20,7 @@ class Trip extends Model
     protected $fillable = [
         'team_id',
         'vehicle_id',
+        'trip_import_id',
         'trip_date',
         'started_at',
         'ended_at',
@@ -72,6 +73,14 @@ class Trip extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    /**
+     * @return BelongsTo<TripImport, $this>
+     */
+    public function import(): BelongsTo
+    {
+        return $this->belongsTo(TripImport::class, 'trip_import_id');
     }
 
     protected static function newFactory(): TripFactory

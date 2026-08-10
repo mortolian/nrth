@@ -239,6 +239,30 @@ class TripController extends Controller
         return back()->with('success', __('Trip deleted.'));
     }
 
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        $this->authorizeTeam('vehicles.delete', $request);
+
+        $teamId = (int) $request->user()->current_team_id;
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+
+        $deleted = Trip::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereIn('id', $ids)
+            ->delete();
+
+        return back()->with('success', trans_choice(
+            '{1} Deleted :count trip.|[2,*] Deleted :count trips.',
+            $deleted,
+            ['count' => $deleted]
+        ));
+    }
+
     /**
      * @return array{search: string, purpose: string, vehicle_id: int, from: string, to: string}
      */

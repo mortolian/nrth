@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
@@ -15,6 +15,10 @@ const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
 const canManage = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) && perms.includes('vehicles.manage');
+});
+const canDelete = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('vehicles.delete');
 });
 
 type VehicleOption = {
@@ -121,8 +125,62 @@ const exportCsv = () => {
 };
 
 const confirmDelete = (trip: TripRow) => {
+    if (!canDelete.value) return;
     if (!confirm(`Delete trip from ${trip.trip_date ?? 'this date'}?`)) return;
     router.delete(route('vehicles.trips.destroy', trip.id), { preserveScroll: true });
+};
+
+const selected = ref<number[]>([]);
+const pageIds = computed(() => props.trips.data.map((trip) => trip.id));
+const allPageSelected = computed(
+    () => pageIds.value.length > 0 && pageIds.value.every((id) => selected.value.includes(id)),
+);
+const somePageSelected = computed(
+    () => pageIds.value.some((id) => selected.value.includes(id)) && !allPageSelected.value,
+);
+const selectAllCheckbox = ref<HTMLInputElement | null>(null);
+const selectAllMobileCheckbox = ref<HTMLInputElement | null>(null);
+
+watch([allPageSelected, somePageSelected], async () => {
+    await nextTick();
+    if (selectAllCheckbox.value) {
+        selectAllCheckbox.value.indeterminate = somePageSelected.value;
+    }
+    if (selectAllMobileCheckbox.value) {
+        selectAllMobileCheckbox.value.indeterminate = somePageSelected.value;
+    }
+}, { immediate: true });
+
+const toggleSelected = (id: number, checked: boolean) => {
+    if (checked) {
+        if (!selected.value.includes(id)) selected.value.push(id);
+        return;
+    }
+    selected.value = selected.value.filter((item) => item !== id);
+};
+
+const toggleSelectAllPage = (checked: boolean) => {
+    if (checked) {
+        selected.value = [...new Set([...selected.value, ...pageIds.value])];
+        return;
+    }
+    const onPage = new Set(pageIds.value);
+    selected.value = selected.value.filter((id) => !onPage.has(id));
+};
+
+const confirmBulkDelete = () => {
+    if (!canDelete.value || selected.value.length === 0) return;
+    const count = selected.value.length;
+    if (!confirm(`Delete ${count} selected trip${count === 1 ? '' : 's'}? This cannot be undone.`)) {
+        return;
+    }
+    router.delete(route('vehicles.trips.bulk-destroy'), {
+        data: { ids: selected.value },
+        preserveScroll: true,
+        onSuccess: () => {
+            selected.value = [];
+        },
+    });
 };
 
 const togglingPurposeIds = ref(new Set<number>());
@@ -146,7 +204,7 @@ const togglePurpose = (trip: TripRow) => {
 const rowActionItems = (trip: TripRow) => [
     ...(tripHasMapLink(trip) ? [{ id: 'map', label: 'View on map' }] : []),
     { id: 'edit', label: 'Edit' },
-    { id: 'delete', label: 'Delete' },
+    ...(canDelete.value ? [{ id: 'delete', label: 'Delete' }] : []),
 ];
 
 const onRowAction = (trip: TripRow, actionId: string) => {
@@ -164,6 +222,20 @@ const onRowAction = (trip: TripRow, actionId: string) => {
         confirmDelete(trip);
     }
 };
+
+const tableColumns = computed(() => [
+    ...(canDelete.value ? [{ key: 'select', label: '', widthClass: 'w-10' }] : []),
+    { key: 'date', label: 'Date', widthClass: 'whitespace-nowrap' },
+    { key: 'vehicle', label: 'Vehicle', widthClass: 'whitespace-nowrap' },
+    { key: 'route', label: 'Route', widthClass: 'min-w-[18rem]' },
+    { key: 'purpose', label: 'Purpose', widthClass: 'whitespace-nowrap' },
+    { key: 'opening', label: 'Opening (est.)', widthClass: 'whitespace-nowrap' },
+    { key: 'closing', label: 'Closing (est.)', widthClass: 'whitespace-nowrap' },
+    { key: 'distance', label: 'Distance', widthClass: 'whitespace-nowrap' },
+    { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
+]);
+
+const emptyColspan = computed(() => tableColumns.value.length);
 </script>
 
 <template>
@@ -248,8 +320,35 @@ const onRowAction = (trip: TripRow, actionId: string) => {
         </AppCard>
 
         <AppCard class="mt-5">
+            <div
+                v-if="canDelete && selected.length > 0"
+                class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+            >
+                <p class="text-sm text-slate-700">
+                    {{ selected.length }} selected
+                </p>
+                <AppButton variant="danger" size="sm" @click="confirmBulkDelete">
+                    Delete selected
+                </AppButton>
+            </div>
+
             <!-- Narrow / medium screens: stacked cards (wide table squeezes the route column) -->
             <div class="space-y-3 lg:hidden">
+                <div
+                    v-if="canDelete && trips.data.length"
+                    class="flex items-center gap-2 px-1"
+                    @click.stop
+                >
+                    <input
+                        ref="selectAllMobileCheckbox"
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-slate-300"
+                        :checked="allPageSelected"
+                        :aria-label="allPageSelected ? 'Deselect all on this page' : 'Select all on this page'"
+                        @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
+                    >
+                    <span class="text-xs text-slate-500">Select page</span>
+                </div>
                 <div
                     v-for="trip in trips.data"
                     :key="`mobile-${trip.id}`"
@@ -261,9 +360,20 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                     @keydown.enter.prevent="openTrip(trip)"
                 >
                     <div class="flex items-start justify-between gap-2">
-                        <div class="min-w-0 flex-1">
-                            <p class="font-semibold text-slate-900">{{ formatTripDate(trip.trip_date) }}</p>
-                            <p class="truncate text-sm text-slate-600">{{ trip.vehicle?.name || '—' }}</p>
+                        <div class="flex min-w-0 flex-1 items-start gap-2">
+                            <div v-if="canDelete" class="pt-0.5" @click.stop>
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-slate-300"
+                                    :checked="selected.includes(trip.id)"
+                                    :aria-label="`Select trip ${trip.id}`"
+                                    @change="toggleSelected(trip.id, ($event.target as HTMLInputElement).checked)"
+                                >
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-slate-900">{{ formatTripDate(trip.trip_date) }}</p>
+                                <p class="truncate text-sm text-slate-600">{{ trip.vehicle?.name || '—' }}</p>
+                            </div>
                         </div>
                         <div class="flex shrink-0 items-center gap-1.5" @click.stop>
                             <button
@@ -344,20 +454,22 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                 <AppTable
                     embedded
                     table-class="min-w-[1120px] text-sm"
-                    :columns="[
-                        { key: 'date', label: 'Date', widthClass: 'whitespace-nowrap' },
-                        { key: 'vehicle', label: 'Vehicle', widthClass: 'whitespace-nowrap' },
-                        { key: 'route', label: 'Route', widthClass: 'min-w-[18rem]' },
-                        { key: 'purpose', label: 'Purpose', widthClass: 'whitespace-nowrap' },
-                        { key: 'opening', label: 'Opening (est.)', widthClass: 'whitespace-nowrap' },
-                        { key: 'closing', label: 'Closing (est.)', widthClass: 'whitespace-nowrap' },
-                        { key: 'distance', label: 'Distance', widthClass: 'whitespace-nowrap' },
-                        { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
-                    ]"
+                    :columns="tableColumns"
                     :page="trips.current_page"
                     :last-page="trips.last_page"
                     @page-change="applyFilters"
                 >
+                    <template v-if="canDelete" #header-select>
+                        <input
+                            ref="selectAllCheckbox"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-slate-300"
+                            :checked="allPageSelected"
+                            :disabled="trips.data.length === 0"
+                            :aria-label="allPageSelected ? 'Deselect all on this page' : 'Select all on this page'"
+                            @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
+                        >
+                    </template>
                     <tr
                         v-for="trip in trips.data"
                         :key="trip.id"
@@ -365,6 +477,15 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                         :class="tripRowClass(trip)"
                         @click="openTrip(trip)"
                     >
+                        <td v-if="canDelete" class="px-3 py-2" @click.stop>
+                            <input
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-slate-300"
+                                :checked="selected.includes(trip.id)"
+                                :aria-label="`Select trip ${trip.id}`"
+                                @change="toggleSelected(trip.id, ($event.target as HTMLInputElement).checked)"
+                            >
+                        </td>
                         <td class="whitespace-nowrap px-3 py-2">{{ formatTripDate(trip.trip_date) }}</td>
                         <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
                             {{ trip.vehicle?.name || '—' }}
@@ -405,7 +526,7 @@ const onRowAction = (trip: TripRow, actionId: string) => {
                         </td>
                     </tr>
                     <tr v-if="!trips.data.length">
-                        <td colspan="8" class="px-4 py-6">
+                        <td :colspan="emptyColspan" class="px-4 py-6">
                             <EmptyState
                                 title="No trips yet"
                                 description="Log business and private trips to build your travel log book."

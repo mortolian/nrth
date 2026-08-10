@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Web\Vehicles;
 
+use App\Domain\Vehicles\Enums\TripImportStatus;
 use App\Domain\Vehicles\Enums\TripPurpose;
 use App\Domain\Vehicles\Models\Trip;
+use App\Domain\Vehicles\Models\TripImport;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Domain\Vehicles\Services\ParseTripLogImport;
 use App\Http\Controllers\Controller;
@@ -150,16 +152,29 @@ class TripImportController extends Controller
 
         $created = 0;
 
-        DB::transaction(function () use ($selected, $teamId, $vehicle, &$created): void {
+        DB::transaction(function () use ($selected, $teamId, $vehicle, $draft, &$created): void {
+            $import = TripImport::queryWithoutTeamScope()->create([
+                'team_id' => $teamId,
+                'vehicle_id' => $vehicle->id,
+                'original_filename' => (string) ($draft['filename'] ?? 'trip-log'),
+                'parser' => (string) ($draft['parser'] ?? 'ai'),
+                'status' => TripImportStatus::Imported,
+                'imported_rows' => 0,
+                'metadata' => null,
+            ]);
+
             foreach ($selected as $row) {
                 $payload = $this->normalizeTripPayload($row);
                 Trip::queryWithoutTeamScope()->create([
                     'team_id' => $teamId,
                     'vehicle_id' => $vehicle->id,
+                    'trip_import_id' => $import->id,
                     ...$payload,
                 ]);
                 $created++;
             }
+
+            $import->update(['imported_rows' => $created]);
         });
 
         $request->session()->forget(self::SESSION_KEY);
@@ -170,6 +185,88 @@ class TripImportController extends Controller
                 $created,
                 ['count' => $created]
             ));
+    }
+
+    public function index(Request $request): Response
+    {
+        $this->authorizeTeam('vehicles.view', $request);
+
+        $teamId = (int) $request->user()->current_team_id;
+        $vehicleId = (int) $request->integer('vehicle_id');
+        $canDelete = $request->user()->canOnTeam('vehicles.delete');
+
+        $query = TripImport::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->with(['vehicle:id,name,registration_number']);
+
+        if ($vehicleId > 0) {
+            $query->where('vehicle_id', $vehicleId);
+        }
+
+        $imports = $query
+            ->orderByDesc('id')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (TripImport $import): array => [
+                'id' => $import->id,
+                'original_filename' => $import->original_filename,
+                'parser' => $import->parser,
+                'status' => $import->status->value,
+                'imported_rows' => $import->imported_rows,
+                'can_undo' => $canDelete && $import->status === TripImportStatus::Imported,
+                'created_at' => $import->created_at?->toIso8601String(),
+                'vehicle' => $import->vehicle
+                    ? [
+                        'id' => $import->vehicle->id,
+                        'name' => $import->vehicle->name,
+                        'registration_number' => $import->vehicle->registration_number,
+                    ]
+                    : null,
+            ]);
+
+        return Inertia::render('Vehicles/Trips/Import/History', [
+            'imports' => $imports,
+            'vehicles' => $this->vehicleOptions($teamId, activeOnly: false),
+            'filters' => [
+                'vehicle_id' => $vehicleId > 0 ? $vehicleId : null,
+            ],
+        ]);
+    }
+
+    public function undo(Request $request, TripImport $import): RedirectResponse
+    {
+        $this->authorizeTeam('vehicles.delete', $request);
+        $this->authorizeImport($request, $import);
+
+        if ($import->status !== TripImportStatus::Imported) {
+            throw ValidationException::withMessages([
+                'import' => __('Only a completed import can be undone.'),
+            ]);
+        }
+
+        DB::transaction(function () use ($import): void {
+            Trip::queryWithoutTeamScope()
+                ->where('trip_import_id', $import->id)
+                ->delete();
+
+            $import->update([
+                'status' => TripImportStatus::Undone,
+                'imported_rows' => 0,
+                'metadata' => array_merge($import->metadata ?? [], [
+                    'undone_at' => now()->toIso8601String(),
+                ]),
+            ]);
+        });
+
+        return back()->with('success', __('Import undone. Trips from this import were removed.'));
+    }
+
+    private function authorizeImport(Request $request, TripImport $import): void
+    {
+        abort_unless(
+            $import->team_id === (int) $request->user()->current_team_id,
+            403
+        );
     }
 
     private function ensureAiEnabled(Request $request, ParseTripLogImport $parser): void

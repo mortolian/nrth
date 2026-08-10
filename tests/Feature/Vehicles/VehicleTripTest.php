@@ -7,6 +7,8 @@ use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\TeamAccess\EnsureTeamSystemRoles;
+use App\Support\TeamAccess\RolePresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -262,5 +264,55 @@ class VehicleTripTest extends TestCase
             ->assertRedirect(route('vehicles.index'));
 
         $this->assertNull(Vehicle::queryWithoutTeamScope()->find($vehicle->id));
+    }
+
+    public function test_bulk_delete_removes_selected_team_trips_only(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $other = User::factory()->withPersonalTeam()->create();
+        $this->assertNotNull($other->currentTeam);
+
+        $vehicle = Vehicle::factory()->for($team)->create();
+        $keep = Trip::factory()->forVehicle($vehicle)->create();
+        $removeA = Trip::factory()->forVehicle($vehicle)->create();
+        $removeB = Trip::factory()->forVehicle($vehicle)->create();
+
+        $otherVehicle = Vehicle::factory()->for($other->currentTeam)->create();
+        $foreign = Trip::factory()->forVehicle($otherVehicle)->create();
+
+        $this->delete(route('vehicles.trips.bulk-destroy'), [
+            'ids' => [$removeA->id, $removeB->id, $foreign->id],
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertNotNull(Trip::queryWithoutTeamScope()->find($keep->id));
+        $this->assertNull(Trip::queryWithoutTeamScope()->find($removeA->id));
+        $this->assertNull(Trip::queryWithoutTeamScope()->find($removeB->id));
+        $this->assertNotNull(Trip::queryWithoutTeamScope()->find($foreign->id));
+    }
+
+    public function test_viewer_cannot_bulk_delete_trips(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $vehicle = Vehicle::factory()->for($team)->create();
+        $trip = Trip::factory()->forVehicle($vehicle)->create();
+
+        $viewer = User::factory()->create();
+        $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);
+        $viewer->forceFill(['current_team_id' => $team->id])->save();
+        $this->actingAs($viewer);
+
+        $this->delete(route('vehicles.trips.bulk-destroy'), [
+            'ids' => [$trip->id],
+        ])->assertForbidden();
+
+        $this->assertNotNull(Trip::queryWithoutTeamScope()->find($trip->id));
     }
 }

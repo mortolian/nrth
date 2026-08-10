@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Vehicles;
 
+use App\Domain\Vehicles\Enums\TripImportStatus;
 use App\Domain\Vehicles\Models\Trip;
+use App\Domain\Vehicles\Models\TripImport;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\TeamAccess\EnsureTeamSystemRoles;
+use App\Support\TeamAccess\RolePresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -130,9 +134,95 @@ class TripImportTest extends TestCase
         $this->assertNotNull($imported);
         $this->assertSame(15.0, (float) $imported->distance_km);
         $this->assertStringContainsString('2', (string) $imported->notes);
+        $this->assertNotNull($imported->trip_import_id);
+
+        $import = TripImport::queryWithoutTeamScope()->find($imported->trip_import_id);
+        $this->assertNotNull($import);
+        $this->assertSame(TripImportStatus::Imported, $import->status);
+        $this->assertSame(1, $import->imported_rows);
+        $this->assertSame('telematics', $import->parser);
 
         $vehicle->refresh();
         $this->assertSame(10000.0, (float) $vehicle->starting_odometer_km);
+    }
+
+    public function test_import_can_be_undone(): void
+    {
+        [, $team, $vehicle] = $this->actingTeamWithVehicle();
+        $this->configureAi($team);
+
+        $file = UploadedFile::fake()->createWithContent('LogBook.csv', $this->toyotaCsv());
+
+        $this->post(route('vehicles.trips.import.store'), [
+            'vehicle_id' => $vehicle->id,
+            'file' => $file,
+        ])->assertRedirect(route('vehicles.trips.import.preview'));
+
+        $draft = session('trip_log_import');
+        $keys = collect($draft['trips'])->pluck('key')->all();
+
+        $this->post(route('vehicles.trips.import.confirm'), [
+            'vehicle_id' => $vehicle->id,
+            'keys' => $keys,
+        ])->assertRedirect(route('vehicles.trips.index'));
+
+        $import = TripImport::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->first();
+        $this->assertNotNull($import);
+        $this->assertSame(2, Trip::queryWithoutTeamScope()->where('trip_import_id', $import->id)->count());
+
+        $this->get(route('vehicles.trips.imports.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Vehicles/Trips/Import/History')
+                ->has('imports.data', 1)
+                ->where('imports.data.0.can_undo', true));
+
+        $this->post(route('vehicles.trips.imports.undo', $import))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(0, Trip::queryWithoutTeamScope()->where('trip_import_id', $import->id)->count());
+        $import->refresh();
+        $this->assertSame(TripImportStatus::Undone, $import->status);
+        $this->assertSame(0, $import->imported_rows);
+        $this->assertNotNull($import->metadata['undone_at'] ?? null);
+
+        $this->post(route('vehicles.trips.imports.undo', $import))
+            ->assertSessionHasErrors('import');
+    }
+
+    public function test_viewer_cannot_undo_import(): void
+    {
+        [, $team, $vehicle] = $this->actingTeamWithVehicle();
+        $this->configureAi($team);
+
+        $file = UploadedFile::fake()->createWithContent('LogBook.csv', $this->toyotaCsv());
+        $this->post(route('vehicles.trips.import.store'), [
+            'vehicle_id' => $vehicle->id,
+            'file' => $file,
+        ]);
+        $keys = collect(session('trip_log_import')['trips'])->pluck('key')->all();
+        $this->post(route('vehicles.trips.import.confirm'), [
+            'vehicle_id' => $vehicle->id,
+            'keys' => $keys,
+        ]);
+
+        $import = TripImport::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->firstOrFail();
+
+        EnsureTeamSystemRoles::ensureFor($team);
+        $viewer = User::factory()->create();
+        $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);
+        $viewer->forceFill(['current_team_id' => $team->id])->save();
+        $this->actingAs($viewer);
+
+        $this->post(route('vehicles.trips.imports.undo', $import))->assertForbidden();
+
+        $this->assertSame(TripImportStatus::Imported, $import->fresh()->status);
+        $this->assertGreaterThan(0, Trip::queryWithoutTeamScope()->where('trip_import_id', $import->id)->count());
     }
 
     public function test_import_uses_ai_when_columns_are_unknown(): void

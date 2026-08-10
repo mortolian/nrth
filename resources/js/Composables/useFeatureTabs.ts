@@ -73,6 +73,9 @@ export function useTravelTabs() {
             aiEnabled.value && canTeam('vehicles.manage')
                 ? { id: 'import', label: 'Smart AI import', href: route('vehicles.trips.import.create') }
                 : null,
+            canTeam('vehicles.manage')
+                ? { id: 'import-history', label: 'Import history', href: route('vehicles.trips.imports.index') }
+                : null,
         ].filter(Boolean) as AppTabItem[],
     );
 }
