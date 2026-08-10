@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
+import { Upload } from 'lucide-vue-next';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import { useTravelTabs } from '@/Composables/useFeatureTabs';
 
@@ -37,9 +38,108 @@ const vehicleSelectOptions = computed(() =>
 
 const aiEnabled = computed(() => Boolean(page.props.ai_enabled));
 
+const dropActive = ref(false);
+const fileError = ref<string | null>(null);
+
+const acceptedExtensions = new Set([
+    'csv',
+    'txt',
+    'xlsx',
+    'xls',
+    'pdf',
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'gif',
+]);
+
+const isAcceptedFile = (file: File) => {
+    const name = file.name.toLowerCase();
+    const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : '';
+    if (ext && acceptedExtensions.has(ext)) {
+        return true;
+    }
+    const type = (file.type || '').toLowerCase();
+    return (
+        type === 'text/csv'
+        || type === 'text/plain'
+        || type === 'application/pdf'
+        || type.startsWith('image/')
+        || type.includes('spreadsheet')
+        || type.includes('excel')
+    );
+};
+
+const setFile = (file: File | null) => {
+    fileError.value = null;
+    form.clearErrors('file');
+    form.file = file;
+};
+
 const onFileChange = (event: Event) => {
     const input = event.target as HTMLInputElement;
-    form.file = input.files?.[0] ?? null;
+    const file = input.files?.[0] ?? null;
+    if (file && !isAcceptedFile(file)) {
+        setFile(null);
+        fileError.value = 'Upload a CSV, Excel, PDF, or image file.';
+        input.value = '';
+        return;
+    }
+    setFile(file);
+    input.value = '';
+};
+
+const onDragEnter = (event: DragEvent) => {
+    event.preventDefault();
+    dropActive.value = true;
+};
+
+const onDragOver = (event: DragEvent) => {
+    event.preventDefault();
+    if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy';
+    }
+    dropActive.value = true;
+};
+
+const onDragLeave = (event: DragEvent) => {
+    event.preventDefault();
+    const current = event.currentTarget as HTMLElement | null;
+    const related = event.relatedTarget as Node | null;
+    if (current && related && current.contains(related)) {
+        return;
+    }
+    dropActive.value = false;
+};
+
+const onDrop = (event: DragEvent) => {
+    event.preventDefault();
+    dropActive.value = false;
+    const file = event.dataTransfer?.files?.[0] ?? null;
+    if (!file) {
+        return;
+    }
+    if (!isAcceptedFile(file)) {
+        setFile(null);
+        fileError.value = 'Upload a CSV, Excel, PDF, or image file.';
+        return;
+    }
+    setFile(file);
+};
+
+const clearFile = () => {
+    setFile(null);
+};
+
+const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const submit = () => {
@@ -79,16 +179,53 @@ const submit = () => {
                 </div>
 
                 <div>
-                    <label class="mb-1.5 block text-xs font-medium text-slate-500">Trip log file</label>
-                    <input
-                        type="file"
-                        accept=".csv,.txt,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,text/csv,text/plain,application/pdf,image/*"
-                        class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
-                        @change="onFileChange"
+                    <p class="mb-1.5 text-xs font-medium text-slate-500">Trip log file</p>
+                    <label
+                        class="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-6 text-center transition"
+                        :class="dropActive
+                            ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-500/20'
+                            : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'"
+                        @dragenter="onDragEnter"
+                        @dragover="onDragOver"
+                        @dragleave="onDragLeave"
+                        @drop="onDrop"
                     >
+                        <Upload class="h-5 w-5 shrink-0 text-slate-500" />
+                        <span class="text-sm font-medium text-slate-800">
+                            {{
+                                dropActive
+                                    ? 'Drop to upload'
+                                    : form.file
+                                        ? 'Replace file'
+                                        : 'Drop trip log here'
+                            }}
+                        </span>
+                        <span class="text-xs text-slate-500">
+                            CSV, Excel, PDF, or image — click or drag · max 10MB
+                        </span>
+                        <input
+                            type="file"
+                            accept=".csv,.txt,.xlsx,.xls,.pdf,.jpg,.jpeg,.png,.webp,.gif,text/csv,text/plain,application/pdf,image/*"
+                            class="hidden"
+                            @change="onFileChange"
+                        >
+                    </label>
+                    <div
+                        v-if="form.file"
+                        class="mt-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                    >
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-slate-900">{{ form.file.name }}</p>
+                            <p class="text-xs text-slate-500">{{ formatFileSize(form.file.size) }}</p>
+                        </div>
+                        <AppButton type="button" variant="ghost" size="sm" @click="clearFile">
+                            Remove
+                        </AppButton>
+                    </div>
                     <p class="mt-1.5 text-xs text-slate-500">
-                        CSV, Excel, PDF, or image — max 10MB. Brief GPS stops are consolidated into single trips.
+                        Brief GPS stops are consolidated into single trips.
                     </p>
+                    <p v-if="fileError" class="mt-1.5 text-xs text-red-600">{{ fileError }}</p>
                     <p v-if="form.errors.file" class="mt-1.5 text-xs text-red-600">{{ form.errors.file }}</p>
                 </div>
 
@@ -97,7 +234,7 @@ const submit = () => {
                         type="submit"
                         variant="primary"
                         :loading="form.processing"
-                        :disabled="!vehicles.length || !aiEnabled"
+                        :disabled="!vehicles.length || !aiEnabled || !form.file"
                     >
                         {{ form.processing ? 'Scanning…' : 'Scan & preview' }}
                     </AppButton>
