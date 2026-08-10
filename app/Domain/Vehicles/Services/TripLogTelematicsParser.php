@@ -136,6 +136,13 @@ final class TripLogTelematicsParser
             $hasTime = isset($map['started_at']) || isset($map['ended_at']);
 
             if ($hasDistance && ($hasRoute || $hasTime) && count($map) >= 3) {
+                if (! isset($map['purpose'])) {
+                    $inferred = $this->inferPurposeColumn($rows, $index, $map);
+                    if ($inferred !== null) {
+                        $map['purpose'] = $inferred;
+                    }
+                }
+
                 return [$index, $map];
             }
         }
@@ -172,9 +179,14 @@ final class TripLogTelematicsParser
             $normalized === 'time passed'
             || $normalized === 'duration'
             || $normalized === 'trip duration' => 'duration_raw',
+            // Toyota Fleet sometimes labels this column with the active filter
+            // value ("Personal" / "Business") instead of "Trip Type".
             $normalized === 'trip type'
             || $normalized === 'purpose'
-            || $normalized === 'type' => 'purpose',
+            || $normalized === 'type'
+            || $normalized === 'personal'
+            || $normalized === 'business'
+            || $normalized === 'private' => 'purpose',
             $normalized === 'start latitude and longitude'
             || $normalized === 'start latlng'
             || $normalized === 'start lat/lng' => 'start_latlng',
@@ -188,6 +200,62 @@ final class TripLogTelematicsParser
             $normalized === 'notes' || $normalized === 'comment' || $normalized === 'remarks' => 'notes',
             default => null,
         };
+    }
+
+    /**
+     * When the purpose header is missing/mislabelled, find a column whose values
+     * are overwhelmingly business/personal/private labels.
+     *
+     * @param  list<list<string>>  $rows
+     * @param  array<string, int>  $map
+     */
+    private function inferPurposeColumn(array $rows, int $headerIndex, array $map): ?int
+    {
+        $used = array_flip(array_values($map));
+        $width = 0;
+        foreach (array_slice($rows, $headerIndex, 80) as $row) {
+            $width = max($width, count($row));
+        }
+        if ($width === 0) {
+            return null;
+        }
+
+        $bestCol = null;
+        $bestScore = 0;
+
+        for ($col = 0; $col < $width; $col++) {
+            if (isset($used[$col])) {
+                continue;
+            }
+
+            $hits = 0;
+            $seen = 0;
+            for ($i = $headerIndex + 1; $i < count($rows) && $seen < 80; $i++) {
+                $value = trim((string) ($rows[$i][$col] ?? ''));
+                if ($value === '') {
+                    continue;
+                }
+                $seen++;
+                $normalized = mb_strtolower($value);
+                if (in_array($normalized, [
+                    'business',
+                    'private',
+                    'personal',
+                    'business trip',
+                    'private trip',
+                    'personal trip',
+                ], true)) {
+                    $hits++;
+                }
+            }
+
+            if ($seen >= 3 && $hits === $seen && $hits > $bestScore) {
+                $bestScore = $hits;
+                $bestCol = $col;
+            }
+        }
+
+        return $bestCol;
     }
 
     /**

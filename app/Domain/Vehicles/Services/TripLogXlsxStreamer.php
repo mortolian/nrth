@@ -167,7 +167,12 @@ final class TripLogXlsxStreamer
             }
 
             // Fleet exports often pad tens of thousands of empty styled cells after the data.
-            if (! str_contains($rowXml, '<v>') && ! str_contains($rowXml, '<v ')) {
+            // Toyota exports may use inlineStr (<is><t>…) with no sharedStrings / <v> cells.
+            $hasValue = str_contains($rowXml, '<v>')
+                || str_contains($rowXml, '<v ')
+                || str_contains($rowXml, '<is>')
+                || str_contains($rowXml, 'inlineStr');
+            if (! $hasValue) {
                 $emptyStreak++;
                 if ($emptyStreak >= 40 && $matrix !== []) {
                     break;
@@ -225,10 +230,18 @@ final class TripLogXlsxStreamer
             $cellXml = $reader->readOuterXML();
             $cellReader = new XMLReader;
             $cellReader->XML($cellXml);
-            while ($cellReader->read()) {
-                if ($cellReader->nodeType === XMLReader::ELEMENT && $cellReader->localName === 'v') {
-                    $value = (string) $cellReader->readString();
-                    break;
+            if ($type === 'inlineStr') {
+                while ($cellReader->read()) {
+                    if ($cellReader->nodeType === XMLReader::ELEMENT && $cellReader->localName === 't') {
+                        $value .= (string) $cellReader->readString();
+                    }
+                }
+            } else {
+                while ($cellReader->read()) {
+                    if ($cellReader->nodeType === XMLReader::ELEMENT && $cellReader->localName === 'v') {
+                        $value = (string) $cellReader->readString();
+                        break;
+                    }
                 }
             }
             $cellReader->close();

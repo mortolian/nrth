@@ -97,4 +97,77 @@ class TripLogTelematicsParserTest extends TestCase
         $this->assertSame(22.11535, $segment['start_longitude']);
         $this->assertSame(432, $segment['duration_seconds']); // 7.2 minutes
     }
+
+    public function test_maps_toyota_personal_header_as_purpose_column(): void
+    {
+        $parser = new TripLogTelematicsParser;
+
+        // Toyota Fleet sometimes writes the active filter label ("Personal")
+        // into the Trip Type header cell instead of "Trip Type".
+        $result = $parser->tryParse([
+            ['Vehicle Reg', 'CBS83344', 'VIN', 'AHTJB3DD804533836'],
+            [
+                'Distance',
+                'Start Address',
+                'End Address',
+                'Start Latitude and Longitude',
+                'End Latitude and Longitude',
+                'Start Date',
+                'End Date',
+                'Time Passed',
+                'Personal',
+            ],
+            [
+                '1,00',
+                'Home',
+                'Shop',
+                '-34,18434,22,11477',
+                '-34,19073,22,11537',
+                '2026/08/02 7:46:38 PM',
+                '2026/08/02 7:53:03 PM',
+                '6,42',
+                'Personal',
+            ],
+            [
+                '12,00',
+                'Shop',
+                'Office',
+                '-34,19073,22,11537',
+                '-34,18434,22,11477',
+                '2026/08/02 8:00:00 PM',
+                '2026/08/02 8:20:00 PM',
+                '20,0',
+                'Business',
+            ],
+        ]);
+
+        $this->assertTrue($result['matched']);
+        $this->assertCount(2, $result['segments']);
+        $this->assertSame('private', $result['segments'][0]['purpose']);
+        $this->assertSame('business', $result['segments'][1]['purpose']);
+    }
+
+    public function test_infers_purpose_column_from_cell_values_when_header_missing(): void
+    {
+        $parser = new TripLogTelematicsParser;
+
+        $result = $parser->tryParse([
+            [
+                'Distance',
+                'Start Address',
+                'End Address',
+                'Start Date',
+                'End Date',
+                'Mystery',
+            ],
+            ['5.0', 'A', 'B', '2026-08-01 08:00:00', '2026-08-01 08:20:00', 'Personal'],
+            ['6.0', 'B', 'C', '2026-08-01 09:00:00', '2026-08-01 09:20:00', 'Business'],
+            ['7.0', 'C', 'D', '2026-08-01 10:00:00', '2026-08-01 10:20:00', 'Personal'],
+        ]);
+
+        $this->assertTrue($result['matched']);
+        $this->assertSame('private', $result['segments'][0]['purpose']);
+        $this->assertSame('business', $result['segments'][1]['purpose']);
+        $this->assertSame('private', $result['segments'][2]['purpose']);
+    }
 }

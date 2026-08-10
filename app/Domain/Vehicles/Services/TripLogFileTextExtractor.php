@@ -102,6 +102,10 @@ final class TripLogFileTextExtractor
             } catch (ValidationException $e) {
                 throw $e;
             } catch (Throwable) {
+                $matrix = [];
+            }
+
+            if ($matrix === []) {
                 $matrix = $this->fromSpreadsheetViaPhpSpreadsheet($path);
             }
         } else {
