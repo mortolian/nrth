@@ -6,10 +6,12 @@ use App\Domain\Instance\Services\InstanceMailSettings;
 use App\Listeners\ApplyInstanceRuntimeSettings;
 use App\Mail\InstanceSmtpTestMail;
 use App\Models\InstanceSetting;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
+use Spatie\Backup\Config\Config;
 use Tests\TestCase;
 
 class InstanceMailSettingsTest extends TestCase
@@ -113,7 +115,7 @@ class InstanceMailSettingsTest extends TestCase
         $this->assertSame('nrth', config('backup.notifications.mail.from.name'));
         $this->assertSame(
             'noreply@example.com',
-            app(\Spatie\Backup\Config\Config::class)->notifications->mail->from->address,
+            app(Config::class)->notifications->mail->from->address,
         );
     }
 
@@ -246,7 +248,7 @@ class InstanceMailSettingsTest extends TestCase
             'backup.notifications.mail.to' => 'your@example.com',
         ]);
 
-        \App\Models\User::factory()->create([
+        User::factory()->create([
             'email' => 'ops@books.test',
             'is_instance_operator' => true,
         ]);
@@ -265,7 +267,7 @@ class InstanceMailSettingsTest extends TestCase
         $this->assertSame('ops@books.test', config('backup.notifications.mail.to'));
         $this->assertSame(
             'ops@books.test',
-            app(\Spatie\Backup\Config\Config::class)->notifications->mail->to,
+            app(Config::class)->notifications->mail->to,
         );
     }
 

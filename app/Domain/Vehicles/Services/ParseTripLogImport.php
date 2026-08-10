@@ -2,6 +2,7 @@
 
 namespace App\Domain\Vehicles\Services;
 
+use App\Domain\Ai\AiProvider;
 use App\Domain\Ai\AiProviderRegistry;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
@@ -183,7 +184,7 @@ final class ParseTripLogImport
         }
     }
 
-    private function providerFor(Team $team): \App\Domain\Ai\AiProvider
+    private function providerFor(Team $team): AiProvider
     {
         try {
             return $this->providers->get($team->aiProvider());

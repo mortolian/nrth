@@ -64,6 +64,7 @@ final class TripLogXlsxStreamer
             $siXml = $reader->readOuterXML();
             if ($siXml === '') {
                 $shared[] = '';
+
                 continue;
             }
 

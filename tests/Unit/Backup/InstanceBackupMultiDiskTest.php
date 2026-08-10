@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Backup;
 
-use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;

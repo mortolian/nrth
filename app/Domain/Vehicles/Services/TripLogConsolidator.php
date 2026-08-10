@@ -54,6 +54,7 @@ final class TripLogConsolidator
 
             if ($current === null) {
                 $current = $normalized;
+
                 continue;
             }
 

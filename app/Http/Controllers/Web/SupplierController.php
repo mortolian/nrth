@@ -13,6 +13,7 @@ use App\Support\Iso4217Currencies;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -108,7 +109,7 @@ class SupplierController extends Controller
             'document' => ['required', 'file', 'max:10240'],
         ]);
 
-        /** @var \Illuminate\Http\UploadedFile $document */
+        /** @var UploadedFile $document */
         $document = $request->file('document');
         $parsed = $parser->parse($document, $team);
 

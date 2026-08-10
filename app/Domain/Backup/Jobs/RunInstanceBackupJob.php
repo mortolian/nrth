@@ -8,6 +8,7 @@ use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -116,7 +117,7 @@ class RunInstanceBackupJob implements ShouldQueue
                 'error_message' => null,
                 'mirror_warning' => $backups->mirrorWarningFor($match['filename']),
                 'completed_at' => ! empty($match['date'])
-                    ? \Illuminate\Support\Carbon::parse($match['date'])
+                    ? Carbon::parse($match['date'])
                     : now(),
             ])->save();
 

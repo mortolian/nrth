@@ -15,7 +15,7 @@ final class SafeBackupEventHandler extends EventHandler
 {
     public function subscribe(Dispatcher $events): void
     {
-        $events->listen(array_keys(static::$eventToNotificationMap), function (object $event): void {
+        $events->listen(array_keys(self::$eventToNotificationMap), function (object $event): void {
             if (! static::$enabled) {
                 return;
             }

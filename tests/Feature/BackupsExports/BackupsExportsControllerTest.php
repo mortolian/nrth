@@ -6,6 +6,9 @@ use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupService;
+use App\Domain\Backup\Services\InstanceBackupTypeResolver;
+use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
+use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
@@ -332,9 +335,9 @@ class BackupsExportsControllerTest extends TestCase
         // Exercise reclaim directly with a partial mock of listBackups via subclassing service is heavy —
         // instead call reclaim with a real service after binding list via partial mock.
         $service = \Mockery::mock(InstanceBackupService::class, [
-            app(\App\Domain\Instance\Services\InstanceBackupRetentionSettings::class),
-            app(\App\Domain\Backup\Services\InstanceBackupTypeResolver::class),
-            app(\App\Domain\Instance\Services\InstanceBackupDestinationSettings::class),
+            app(InstanceBackupRetentionSettings::class),
+            app(InstanceBackupTypeResolver::class),
+            app(InstanceBackupDestinationSettings::class),
         ])->makePartial();
         $service->shouldReceive('listLocalBackups')->andReturn([
             [

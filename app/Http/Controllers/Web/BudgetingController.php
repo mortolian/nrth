@@ -72,7 +72,7 @@ class BudgetingController extends Controller
 
         $active = $budgetRows->firstWhere('is_active', true);
 
-        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $businessCurrency): array {
+        $budgets = $budgetRows->map(function (Budget $budget) use ($businessCurrency): array {
             $allocated = (int) $budget->categories->sum('envelope_cents');
             $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
 

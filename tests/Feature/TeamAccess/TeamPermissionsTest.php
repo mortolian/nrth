@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\TeamAccess;
 
+use App\Domain\Vehicles\Models\Trip;
+use App\Domain\Vehicles\Models\Vehicle;
 use App\Models\Team;
 use App\Models\TeamRole;
 use App\Models\User;
@@ -213,8 +215,8 @@ class TeamPermissionsTest extends TestCase
             ->get(route('vehicles.trips.import.create'))
             ->assertForbidden();
 
-        $vehicle = \App\Domain\Vehicles\Models\Vehicle::factory()->for($owner->currentTeam)->create();
-        $trip = \App\Domain\Vehicles\Models\Trip::factory()->forVehicle($vehicle)->create();
+        $vehicle = Vehicle::factory()->for($owner->currentTeam)->create();
+        $trip = Trip::factory()->forVehicle($vehicle)->create();
 
         $this->actingAs($viewer)
             ->post(route('vehicles.trips.toggle-purpose', $trip))
