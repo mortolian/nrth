@@ -133,6 +133,12 @@ class Team extends JetstreamTeam implements HasMedia
             return;
         }
 
+        if (! Schema::hasTable('team_modules')) {
+            throw new \RuntimeException(
+                'The team_modules table is missing. Run `php artisan migrate` (or `./scripts/compose.sh exec -T app php artisan migrate`) to apply pending migrations.'
+            );
+        }
+
         $this->teamModules()->updateOrCreate(
             ['name' => $name],
             ['enabled' => $enabled],

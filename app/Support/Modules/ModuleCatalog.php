@@ -14,7 +14,7 @@ final class ModuleCatalog
         return [
             self::WEALTH => [
                 'label' => 'Wealth',
-                'description' => 'Track net worth, investments, and related personal-finance views. Coming soon — this is a placeholder.',
+                'description' => 'Track investment accounts, savings, retirement funds, and portfolio history.',
                 'default_enabled' => false,
             ],
         ];

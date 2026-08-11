@@ -19,7 +19,7 @@ These areas exist and are usable, but expect rough edges and breaking changes:
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
 | **Teams** | Multi-user businesses via Jetstream |
-| **Optional modules** | Settings → Features; `team_modules` enable/disable (Wealth placeholder, off by default) |
+| **Optional modules** | Settings → Features; Wealth (portfolios, assets, valuations, cash flows, allowances) off by default |
 | **Self-hosting** | Docker Compose install via `scripts/install.sh` |
 
 See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.
@@ -47,7 +47,7 @@ Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and
 
 Ideas under consideration, not scheduled:
 
-- Wealth module domain (net worth, investments) beyond the current placeholder
+- Wealth module refinements (CSV import, multi-currency portfolios)
 - Additional bank statement formats and bank-specific CSV presets
 - Expense rules (recurring expenses)
 - Deeper SARS reporting (beyond current VAT scaffolding)

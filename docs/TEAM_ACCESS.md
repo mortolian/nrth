@@ -71,7 +71,7 @@ Money In catalog keys include `invoices.*`, `estimates.*`, `clients.*`, and `ite
 
 Travel catalog keys are `vehicles.view`, `vehicles.manage`, and `vehicles.delete` (vehicles registry and trip log book). Smart AI import (fleet/GPS exports) requires `vehicles.manage` and a team AI provider. Confirmed imports are tracked as batches; undo (remove all trips from that import) and multi-select bulk delete on the log book require `vehicles.delete`. Filtered CSV and PDF log book exports require `vehicles.view`. PDF export also requires a from/to date range and is capped (currently 1,500 trips) so DomPDF cannot exhaust request memory. Licence disc expiry reminders email team members who have `vehicles.view` (and have not opted out under Profile preferences).
 
-Wealth catalog keys are `wealth.view` and `wealth.manage`. The Wealth area is an optional module (off by default); it only appears in nav and accepts requests when enabled under Settings → Features.
+Wealth catalog keys are `wealth.view` and `wealth.manage`. The Wealth area is an optional module (off by default under Settings → Features). It covers portfolios, assets, valuation snapshots, cash-flow transactions, contribution allowances, and derived investment movement / history.
 
 ## Tests
 

@@ -1,9 +1,247 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { LineChart } from 'echarts/charts';
+import { GridComponent, TooltipComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import { use } from 'echarts/core';
+import VChart from 'vue-echarts';
 import { PiggyBank } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import EmptyState from '@/Components/EmptyState.vue';
-import AppButton from '@/Components/AppButton.vue';
+import AppTable from '@/Components/AppTable.vue';
+import type { TableColumn } from '@/Components/AppTable.vue';
+import DialogModal from '@/Components/DialogModal.vue';
+import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import { useToast } from '@/Composables/useToast';
+
+use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
+
+type Portfolio = {
+    id: number;
+    name: string;
+    base_currency: string;
+    financial_year_start_month: number;
+    is_default: boolean;
+    notes: string | null;
+};
+
+type Overview = {
+    total_cents: number;
+    accessible_cents: number;
+    restricted_cents: number;
+    currency: string;
+    month: { investment_movement_cents: number; contributions_cents: number; withdrawals_cents: number };
+    financial_year: {
+        investment_movement_cents: number;
+        contributions_cents: number;
+        withdrawals_cents: number;
+        label: string;
+    };
+    assets: Array<{
+        id: number;
+        name: string;
+        owner_name: string;
+        asset_type_label: string;
+        institution: string | null;
+        current_value_cents: number;
+        period_movement_cents: number;
+        financial_year_movement_cents: number;
+    }>;
+};
+
+const props = defineProps<{
+    portfolio: Portfolio;
+    portfolios: Portfolio[];
+    overview: Overview;
+    monthly_history: Array<{ label: string; date: string; value_cents: number }>;
+    can_manage: boolean;
+}>();
+
+const page = usePage();
+const toast = useToast();
+const canManage = computed(() => props.can_manage || (page.props.team_permissions as string[] | undefined)?.includes('wealth.manage'));
+
+const currency = computed(() => props.overview.currency || props.portfolio.base_currency || 'ZAR');
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, currency.value);
+const formatSigned = (cents: number) => {
+    const n = Number(cents) || 0;
+    const formatted = formatCents(Math.abs(n));
+    if (n > 0) return `+${formatted}`;
+    if (n < 0) return `−${formatted}`;
+    return formatted;
+};
+
+const portfolioOptions = computed(() =>
+    props.portfolios.map((p) => ({
+        label: p.is_default ? `${p.name} (default)` : p.name,
+        value: String(p.id),
+    })),
+);
+
+const selectedPortfolioId = ref(String(props.portfolio.id));
+watch(
+    () => props.portfolio.id,
+    (id) => {
+        selectedPortfolioId.value = String(id);
+    },
+);
+
+const switchPortfolio = (value: string) => {
+    if (value === String(props.portfolio.id)) return;
+    router.get(route('wealth.index', { portfolio: value }), {}, { preserveState: false });
+};
+
+const showCreateModal = ref(false);
+const showEditModal = ref(false);
+const savingPortfolio = ref(false);
+const createForm = ref({ name: '', financial_year_start_month: String(props.portfolio.financial_year_start_month) });
+const editForm = ref({
+    name: props.portfolio.name,
+    financial_year_start_month: String(props.portfolio.financial_year_start_month),
+    is_default: props.portfolio.is_default,
+});
+
+watch(showEditModal, (open) => {
+    if (!open) return;
+    editForm.value = {
+        name: props.portfolio.name,
+        financial_year_start_month: String(props.portfolio.financial_year_start_month),
+        is_default: props.portfolio.is_default,
+    };
+});
+
+const monthOptions = [
+    { label: 'January', value: '1' },
+    { label: 'February', value: '2' },
+    { label: 'March', value: '3' },
+    { label: 'April', value: '4' },
+    { label: 'May', value: '5' },
+    { label: 'June', value: '6' },
+    { label: 'July', value: '7' },
+    { label: 'August', value: '8' },
+    { label: 'September', value: '9' },
+    { label: 'October', value: '10' },
+    { label: 'November', value: '11' },
+    { label: 'December', value: '12' },
+];
+
+const openCreateModal = () => {
+    createForm.value = {
+        name: '',
+        financial_year_start_month: String(props.portfolio.financial_year_start_month),
+    };
+    showCreateModal.value = true;
+};
+
+const createPortfolio = () => {
+    if (savingPortfolio.value) return;
+    const name = createForm.value.name.trim();
+    if (!name) {
+        toast.error('Enter a portfolio name.');
+        return;
+    }
+    savingPortfolio.value = true;
+    router.post(
+        route('wealth.portfolios.store'),
+        {
+            name,
+            financial_year_start_month: Number(createForm.value.financial_year_start_month),
+        },
+        {
+            onSuccess: () => {
+                showCreateModal.value = false;
+            },
+            onError: () => toast.error('Could not create portfolio.'),
+            onFinish: () => {
+                savingPortfolio.value = false;
+            },
+        },
+    );
+};
+
+const updatePortfolio = () => {
+    if (savingPortfolio.value) return;
+    const name = editForm.value.name.trim();
+    if (!name) {
+        toast.error('Enter a portfolio name.');
+        return;
+    }
+    savingPortfolio.value = true;
+    router.put(
+        route('wealth.portfolios.update', props.portfolio.id),
+        {
+            name,
+            financial_year_start_month: Number(editForm.value.financial_year_start_month),
+            is_default: editForm.value.is_default,
+        },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                showEditModal.value = false;
+                toast.success('Portfolio updated.');
+            },
+            onError: () => toast.error('Could not update portfolio.'),
+            onFinish: () => {
+                savingPortfolio.value = false;
+            },
+        },
+    );
+};
+
+const archivePortfolio = () => {
+    if (savingPortfolio.value || props.portfolios.length <= 1) return;
+    savingPortfolio.value = true;
+    router.delete(route('wealth.portfolios.destroy', props.portfolio.id), {
+        onSuccess: () => {
+            showEditModal.value = false;
+        },
+        onError: () => toast.error('Could not archive portfolio.'),
+        onFinish: () => {
+            savingPortfolio.value = false;
+        },
+    });
+};
+
+const columns: TableColumn[] = [
+    { key: 'asset', label: 'Asset' },
+    { key: 'owner', label: 'Owner' },
+    { key: 'type', label: 'Type' },
+    { key: 'institution', label: 'Institution' },
+    { key: 'value', label: 'Current value', align: 'right' },
+    { key: 'period', label: 'Period movement', align: 'right' },
+    { key: 'fy', label: 'FY movement', align: 'right' },
+];
+
+const chartOptions = computed(() => ({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 48, right: 16, top: 24, bottom: 32 },
+    xAxis: {
+        type: 'category',
+        data: props.monthly_history.map((p) => p.label),
+        axisLabel: { color: '#64748b', fontSize: 11 },
+    },
+    yAxis: {
+        type: 'value',
+        axisLabel: {
+            color: '#64748b',
+            fontSize: 11,
+            formatter: (v: number) => useFormatCurrency(v / 100, currency.value),
+        },
+        splitLine: { lineStyle: { color: '#e2e8f0' } },
+    },
+    series: [
+        {
+            type: 'line',
+            smooth: true,
+            data: props.monthly_history.map((p) => p.value_cents),
+            areaStyle: { opacity: 0.08 },
+            lineStyle: { width: 2, color: '#0f766e' },
+            itemStyle: { color: '#0f766e' },
+        },
+    ],
+}));
+
+const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
 </script>
 
 <template>
@@ -13,23 +251,194 @@ import AppButton from '@/Components/AppButton.vue';
     >
         <PageHeader
             title="Wealth"
-            subtitle="Optional module for net worth and investments."
-        />
+            :subtitle="`Viewing ${portfolio.name} · ${portfolio.base_currency}`"
+        >
+            <template #actions>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="min-w-[13rem] w-52">
+                        <AppSelect
+                            :model-value="selectedPortfolioId"
+                            :options="portfolioOptions"
+                            size="sm"
+                            @update:model-value="switchPortfolio"
+                        />
+                    </div>
+                    <AppButton
+                        v-if="canManage"
+                        variant="secondary"
+                        size="sm"
+                        @click="showEditModal = true"
+                    >
+                        Portfolio settings
+                    </AppButton>
+                    <AppButton
+                        v-if="canManage"
+                        variant="secondary"
+                        size="sm"
+                        @click="openCreateModal"
+                    >
+                        New portfolio
+                    </AppButton>
+                    <Link :href="route('wealth.history', portfolioQuery)">
+                        <AppButton variant="secondary" size="sm">History</AppButton>
+                    </Link>
+                    <Link :href="route('wealth.allowances.index', portfolioQuery)">
+                        <AppButton variant="secondary" size="sm">Allowances</AppButton>
+                    </Link>
+                    <Link v-if="canManage" :href="route('wealth.assets.create', portfolioQuery)">
+                        <AppButton variant="primary" size="sm">Add asset</AppButton>
+                    </Link>
+                </div>
+            </template>
+        </PageHeader>
 
-        <div class="mt-6">
+        <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Total wealth</p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatCents(overview.total_cents) }}</p>
+            </AppCard>
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Accessible</p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatCents(overview.accessible_cents) }}</p>
+            </AppCard>
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Restricted / retirement</p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatCents(overview.restricted_cents) }}</p>
+            </AppCard>
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Change this month</p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatSigned(overview.month.investment_movement_cents) }}</p>
+            </AppCard>
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Change FY {{ overview.financial_year.label }}</p>
+                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatSigned(overview.financial_year.investment_movement_cents) }}</p>
+            </AppCard>
+        </div>
+
+        <AppCard class="mt-6">
+            <h3 class="mb-3 text-base font-semibold text-slate-900">Recent portfolio value</h3>
+            <div v-if="monthly_history.length" class="h-56 w-full md:h-72">
+                <VChart class="h-full w-full" :option="chartOptions" autoresize />
+            </div>
             <EmptyState
-                title="Wealth is coming soon"
-                description="This is a placeholder. Enable or disable the Wealth module under Settings → Features. Domain features will land in a follow-up."
+                v-else
+                title="No valuation history yet"
+                description="Add assets and monthly valuations to see portfolio growth over time."
+                :icon="PiggyBank"
+            />
+        </AppCard>
+
+        <AppCard class="mt-6">
+            <h3 class="mb-3 text-base font-semibold text-slate-900">Assets</h3>
+            <AppTable
+                v-if="overview.assets.length"
+                :columns="columns"
+                :show-pagination="false"
+                dense
+                table-class="text-sm"
+                embedded
+            >
+                <tr
+                    v-for="row in overview.assets"
+                    :key="row.id"
+                    class="cursor-pointer hover:bg-slate-50"
+                    @click="router.visit(route('wealth.assets.show', row.id))"
+                >
+                    <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">{{ row.name }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.owner_name }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.asset_type_label }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.institution || '—' }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">{{ formatCents(row.current_value_cents) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.period_movement_cents) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.financial_year_movement_cents) }}</td>
+                </tr>
+            </AppTable>
+            <EmptyState
+                v-else
+                title="No assets yet"
+                :description="canManage ? 'Add your first investment, savings, or retirement account to this portfolio.' : 'Assets will appear here once someone with access adds them.'"
                 :icon="PiggyBank"
             >
-                <template #action>
-                    <Link :href="route('settings.features')">
-                        <AppButton variant="secondary" size="sm">
-                            Manage features
-                        </AppButton>
+                <template v-if="canManage" #action>
+                    <Link :href="route('wealth.assets.create', portfolioQuery)">
+                        <AppButton variant="primary" size="sm">Add asset</AppButton>
                     </Link>
                 </template>
             </EmptyState>
-        </div>
+        </AppCard>
+
+        <DialogModal :show="showCreateModal" max-width="lg" @close="showCreateModal = false">
+            <template #title>
+                New portfolio
+            </template>
+            <template #content>
+                <div class="space-y-4 text-left text-slate-900">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
+                        <AppInput v-model="createForm.name" placeholder="e.g. Personal, Business, Kids" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Financial year starts</label>
+                        <AppSelect v-model="createForm.financial_year_start_month" :options="monthOptions" />
+                        <p class="mt-1 text-xs text-slate-500">Used for FY movement and annual history on this portfolio.</p>
+                    </div>
+                </div>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton variant="secondary" :disabled="savingPortfolio" @click="showCreateModal = false">Cancel</AppButton>
+                    <AppButton variant="primary" :loading="savingPortfolio" :disabled="savingPortfolio" @click="createPortfolio">
+                        Create portfolio
+                    </AppButton>
+                </div>
+            </template>
+        </DialogModal>
+
+        <DialogModal :show="showEditModal" max-width="lg" @close="showEditModal = false">
+            <template #title>
+                Portfolio settings
+            </template>
+            <template #content>
+                <div class="space-y-4 text-left text-slate-900">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Name</label>
+                        <AppInput v-model="editForm.name" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Financial year starts</label>
+                        <AppSelect v-model="editForm.financial_year_start_month" :options="monthOptions" />
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                            v-model="editForm.is_default"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        >
+                        Default portfolio for this business
+                    </label>
+                    <p v-if="portfolios.length > 1" class="text-xs text-slate-500">
+                        Archiving removes this portfolio from the switcher. Assets remain in the database but are not shown until restored in a later release.
+                    </p>
+                </div>
+            </template>
+            <template #footer>
+                <div class="flex w-full flex-wrap items-center justify-between gap-2">
+                    <AppButton
+                        v-if="portfolios.length > 1"
+                        variant="danger"
+                        :disabled="savingPortfolio"
+                        @click="archivePortfolio"
+                    >
+                        Archive portfolio
+                    </AppButton>
+                    <div class="ml-auto flex gap-2">
+                        <AppButton variant="secondary" :disabled="savingPortfolio" @click="showEditModal = false">Cancel</AppButton>
+                        <AppButton variant="primary" :loading="savingPortfolio" :disabled="savingPortfolio" @click="updatePortfolio">
+                            Save
+                        </AppButton>
+                    </div>
+                </div>
+            </template>
+        </DialogModal>
     </AppLayout>
 </template>
