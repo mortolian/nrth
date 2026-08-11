@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
+use App\Support\Modules\ModuleCatalog;
 use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -80,6 +81,7 @@ class HandleInertiaRequests extends Middleware
                 $request->user()?->currentTeam?->mergedBusinessSettings()['session_idle_timeout_minutes'] ?? 0
             ),
             'ai_enabled' => fn () => (bool) $request->user()?->currentTeam?->aiEnabled(),
+            'enabled_modules' => fn () => $request->user()?->currentTeam?->enabledModules() ?? [],
             'can_manage_backups' => fn () => $request->user() !== null
                 && Gate::forUser($request->user())->allows('manageInstanceBackups'),
             'can_access_backups_exports' => function () use ($request) {
@@ -136,6 +138,7 @@ class HandleInertiaRequests extends Middleware
         $vatEnabled = $team?->chargesVat() ?? false;
         $permissions = $user !== null ? TeamAccess::permissionsFor($user, $team) : [];
         $can = fn (string $permission): bool => in_array($permission, $permissions, true);
+        $moduleOn = fn (string $name): bool => $team?->moduleEnabled($name) ?? false;
 
         $quickActions = array_values(array_filter([
             $can('invoices.manage')
@@ -175,7 +178,11 @@ class HandleInertiaRequests extends Middleware
             $can('accounting.view') ? ['id' => 'chart-of-accounts', 'label' => 'Chart of Accounts (setup)', 'href' => route('accounting.accounts.index')] : null,
             $can('budgets.view') ? ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')] : null,
             $can('contracts.view') ? ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')] : null,
+            ($moduleOn(ModuleCatalog::WEALTH) && $can('wealth.view'))
+                ? ['id' => 'wealth', 'label' => 'Wealth', 'href' => route('wealth.index')]
+                : null,
             $can('settings.business') ? ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')] : null,
+            $can('settings.business') ? ['id' => 'features-settings', 'label' => 'Features', 'href' => route('settings.features')] : null,
             $can('settings.business') ? ['id' => 'note-templates', 'label' => 'Note Templates', 'href' => route('settings.note-templates.index')] : null,
             $can('settings.team') ? ['id' => 'team-settings', 'label' => 'Team Members', 'href' => route('settings.team')] : null,
             ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('settings.index')],

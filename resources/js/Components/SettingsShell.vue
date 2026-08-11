@@ -6,7 +6,7 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'profile' | 'business' | 'team' | 'note-templates' | 'instance';
+    section: 'profile' | 'business' | 'team' | 'note-templates' | 'instance' | 'features';
     title?: string;
     subtitle?: string;
 }>();
@@ -26,6 +26,7 @@ const sections = computed((): AppTabItem[] => {
 
     if (canTeam('settings.business')) {
         tabs.push({ id: 'business', label: 'Business', href: route('settings.business') });
+        tabs.push({ id: 'features', label: 'Features', href: route('settings.features') });
         tabs.push({ id: 'note-templates', label: 'Note templates', href: route('settings.note-templates.index') });
     }
 
@@ -60,6 +61,8 @@ const headerSubtitle = computed(() => {
             return undefined;
         case 'business':
             return 'Profile, invoicing, tax, banking, and online payments for the current business.';
+        case 'features':
+            return 'Optional modules for this business. Disabling hides them without deleting data.';
         case 'team':
             return 'People who can access the currently selected business.';
         case 'note-templates':

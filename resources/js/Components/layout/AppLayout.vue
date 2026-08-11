@@ -21,6 +21,7 @@ import {
     Menu,
     MoreHorizontal,
     PanelLeft,
+    PiggyBank,
     Plus,
     Receipt,
     Search,
@@ -74,6 +75,11 @@ const currentTeamRoleLabel = computed(() => {
 const hasTeamFeatures = computed(() => Boolean(page.props.jetstream?.hasTeamFeatures));
 const currentPath = computed(() => page.url.split('?')[0]);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
+const enabledModules = computed(() => {
+    const modules = page.props.enabled_modules;
+    return Array.isArray(modules) ? (modules as string[]) : [];
+});
+const moduleEnabled = (name: string) => enabledModules.value.includes(name);
 const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
 const canLeaveCurrentTeam = computed(() => Boolean(page.props.can_leave_current_team));
 const teamPermissions = computed(() => {
@@ -162,6 +168,15 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
+    if (moduleEnabled('wealth') && canTeam('wealth.view')) {
+        items.push({
+            label: 'Wealth',
+            href: route('wealth.index'),
+            icon: PiggyBank,
+            matchPrefixes: ['/wealth'],
+        });
+    }
+
     if (vatEnabled.value && canTeam('tax.view')) {
         items.push({
             label: 'Tax',
@@ -234,6 +249,7 @@ const isTeamSettingsPath = computed(
 const isSettingsSectionActive = computed(
     () => isActivePath(route('profile.show'))
         || isActivePath(route('settings.business'))
+        || isActivePath(route('settings.features'))
         || pathMatchesPrefix('/settings/instance')
         || pathMatchesPrefix('/settings/note-templates')
         || isTeamSettingsPath.value,

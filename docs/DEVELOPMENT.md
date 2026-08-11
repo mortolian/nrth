@@ -124,6 +124,7 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 ## Architecture
 
 - Business logic lives under `app/Domain/{Context}/` (actions, DTOs, models, services).
+- Optional product modules live under `app/Modules/{Name}/` (bounded HTTP, routes, providers). Enable/disable per team via **Settings → Features** (`team_modules`); disabled modules stay out of nav and return 403, without deleting data. See [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php). The first module is **Wealth** (placeholder).
 - Team-owned models use `App\Domain\Shared\HasTeamScope`.
 - Controllers stay thin; call actions/services from `app/Http/Controllers/Web/`.
 - UI: Inertia + Vue 3 in `resources/js/Pages/`.

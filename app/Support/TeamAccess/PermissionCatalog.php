@@ -52,6 +52,8 @@ final class PermissionCatalog
             'vehicles.view' => ['label' => 'View vehicles and trip log', 'group' => 'Travel'],
             'vehicles.manage' => ['label' => 'Create and edit vehicles and trips', 'group' => 'Travel'],
             'vehicles.delete' => ['label' => 'Delete vehicles and trips', 'group' => 'Travel'],
+            'wealth.view' => ['label' => 'View wealth', 'group' => 'Wealth'],
+            'wealth.manage' => ['label' => 'Manage wealth', 'group' => 'Wealth'],
             'settings.business' => ['label' => 'Manage business settings', 'group' => 'Settings'],
             'settings.team' => ['label' => 'Manage team members and roles', 'group' => 'Settings'],
         ];

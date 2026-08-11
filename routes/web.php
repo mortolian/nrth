@@ -28,6 +28,7 @@ use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\PublicInvoicePayController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
+use App\Http\Controllers\Web\Settings\FeaturesSettingsController;
 use App\Http\Controllers\Web\Settings\InstanceSettingsController;
 use App\Http\Controllers\Web\Settings\NoteTemplateController;
 use App\Http\Controllers\Web\Settings\TeamInvitationController;
@@ -79,6 +80,8 @@ Route::middleware([
     Route::get('/settings', fn () => redirect()->route('profile.show'))->name('settings.index');
     Route::get('/settings/business', [BusinessSettingsController::class, 'edit'])->name('settings.business');
     Route::post('/settings/business', [BusinessSettingsController::class, 'update'])->name('settings.business.update');
+    Route::get('/settings/features', [FeaturesSettingsController::class, 'edit'])->name('settings.features');
+    Route::put('/settings/features', [FeaturesSettingsController::class, 'update'])->name('settings.features.update');
     Route::get('/settings/note-templates', [NoteTemplateController::class, 'index'])->name('settings.note-templates.index');
     Route::post('/settings/note-templates', [NoteTemplateController::class, 'store'])->name('settings.note-templates.store');
     Route::put('/settings/note-templates/{noteTemplate}', [NoteTemplateController::class, 'update'])->name('settings.note-templates.update');

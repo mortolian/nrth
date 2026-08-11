@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Wealth\Providers\WealthServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\HorizonServiceProvider;
@@ -10,4 +11,5 @@ return [
     FortifyServiceProvider::class,
     HorizonServiceProvider::class,
     JetstreamServiceProvider::class,
+    WealthServiceProvider::class,
 ];

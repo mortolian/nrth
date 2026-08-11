@@ -4,10 +4,12 @@ namespace App\Models;
 
 use App\Domain\Ai\AiCatalog;
 use App\Domain\Tax\Models\TaxRate;
+use App\Support\Modules\ModuleCatalog;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamDeleted;
@@ -80,6 +82,61 @@ class Team extends JetstreamTeam implements HasMedia
     public function teamRoles(): HasMany
     {
         return $this->hasMany(TeamRole::class)->orderBy('is_system', 'desc')->orderBy('name');
+    }
+
+    /**
+     * @return HasMany<TeamModule, $this>
+     */
+    public function teamModules(): HasMany
+    {
+        return $this->hasMany(TeamModule::class);
+    }
+
+    public function moduleEnabled(string $name): bool
+    {
+        if (! ModuleCatalog::isValid($name)) {
+            return false;
+        }
+
+        if (! Schema::hasTable('team_modules')) {
+            return ModuleCatalog::defaultEnabled($name);
+        }
+
+        $row = $this->teamModules()->where('name', $name)->first();
+
+        if ($row === null) {
+            return ModuleCatalog::defaultEnabled($name);
+        }
+
+        return (bool) $row->enabled;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function enabledModules(): array
+    {
+        $enabled = [];
+
+        foreach (ModuleCatalog::keys() as $name) {
+            if ($this->moduleEnabled($name)) {
+                $enabled[] = $name;
+            }
+        }
+
+        return $enabled;
+    }
+
+    public function setModuleEnabled(string $name, bool $enabled): void
+    {
+        if (! ModuleCatalog::isValid($name)) {
+            return;
+        }
+
+        $this->teamModules()->updateOrCreate(
+            ['name' => $name],
+            ['enabled' => $enabled],
+        );
     }
 
     public function registerMediaCollections(): void

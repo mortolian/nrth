@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureTeamModule;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectIncompleteOnboarding;
@@ -24,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
 
         $middleware->append(ForceHttps::class);
+
+        $middleware->alias([
+            'team.module' => EnsureTeamModule::class,
+        ]);
 
         $middleware->web(append: [
             HandleInertiaRequests::class,

@@ -35,7 +35,7 @@ Resolution order for a member: belong to team → if owner, all permissions → 
 
 Owner-only product areas that stay outside (or beside) the matrix: tax takeout, instance backups (`manageInstanceBackups`). Instance settings (outbound SMTP, operators) use the same operator gate under **Settings → Instance**. Renaming or deleting a business stays Jetstream `TeamPolicy` (owner). Inviting members, changing roles, and custom role CRUD use `settings.team` (owner by default; grantable on a custom role). Business settings pages use `settings.business` the same way.
 
-**Settings navigation:** Profile is always available. Business and Team members tabs appear only when the signed-in user has `settings.business` / `settings.team` respectively — viewers and accountants should not see those links (and get 403 if they hit the URLs directly).
+**Settings navigation:** Profile is always available. Business, Features, and Team members tabs appear only when the signed-in user has `settings.business` / `settings.team` respectively — viewers and accountants should not see those links (and get 403 if they hit the URLs directly). **Settings → Features** toggles optional modules (`team_modules`); Features uses `settings.business`.
 
 ## Leaving a business
 
@@ -70,6 +70,8 @@ See [AGENTS.md](../AGENTS.md) for the agent checklist (permissions **and** docum
 Money In catalog keys include `invoices.*`, `estimates.*`, `clients.*`, and `items.*` (products/services catalog). Invoice **note templates** live under Settings → Note templates (`settings.business`). Item unit labels are under Settings → Business.
 
 Travel catalog keys are `vehicles.view`, `vehicles.manage`, and `vehicles.delete` (vehicles registry and trip log book). Smart AI import (fleet/GPS exports) requires `vehicles.manage` and a team AI provider. Confirmed imports are tracked as batches; undo (remove all trips from that import) and multi-select bulk delete on the log book require `vehicles.delete`. Filtered CSV and PDF log book exports require `vehicles.view`. PDF export also requires a from/to date range and is capped (currently 1,500 trips) so DomPDF cannot exhaust request memory. Licence disc expiry reminders email team members who have `vehicles.view` (and have not opted out under Profile preferences).
+
+Wealth catalog keys are `wealth.view` and `wealth.manage`. The Wealth area is an optional module (off by default); it only appears in nav and accepts requests when enabled under Settings → Features.
 
 ## Tests
 
