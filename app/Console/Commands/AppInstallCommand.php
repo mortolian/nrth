@@ -146,7 +146,7 @@ class AppInstallCommand extends Command
         $this->line('  <fg=yellow;options=bold>Next steps</>');
         $this->line('  <fg=gray>1.</> Sign in at the URL above with your email and password');
         $this->line('  <fg=gray>2.</> Complete the in-app setup wizard (company details and preferences)');
-        $this->line('  <fg=gray>3.</> You are the instance operator: manage operators and backups under <fg=cyan>Backups & exports</>');
+        $this->line('  <fg=gray>3.</> You are the instance operator: manage operators and backups under <fg=cyan>Settings → Backups & exports</>');
         $this->line('  <fg=gray>4.</> After upgrades, run <fg=cyan>./scripts/update</>');
         $this->newLine();
         $this->components->info($appName.' is ready.');

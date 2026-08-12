@@ -6,7 +6,7 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'profile' | 'business' | 'team' | 'note-templates' | 'instance' | 'features';
+    section: 'profile' | 'business' | 'team' | 'note-templates' | 'instance' | 'features' | 'backups';
     title?: string;
     subtitle?: string;
 }>();
@@ -18,6 +18,7 @@ const teamPermissions = computed(() => {
 });
 const canTeam = (permission: string) => teamPermissions.value.includes(permission);
 const canManageInstance = computed(() => Boolean(page.props.can_manage_backups));
+const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
 
 const sections = computed((): AppTabItem[] => {
     const tabs: AppTabItem[] = [
@@ -32,6 +33,10 @@ const sections = computed((): AppTabItem[] => {
 
     if (canTeam('settings.team')) {
         tabs.push({ id: 'team', label: 'Team members', href: route('settings.team') });
+    }
+
+    if (canAccessBackupsExports.value) {
+        tabs.push({ id: 'backups', label: 'Backups & exports', href: route('backups-exports.index') });
     }
 
     if (canManageInstance.value) {
@@ -63,6 +68,8 @@ const headerSubtitle = computed(() => {
             return 'Profile, invoicing, tax, banking, and online payments for the current business.';
         case 'features':
             return 'Optional modules for this business. Disabling hides them without deleting data.';
+        case 'backups':
+            return 'Tax data takeouts for your team, and whole-server backups for operators.';
         case 'team':
             return 'People who can access the currently selected business.';
         case 'note-templates':

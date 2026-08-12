@@ -178,22 +178,24 @@ Route::middleware([
     Route::delete('/accounting/accounts/{account}', [AccountController::class, 'destroy'])->name('accounting.accounts.destroy');
     Route::get('/accounting/accounts/{account}/statement', [AccountStatementController::class, 'show'])->name('accounting.accounts.statement');
     Route::get('/accounting/accounts/{account}/statement/export', [AccountStatementController::class, 'exportCsv'])->name('accounting.accounts.statement.export');
-    Route::get('/budgeting', [BudgetingController::class, 'index'])->name('budgeting.index');
-    Route::get('/budgeting/create', [BudgetingController::class, 'create'])->name('budgeting.create');
-    Route::post('/budgeting', [BudgetingController::class, 'store'])->name('budgeting.store');
-    Route::get('/budgeting/{budget}', [BudgetingController::class, 'show'])->name('budgeting.show');
-    Route::get('/budgeting/{budget}/edit', [BudgetingController::class, 'edit'])->name('budgeting.edit');
-    Route::put('/budgeting/{budget}', [BudgetingController::class, 'update'])->name('budgeting.update');
-    Route::delete('/budgeting/{budget}', [BudgetingController::class, 'destroy'])->name('budgeting.destroy');
-    Route::post('/budgeting/trash/{id}/restore', [BudgetingController::class, 'restore'])->whereNumber('id')->name('budgeting.restore');
-    Route::delete('/budgeting/trash/{id}', [BudgetingController::class, 'forceDestroy'])->whereNumber('id')->name('budgeting.force-destroy');
-    Route::post('/budgeting/{budget}/import-structure', [BudgetingController::class, 'importStructure'])->name('budgeting.import-structure');
-    Route::post('/budgeting/{budget}/categories', [BudgetingController::class, 'storeCategory'])->name('budgeting.categories.store');
-    Route::put('/budgeting/{budget}/categories/{category}', [BudgetingController::class, 'updateCategory'])->name('budgeting.categories.update');
-    Route::delete('/budgeting/{budget}/categories/{category}', [BudgetingController::class, 'destroyCategory'])->name('budgeting.categories.destroy');
-    Route::post('/budgeting/{budget}/categories/{category}/items', [BudgetingController::class, 'storeItem'])->name('budgeting.items.store');
-    Route::put('/budgeting/{budget}/categories/{category}/items/{item}', [BudgetingController::class, 'updateItem'])->name('budgeting.items.update');
-    Route::delete('/budgeting/{budget}/categories/{category}/items/{item}', [BudgetingController::class, 'destroyItem'])->name('budgeting.items.destroy');
+    Route::middleware('team.module:planning')->group(function () {
+        Route::get('/budgeting', [BudgetingController::class, 'index'])->name('budgeting.index');
+        Route::get('/budgeting/create', [BudgetingController::class, 'create'])->name('budgeting.create');
+        Route::post('/budgeting', [BudgetingController::class, 'store'])->name('budgeting.store');
+        Route::get('/budgeting/{budget}', [BudgetingController::class, 'show'])->name('budgeting.show');
+        Route::get('/budgeting/{budget}/edit', [BudgetingController::class, 'edit'])->name('budgeting.edit');
+        Route::put('/budgeting/{budget}', [BudgetingController::class, 'update'])->name('budgeting.update');
+        Route::delete('/budgeting/{budget}', [BudgetingController::class, 'destroy'])->name('budgeting.destroy');
+        Route::post('/budgeting/trash/{id}/restore', [BudgetingController::class, 'restore'])->whereNumber('id')->name('budgeting.restore');
+        Route::delete('/budgeting/trash/{id}', [BudgetingController::class, 'forceDestroy'])->whereNumber('id')->name('budgeting.force-destroy');
+        Route::post('/budgeting/{budget}/import-structure', [BudgetingController::class, 'importStructure'])->name('budgeting.import-structure');
+        Route::post('/budgeting/{budget}/categories', [BudgetingController::class, 'storeCategory'])->name('budgeting.categories.store');
+        Route::put('/budgeting/{budget}/categories/{category}', [BudgetingController::class, 'updateCategory'])->name('budgeting.categories.update');
+        Route::delete('/budgeting/{budget}/categories/{category}', [BudgetingController::class, 'destroyCategory'])->name('budgeting.categories.destroy');
+        Route::post('/budgeting/{budget}/categories/{category}/items', [BudgetingController::class, 'storeItem'])->name('budgeting.items.store');
+        Route::put('/budgeting/{budget}/categories/{category}/items/{item}', [BudgetingController::class, 'updateItem'])->name('budgeting.items.update');
+        Route::delete('/budgeting/{budget}/categories/{category}/items/{item}', [BudgetingController::class, 'destroyItem'])->name('budgeting.items.destroy');
+    });
     Route::get('/tax/vat', [VATController::class, 'index'])->name('tax.vat.index');
     Route::get('/tax/vat-rates', [VatRateController::class, 'index'])->name('tax.vat-rates.index');
     Route::post('/tax/vat-rates', [VatRateController::class, 'store'])->name('tax.vat-rates.store');
@@ -210,7 +212,7 @@ Route::middleware([
     Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');
     Route::get('/reports/cash-flow', [ReportsController::class, 'cashFlow'])->name('reports.cash-flow');
-    Route::prefix('vehicles')->name('vehicles.')->group(function () {
+    Route::prefix('vehicles')->name('vehicles.')->middleware('team.module:travel')->group(function () {
         Route::get('/trips', [TripController::class, 'index'])->name('trips.index');
         Route::get('/trips/export', [TripController::class, 'exportCsv'])->name('trips.export');
         Route::get('/trips/export-pdf', [TripController::class, 'exportPdf'])->name('trips.export-pdf');
@@ -236,7 +238,7 @@ Route::middleware([
         Route::put('/{vehicle}', [VehicleController::class, 'update'])->name('update');
         Route::delete('/{vehicle}', [VehicleController::class, 'destroy'])->name('destroy');
     });
-    Route::prefix('contracting')->name('contracting.')->group(function () {
+    Route::prefix('contracting')->name('contracting.')->middleware('team.module:contracting')->group(function () {
         Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
         Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
         Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');

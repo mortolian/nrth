@@ -6,12 +6,33 @@ final class ModuleCatalog
 {
     public const WEALTH = 'wealth';
 
+    public const TRAVEL = 'travel';
+
+    public const PLANNING = 'planning';
+
+    public const CONTRACTING = 'contracting';
+
     /**
      * @return array<string, array{label: string, description: string, default_enabled: bool}>
      */
     public static function definitions(): array
     {
         return [
+            self::TRAVEL => [
+                'label' => 'Travel',
+                'description' => 'Vehicles, trip log book, licence reminders, and trip imports.',
+                'default_enabled' => false,
+            ],
+            self::PLANNING => [
+                'label' => 'Planning',
+                'description' => 'Category budgets, envelopes, and variance tracking.',
+                'default_enabled' => false,
+            ],
+            self::CONTRACTING => [
+                'label' => 'Contracting',
+                'description' => 'Client contracts and generate invoices from contract terms.',
+                'default_enabled' => false,
+            ],
             self::WEALTH => [
                 'label' => 'Wealth',
                 'description' => 'Track investment accounts, savings, retirement funds, and portfolio history.',

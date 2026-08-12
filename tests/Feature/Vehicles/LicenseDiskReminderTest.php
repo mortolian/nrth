@@ -19,6 +19,7 @@ class LicenseDiskReminderTest extends TestCase
         $user = User::factory()->withPersonalTeam()->create();
         $team = $user->currentTeam;
         $this->assertNotNull($team);
+        $this->enableTeamModules($team);
         $user->forceFill(['current_team_id' => $team->id])->save();
         $this->actingAs($user);
 

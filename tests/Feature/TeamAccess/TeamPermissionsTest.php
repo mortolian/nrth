@@ -252,6 +252,7 @@ class TeamPermissionsTest extends TestCase
         /** @var Team $team */
         $team = $owner->currentTeam;
         EnsureTeamSystemRoles::ensureFor($team);
+        $this->enableTeamModules($team);
 
         $member = User::factory()->create();
         $team->users()->attach($member, ['role' => $role]);

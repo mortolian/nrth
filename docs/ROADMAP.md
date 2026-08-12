@@ -19,7 +19,7 @@ These areas exist and are usable, but expect rough edges and breaking changes:
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
 | **Teams** | Multi-user businesses via Jetstream |
-| **Optional modules** | Settings → Features; Wealth (portfolios, assets, valuations, cash flows, allowances) off by default |
+| **Optional modules** | Settings → Features; Travel, Planning, Contracting, Wealth off by default for new businesses |
 | **Self-hosting** | Docker Compose install via `scripts/install.sh` |
 
 See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.

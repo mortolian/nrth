@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
@@ -401,18 +401,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <AppLayout
-        title="Backups & exports"
-        :breadcrumbs="[{ label: 'Backups & exports' }]"
+    <SettingsShell
+        section="backups"
+        title="Settings · Backups & exports"
+        subtitle="Tax data takeouts for your team, and whole-server backups for operators"
     >
-        <PageHeader
-            title="Backups & exports"
-            subtitle="Tax data takeouts for your team, and whole-server backups for operators"
-        />
-
         <nav
             v-if="can_generate_takeout && can_manage_backups"
-            class="mt-5 border-b border-slate-200"
+            class="border-b border-slate-200"
             aria-label="Backups and exports sections"
         >
             <div class="-mb-px flex gap-6" role="tablist">
@@ -703,5 +699,5 @@ onBeforeUnmount(() => {
                 </div>
             </AppCard>
         </section>
-    </AppLayout>
+    </SettingsShell>
 </template>

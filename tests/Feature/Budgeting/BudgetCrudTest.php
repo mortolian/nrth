@@ -25,6 +25,7 @@ class BudgetCrudTest extends TestCase
         $this->actingAs($user);
         $team = $user->currentTeam;
         $this->assertNotNull($team);
+        $this->enableTeamModules($team);
 
         return [$user, $team];
     }
@@ -437,6 +438,7 @@ class BudgetCrudTest extends TestCase
         /** @var Team $team */
         $team = $owner->currentTeam;
         EnsureTeamSystemRoles::ensureFor($team);
+        $this->enableTeamModules($team);
 
         $viewer = User::factory()->create();
         $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);

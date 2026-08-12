@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
 
 type BackupDestinations = {
     s3: {
@@ -96,28 +96,21 @@ const testPath = () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Offsite destinations"
-        :breadcrumbs="[
-            { label: 'Backups & exports', href: route('backups-exports.index', { section: 'backup' }) },
-            { label: 'Offsite destinations' },
-        ]"
+    <SettingsShell
+        section="backups"
+        title="Settings · Offsite destinations"
+        subtitle="Mirror each local backup zip to S3-compatible storage or a path/NFS mount"
     >
-        <PageHeader
-            title="Offsite destinations"
-            subtitle="Mirror each local backup zip to S3-compatible storage or a path/NFS mount"
-        >
-            <template #actions>
-                <Link
-                    :href="route('backups-exports.index', { section: 'backup' })"
-                    class="text-sm font-medium text-brand-700 hover:underline"
-                >
-                    Back to instance backup
-                </Link>
-            </template>
-        </PageHeader>
+        <div class="mb-4">
+            <Link
+                :href="route('backups-exports.index', { section: 'backup' })"
+                class="text-sm font-medium text-brand-700 hover:underline"
+            >
+                Back to instance backup
+            </Link>
+        </div>
 
-        <AppCard class="mt-5">
+        <AppCard>
             <p class="text-sm text-slate-600">
                 Each backup is always stored locally, and also written to every enabled offsite target.
                 Leave access key / secret blank when saving to keep the stored values.
@@ -201,5 +194,5 @@ const testPath = () => {
                 </FormActions>
             </form>
         </AppCard>
-    </AppLayout>
+    </SettingsShell>
 </template>

@@ -20,6 +20,7 @@ class VehicleTripTest extends TestCase
 
     private function actingTeamContext(User $user, Team $team): void
     {
+        $this->enableTeamModules($team);
         $user->forceFill(['current_team_id' => $team->id])->save();
         $this->actingAs($user);
     }
@@ -316,6 +317,7 @@ class VehicleTripTest extends TestCase
         $team = $owner->currentTeam;
         $this->assertNotNull($team);
         EnsureTeamSystemRoles::ensureFor($team);
+        $this->enableTeamModules($team);
 
         $vehicle = Vehicle::factory()->for($team)->create();
         $trip = Trip::factory()->forVehicle($vehicle)->create();

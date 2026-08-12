@@ -2,6 +2,8 @@
 
 namespace Tests;
 
+use App\Models\Team;
+use App\Support\Modules\ModuleCatalog;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
 
@@ -13,6 +15,24 @@ abstract class TestCase extends BaseTestCase
 
         $this->assertUsingDisposableTestDatabase();
         $this->withoutVite();
+    }
+
+    /**
+     * Enable optional modules on a team (product default is off for new teams).
+     *
+     * @param  list<string>|null  $modules
+     */
+    protected function enableTeamModules(Team $team, ?array $modules = null): void
+    {
+        $modules ??= [
+            ModuleCatalog::TRAVEL,
+            ModuleCatalog::PLANNING,
+            ModuleCatalog::CONTRACTING,
+        ];
+
+        foreach ($modules as $name) {
+            $team->setModuleEnabled($name, true);
+        }
     }
 
     /**

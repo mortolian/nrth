@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
-    Archive,
     Bell,
     BookOpen,
     Briefcase,
@@ -80,7 +79,6 @@ const enabledModules = computed(() => {
     return Array.isArray(modules) ? (modules as string[]) : [];
 });
 const moduleEnabled = (name: string) => enabledModules.value.includes(name);
-const canAccessBackupsExports = computed(() => Boolean(page.props.can_access_backups_exports));
 const canLeaveCurrentTeam = computed(() => Boolean(page.props.can_leave_current_team));
 const teamPermissions = computed(() => {
     const perms = page.props.team_permissions;
@@ -141,7 +139,7 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
-    if (canTeam('vehicles.view')) {
+    if (moduleEnabled('travel') && canTeam('vehicles.view')) {
         items.push({
             label: 'Travel',
             href: route('vehicles.trips.index'),
@@ -150,7 +148,7 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
-    if (canTeam('budgets.view')) {
+    if (moduleEnabled('planning') && canTeam('budgets.view')) {
         items.push({
             label: 'Planning',
             href: route('budgeting.index'),
@@ -159,7 +157,7 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
-    if (canTeam('contracts.view')) {
+    if (moduleEnabled('contracting') && canTeam('contracts.view')) {
         items.push({
             label: 'Contracting',
             href: route('contracting.contracts.index'),
@@ -192,15 +190,6 @@ const navItems = computed<MenuItem[]>(() => {
             href: route('reports.profit-loss'),
             icon: ChartColumnBig,
             matchPrefixes: ['/reports'],
-        });
-    }
-
-    if (canAccessBackupsExports.value) {
-        items.push({
-            label: 'Backups & exports',
-            href: route('backups-exports.index'),
-            icon: Archive,
-            matchPrefixes: ['/backups-exports'],
         });
     }
 
@@ -252,6 +241,7 @@ const isSettingsSectionActive = computed(
         || isActivePath(route('settings.features'))
         || pathMatchesPrefix('/settings/instance')
         || pathMatchesPrefix('/settings/note-templates')
+        || pathMatchesPrefix('/backups-exports')
         || isTeamSettingsPath.value,
 );
 
@@ -278,11 +268,17 @@ const commandPaletteData = computed<PaletteData>(() => ({
         { id: 'expenses', label: 'Expenses', href: route('expenses.index') },
         { id: 'suppliers', label: 'Suppliers', href: route('suppliers.index') },
         { id: 'banking-transactions', label: 'Banking Transactions', href: route('banking.transactions.index') },
-        { id: 'vehicles-trips', label: 'Trip Log', href: route('vehicles.trips.index') },
-        { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
+        ...(moduleEnabled('travel') ? [
+            { id: 'vehicles-trips', label: 'Trip Log', href: route('vehicles.trips.index') },
+            { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },
+        ] : []),
         { id: 'accounting-transactions', label: 'Accounting Transactions', href: route('accounting.transactions.index') },
-        { id: 'budgets', label: 'Budgets', href: route('budgeting.index') },
-        { id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') },
+        ...(moduleEnabled('planning')
+            ? [{ id: 'budgets', label: 'Budgets', href: route('budgeting.index') }]
+            : []),
+        ...(moduleEnabled('contracting')
+            ? [{ id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') }]
+            : []),
         { id: 'profile', label: 'Settings', href: route('settings.index') },
     ],
     recent: page.props.commandPalette?.recent ?? {},

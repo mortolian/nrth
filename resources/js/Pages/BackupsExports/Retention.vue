@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
 
 type BackupRetention = {
     keep_daily: number;
@@ -67,28 +67,21 @@ const saveRetention = () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Backup retention"
-        :breadcrumbs="[
-            { label: 'Backups & exports', href: route('backups-exports.index', { section: 'backup' }) },
-            { label: 'Backup retention' },
-        ]"
+    <SettingsShell
+        section="backups"
+        title="Settings · Backup retention"
+        subtitle="How many daily, weekly, monthly, and yearly backup zips to keep"
     >
-        <PageHeader
-            title="Backup retention"
-            subtitle="How many daily, weekly, monthly, and yearly backup zips to keep"
-        >
-            <template #actions>
-                <Link
-                    :href="route('backups-exports.index', { section: 'backup' })"
-                    class="text-sm font-medium text-brand-700 hover:underline"
-                >
-                    Back to instance backup
-                </Link>
-            </template>
-        </PageHeader>
+        <div class="mb-4">
+            <Link
+                :href="route('backups-exports.index', { section: 'backup' })"
+                class="text-sm font-medium text-brand-700 hover:underline"
+            >
+                Back to instance backup
+            </Link>
+        </div>
 
-        <AppCard class="mt-5">
+        <AppCard>
             <p class="text-sm text-slate-600">
                 One backup zip is created each day. On the weekly day it also counts as weekly;
                 on month-end also monthly; on 31 Dec also yearly. Counts below are how many of
@@ -179,5 +172,5 @@ const saveRetention = () => {
                 </FormActions>
             </form>
         </AppCard>
-    </AppLayout>
+    </SettingsShell>
 </template>

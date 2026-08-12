@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import SettingsShell from '@/Components/SettingsShell.vue';
 
 type RestoreGuide = {
     backup_name: string;
@@ -154,28 +154,21 @@ const downloadRestoreScript = () => {
 </script>
 
 <template>
-    <AppLayout
-        title="Instance restore guide"
-        :breadcrumbs="[
-            { label: 'Backups & exports', href: route('backups-exports.index', { section: 'backup' }) },
-            { label: 'Instance restore guide' },
-        ]"
+    <SettingsShell
+        section="backups"
+        title="Settings · Instance restore guide"
+        subtitle="Generate a downtime-aware shell script — there is no one-click restore in the app"
     >
-        <PageHeader
-            title="Instance restore guide"
-            subtitle="Generate a downtime-aware shell script — there is no one-click restore in the app"
-        >
-            <template #actions>
-                <Link
-                    :href="route('backups-exports.index', { section: 'backup' })"
-                    class="text-sm font-medium text-brand-700 hover:underline"
-                >
-                    Back to instance backup
-                </Link>
-            </template>
-        </PageHeader>
+        <div class="mb-4">
+            <Link
+                :href="route('backups-exports.index', { section: 'backup' })"
+                class="text-sm font-medium text-brand-700 hover:underline"
+            >
+                Back to instance backup
+            </Link>
+        </div>
 
-        <AppCard class="mt-5">
+        <AppCard>
             <p class="text-sm text-slate-600">
                 One-click restore is not available in the app (it would overwrite the live database while the app is running).
                 Pick a ready backup to generate a downtime-aware shell script for your host.
@@ -228,5 +221,5 @@ const downloadRestoreScript = () => {
 
             <pre class="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-950 p-3 text-xs leading-relaxed text-slate-100">{{ restoreScript }}</pre>
         </AppCard>
-    </AppLayout>
+    </SettingsShell>
 </template>

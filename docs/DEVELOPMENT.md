@@ -117,14 +117,14 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 
 ### Backups & exports (local)
 
-- Team owners use **Backups & exports** for data takeouts (Tax → Documents redirects there).
+- Team owners use **Settings → Backups & exports** for data takeouts (Tax → Documents redirects there).
 - The first user created is an instance operator. Public self-registration is disabled; for local access, use the installer-created account or create users/admins explicitly. Manage operators under **Settings → Instance**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
 - Takeout and instance backup jobs run on Horizon’s `long` queue (multi-minute). Restart Horizon after pulling changes: `./vendor/bin/sail restart horizon` (or `php artisan horizon:terminate`).
 - Instance backups need `pg_dump` matching Compose Postgres (**16**). After Dockerfile client changes: `./vendor/bin/sail build` then recreate containers.
 ## Architecture
 
 - Business logic lives under `app/Domain/{Context}/` (actions, DTOs, models, services).
-- Optional product modules live under `app/Modules/{Name}/` (bounded HTTP, routes, providers). Enable/disable per team via **Settings → Features** (`team_modules`); disabled modules stay out of nav and return 403, without deleting data. See [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php). The first module is **Wealth** (placeholder).
+- Optional product modules are listed in [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php) (`travel`, `planning`, `contracting`, `wealth`). Enable/disable per team via **Settings → Features** (`team_modules`); disabled modules stay out of nav and return 403, without deleting data. Bounded module code may live under `app/Modules/{Name}/` (e.g. Wealth); Travel / Planning / Contracting still use `app/Domain` + web routes with `team.module:{name}` middleware. New businesses start with all optional modules off.
 - Team-owned models use `App\Domain\Shared\HasTeamScope`.
 - Controllers stay thin; call actions/services from `app/Http/Controllers/Web/`.
 - UI: Inertia + Vue 3 in `resources/js/Pages/`.
