@@ -2,6 +2,20 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.3](https://github.com/mortolian/nrth/compare/v0.1.2...v0.1.3) (2026-08-12)
+
+
+### Features
+
+* add bulk delete and import history functionality for trips ([ee69136](https://github.com/mortolian/nrth/commit/ee691369f28fd65c224fc6350682cdd1050bb15b))
+* add instance timezone management and settings ([bbc42bf](https://github.com/mortolian/nrth/commit/bbc42bf8ba90f40d95fbff5007cbf7b991736ce9))
+* add PDF export functionality for trip logs and enhance odometer estimation ([658f9ba](https://github.com/mortolian/nrth/commit/658f9ba613e854eedd4ceabfeb329ce845f170c9))
+* enhance file upload functionality in trip log import ([5c27062](https://github.com/mortolian/nrth/commit/5c27062eb37574029788f55a8414ece9d258ee41))
+* enhance module management and backup features ([a481efb](https://github.com/mortolian/nrth/commit/a481efbe44030241033b15fe9e8cd51fd52e32e7))
+* enhance trip log parsing with purpose inference and inline string support ([cfc8eea](https://github.com/mortolian/nrth/commit/cfc8eea2957e99b0beb52dca3c410e68370e4a32))
+* enhance Wealth module with new features and improvements ([cfabdd5](https://github.com/mortolian/nrth/commit/cfabdd53e1fd29662f07b0b67f95883b16ec9c5d))
+* introduce Wealth module and enhance team module management ([fb7cf37](https://github.com/mortolian/nrth/commit/fb7cf375e00a845a44df1d36c7973f3cc213bec4))
+
 ## [0.1.2](https://github.com/mortolian/nrth/compare/v0.1.1...v0.1.2) (2026-08-10)
 
 
