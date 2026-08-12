@@ -11,6 +11,7 @@ import {
     ChartColumnBig,
     ChevronDown,
     ChevronRight,
+    Clock,
     CreditCard,
     FileText,
     FolderKanban,
@@ -36,6 +37,7 @@ import DropdownLink from '@/Components/DropdownLink.vue';
 import CommandPalette from '@/Components/layout/CommandPalette.vue';
 import SessionIdleWatcher from '@/Components/layout/SessionIdleWatcher.vue';
 import { useAppDisplayName } from '@/lib/appName';
+import { useInstanceClock } from '@/Composables/useInstanceClock';
 
 const SETTINGS_SECTION_LABEL = 'Settings';
 
@@ -63,7 +65,10 @@ const quickAddOpen = ref(false);
 const commandPaletteOpen = ref(false);
 
 const appDisplayName = useAppDisplayName();
-
+const { parts: instanceClock } = useInstanceClock();
+const instanceClockTitle = computed(
+    () => `${instanceClock.value.date} ${instanceClock.value.time} (${instanceClock.value.timezone})`,
+);
 const currentTeam = computed(() => page.props.auth?.user?.current_team);
 const teams = computed(() => page.props.auth?.user?.all_teams ?? []);
 const authUser = computed(() => page.props.auth?.user);
@@ -357,6 +362,52 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         </div>
                     </template>
                 </nav>
+
+                <div
+                    class="border-t border-canvas-200 px-2 py-3"
+                    :title="instanceClockTitle"
+                >
+                    <div
+                        v-if="!collapsed"
+                        class="rounded-md border border-canvas-200/80 bg-white/50 px-3 py-2.5 shadow-sm shadow-slate-900/[0.03]"
+                    >
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                <Clock class="h-3 w-3 shrink-0 text-brand-700/70" aria-hidden="true" />
+                                <span>Local time</span>
+                            </div>
+                            <span
+                                class="inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-800"
+                                aria-hidden="true"
+                            >
+                                <span class="relative flex h-1.5 w-1.5">
+                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-600/40" />
+                                    <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-700" />
+                                </span>
+                                Live
+                            </span>
+                        </div>
+                        <p class="mt-2 flex items-baseline gap-2 tabular-nums">
+                            <span class="text-lg font-semibold tracking-tight text-slate-900">{{ instanceClock.time }}</span>
+                            <span class="text-xs font-medium text-slate-400">{{ instanceClock.timezoneLabel }}</span>
+                        </p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            {{ instanceClock.date }}
+                        </p>
+                    </div>
+                    <div
+                        v-else
+                        class="flex flex-col items-center gap-1 rounded-md border border-canvas-200/80 bg-white/50 px-1 py-2 shadow-sm shadow-slate-900/[0.03]"
+                    >
+                        <Clock class="h-3.5 w-3.5 text-brand-700/70" aria-hidden="true" />
+                        <p class="text-center text-[10px] font-semibold leading-tight tabular-nums text-slate-800">
+                            {{ instanceClock.time.slice(0, 5) }}
+                        </p>
+                        <p class="text-center text-[9px] leading-tight text-slate-400">
+                            {{ instanceClock.timezoneLabel }}
+                        </p>
+                    </div>
+                </div>
             </aside>
 
             <div :class="[collapsed ? 'lg:pl-20' : 'lg:pl-[260px]']" class="transition-all">
@@ -550,7 +601,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
             <div v-if="mobileOpen" class="fixed inset-0 z-50 bg-black/50 lg:hidden" @click="mobileOpen = false" />
             <aside
                 :class="[
-                    'fixed inset-y-0 left-0 z-[60] w-[260px] bg-canvas-100 p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
+                    'fixed inset-y-0 left-0 z-[60] flex w-[260px] flex-col bg-canvas-100 p-4 text-slate-900 shadow-xl transition-transform lg:hidden',
                     mobileOpen ? 'translate-x-0' : '-translate-x-full',
                 ]"
             >
@@ -565,19 +616,51 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <X class="h-4 w-4" />
                     </button>
                 </div>
-                <div class="space-y-1">
-                    <template v-for="item in navItems" :key="`m-${item.label}`">
-                        <Link
-                            :href="item.href"
-                            :class="[
-                                'block rounded-md px-3 py-2 text-sm',
-                                isNavItemActive(item) ? 'bg-brand-500/15 font-medium text-brand-800' : 'hover:bg-white/55',
-                            ]"
-                            @click="mobileOpen = false"
-                        >
-                            {{ item.label }}
-                        </Link>
-                    </template>
+                <div class="flex min-h-0 flex-1 flex-col">
+                    <div class="min-h-0 flex-1 space-y-1 overflow-y-auto">
+                        <template v-for="item in navItems" :key="`m-${item.label}`">
+                            <Link
+                                :href="item.href"
+                                :class="[
+                                    'block rounded-md px-3 py-2 text-sm',
+                                    isNavItemActive(item) ? 'bg-brand-500/15 font-medium text-brand-800' : 'hover:bg-white/55',
+                                ]"
+                                @click="mobileOpen = false"
+                            >
+                                {{ item.label }}
+                            </Link>
+                        </template>
+                    </div>
+                    <div
+                        class="mt-4 border-t border-canvas-200 pt-3"
+                        :title="instanceClockTitle"
+                    >
+                        <div class="rounded-md border border-canvas-200/80 bg-white/50 px-3 py-2.5 shadow-sm shadow-slate-900/[0.03]">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                    <Clock class="h-3 w-3 shrink-0 text-brand-700/70" aria-hidden="true" />
+                                    <span>Local time</span>
+                                </div>
+                                <span
+                                    class="inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-800"
+                                    aria-hidden="true"
+                                >
+                                    <span class="relative flex h-1.5 w-1.5">
+                                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-600/40" />
+                                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-700" />
+                                    </span>
+                                    Live
+                                </span>
+                            </div>
+                            <p class="mt-2 flex items-baseline gap-2 tabular-nums">
+                                <span class="text-lg font-semibold tracking-tight text-slate-900">{{ instanceClock.time }}</span>
+                                <span class="text-xs font-medium text-slate-400">{{ instanceClock.timezoneLabel }}</span>
+                            </p>
+                            <p class="mt-0.5 text-xs text-slate-500">
+                                {{ instanceClock.date }}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </aside>
 

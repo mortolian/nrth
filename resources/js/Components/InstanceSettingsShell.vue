@@ -5,13 +5,14 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'overview' | 'mail' | 'operators';
+    section: 'overview' | 'mail' | 'operators' | 'timezone';
     title?: string;
     subtitle?: string;
 }>();
 
 const tabs = computed((): AppTabItem[] => [
     { id: 'overview', label: 'Overview', href: route('settings.instance') },
+    { id: 'timezone', label: 'Timezone', href: route('settings.instance.timezone') },
     { id: 'mail', label: 'Outbound email', href: route('settings.instance.mail') },
     { id: 'operators', label: 'Operators', href: route('settings.instance.operators') },
 ]);
@@ -22,6 +23,8 @@ const headerSubtitle = computed(() => {
     }
 
     switch (props.section) {
+        case 'timezone':
+            return 'Default timezone for schedules and businesses that have not set their own.';
         case 'mail':
             return 'SMTP for invitations, password resets, and invoices across this install.';
         case 'operators':

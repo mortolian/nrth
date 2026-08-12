@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use Throwable;
 
 /**
@@ -25,6 +26,12 @@ final class ApplyInstanceRuntimeSettings
 
         try {
             app(InstanceBackupDestinationSettings::class)->applyToRuntime();
+        } catch (Throwable) {
+            //
+        }
+
+        try {
+            app(InstanceTimezoneSettings::class)->applyToRuntime();
         } catch (Throwable) {
             //
         }

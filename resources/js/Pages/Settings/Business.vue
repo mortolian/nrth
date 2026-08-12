@@ -61,6 +61,8 @@ const props = defineProps<{
     }>;
     industries: Array<{ value: string; label: string }>;
     financial_year_months: Array<{ value: number; label: string }>;
+    timezone_options: Array<{ value: string; label: string }>;
+    instance_timezone: string;
     vat_period_types: Array<{ value: string; label: string }>;
     bank_account_types: Array<{ value: string; label: string }>;
     ai_providers: Array<{ value: string; label: string }>;
@@ -72,6 +74,10 @@ const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
+const timezoneSelectOptions = computed(() => [
+    { value: '', label: `Instance default (${props.instance_timezone})` },
+    ...props.timezone_options,
+]);
 
 const allowedTabs: BusinessTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'items', 'payment_pages', 'ai'];
 const initialTab = new URLSearchParams(window.location.search).get('tab');
@@ -91,6 +97,7 @@ const form = useForm({
     tax_reference: String(props.settings.tax_reference ?? ''),
     industry: String(props.settings.industry ?? ''),
     financial_year_end_month: Number(props.settings.financial_year_end_month ?? 2),
+    timezone: String(props.settings.timezone ?? ''),
     physical_street: String(props.settings.physical_street ?? ''),
     physical_city: String(props.settings.physical_city ?? ''),
     physical_province: String(props.settings.physical_province ?? ''),
@@ -364,6 +371,7 @@ const submit = () => {
         tax_reference: form.tax_reference,
         industry: form.industry,
         financial_year_end_month: form.financial_year_end_month,
+        timezone: form.timezone || null,
         physical_street: form.physical_street,
         physical_city: form.physical_city,
         physical_province: form.physical_province,
@@ -599,7 +607,7 @@ const resetItemUnits = () => {
 
                     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
                         <h4 class="text-sm font-semibold text-slate-900">Business classification</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">Industry and financial year for reporting context.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Industry, financial year, and local timezone for this business.</p>
                         <div class="mt-4 grid gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-slate-500">Industry</label>
@@ -618,6 +626,18 @@ const resetItemUnits = () => {
                                     @update:model-value="form.financial_year_end_month = Number($event)"
                                 />
                                 <p class="mt-1 text-xs text-slate-500">South Africa commonly uses February.</p>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Timezone</label>
+                                <AppSelect
+                                    v-model="form.timezone"
+                                    :options="timezoneSelectOptions"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Used for the sidebar clock and business-local dates. Leave as instance default to follow
+                                    Settings → Instance → Timezone.
+                                </p>
+                                <p v-if="form.errors.timezone" class="mt-1 text-xs text-rose-600">{{ form.errors.timezone }}</p>
                             </div>
                         </div>
                     </section>

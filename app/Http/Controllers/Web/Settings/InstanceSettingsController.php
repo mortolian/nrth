@@ -6,8 +6,10 @@ use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Timezones;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -23,6 +25,7 @@ class InstanceSettingsController extends Controller
         private readonly InstanceBackupRetentionSettings $backupRetention,
         private readonly InstanceBackupDestinationSettings $backupDestinations,
         private readonly InstanceMailSettings $mailSettings,
+        private readonly InstanceTimezoneSettings $timezoneSettings,
     ) {}
 
     public function edit(): Response
@@ -33,10 +36,46 @@ class InstanceSettingsController extends Controller
 
         return Inertia::render('Settings/Instance/Index', [
             'mail_summary' => $this->mailSettings->publicProps()['summary'],
+            'timezone_summary' => $this->timezoneSettings->publicProps()['summary'],
             'operators_summary' => $operatorCount === 1
                 ? '1 operator'
                 : "{$operatorCount} operators",
         ]);
+    }
+
+    public function timezone(): Response
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $props = $this->timezoneSettings->publicProps();
+
+        return Inertia::render('Settings/Instance/Timezone', [
+            'timezone' => $props,
+            'timezone_options' => Timezones::selectOptions($props['timezone']),
+        ]);
+    }
+
+    public function updateTimezone(Request $request): RedirectResponse
+    {
+        Gate::authorize('manageInstanceBackups');
+
+        $validated = $request->validate([
+            'timezone' => ['required', 'timezone:all'],
+        ]);
+
+        $this->timezoneSettings->update($validated);
+
+        activity()
+            ->causedBy($request->user())
+            ->withProperties([
+                'action' => 'instance_timezone_updated',
+                'timezone' => $validated['timezone'],
+            ])
+            ->log('Updated instance default timezone');
+
+        return redirect()
+            ->route('settings.instance.timezone')
+            ->with('success', 'Instance timezone saved.');
     }
 
     public function mail(Request $request): Response

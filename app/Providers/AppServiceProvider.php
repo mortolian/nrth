@@ -15,6 +15,7 @@ use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
@@ -118,6 +119,12 @@ class AppServiceProvider extends ServiceProvider
 
         try {
             app(InstanceMailSettings::class)->applyToRuntime();
+        } catch (\Throwable) {
+            // DB may be unavailable during early install / migrate.
+        }
+
+        try {
+            app(InstanceTimezoneSettings::class)->applyToRuntime();
         } catch (\Throwable) {
             // DB may be unavailable during early install / migrate.
         }

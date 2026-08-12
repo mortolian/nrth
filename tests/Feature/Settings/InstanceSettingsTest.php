@@ -5,6 +5,7 @@ namespace Tests\Feature\Settings;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Mail\InstanceSmtpTestMail;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -44,7 +45,32 @@ class InstanceSettingsTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Settings/Instance/Index')
                 ->has('mail_summary')
+                ->has('timezone_summary')
                 ->has('operators_summary'));
+    }
+
+    public function test_operator_can_update_instance_timezone(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $this->actingAs($user);
+
+        $this->get(route('settings.instance.timezone'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Settings/Instance/Timezone')
+                ->has('timezone')
+                ->has('timezone_options'));
+
+        $this->put(route('settings.instance.timezone.update'), [
+            'timezone' => 'Africa/Johannesburg',
+        ])->assertRedirect(route('settings.instance.timezone'));
+
+        $this->assertSame(
+            'Africa/Johannesburg',
+            app(InstanceTimezoneSettings::class)->resolved()
+        );
     }
 
     public function test_operator_sees_operators_on_operators_page(): void

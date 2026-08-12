@@ -97,6 +97,9 @@ Route::middleware([
     Route::post('/team-invitations/{invitation}/resend', [TeamInvitationController::class, 'resend'])
         ->name('team-invitations.resend');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
+    Route::get('/settings/instance/timezone', [InstanceSettingsController::class, 'timezone'])->name('settings.instance.timezone');
+    Route::put('/settings/instance/timezone', [InstanceSettingsController::class, 'updateTimezone'])
+        ->name('settings.instance.timezone.update');
     Route::get('/settings/instance/mail', [InstanceSettingsController::class, 'mail'])->name('settings.instance.mail');
     Route::get('/settings/instance/operators', [InstanceSettingsController::class, 'operators'])->name('settings.instance.operators');
     Route::put('/settings/instance/backup-retention', [InstanceSettingsController::class, 'updateBackupRetention'])

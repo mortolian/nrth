@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web\Settings;
 
 use App\Domain\Ai\AiCatalog;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
@@ -10,6 +11,7 @@ use App\Models\Team;
 use App\Models\TeamBankAccount;
 use App\Support\CalendarMonths;
 use App\Support\Iso4217Currencies;
+use App\Support\Timezones;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -70,6 +72,10 @@ class BusinessSettingsController extends Controller
                 ['value' => 'other', 'label' => 'Other'],
             ],
             'financial_year_months' => CalendarMonths::options(),
+            'timezone_options' => Timezones::selectOptions(
+                is_string($settings['timezone'] ?? null) ? (string) $settings['timezone'] : null
+            ),
+            'instance_timezone' => app(InstanceTimezoneSettings::class)->resolved(),
             'vat_period_types' => [
                 ['value' => 'bi_monthly', 'label' => 'Bi-monthly'],
                 ['value' => 'monthly', 'label' => 'Monthly'],
@@ -105,6 +111,10 @@ class BusinessSettingsController extends Controller
             $request->merge(['default_vat_rate' => 0]);
         }
 
+        if ($request->input('timezone') === '') {
+            $request->merge(['timezone' => null]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'trading_name' => ['nullable', 'string', 'max:255'],
@@ -124,6 +134,7 @@ class BusinessSettingsController extends Controller
             'tax_reference' => ['nullable', 'string', 'max:255'],
             'industry' => ['nullable', 'string', 'max:64'],
             'financial_year_end_month' => ['required', 'integer', Rule::in([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])],
+            'timezone' => ['nullable', 'timezone:all'],
             'physical_street' => ['nullable', 'string', 'max:255'],
             'physical_city' => ['nullable', 'string', 'max:255'],
             'physical_province' => ['nullable', 'string', 'max:255'],
@@ -320,7 +331,7 @@ class BusinessSettingsController extends Controller
 
         $settingsKeys = [
             'trading_name', 'registration_number', 'vat_number', 'tax_reference', 'industry',
-            'financial_year_end_month', 'physical_street', 'physical_city', 'physical_province',
+            'financial_year_end_month', 'timezone', 'physical_street', 'physical_city', 'physical_province',
             'physical_postal_code', 'physical_country', 'postal_same_as_physical',
             'postal_street', 'postal_city', 'postal_province', 'postal_postal_code', 'postal_country',
             'business_email', 'business_phone', 'business_website',

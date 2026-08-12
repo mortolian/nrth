@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Domain\Ai\AiCatalog;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Tax\Models\TaxRate;
 use App\Support\Modules\ModuleCatalog;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
+use App\Support\Timezones;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -273,6 +275,8 @@ class Team extends JetstreamTeam implements HasMedia
             'tax_reference' => null,
             'industry' => null,
             'financial_year_end_month' => 2,
+            /** null = use instance default timezone */
+            'timezone' => null,
             'physical_street' => null,
             'physical_city' => null,
             'physical_province' => null,
@@ -700,6 +704,19 @@ class Team extends JetstreamTeam implements HasMedia
     public function chargesVat(): bool
     {
         return filter_var($this->mergedBusinessSettings()['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Effective IANA timezone for this business (own setting, else instance default).
+     */
+    public function timezone(): string
+    {
+        $configured = $this->mergedBusinessSettings()['timezone'] ?? null;
+        if (is_string($configured) && Timezones::isValid(trim($configured))) {
+            return trim($configured);
+        }
+
+        return app(InstanceTimezoneSettings::class)->resolved();
     }
 
     /** Effective default VAT rate (0–1) for new line items; 0 when not VAT-registered or when zero-rated. */

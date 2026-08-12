@@ -125,6 +125,7 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 
 - Business logic lives under `app/Domain/{Context}/` (actions, DTOs, models, services).
 - Optional product modules are listed in [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php) (`travel`, `planning`, `contracting`, `wealth`). Enable/disable per team via **Settings → Features** (`team_modules`); disabled modules stay out of nav and return 403, without deleting data. Bounded module code may live under `app/Modules/{Name}/` (e.g. Wealth); Travel / Planning / Contracting still use `app/Domain` + web routes with `team.module:{name}` middleware. New businesses start with all optional modules off.
+- Instance default timezone: **Settings → Instance → Timezone** (operators; stored in `instance_settings`, fallback `APP_TIMEZONE`). Per-business override: **Settings → Business** (`business_settings.timezone`). Sidebar clock uses the current business effective timezone.
 - Team-owned models use `App\Domain\Shared\HasTeamScope`.
 - Controllers stay thin; call actions/services from `app/Http/Controllers/Web/`.
 - UI: Inertia + Vue 3 in `resources/js/Pages/`.

@@ -11,6 +11,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
 use App\Support\Modules\ModuleCatalog;
 use App\Support\TeamAccess\TeamAccess;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
@@ -58,6 +59,15 @@ class HandleInertiaRequests extends Middleware
             'csrf_token' => fn () => csrf_token(),
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
+            'app_timezone' => function () use ($request) {
+                $team = $request->user()?->currentTeam;
+                if ($team !== null) {
+                    return $team->timezone();
+                }
+
+                return app(InstanceTimezoneSettings::class)->resolved();
+            },
+            'instance_timezone' => fn () => app(InstanceTimezoneSettings::class)->resolved(),
             'currencyOptions' => fn () => Iso4217Currencies::selectOptions(),
             'business_logo_url' => fn () => $request->user()?->currentTeam?->getFirstMedia('logo')?->getUrl() ?: null,
             'business_currency' => fn () => Iso4217Currencies::normalize(
