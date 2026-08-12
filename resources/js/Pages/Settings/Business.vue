@@ -75,8 +75,8 @@ const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
 const timezoneSelectOptions = computed(() => [
-    { value: '', label: `Instance default (${props.instance_timezone})` },
-    ...props.timezone_options,
+    { value: '', label: `Instance default (${props.instance_timezone || 'UTC'})` },
+    ...(Array.isArray(props.timezone_options) ? props.timezone_options : []),
 ]);
 
 const allowedTabs: BusinessTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'items', 'payment_pages', 'ai'];

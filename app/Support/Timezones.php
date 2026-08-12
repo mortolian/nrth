@@ -5,7 +5,8 @@ namespace App\Support;
 final class Timezones
 {
     /**
-     * Preferred zones shown first in selects (still valid IANA identifiers).
+     * Curated IANA zones for selects. AppSelect renders every option eagerly,
+     * so we must not dump timezone_identifiers_list() (~400+) into the page.
      *
      * @var list<string>
      */
@@ -15,23 +16,38 @@ final class Timezones
         'Africa/Maputo',
         'Africa/Harare',
         'Africa/Gaborone',
+        'Africa/Lusaka',
+        'Africa/Blantyre',
         'Africa/Nairobi',
         'Africa/Lagos',
+        'Africa/Accra',
         'Africa/Cairo',
+        'Africa/Casablanca',
         'Europe/London',
+        'Europe/Dublin',
         'Europe/Amsterdam',
         'Europe/Berlin',
         'Europe/Paris',
+        'Europe/Madrid',
+        'Europe/Rome',
+        'Europe/Zurich',
+        'Europe/Stockholm',
         'UTC',
         'America/New_York',
+        'America/Toronto',
         'America/Chicago',
         'America/Denver',
         'America/Los_Angeles',
         'America/Sao_Paulo',
+        'America/Mexico_City',
         'Asia/Dubai',
+        'Asia/Kolkata',
         'Asia/Singapore',
         'Asia/Hong_Kong',
+        'Asia/Shanghai',
         'Asia/Tokyo',
+        'Asia/Seoul',
+        'Australia/Perth',
         'Australia/Sydney',
         'Pacific/Auckland',
     ];
@@ -53,20 +69,17 @@ final class Timezones
     }
 
     /**
+     * Compact select options (preferred zones + optional current value).
+     *
      * @return list<array{value: string, label: string}>
      */
     public static function selectOptions(?string $include = null): array
     {
         $identifiers = timezone_identifiers_list();
-        $preferred = array_values(array_filter(
+        $ordered = array_values(array_filter(
             self::PREFERRED,
             static fn (string $tz): bool => in_array($tz, $identifiers, true)
         ));
-
-        $rest = array_values(array_diff($identifiers, $preferred));
-        sort($rest);
-
-        $ordered = [...$preferred, ...$rest];
 
         if (is_string($include) && $include !== '' && self::isValid($include) && ! in_array($include, $ordered, true)) {
             array_unshift($ordered, $include);

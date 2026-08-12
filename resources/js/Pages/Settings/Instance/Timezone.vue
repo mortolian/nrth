@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import InstanceSettingsShell from '@/Components/InstanceSettingsShell.vue';
 
@@ -11,12 +11,16 @@ type TimezoneSettings = {
 
 const props = defineProps<{
     timezone: TimezoneSettings;
-    timezone_options: Array<{ value: string; label: string }>;
+    timezone_options?: Array<{ value: string; label: string }>;
 }>();
 
 const form = useForm({
     timezone: props.timezone.timezone,
 });
+
+const timezoneOptions = computed(() =>
+    Array.isArray(props.timezone_options) ? props.timezone_options : [],
+);
 
 watch(
     () => props.timezone,
@@ -57,7 +61,7 @@ const save = () => {
                     <AppSelect
                         id="instance-timezone"
                         v-model="form.timezone"
-                        :options="timezone_options"
+                        :options="timezoneOptions"
                     />
                     <p v-if="form.errors.timezone" class="mt-1 text-xs text-rose-600">
                         {{ form.errors.timezone }}

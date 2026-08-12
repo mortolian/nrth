@@ -61,7 +61,9 @@ class InstanceSettingsTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Settings/Instance/Timezone')
                 ->has('timezone')
-                ->has('timezone_options'));
+                ->has('timezone_options')
+                ->has('timezone_options.0.value')
+                ->missing('timezone_options.100'));
 
         $this->put(route('settings.instance.timezone.update'), [
             'timezone' => 'Africa/Johannesburg',
