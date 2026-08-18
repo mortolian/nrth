@@ -8,12 +8,15 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Services\InvoiceBusinessCurrencySnapshot;
 use App\Http\Controllers\Controller;
+use App\Support\DownloadFilename;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\RedirectResponse;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContractController extends Controller
 {
@@ -116,7 +119,12 @@ class ContractController extends Controller
         ]);
 
         if ($request->hasFile('signed_contract')) {
-            $contract->addMediaFromRequest('signed_contract')->toMediaCollection('signed-contract');
+            $contract->addMediaFromRequest('signed_contract')
+                ->usingFileName(DownloadFilename::sanitize(
+                    (string) $request->file('signed_contract')?->getClientOriginalName(),
+                    'signed-contract.pdf'
+                ))
+                ->toMediaCollection('signed-contract');
         }
 
         return to_route('contracting.contracts.index');
@@ -137,7 +145,12 @@ class ContractController extends Controller
 
         if ($request->hasFile('signed_contract')) {
             $contract->clearMediaCollection('signed-contract');
-            $contract->addMediaFromRequest('signed_contract')->toMediaCollection('signed-contract');
+            $contract->addMediaFromRequest('signed_contract')
+                ->usingFileName(DownloadFilename::sanitize(
+                    (string) $request->file('signed_contract')?->getClientOriginalName(),
+                    'signed-contract.pdf'
+                ))
+                ->toMediaCollection('signed-contract');
         }
 
         return to_route('contracting.contracts.index');
@@ -187,6 +200,26 @@ class ContractController extends Controller
         $contract->save();
 
         return to_route('invoicing.invoices.show', $invoice);
+    }
+
+    public function showSignedDocument(Request $request, Contract $contract): StreamedResponse
+    {
+        $this->authorizeTeam('contracts.view', $request);
+        abort_unless($contract->team_id === $request->user()->current_team_id, 403);
+
+        $media = $contract->getFirstMedia('signed-contract');
+        abort_if($media === null, 404);
+
+        $relative = $media->getPathRelativeToRoot();
+        $disk = Storage::disk($media->disk);
+        abort_unless($relative !== '' && $disk->exists($relative), 404);
+
+        $filename = DownloadFilename::sanitize((string) $media->file_name, 'signed-contract.pdf');
+
+        return $disk->response($relative, $filename, [
+            'Content-Type' => $media->mime_type ?: 'application/pdf',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     /**
@@ -248,7 +281,9 @@ class ContractController extends Controller
             'payment_terms' => $contract->payment_terms,
             'scope_of_work' => $contract->scope_of_work,
             'next_invoice_due_date' => optional($contract->next_invoice_due_date)->toDateString(),
-            'signed_contract_url' => $contract->getFirstMediaUrl('signed-contract') ?: null,
+            'signed_contract_url' => $contract->getFirstMedia('signed-contract') !== null
+                ? route('contracting.contracts.signed-document', $contract)
+                : null,
         ];
     }
 }

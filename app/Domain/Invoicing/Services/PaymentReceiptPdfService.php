@@ -2,7 +2,9 @@
 
 namespace App\Domain\Invoicing\Services;
 
+use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Payment;
+use App\Support\DownloadFilename;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\File;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -12,14 +14,15 @@ class PaymentReceiptPdfService
     public function generate(Payment $payment): Media
     {
         $tmpPath = $this->renderToTemporaryPath($payment);
-        $payment = $payment->fresh(['invoice', 'team', 'invoice.client']);
+        $payment = Payment::queryWithoutTeamScope()->find($payment->id);
         if ($payment === null) {
             File::delete($tmpPath);
             throw new \RuntimeException('Payment not found.');
         }
 
-        $invoiceNumber = (string) ($payment->invoice?->number ?? 'invoice');
-        $fileName = 'receipt-'.$invoiceNumber.'-'.$payment->id.'.pdf';
+        $invoice = Invoice::queryWithoutTeamScope()->find($payment->invoice_id);
+        $invoiceNumber = (string) ($invoice?->number ?? 'invoice');
+        $fileName = DownloadFilename::sanitize('receipt-'.$invoiceNumber.'-'.$payment->id.'.pdf', 'receipt.pdf');
 
         try {
             return $payment
@@ -37,10 +40,16 @@ class PaymentReceiptPdfService
      */
     public function renderToTemporaryPath(Payment $payment): string
     {
-        $payment = $payment->fresh(['invoice.client', 'invoice.payments', 'team']);
-        if ($payment === null || $payment->invoice === null) {
+        $payment = Payment::queryWithoutTeamScope()->find($payment->id);
+        $invoice = $payment !== null
+            ? Invoice::queryWithoutTeamScope()->with('payments')->find($payment->invoice_id)
+            : null;
+        if ($payment === null || $invoice === null) {
             throw new \RuntimeException('Payment or invoice not found.');
         }
+        $invoice->loadClientWithoutTeamScope();
+        $payment->setRelation('invoice', $invoice);
+        $payment->loadMissing('team');
 
         $tmpPath = storage_path('app/tmp/payment-receipt-'.$payment->id.'-'.uniqid().'.pdf');
         File::ensureDirectoryExists(dirname($tmpPath));
@@ -53,7 +62,7 @@ class PaymentReceiptPdfService
         ])
             ->setPaper('a4')
             ->setOptions([
-                'isRemoteEnabled' => true,
+                'isRemoteEnabled' => false,
                 'isPhpEnabled' => false,
                 'defaultFont' => 'DejaVu Sans',
                 'dpi' => 96,

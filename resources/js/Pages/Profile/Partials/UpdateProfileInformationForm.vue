@@ -19,6 +19,7 @@ const form = useForm({
     _method: 'PUT',
     name: props.user.name,
     email: props.user.email,
+    current_password: '',
     photo: null,
 });
 
@@ -35,6 +36,7 @@ const updateProfileInformation = () => {
         errorBag: 'updateProfileInformation',
         preserveScroll: true,
         onSuccess: () => {
+            form.current_password = '';
             clearPhotoFileInput();
             toast.success('Profile saved.');
         },
@@ -184,6 +186,25 @@ const clearPhotoFileInput = () => {
                         A new verification link has been sent to your email address.
                     </div>
                 </div>
+            </div>
+
+            <div
+                v-if="form.email.trim().toLowerCase() !== String(user.email).trim().toLowerCase()"
+                class="col-span-6 sm:col-span-4"
+            >
+                <InputLabel for="current_password" value="Current password" />
+                <TextInput
+                    id="current_password"
+                    v-model="form.current_password"
+                    type="password"
+                    class="mt-1 block w-full"
+                    required
+                    autocomplete="current-password"
+                />
+                <p class="mt-1 text-xs text-slate-500">
+                    Required to change your email address.
+                </p>
+                <InputError :message="form.errors.current_password" class="mt-2" />
             </div>
         </template>
 

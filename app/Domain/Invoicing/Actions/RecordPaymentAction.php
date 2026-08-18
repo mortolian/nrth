@@ -317,7 +317,6 @@ class RecordPaymentAction
     private function resolveDepositGlAccount(RecordPaymentDTO $dto): Account
     {
         $bankingAccount = BankingAccount::queryWithoutTeamScope()
-            ->with('glAccount')
             ->where('team_id', $dto->teamId)
             ->whereKey($dto->bankingAccountId)
             ->first();
@@ -334,7 +333,9 @@ class RecordPaymentAction
             ]);
         }
 
-        $gl = $bankingAccount->glAccount;
+        $gl = $bankingAccount->gl_account_id !== null
+            ? Account::queryWithoutTeamScope()->whereKey($bankingAccount->gl_account_id)->first()
+            : null;
         if ($gl === null || $bankingAccount->gl_account_id === null) {
             throw ValidationException::withMessages([
                 'banking_account_id' => __('Link that banking account to a ledger account first.'),

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Invoicing;
 use App\Domain\Invoicing\Models\Estimate;
 use App\Domain\Invoicing\Services\EstimatePdfService;
 use App\Http\Controllers\Controller;
+use App\Support\DownloadFilename;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -44,8 +45,9 @@ class EstimatePdfController extends Controller
                 fpassthru($stream);
                 fclose($stream);
             }
-        }, $media->file_name, [
+        }, DownloadFilename::sanitize((string) $media->file_name, 'estimate.pdf'), [
             'Content-Type' => $media->mime_type ?: 'application/pdf',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 }

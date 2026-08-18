@@ -263,6 +263,107 @@ class OnlinePaymentWebhooksTest extends TestCase
         ])->assertStatus(400);
     }
 
+    public function test_payfast_webhook_rejects_missing_passphrase_even_with_matching_md5(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->teamWithPayFast($team, '');
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'sent_at' => Carbon::parse('2026-04-15'),
+                'subtotal_cents' => 100_00,
+                'vat_amount_cents' => 15_00,
+                'total_cents' => 115_00,
+                'amount_paid_cents' => 0,
+                'currency' => 'ZAR',
+            ]);
+
+        InvoiceOnlinePaymentSession::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'invoice_id' => $invoice->id,
+            'provider' => 'payfast',
+            'status' => OnlinePaymentSessionStatus::Pending,
+            'amount_cents' => 115_00,
+            'currency' => 'ZAR',
+            'provider_checkout_id' => 'nrth-1-deadbeef',
+        ]);
+
+        $fields = [
+            'm_payment_id' => 'nrth-1-deadbeef',
+            'pf_payment_id' => '9',
+            'payment_status' => 'COMPLETE',
+            'amount_gross' => '115.00',
+            'amount_fee' => '3.45',
+            'amount_net' => '111.55',
+        ];
+        $fields['signature'] = PayFastSignature::build($fields, null);
+
+        $this->post(route('webhooks.payfast', $team), $fields)->assertStatus(400);
+        $this->assertSame(0, (int) $invoice->fresh()->getRawOriginal('amount_paid_cents'));
+    }
+
+    public function test_payfast_webhook_completes_when_guest_team_scope_hides_invoices(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->teamWithPayFast($team, 'pf-secret');
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'sent_at' => Carbon::parse('2026-04-15'),
+                'subtotal_cents' => 100_00,
+                'vat_amount_cents' => 15_00,
+                'total_cents' => 115_00,
+                'amount_paid_cents' => 0,
+                'currency' => 'ZAR',
+            ]);
+
+        $mPaymentId = 'nrth-pf-guest-scope';
+
+        InvoiceOnlinePaymentSession::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'invoice_id' => $invoice->id,
+            'provider' => 'payfast',
+            'status' => OnlinePaymentSessionStatus::Pending,
+            'amount_cents' => 115_00,
+            'currency' => 'ZAR',
+            'provider_checkout_id' => $mPaymentId,
+        ]);
+
+        $this->app->instance('nrth.forceGuestTeamScope', true);
+
+        $fields = [
+            'm_payment_id' => $mPaymentId,
+            'pf_payment_id' => '654321',
+            'payment_status' => 'COMPLETE',
+            'amount_gross' => '115.00',
+            'amount_fee' => '-3.45',
+            'amount_net' => '111.55',
+            'merchant_id' => '100001',
+        ];
+        $fields['signature'] = PayFastSignature::build($fields, 'pf-secret');
+
+        $this->post(route('webhooks.payfast', $team), $fields)->assertOk();
+
+        $this->app->forgetInstance('nrth.forceGuestTeamScope');
+
+        $invoice->refresh();
+        $this->assertSame(InvoiceStatus::Paid, $invoice->status);
+        $this->assertSame(115_00, (int) $invoice->getRawOriginal('amount_paid_cents'));
+    }
+
+    public function test_payfast_sandbox_defaults_to_live(): void
+    {
+        $this->assertFalse((bool) config('services.payfast.sandbox'));
+    }
+
     public function test_online_payment_start_requires_configuration(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

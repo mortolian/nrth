@@ -24,11 +24,21 @@ class PayFastPaymentWebhookController extends Controller
         /** @var array<string, mixed> $payfast */
         $payfast = is_array($gateways['payfast'] ?? null) ? $gateways['payfast'] : [];
         $passphrase = isset($payfast['passphrase']) && is_string($payfast['passphrase']) ? trim($payfast['passphrase']) : '';
+        if ($passphrase === '') {
+            return response('Webhook not configured', 400);
+        }
+
+        $merchantId = isset($payfast['merchant_id']) && is_string($payfast['merchant_id']) ? trim($payfast['merchant_id']) : '';
 
         /** @var array<string, mixed> $posted */
         $posted = $request->all();
-        if (! PayFastSignature::verifyPosted($posted, $passphrase !== '' ? $passphrase : null)) {
+        if (! PayFastSignature::verifyPosted($posted, $passphrase)) {
             return response('Invalid signature', 400);
+        }
+
+        $postedMerchant = isset($posted['merchant_id']) ? trim((string) $posted['merchant_id']) : '';
+        if ($merchantId !== '' && $postedMerchant !== '' && $postedMerchant !== $merchantId) {
+            return response('Invalid merchant', 400);
         }
 
         $paymentStatus = isset($posted['payment_status']) ? (string) $posted['payment_status'] : '';

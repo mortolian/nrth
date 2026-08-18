@@ -5,6 +5,7 @@ namespace App\Domain\Contracting\Models;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
+use App\Support\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\MediaLibrary\HasMedia;
@@ -45,7 +46,7 @@ class Contract extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('signed-contract')->singleFile();
+        $this->addMediaCollection('signed-contract')->useDisk(MediaDisks::private())->singleFile();
     }
 
     /**

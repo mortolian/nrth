@@ -2,7 +2,6 @@
 
 namespace App\Modules\Wealth\Providers;
 
-use App\Http\Middleware\EnforceSessionIdleTimeout;
 use App\Modules\Wealth\Contracts\WealthAssetValueProvider;
 use App\Modules\Wealth\Services\ModuleWealthAssetValueProvider;
 use Illuminate\Support\Facades\Route;
@@ -24,7 +23,6 @@ class WealthServiceProvider extends ServiceProvider
             'auth:sanctum',
             config('jetstream.auth_session'),
             'verified',
-            EnforceSessionIdleTimeout::class,
             'team.module:wealth',
         ])->prefix('wealth')->name('wealth.')->group(__DIR__.'/../routes/web.php');
     }

@@ -4,7 +4,9 @@ namespace App\Domain\Invoicing\Models;
 
 use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Shared\HasTeamScope;
+use App\Domain\Shared\LoadsClientWithoutTeamScope;
 use App\Models\Team;
+use App\Support\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
@@ -16,6 +18,7 @@ class Estimate extends Model implements HasMedia
 {
     use HasTeamScope;
     use InteractsWithMedia;
+    use LoadsClientWithoutTeamScope;
 
     protected $table = 'estimates';
 
@@ -86,7 +89,7 @@ class Estimate extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('estimate-pdfs')->singleFile();
+        $this->addMediaCollection('estimate-pdfs')->useDisk(MediaDisks::private())->singleFile();
     }
 
     /**

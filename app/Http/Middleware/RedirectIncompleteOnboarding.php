@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\AcceptTeamInvitations;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,9 +34,6 @@ class RedirectIncompleteOnboarding
             return $next($request);
         }
 
-        // Pending invites / membership on another business take priority over
-        // unfinished personal-team owner setup.
-        AcceptTeamInvitations::settleMembership($user);
         $user = $user->fresh();
 
         if ($user === null || $user->completed_onboarding_at !== null) {

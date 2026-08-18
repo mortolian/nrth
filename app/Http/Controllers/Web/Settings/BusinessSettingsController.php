@@ -213,7 +213,12 @@ class BusinessSettingsController extends Controller
                 'string',
                 'max:255',
             ],
-            'payment_gateways.payfast.passphrase' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.payfast.passphrase' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.payfast.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.stripe' => ['required', 'array'],
             'payment_gateways.stripe.enabled' => ['required', 'boolean'],
             'payment_gateways.stripe.publishable_key' => [
@@ -228,7 +233,12 @@ class BusinessSettingsController extends Controller
                 'string',
                 'max:255',
             ],
-            'payment_gateways.stripe.webhook_secret' => ['nullable', 'string', 'max:255'],
+            'payment_gateways.stripe.webhook_secret' => [
+                Rule::requiredIf(fn () => $request->boolean('payment_gateways.stripe.enabled')),
+                'nullable',
+                'string',
+                'max:255',
+            ],
             'payment_gateways.paypal' => ['required', 'array'],
             'payment_gateways.paypal.enabled' => ['required', 'boolean'],
             'payment_gateways.paypal.client_id' => [
@@ -301,7 +311,7 @@ class BusinessSettingsController extends Controller
             'bank_accounts.*.show_on_invoice' => ['required', 'boolean'],
             'item_units' => ['sometimes', 'array', 'max:50'],
             'item_units.*' => ['nullable', 'string', 'max:32'],
-            'logo' => ['nullable', 'image', 'max:4096'],
+            'logo' => ['nullable', 'mimes:jpeg,jpg,png,gif,webp', 'max:4096'],
             'remove_logo' => ['nullable', 'boolean'],
         ]);
 

@@ -175,7 +175,7 @@ class OnboardingController extends Controller
             'bank_account_number' => ['nullable', 'string', 'max:64'],
             'bank_branch_code' => ['nullable', 'string', 'max:32'],
             'bank_account_type' => ['required', Rule::in(['current', 'savings'])],
-            'logo' => ['nullable', 'image', 'max:4096'],
+            'logo' => ['nullable', 'mimes:jpeg,jpg,png,gif,webp', 'max:4096'],
         ]);
 
         if (! $validated['vat_registered']) {

@@ -36,7 +36,7 @@ return [
     ],
 
     'payfast' => [
-        'sandbox' => env('PAYFAST_SANDBOX', true),
+        'sandbox' => env('PAYFAST_SANDBOX', false),
     ],
 
     'openai' => [

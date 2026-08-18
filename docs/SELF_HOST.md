@@ -15,6 +15,7 @@ nrth is a financial app — do not expose plain HTTP long-term.
 - Set `APP_URL` to the public `https://…` URL (**no** `:8000` when using Caddy on 443).
 - Never open `https://host:8000` — nothing speaks TLS on that port.
 - `--lan` / HTTP on `:8000` is **trusted private network only**. Do not port-forward the app to the internet.
+- Do not publish Octane `:8000` on a public interface. The default `TRUSTED_PROXIES=*` trusts `X-Forwarded-*` from any client; only Caddy (or your reverse proxy) should be able to reach port 8000.
 - Postgres and Redis host ports bind to `127.0.0.1` by default. Vite HMR and Mailpit are dev-only services behind the optional `dev` Compose profile.
 - Production: do not publish Postgres, Redis, or Mailpit on `0.0.0.0`; firewall should allow **80/443 only** to the host.
 
@@ -50,6 +51,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 4. Outbound email: configure SMTP under **Settings → Instance → Outbound email**, or set `MAIL_*` in `.env` (Mailpit is for testing — do not expose `:8025` publicly). Instance SMTP overrides `.env` when enabled (applied on each Octane request and Horizon job — no worker restart required after saving). Use a **From** address on a domain your provider has verified (not `example.com`); that From is also used for instance backup status emails, which go to instance operators. A backup zip is still marked Ready if the status email fails to send.
 5. Instance backups (`./scripts/backup`) plus a host-level snapshot of Postgres + `storage` volumes — see [Backups and restore](#backups-and-restore)
 6. Never commit `.env`
+7. Leave `PAYFAST_SANDBOX` unset or `false` on a live host (sandbox ITNs can mark invoices paid). `MEDIA_DISK` should stay `local` (private) unless you have configured private object storage.
 
 ---
 

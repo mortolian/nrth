@@ -662,7 +662,7 @@ const resetItemUnits = () => {
                                 <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
                                     <ImagePlus class="h-4 w-4" />
                                     Upload
-                                    <input type="file" accept="image/*" class="hidden" @change="onLogo">
+                                    <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" @change="onLogo">
                                 </label>
                                 <button
                                     v-if="displayLogo"
@@ -1228,7 +1228,12 @@ const resetItemUnits = () => {
                                 <AppInput v-model="form.payment_gateways.payfast.merchant_key" />
                                 <p v-if="form.errors['payment_gateways.payfast.merchant_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.payfast.merchant_key'] }}</p>
                             </div>
-                            <div><label class="mb-1 block text-xs text-slate-500">Passphrase</label><AppInput v-model="form.payment_gateways.payfast.passphrase" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Passphrase</label>
+                                <AppInput v-model="form.payment_gateways.payfast.passphrase" />
+                                <p class="mt-1 text-xs text-slate-500">Required. Use the same passphrase as in PayFast so ITN notifications cannot be forged.</p>
+                                <p v-if="form.errors['payment_gateways.payfast.passphrase']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.payfast.passphrase'] }}</p>
+                            </div>
                         </div>
                     </div>
                     <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -1247,7 +1252,12 @@ const resetItemUnits = () => {
                                 <AppInput v-model="form.payment_gateways.stripe.secret_key" />
                                 <p v-if="form.errors['payment_gateways.stripe.secret_key']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.stripe.secret_key'] }}</p>
                             </div>
-                            <div><label class="mb-1 block text-xs text-slate-500">Webhook secret</label><AppInput v-model="form.payment_gateways.stripe.webhook_secret" /></div>
+                            <div>
+                                <label class="mb-1 block text-xs text-slate-500">Webhook secret</label>
+                                <AppInput v-model="form.payment_gateways.stripe.webhook_secret" />
+                                <p class="mt-1 text-xs text-slate-500">Required. Stripe signs Checkout webhooks with this secret.</p>
+                                <p v-if="form.errors['payment_gateways.stripe.webhook_secret']" class="mt-1 text-xs text-rose-600">{{ form.errors['payment_gateways.stripe.webhook_secret'] }}</p>
+                            </div>
                         </div>
                     </div>
                     <div class="rounded-md border border-slate-200 bg-slate-50 p-3">

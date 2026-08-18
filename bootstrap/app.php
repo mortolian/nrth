@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceSessionIdleTimeout;
 use App\Http\Middleware\EnsureTeamModule;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->web(append: [
+            EnforceSessionIdleTimeout::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             SyncSpatieTeamRole::class,
@@ -38,7 +40,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->validateCsrfTokens(except: [
-            'webhooks/payments/*',
+            'webhooks/payments/stripe/*',
+            'webhooks/payments/payfast/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -3,7 +3,10 @@
 namespace Tests\Feature\Invoicing;
 
 use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Invoicing\Enums\OnlinePaymentSessionStatus;
+use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\InvoiceOnlinePaymentSession;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -241,5 +244,89 @@ class PublicInvoicePayTest extends TestCase
 
         $invoice->refresh();
         $this->assertNull($invoice->public_token);
+    }
+
+    public function test_public_pay_page_includes_client_when_guest_team_scope_is_forced(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $team->forceFill([
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
+                ['payment_pages_enabled' => true],
+            ),
+        ])->save();
+
+        $client = Client::factory()->for($team)->create([
+            'name' => 'Visible Client',
+            'email' => 'billing@visible.test',
+        ]);
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'client_id' => $client->id,
+                'status' => InvoiceStatus::Sent,
+                'sent_at' => Carbon::parse('2026-04-15'),
+                'public_token' => 'c1d2e3f4a5b6789012345678abcdef01',
+                'total_cents' => 100_00,
+                'amount_paid_cents' => 0,
+            ]);
+
+        $this->app->instance('nrth.forceGuestTeamScope', true);
+
+        $this->get(route('public.invoice.pay', ['token' => $invoice->public_token]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Public/InvoicePay')
+                ->where('invoice.client.name', 'Visible Client')
+                ->where('invoice.client.email', 'billing@visible.test'));
+    }
+
+    public function test_public_pay_success_banner_requires_a_completed_session(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $team->forceFill([
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
+                ['payment_pages_enabled' => true],
+            ),
+        ])->save();
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'sent_at' => Carbon::parse('2026-04-15'),
+                'public_token' => 'd2e3f4a5b6789012345678abcdef0123',
+                'total_cents' => 100_00,
+                'amount_paid_cents' => 0,
+            ]);
+
+        $this->get(route('public.invoice.pay', [
+            'token' => $invoice->public_token,
+            'online_payment' => 'success',
+        ]))->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('flash_online_payment', null));
+
+        InvoiceOnlinePaymentSession::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'invoice_id' => $invoice->id,
+            'provider' => 'payfast',
+            'status' => OnlinePaymentSessionStatus::Completed,
+            'amount_cents' => 100_00,
+            'currency' => 'ZAR',
+            'provider_checkout_id' => 'nrth-done',
+        ]);
+
+        $this->get(route('public.invoice.pay', [
+            'token' => $invoice->public_token,
+            'online_payment' => 'success',
+        ]))->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('flash_online_payment', 'success'));
     }
 }

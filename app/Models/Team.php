@@ -149,7 +149,7 @@ class Team extends JetstreamTeam implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('logo')->singleFile();
+        $this->addMediaCollection('logo')->useDisk('public')->singleFile();
     }
 
     public function getLogoUrlAttribute(): ?string
@@ -256,8 +256,8 @@ class Team extends JetstreamTeam implements HasMedia
         }
 
         $mime = $media->mime_type;
-        if ($mime === null || $mime === '') {
-            $mime = 'image/png';
+        if ($mime === null || $mime === '' || ! in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+            return null;
         }
 
         return 'data:'.$mime.';base64,'.base64_encode($binary);

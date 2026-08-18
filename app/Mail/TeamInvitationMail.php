@@ -12,13 +12,17 @@ class TeamInvitationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
+    public const JOIN_LINK_TTL_DAYS = 7;
+
     public function __construct(public TeamInvitationModel $invitation) {}
 
     public function build(): self
     {
-        $joinUrl = URL::signedRoute('team-invitations.join', [
-            'invitation' => $this->invitation,
-        ]);
+        $joinUrl = URL::temporarySignedRoute(
+            'team-invitations.join',
+            now()->addDays(self::JOIN_LINK_TTL_DAYS),
+            ['invitation' => $this->invitation],
+        );
 
         return $this->markdown('emails.team-invitation', [
             'acceptUrl' => $joinUrl,

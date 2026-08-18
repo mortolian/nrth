@@ -149,4 +149,15 @@ class ParseSupplierDocumentTest extends TestCase
             ->assertJsonPath('data.name', 'Odd Vat Co')
             ->assertJsonPath('data.vat_number', null);
     }
+
+    public function test_parse_document_rejects_disallowed_mime_types(): void
+    {
+        [, $team] = $this->actingTeam();
+        $this->configureAi($team);
+
+        $this->postJson(route('suppliers.parse-document'), [
+            'document' => UploadedFile::fake()->create('notes.txt', 10, 'text/plain'),
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors('document');
+    }
 }

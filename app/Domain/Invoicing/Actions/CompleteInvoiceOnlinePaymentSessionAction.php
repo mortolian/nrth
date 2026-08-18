@@ -7,6 +7,7 @@ use App\Domain\Invoicing\DTOs\RecordPaymentDTO;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Enums\OnlinePaymentSessionStatus;
 use App\Domain\Invoicing\Enums\PaymentMethod;
+use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoiceOnlinePaymentSession;
 use App\Models\Team;
 use App\Support\Iso4217Currencies;
@@ -47,8 +48,11 @@ class CompleteInvoiceOnlinePaymentSessionAction
                 ]);
             }
 
-            $locked->loadMissing('invoice');
-            $invoice = $locked->invoice;
+            $invoice = Invoice::queryWithoutTeamScope()
+                ->whereKey($locked->invoice_id)
+                ->where('team_id', $locked->team_id)
+                ->lockForUpdate()
+                ->first();
             if ($invoice === null) {
                 throw ValidationException::withMessages([
                     'invoice' => __('Invoice not found for this payment session.'),

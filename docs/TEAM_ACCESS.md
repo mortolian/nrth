@@ -52,10 +52,10 @@ Leaving uses Jetstream `DELETE /teams/{team}/members/{user}` (self). Owners cann
 Invited people should **join the existing business**, not create a new one:
 
 1. Owner invites by email (role = `team_roles.key`).
-2. The email has one button: **Join {business}** → signed `/invitations/{id}` (`team-invitations.join`).
+2. The email has one button: **Join {business}** → signed `/invitations/{id}` (`team-invitations.join`). The link expires after **7 days**.
 3. **New user** (no account): self-registration is disabled. The invite link sends them to sign in with a message to ask the instance administrator or business owner to create their account first.
-4. **Existing user**: sign in with that email; login automatically accepts pending invites and lands on the invited business (skips owner onboarding even if a leftover personal team exists).
-5. Middleware / onboarding also settle pending invites and prefer membership on another business over unfinished personal-team setup.
+4. **Existing user**: sign in with that email; login automatically accepts pending invites for a **verified** address and lands on the invited business (skips owner onboarding even if a leftover personal team exists). Changing your profile email requires your current password and clears verification, so it does not auto-join invitations for the new address.
+5. Signed join/accept still matches on email. Middleware no longer auto-joins on every request.
 
 ## When adding a feature
 

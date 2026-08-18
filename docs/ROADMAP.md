@@ -36,7 +36,7 @@ Planned focus areas — not committed dates or ordering:
 - [ ] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings
 - [ ] **README screenshots / demo** — visual overview for new visitors
 - [x] **Architecture docs** — domain layout, actions, team scoping ([docs/ARCHITECTURE.md](ARCHITECTURE.md))
-- [ ] **Security review** — auth flows, uploads, payment webhooks
+- [x] **Security review** — auth, uploads, public pay, Stripe/PayFast webhooks, invitation/email-change hardening ([SECURITY.md](../SECURITY.md))
 - [x] **Expanded test coverage** — tenant isolation plus report arithmetic (P&L / TB / BS / cash flow) and invoice overpayment rejection
 
 Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and [Discussions](https://github.com/mortolian/nrth/discussions).

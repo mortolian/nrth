@@ -33,6 +33,29 @@ class InviteTeamMemberTest extends TestCase
         $this->assertCount(1, $user->currentTeam->fresh()->teamInvitations);
     }
 
+    public function test_invitation_mail_includes_expiring_join_link(): void
+    {
+        if (! Features::sendsTeamInvitations()) {
+            $this->markTestSkipped('Team invitations not enabled.');
+        }
+
+        Mail::fake();
+
+        $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+
+        $this->post('/teams/'.$user->currentTeam->id.'/members', [
+            'email' => 'expiring@example.com',
+            'role' => 'accountant',
+        ]);
+
+        Mail::assertSent(TeamInvitationMail::class, function (TeamInvitationMail $mail) {
+            $html = $mail->render();
+            $this->assertStringContainsString('expires=', $html);
+
+            return true;
+        });
+    }
+
     public function test_team_member_invitations_can_be_cancelled(): void
     {
         if (! Features::sendsTeamInvitations()) {

@@ -8,9 +8,10 @@ return [
     |--------------------------------------------------------------------------
     |
     | Optional comma-separated login emails that may manage whole-install backups
-    | in addition to users with is_instance_operator. Prefer Backups & exports
-    | (Instance backup) for day-to-day operator management. The first registered
-    | user is promoted automatically; existing installs can run:
+    | in addition to users with is_instance_operator. The matching user must have
+    | email_verified_at set; changing profile email clears that timestamp.
+    | Prefer Settings → Instance for day-to-day operator management. The first
+    | created user is promoted automatically; existing installs can run:
     | php artisan nrth:promote-first-operator
     |
     */

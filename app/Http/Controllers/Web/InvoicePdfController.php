@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Services\InvoicePdfService;
 use App\Http\Controllers\Controller;
+use App\Support\DownloadFilename;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,7 +52,10 @@ class InvoicePdfController extends Controller
         $disk = Storage::disk($media->disk);
         $path = $media->getPathRelativeToRoot();
         $stream = $disk->readStream($path);
-        $fileName = $media->file_name ?: ($invoice->number.'.pdf');
+        $fileName = DownloadFilename::sanitize(
+            (string) ($media->file_name ?: ($invoice->number.'.pdf')),
+            'invoice.pdf'
+        );
         $headers = [
             'Content-Type' => $media->mime_type ?: 'application/pdf',
         ];
@@ -65,7 +69,7 @@ class InvoicePdfController extends Controller
             }, $fileName, $headers);
         }
 
-        $safeName = str_replace('"', '', $fileName);
+        $safeName = DownloadFilename::sanitize($fileName, 'invoice.pdf');
         $headers['Content-Disposition'] = 'inline; filename="'.$safeName.'"';
         $headers['Cache-Control'] = 'private, max-age=0, must-revalidate';
 

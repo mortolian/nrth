@@ -70,7 +70,7 @@ Deeper docs for contributors and self-hosters.
 
 Security, licensing, and optional infrastructure improvements.
 
-- [ ] **Security review** — Audit auth flows, file uploads, and payment webhooks (Stripe / PayFast: [PayFastPaymentWebhookController](../app/Http/Controllers/Web/Webhooks/PayFastPaymentWebhookController.php), related invoicing payment tests)
+- [x] **Security review** — Auth, uploads, public pay, Stripe/PayFast webhooks (2026-08-18). PayFast passphrase and Stripe webhook secret are required; residuals in [SECURITY.md](../SECURITY.md)
 - [ ] **Composer / dependency license scan in CI** (optional) — Add a license compliance check to [.github/workflows/](../.github/workflows/) (e.g. `composer licenses` or a dedicated action)
 - [ ] **Publish Docker image to GHCR** (optional) — Simplify self-hosting; reference from [SELF_HOST.md](SELF_HOST.md) and [compose.yaml](../compose.yaml)
 - [ ] **Hosted docs site** (optional) — e.g. GitHub Pages or Read the Docs for [docs/](.)

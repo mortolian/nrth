@@ -4,6 +4,7 @@ namespace App\Domain\Invoicing\Services;
 
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Support\DownloadFilename;
 use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\InvoicePayQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -15,7 +16,7 @@ class InvoicePdfService
     public function generate(Invoice $invoice): Media
     {
         $tmpPath = $this->renderToTemporaryPath($invoice);
-        $invoice = $invoice->fresh();
+        $invoice = Invoice::queryWithoutTeamScope()->find($invoice->id);
         if ($invoice === null) {
             File::delete($tmpPath);
             throw new \RuntimeException('Invoice not found.');
@@ -25,7 +26,7 @@ class InvoicePdfService
             return $invoice
                 ->addMedia($tmpPath)
                 ->usingName('Invoice '.$invoice->number)
-                ->usingFileName($invoice->number.'.pdf')
+                ->usingFileName(DownloadFilename::sanitize($invoice->number.'.pdf', 'invoice.pdf'))
                 ->toMediaCollection('invoice-pdfs');
         } finally {
             File::delete($tmpPath);
@@ -37,10 +38,13 @@ class InvoicePdfService
      */
     public function renderToTemporaryPath(Invoice $invoice): string
     {
-        $invoice = $invoice->fresh(['team', 'client', 'lineItems']);
+        $invoice = Invoice::queryWithoutTeamScope()
+            ->with(['team', 'lineItems'])
+            ->find($invoice->id);
         if ($invoice === null) {
             throw new \RuntimeException('Invoice not found.');
         }
+        $invoice->loadClientWithoutTeamScope();
 
         $tmpPath = storage_path('app/tmp/invoice-'.$invoice->id.'-'.uniqid().'.pdf');
         File::ensureDirectoryExists(dirname($tmpPath));
@@ -63,7 +67,7 @@ class InvoicePdfService
         ])
             ->setPaper('a4')
             ->setOptions([
-                'isRemoteEnabled' => true,
+                'isRemoteEnabled' => false,
                 'isPhpEnabled' => false,
                 'defaultFont' => 'DejaVu Sans',
                 'dpi' => 96,

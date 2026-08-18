@@ -69,6 +69,10 @@ class InstanceOperatorService
             return true;
         }
 
+        if ($user->email_verified_at === null) {
+            return false;
+        }
+
         $email = strtolower((string) $user->email);
 
         return $email !== '' && in_array($email, $this->envOperatorEmails(), true);

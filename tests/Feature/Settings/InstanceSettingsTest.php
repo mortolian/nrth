@@ -104,6 +104,36 @@ class InstanceSettingsTest extends TestCase
         $this->get(route('settings.instance'))->assertForbidden();
     }
 
+    public function test_unverified_env_operator_email_cannot_manage_instance(): void
+    {
+        User::factory()->withPersonalTeam()->create();
+
+        Config::set('nrth.operator_emails', ['env-op@example.com']);
+
+        $user = User::factory()->withPersonalTeam()->unverified()->create([
+            'email' => 'env-op@example.com',
+            'is_instance_operator' => false,
+        ]);
+
+        $this->actingAs($user);
+        $this->get(route('settings.instance'))->assertForbidden();
+    }
+
+    public function test_verified_env_operator_email_can_manage_instance(): void
+    {
+        User::factory()->withPersonalTeam()->create();
+
+        Config::set('nrth.operator_emails', ['env-op@example.com']);
+
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'env-op@example.com',
+            'is_instance_operator' => false,
+        ]);
+
+        $this->actingAs($user);
+        $this->get(route('settings.instance'))->assertOk();
+    }
+
     public function test_operator_can_add_another_operator_by_email(): void
     {
         $operator = User::factory()->withPersonalTeam()->create([

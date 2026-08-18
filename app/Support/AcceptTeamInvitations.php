@@ -20,6 +20,10 @@ final class AcceptTeamInvitations
             return null;
         }
 
+        if ($user->email_verified_at === null) {
+            return null;
+        }
+
         $invitations = TeamInvitation::query()
             ->with('team')
             ->whereRaw('lower(email) = ?', [$email])

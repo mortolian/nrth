@@ -71,6 +71,32 @@ class SessionIdleTimeoutTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_idle_timeout_applies_to_profile_routes(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        $team->forceFill([
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
+                ['session_idle_timeout_minutes' => 15]
+            ),
+        ])->save();
+
+        $this->actingAs($user);
+
+        $stale = now()->subMinutes(16)->getTimestamp();
+
+        $this->withSession([
+            EnforceSessionIdleTimeout::SESSION_KEY => $stale,
+        ])->get(route('profile.show'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status', 'You were signed out due to inactivity.');
+
+        $this->assertGuest();
+    }
+
     public function test_request_within_idle_window_refreshes_activity(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

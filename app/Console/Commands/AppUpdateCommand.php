@@ -50,6 +50,13 @@ class AppUpdateCommand extends Command
                 }
             });
 
+            $this->components->task('Moving media off the public disk', function (): void {
+                Artisan::call('nrth:move-media-to-private-disk', ['--ansi' => true]);
+                if (Artisan::output() !== '') {
+                    $this->output->write(Artisan::output());
+                }
+            });
+
             $this->components->task('Clearing config, route, and view caches', function (): void {
                 Artisan::call('config:clear', ['--ansi' => true]);
                 Artisan::call('route:clear', ['--ansi' => true]);

@@ -128,9 +128,114 @@ class PaymentPagesEnabledTest extends TestCase
         $this->assertNotNull($team);
         $settings = $team->mergedBusinessSettings();
 
-        $payload = [
+        $payload = $this->businessPaymentTabPayload($team->name, $settings, [
+            'stripe' => [
+                'enabled' => true,
+                'publishable_key' => '',
+                'secret_key' => '',
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('settings.business.update'), $payload)
+            ->assertSessionHasErrors([
+                'payment_gateways.stripe.publishable_key',
+                'payment_gateways.stripe.secret_key',
+            ]);
+    }
+
+    public function test_enabling_stripe_without_webhook_secret_is_rejected(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $settings = $team->mergedBusinessSettings();
+
+        $payload = $this->businessPaymentTabPayload($team->name, $settings, [
+            'stripe' => [
+                'enabled' => true,
+                'publishable_key' => 'pk_test',
+                'secret_key' => 'sk_test',
+                'webhook_secret' => '',
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('settings.business.update'), $payload)
+            ->assertSessionHasErrors('payment_gateways.stripe.webhook_secret');
+    }
+
+    public function test_enabling_payfast_without_passphrase_is_rejected(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $settings = $team->mergedBusinessSettings();
+
+        $payload = $this->businessPaymentTabPayload($team->name, $settings, [
+            'payfast' => [
+                'enabled' => true,
+                'merchant_id' => '100001',
+                'merchant_key' => 'abc123',
+                'passphrase' => '',
+            ],
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('settings.business.update'), $payload)
+            ->assertSessionHasErrors('payment_gateways.payfast.passphrase');
+    }
+
+    public function test_start_online_payment_rejects_when_payment_pages_disabled(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $user->forceFill(['current_team_id' => $team->id])->save();
+
+        $team->forceFill([
+            'business_settings' => array_replace_recursive(
+                is_array($team->business_settings) ? $team->business_settings : [],
+                [
+                    'payment_pages_enabled' => false,
+                    'payment_gateways' => [
+                        'stripe' => [
+                            'enabled' => true,
+                            'secret_key' => 'sk_test_fake',
+                            'publishable_key' => 'pk_test_fake',
+                        ],
+                    ],
+                ]
+            ),
+        ])->save();
+
+        $this->actingAs($user);
+
+        $invoice = Invoice::factory()->for($team)->create([
+            'status' => InvoiceStatus::Sent,
+            'sent_at' => now(),
+            'currency' => 'ZAR',
+            'total_cents' => 10_000,
+            'amount_paid_cents' => 0,
+        ]);
+
+        $response = $this->post(route('invoicing.invoices.online-payments.store', $invoice), [
+            'provider' => 'stripe',
+        ]);
+
+        $response->assertSessionHasErrors('provider');
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @param  array<string, array<string, mixed>>  $gatewayOverrides
+     * @return array<string, mixed>
+     */
+    private function businessPaymentTabPayload(string $name, array $settings, array $gatewayOverrides): array
+    {
+        return [
             'tab' => 'payment_pages',
-            'name' => $team->name,
+            'name' => $name,
             'trading_name' => $settings['trading_name'],
             'registration_number' => $settings['registration_number'],
             'vat_number' => $settings['vat_number'],
@@ -173,13 +278,7 @@ class PaymentPagesEnabledTest extends TestCase
             'payment_pages_enabled' => true,
             'session_idle_timeout_minutes' => $settings['session_idle_timeout_minutes'],
             'ai' => $settings['ai'],
-            'payment_gateways' => array_replace_recursive($settings['payment_gateways'], [
-                'stripe' => [
-                    'enabled' => true,
-                    'publishable_key' => '',
-                    'secret_key' => '',
-                ],
-            ]),
+            'payment_gateways' => array_replace_recursive($settings['payment_gateways'], $gatewayOverrides),
             'bank_accounts' => [
                 [
                     'title' => '',
@@ -196,52 +295,5 @@ class PaymentPagesEnabledTest extends TestCase
                 ],
             ],
         ];
-
-        $this->actingAs($user)
-            ->post(route('settings.business.update'), $payload)
-            ->assertSessionHasErrors([
-                'payment_gateways.stripe.publishable_key',
-                'payment_gateways.stripe.secret_key',
-            ]);
-    }
-
-    public function test_start_online_payment_rejects_when_payment_pages_disabled(): void
-    {
-        $user = User::factory()->withPersonalTeam()->create();
-        $team = $user->currentTeam;
-        $this->assertNotNull($team);
-        $user->forceFill(['current_team_id' => $team->id])->save();
-
-        $team->forceFill([
-            'business_settings' => array_replace_recursive(
-                is_array($team->business_settings) ? $team->business_settings : [],
-                [
-                    'payment_pages_enabled' => false,
-                    'payment_gateways' => [
-                        'stripe' => [
-                            'enabled' => true,
-                            'secret_key' => 'sk_test_fake',
-                            'publishable_key' => 'pk_test_fake',
-                        ],
-                    ],
-                ]
-            ),
-        ])->save();
-
-        $this->actingAs($user);
-
-        $invoice = Invoice::factory()->for($team)->create([
-            'status' => InvoiceStatus::Sent,
-            'sent_at' => now(),
-            'currency' => 'ZAR',
-            'total_cents' => 10_000,
-            'amount_paid_cents' => 0,
-        ]);
-
-        $response = $this->post(route('invoicing.invoices.online-payments.store', $invoice), [
-            'provider' => 'stripe',
-        ]);
-
-        $response->assertSessionHasErrors('provider');
     }
 }

@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
@@ -79,5 +80,28 @@ class UserFactory extends Factory
                 ->when(is_callable($callback), $callback),
             'ownedTeams'
         );
+    }
+
+    /**
+     * Preserve the operator flag when it is not mass-assignable.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public function make($attributes = [], ?Model $parent = null)
+    {
+        $operator = null;
+        if (is_array($attributes) && array_key_exists('is_instance_operator', $attributes)) {
+            $operator = (bool) $attributes['is_instance_operator'];
+            unset($attributes['is_instance_operator']);
+        }
+
+        /** @var User $user */
+        $user = parent::make($attributes, $parent);
+
+        if ($operator !== null) {
+            $user->forceFill(['is_instance_operator' => $operator]);
+        }
+
+        return $user;
     }
 }

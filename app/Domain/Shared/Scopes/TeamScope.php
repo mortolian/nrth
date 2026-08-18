@@ -11,7 +11,10 @@ final class TeamScope implements Scope
     public function apply(Builder $builder, Model $model): void
     {
         if (! auth()->hasUser()) {
-            if (! app()->runningInConsole()) {
+            $treatAsHttpGuest = ! app()->runningInConsole()
+                || app()->bound('nrth.forceGuestTeamScope');
+
+            if ($treatAsHttpGuest) {
                 $builder->whereRaw('1 = 0');
             }
 

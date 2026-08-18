@@ -39,7 +39,6 @@ class User extends Authenticatable
         'password',
         'preferences',
         'completed_onboarding_at',
-        'is_instance_operator',
     ];
 
     /**

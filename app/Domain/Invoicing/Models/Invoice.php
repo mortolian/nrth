@@ -6,7 +6,9 @@ use App\Domain\Accounting\Casts\MoneyCast;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Shared\HasTeamScope;
+use App\Domain\Shared\LoadsClientWithoutTeamScope;
 use App\Models\Team;
+use App\Support\MediaDisks;
 use Brick\Money\Money;
 use Carbon\Carbon;
 use Database\Factories\InvoiceFactory;
@@ -27,6 +29,7 @@ class Invoice extends Model implements HasMedia
 
     use HasTeamScope;
     use InteractsWithMedia;
+    use LoadsClientWithoutTeamScope;
 
     protected $fillable = [
         'team_id',
@@ -134,7 +137,7 @@ class Invoice extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('invoice-pdfs')->singleFile();
+        $this->addMediaCollection('invoice-pdfs')->useDisk(MediaDisks::private())->singleFile();
     }
 
     /**

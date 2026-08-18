@@ -8,6 +8,7 @@ use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Invoicing\Enums\PaymentMethod;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
+use App\Support\MediaDisks;
 use Database\Factories\PaymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -85,7 +86,7 @@ class Payment extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('payment-receipts')->singleFile();
+        $this->addMediaCollection('payment-receipts')->useDisk(MediaDisks::private())->singleFile();
     }
 
     /**

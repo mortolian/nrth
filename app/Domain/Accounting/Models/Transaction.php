@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\MediaDisks;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -54,7 +55,7 @@ class Transaction extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('attachments');
+        $this->addMediaCollection('attachments')->useDisk(MediaDisks::private());
     }
 
     /**

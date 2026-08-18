@@ -330,9 +330,9 @@ class ExpensesController extends Controller
         }
 
         $request->validate([
-            'receipt' => ['nullable', 'file', 'max:10240'],
+            'receipt' => ['nullable', 'file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
             'receipts' => ['nullable', 'array', 'max:10'],
-            'receipts.*' => ['file', 'max:10240'],
+            'receipts.*' => ['file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
             'attachment_id' => ['nullable', 'integer'],
             'attachment_ids' => ['nullable', 'array', 'max:10'],
             'attachment_ids.*' => ['integer'],
@@ -577,9 +577,9 @@ class ExpensesController extends Controller
         $this->authorizeTeam('expenses.manage', $request);
         $transaction = $this->resolveTeamExpense($request, $transaction);
         $request->validate([
-            'receipt' => ['nullable', 'file', 'max:10240'],
+            'receipt' => ['nullable', 'file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
             'receipts' => ['nullable', 'array', 'max:20'],
-            'receipts.*' => ['file', 'max:10240'],
+            'receipts.*' => ['file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
         ]);
 
         if (! $request->hasFile('receipts') && ! $request->hasFile('receipt')) {
@@ -618,9 +618,12 @@ class ExpensesController extends Controller
         $path = $media->getPath();
         abort_unless(is_string($path) && $path !== '' && is_file($path), 404);
 
+        $filename = str_replace(["\r", "\n", '"'], '', (string) $media->file_name) ?: 'receipt';
+
         return response()->file($path, [
             'Content-Type' => $media->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => 'inline; filename="'.$media->file_name.'"',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -777,9 +780,9 @@ class ExpensesController extends Controller
             'office_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'distance_km' => ['nullable', 'numeric', 'min:0'],
             'rate_per_km' => ['nullable', 'numeric', 'min:0'],
-            'receipt' => ['nullable', 'file', 'max:10240'],
+            'receipt' => ['nullable', 'file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
             'receipts' => ['nullable', 'array', 'max:20'],
-            'receipts.*' => ['file', 'max:10240'],
+            'receipts.*' => ['file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
             'remove_attachment_ids' => ['nullable', 'array', 'max:50'],
             'remove_attachment_ids.*' => ['integer'],
         ]);

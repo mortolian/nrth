@@ -89,6 +89,15 @@ class StartInvoiceOnlinePaymentSessionAction
             ]);
         }
 
+        $webhookSecret = isset($cfg['webhook_secret']) && is_string($cfg['webhook_secret']) ? trim($cfg['webhook_secret']) : '';
+        if ($webhookSecret === '') {
+            throw ValidationException::withMessages([
+                'provider' => __('Stripe webhook secret is not configured. Add it so Checkout completions can be verified.'),
+            ]);
+        }
+
+        $this->cancelPendingSessions($team, $invoice, 'stripe');
+
         $session = InvoiceOnlinePaymentSession::query()->create([
             'team_id' => $team->id,
             'invoice_id' => $invoice->id,
@@ -173,6 +182,14 @@ class StartInvoiceOnlinePaymentSessionAction
             ]);
         }
 
+        if ($passphrase === '') {
+            throw ValidationException::withMessages([
+                'provider' => __('PayFast passphrase is not configured. Add the merchant passphrase so payment notifications cannot be forged.'),
+            ]);
+        }
+
+        $this->cancelPendingSessions($team, $invoice, 'payfast');
+
         $session = InvoiceOnlinePaymentSession::query()->create([
             'team_id' => $team->id,
             'invoice_id' => $invoice->id,
@@ -197,7 +214,7 @@ class StartInvoiceOnlinePaymentSessionAction
         $returnUrl = $checkoutReturnUrls['payfast_return'] ?? ($defaultShow.'?online_payment=success');
         $cancelUrl = $checkoutReturnUrls['payfast_cancel'] ?? ($defaultShow.'?online_payment=cancelled');
 
-        $invoice->loadMissing('client');
+        $invoice->loadClientWithoutTeamScope();
         $settings = $team->mergedBusinessSettings();
         $email = trim((string) ($invoice->client?->email ?? ''));
         if ($email === '') {
@@ -223,13 +240,13 @@ class StartInvoiceOnlinePaymentSessionAction
             'item_name' => 'Invoice '.$invoice->number,
         ];
 
-        $signature = PayFastSignature::build($fields, $passphrase !== '' ? $passphrase : null);
+        $signature = PayFastSignature::build($fields, $passphrase);
         $fields['signature'] = $signature;
 
         /** @var array<string, string> $stringFields */
         $stringFields = array_map(static fn (mixed $v): string => (string) $v, $fields);
 
-        $sandbox = (bool) config('services.payfast.sandbox', true);
+        $sandbox = (bool) config('services.payfast.sandbox', false);
         $action = $sandbox
             ? 'https://sandbox.payfast.co.za/eng/process'
             : 'https://www.payfast.co.za/eng/process';
@@ -239,5 +256,15 @@ class StartInvoiceOnlinePaymentSessionAction
             'action' => $action,
             'fields' => $stringFields,
         ];
+    }
+
+    private function cancelPendingSessions(Team $team, Invoice $invoice, string $provider): void
+    {
+        InvoiceOnlinePaymentSession::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('invoice_id', $invoice->id)
+            ->where('provider', $provider)
+            ->where('status', OnlinePaymentSessionStatus::Pending)
+            ->update(['status' => OnlinePaymentSessionStatus::Cancelled]);
     }
 }

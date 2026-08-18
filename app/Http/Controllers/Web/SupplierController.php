@@ -106,7 +106,7 @@ class SupplierController extends Controller
         }
 
         $request->validate([
-            'document' => ['required', 'file', 'max:10240'],
+            'document' => ['required', 'file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
         ]);
 
         /** @var UploadedFile $document */

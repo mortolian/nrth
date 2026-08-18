@@ -59,6 +59,29 @@ If you run your own instance:
 - Apply updates from `master` or tagged releases promptly
 - See [docs/SELF_HOST.md](docs/SELF_HOST.md)
 
+### Beta review (2026-08-18)
+
+Reviewed auth, uploads, public pay, and Stripe/PayFast webhooks. Changes shipped with that review:
+
+- PayFast **passphrase is required** when the gateway is enabled; ITN is rejected if it is missing (unsigned MD5 is not accepted)
+- Stripe **webhook signing secret is required** when Stripe is enabled
+- Business logos reject SVG; expense receipts are limited to JPEG/PNG/GIF/WebP/PDF
+- Invoice PDFs, receipts, and signed contracts are stored on the **private** media disk (not `/storage/…` after `storage:link`). Logos stay on the public disk. `./scripts/update` runs `nrth:move-media-to-private-disk`
+- DomPDF does not fetch remote URLs from invoice markdown
+- Online payment completion loads invoices without TeamScope (webhooks are unauthenticated HTTP)
+- PayFast sandbox defaults to **off** (`PAYFAST_SANDBOX=false`); the public “payment completed” banner only shows after a completed checkout session
+- Changing your email requires the current password and clears `email_verified_at`, so a new address cannot auto-join pending invitations or match `NRTH_OPERATOR_EMAILS` until that mailbox is treated as verified
+- Session idle timeout applies to the full `web` stack (including Jetstream profile and team pages)
+- Invitation join links expire after 7 days
+- `is_instance_operator` is not mass-assignable
+
+Residual (accepted for self-host / later hardening):
+
+- Email verification is off (`MustVerifyEmail` unused). Invitees must already have an account; public registration is disabled
+- PayFast does not call PayFast’s extra server-to-server confirm step; passphrase + signature + amount match is the bar
+- Optional AI `base_url` can point at an operator-chosen host (`settings.business`)
+- Multi-tenant operator guide (production `.env` warnings) is still a separate doc item
+
 ## Disclaimer
 
 nrth is accounting software provided as-is. It is not a substitute for professional financial or tax advice. Use at your own risk.

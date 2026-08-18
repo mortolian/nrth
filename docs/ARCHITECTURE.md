@@ -171,6 +171,10 @@ Wealth is the template for a future bounded module (own migrations, routes, Iner
 
 The first installed user is an instance operator. Public registration is disabled by default. Operator break-glass: `NRTH_OPERATOR_EMAILS`. This is **not** TeamAccess.
 
+## Files
+
+Invoice PDFs, expense receipts, payment receipts, and signed contracts use Spatie Media Library on `MEDIA_DISK` (default `local` → `storage/app/private`). They are not served via `public/storage`. Logos stay on the `public` disk. `./scripts/update` runs `nrth:move-media-to-private-disk` for existing public files.
+
 ## Unauthenticated edges
 
 These routes are outside the logged-in group. They must not trust `current_team_id`.
@@ -178,8 +182,8 @@ These routes are outside the logged-in group. They must not trust `current_team_
 | Surface | Mechanism |
 |---------|-----------|
 | Public invoice pay `/pay/{token}` | Opaque 32-hex token; [`PublicInvoicePayController`](../app/Http/Controllers/Web/PublicInvoicePayController.php) loads invoices with `queryWithoutTeamScope()` |
-| Stripe / PayFast webhooks | `/webhooks/payments/{provider}/{team}` — CSRF excluded in [`bootstrap/app.php`](../bootstrap/app.php); team from the URL, not the session |
-| Signed team invitation | `/invitations/{invitation}` |
+| Stripe / PayFast webhooks | `/webhooks/payments/{provider}/{team}` — CSRF excluded for those two path prefixes in [`bootstrap/app.php`](../bootstrap/app.php); team from the URL, not the session. Completion loads the invoice with `queryWithoutTeamScope()` and row lock. Stripe verifies `Stripe-Signature` with the team webhook secret. PayFast verifies ITN MD5 with the **required** merchant passphrase (sandbox is off unless `PAYFAST_SANDBOX=true`). |
+| Signed team invitation | `/invitations/{invitation}` — temporary signature (7 days) |
 
 ## Frontend
 

@@ -47,7 +47,6 @@ use App\Http\Controllers\Web\Vehicles\TripImportController;
 use App\Http\Controllers\Web\Vehicles\VehicleController;
 use App\Http\Controllers\Web\Webhooks\PayFastPaymentWebhookController;
 use App\Http\Controllers\Web\Webhooks\StripePaymentWebhookController;
-use App\Http\Middleware\EnforceSessionIdleTimeout;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -71,7 +70,6 @@ Route::middleware([
     'auth:sanctum',
     config('jetstream.auth_session'),
     'verified',
-    EnforceSessionIdleTimeout::class,
 ])->group(function () {
     Route::get('/onboarding/setup', [OnboardingController::class, 'show'])->name('onboarding.setup');
     Route::post('/onboarding/progress', [OnboardingController::class, 'saveProgress'])->name('onboarding.progress');
@@ -252,6 +250,7 @@ Route::middleware([
         Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
         Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
         Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
+        Route::get('/contracts/{contract}/signed-document', [ContractController::class, 'showSignedDocument'])->name('contracts.signed-document');
         Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
         Route::post('/contracts/{contract}/generate-invoice', [ContractController::class, 'generateInvoice'])->name('contracts.generate-invoice');
     });

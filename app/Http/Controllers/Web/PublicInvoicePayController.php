@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Web;
 use App\Domain\Invoicing\Actions\MarkInvoiceViewedAction;
 use App\Domain\Invoicing\Actions\StartInvoiceOnlinePaymentSessionAction;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Invoicing\Enums\OnlinePaymentSessionStatus;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\InvoiceOnlinePaymentSession;
 use App\Domain\Invoicing\Services\InvoiceMarkdownRenderer;
 use App\Domain\Invoicing\Services\InvoicePdfService;
 use App\Http\Controllers\Controller;
+use App\Support\DownloadFilename;
 use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
@@ -35,9 +38,14 @@ class PublicInvoicePayController extends Controller
         $this->abortUnlessPaymentPagesEnabled($invoice);
 
         app(MarkInvoiceViewedAction::class)->execute($invoice);
-        $invoice->refresh();
+        $reloaded = Invoice::queryWithoutTeamScope()->find($invoice->id);
+        if ($reloaded === null) {
+            abort(404);
+        }
+        $invoice = $reloaded;
 
-        $invoice->loadMissing(['team', 'client', 'lineItems']);
+        $invoice->loadMissing(['team', 'lineItems']);
+        $invoice->loadClientWithoutTeamScope();
         $team = $invoice->team;
 
         $issuer = $team !== null
@@ -93,7 +101,7 @@ class PublicInvoicePayController extends Controller
             'charges_vat' => $team?->chargesVat() ?? false,
             'online_payment_providers' => InvoiceOnlinePaymentProviders::enabledForInvoice($invoice),
             'pdf_url' => route('public.invoice.pdf', ['token' => $token]),
-            'flash_online_payment' => $request->query('online_payment'),
+            'flash_online_payment' => $this->publicPaymentFlash($request, $invoice, $amountDueCents),
         ]);
     }
 
@@ -176,8 +184,9 @@ class PublicInvoicePayController extends Controller
                 fpassthru($stream);
                 fclose($stream);
             }
-        }, $media->file_name, [
+        }, DownloadFilename::sanitize((string) $media->file_name, 'invoice.pdf'), [
             'Content-Type' => $media->mime_type ?: 'application/pdf',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -208,5 +217,29 @@ class PublicInvoicePayController extends Controller
         if (! InvoiceOnlinePaymentProviders::paymentPagesEnabledForTeam($invoice->team)) {
             abort(404);
         }
+    }
+
+    private function publicPaymentFlash(Request $request, Invoice $invoice, int $amountDueCents): ?string
+    {
+        $flash = $request->query('online_payment');
+        if (! is_string($flash) || ! in_array($flash, ['success', 'cancelled'], true)) {
+            return null;
+        }
+
+        if ($flash === 'cancelled') {
+            return 'cancelled';
+        }
+
+        $completed = InvoiceOnlinePaymentSession::queryWithoutTeamScope()
+            ->where('invoice_id', $invoice->id)
+            ->where('team_id', $invoice->team_id)
+            ->where('status', OnlinePaymentSessionStatus::Completed)
+            ->exists();
+
+        if ($completed || $amountDueCents < 1) {
+            return 'success';
+        }
+
+        return null;
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Actions\Fortify;
 
 use App\Models\User;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
@@ -21,36 +20,37 @@ class UpdateUserProfileInformation implements UpdatesUserProfileInformation
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'photo' => ['nullable', 'mimes:jpg,jpeg,png', 'max:1024'],
+            'current_password' => [
+                Rule::requiredIf(fn (): bool => $this->emailIsChanging($user, $input)),
+                'nullable',
+                'current_password',
+            ],
         ])->validateWithBag('updateProfileInformation');
 
         if (isset($input['photo'])) {
             $user->updateProfilePhoto($input['photo']);
         }
 
-        if ($input['email'] !== $user->email &&
-            $user instanceof MustVerifyEmail) {
-            $this->updateVerifiedUser($user, $input);
-        } else {
+        if ($this->emailIsChanging($user, $input)) {
             $user->forceFill([
                 'name' => $input['name'],
                 'email' => $input['email'],
+                'email_verified_at' => null,
             ])->save();
+
+            return;
         }
+
+        $user->forceFill([
+            'name' => $input['name'],
+        ])->save();
     }
 
     /**
-     * Update the given verified user's profile information.
-     *
-     * @param  array<string, string>  $input
+     * @param  array<string, mixed>  $input
      */
-    protected function updateVerifiedUser(User $user, array $input): void
+    private function emailIsChanging(User $user, array $input): bool
     {
-        $user->forceFill([
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'email_verified_at' => null,
-        ])->save();
-
-        $user->sendEmailVerificationNotification();
+        return strcasecmp(trim((string) ($input['email'] ?? '')), trim((string) $user->email)) !== 0;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\TeamInvitationMail;
 use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -219,6 +220,38 @@ class AcceptTeamInvitationTest extends TestCase
             ->assertRedirect(route('dashboard'));
     }
 
+    public function test_login_does_not_join_invitations_when_email_is_unverified(): void
+    {
+        if (! JetstreamFeatures::sendsTeamInvitations()) {
+            $this->markTestSkipped('Team invitations not enabled.');
+        }
+
+        $owner = User::factory()->withPersonalTeam()->create([
+            'completed_onboarding_at' => now(),
+        ]);
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $invitee = User::factory()->withPersonalTeam()->unverified()->create([
+            'email' => 'unverified-login@example.com',
+            'password' => bcrypt('password'),
+        ]);
+
+        $team->teamInvitations()->create([
+            'email' => 'unverified-login@example.com',
+            'role' => 'viewer',
+        ]);
+
+        $this->post('/login', [
+            'email' => 'unverified-login@example.com',
+            'password' => 'password',
+        ])->assertRedirect(config('fortify.home'));
+
+        $invitee->refresh();
+        $this->assertFalse($invitee->belongsToTeam($team));
+        $this->assertCount(1, $team->fresh()->teamInvitations);
+    }
+
     public function test_join_link_sends_existing_users_to_login_then_accepts(): void
     {
         if (! JetstreamFeatures::sendsTeamInvitations()) {
@@ -252,5 +285,35 @@ class AcceptTeamInvitationTest extends TestCase
         $existing->refresh();
         $this->assertTrue($existing->belongsToTeam($team));
         $this->assertSame($team->id, $existing->current_team_id);
+    }
+
+    public function test_join_link_expires_after_seven_days(): void
+    {
+        if (! JetstreamFeatures::sendsTeamInvitations()) {
+            $this->markTestSkipped('Team invitations not enabled.');
+        }
+
+        $owner = User::factory()->withPersonalTeam()->create([
+            'completed_onboarding_at' => now(),
+        ]);
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $invitation = $team->teamInvitations()->create([
+            'email' => 'expiring@example.com',
+            'role' => 'viewer',
+        ]);
+
+        $url = URL::temporarySignedRoute(
+            'team-invitations.join',
+            now()->addDays(TeamInvitationMail::JOIN_LINK_TTL_DAYS),
+            ['invitation' => $invitation],
+        );
+
+        $this->get($url)->assertRedirect(route('login'));
+
+        $this->travel(8)->days();
+
+        $this->get($url)->assertForbidden();
     }
 }
