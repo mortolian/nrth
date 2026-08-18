@@ -58,7 +58,7 @@ GitHub presence, first release, and visible polish.
 Deeper docs for contributors and self-hosters.
 
 - [x] **docs/UPGRADE.md** — Tag-to-tag upgrades, backup-before-migrate, additive schema policy from 2026-08-18
-- [ ] **docs/ARCHITECTURE.md** — Document domains, actions pattern, team scoping ([app/Domain/](../app/Domain/), [TeamScope](../app/Domain/Shared/Scopes/TeamScope.php)), and high-level request/data flow
+- [x] **docs/ARCHITECTURE.md** — Domains, actions, team scoping, request flow ([ARCHITECTURE.md](ARCHITECTURE.md))
 - [x] **docs/ROADMAP.md** — Planned features, alpha scope, and what is explicitly out of scope for now
 - [ ] **.env.example production warnings** — Add prominent comments for default passwords and secrets ([.env.example](../.env.example): `DB_PASSWORD`, `APP_KEY`, etc.)
 - [x] **Spatie Backup documentation** — Instance backup, restore, `config/backup.php` operator notes, and env keys in [SELF_HOST.md](SELF_HOST.md) / [INSTALL.md](INSTALL.md)

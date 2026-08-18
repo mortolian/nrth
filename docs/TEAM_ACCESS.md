@@ -1,6 +1,6 @@
 # Team access and roles
 
-nrth authorizes day-to-day product features through **TeamAccess**, not Spatie team roles or Jetstream ability strings.
+nrth authorizes day-to-day product features through **TeamAccess**, not Spatie team roles or Jetstream ability strings. How TeamAccess sits next to Eloquent `TeamScope`, actions, and HTTP: [ARCHITECTURE.md](ARCHITECTURE.md#team-scoping).
 
 ## Mental model
 

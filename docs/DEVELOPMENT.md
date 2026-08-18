@@ -126,16 +126,14 @@ Canonical self-host guide: [SELF_HOST.md](SELF_HOST.md) (`./scripts/backup`, res
 
 ## Architecture
 
-- Business logic lives under `app/Domain/{Context}/` (actions, DTOs, models, services).
-- Optional product modules are listed in [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php) (`travel`, `planning`, `contracting`, `wealth`). Enable/disable per team via **Settings → Features** (`team_modules`); disabled modules stay out of nav and return 403, without deleting data. Bounded module code may live under `app/Modules/{Name}/` (e.g. Wealth); Travel / Planning / Contracting still use `app/Domain` + web routes with `team.module:{name}` middleware. New businesses start with all optional modules off.
+Canonical map of domains, actions, team scoping, and request flow: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+
+### Product notes for local work
+
+- Optional modules (`travel`, `planning`, `contracting`, `wealth`): **Settings → Features**. See [ARCHITECTURE.md](ARCHITECTURE.md#optional-modules).
 - Instance default timezone: **Settings → Instance → Timezone** (operators; stored in `instance_settings`, fallback `APP_TIMEZONE`). Per-business override: **Settings → Business** (`business_settings.timezone`). Sidebar clock uses the current business effective timezone.
-- Team-owned models use `App\Domain\Shared\HasTeamScope`.
-- Controllers stay thin; call actions/services from `app/Http/Controllers/Web/`.
-- UI: Inertia + Vue 3 in `resources/js/Pages/`.
-- Ledger amounts use `brick/money` and cents; bank import lines use decimal columns separately. Bank reconciliation stores allocations in cents and links imported lines to posted accounting transactions without rewriting the ledger.
 - Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
 - Licence disc reminders: the same scheduler runs `vehicles:send-license-disk-reminders` daily at 01:15 for active vehicles whose disc expires within 30 days (opt out under Profile → Notifications).
-- Sending or marking an invoice as sent posts an accrual journal (Dr AR, Cr income accounts + VAT). Subsequent payments clear AR only when that accrual exists.
 - **Note templates** (Settings → Note templates, or command palette “Note Templates”): create named markdown snippets such as “International Banking Details”. Attach them on a client to prefill new invoices/estimates, or insert them while editing a document. Footers/terms stay freeform per document (markdown editor, no shared templates). Example body:
 
 ```markdown

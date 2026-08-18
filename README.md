@@ -55,7 +55,7 @@ npm install && npm run dev
 php artisan serve   # second terminal
 ```
 
-Details, Docker dev workflow, architecture, and tests: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**
+Details, Docker dev workflow, and tests: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** · How the app is structured: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 ## Documentation
 
@@ -65,6 +65,7 @@ Details, Docker dev workflow, architecture, and tests: **[docs/DEVELOPMENT.md](d
 | [docs/UPGRADE.md](docs/UPGRADE.md) | Tag-to-tag upgrades, backups, rollback |
 | [docs/SELF_HOST.md](docs/SELF_HOST.md) | HTTPS, instance backup & restore |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Domains, actions, team scoping |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer-only personal dev server |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Alpha scope, plans, and out-of-scope items |
 | [docs/RELEASE.md](docs/RELEASE.md) | Automated releases and changelog |
@@ -84,7 +85,7 @@ Please search [existing issues](https://github.com/mortolian/nrth/issues) before
 
 Laravel 13 · Jetstream (Inertia + Teams) · Vue 3 · Tailwind CSS v4 · PostgreSQL · Redis · Octane (Swoole) · Horizon
 
-Domain logic lives under `app/Domain/`. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for more.
+Domain logic lives under `app/Domain/`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## License
 

@@ -127,5 +127,6 @@ More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
 | [SELF_HOST.md](SELF_HOST.md) | HTTPS, instance backup & restore, troubleshooting |
 | [UPGRADE.md](UPGRADE.md) | Tag-to-tag upgrades and rollback |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local contributor setup |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Domains, actions, team scoping (contributors) |
 | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | Maintainer push-to-deploy |
 | [RELEASE.md](RELEASE.md) | Versioning / Release Please (maintainers) |

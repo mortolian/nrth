@@ -35,7 +35,7 @@ Planned focus areas — not committed dates or ordering:
 - [x] **Backup & restore docs** — instance backup (`./scripts/backup`), offsite, retention, and CLI restore ([docs/SELF_HOST.md](SELF_HOST.md))
 - [ ] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings
 - [ ] **README screenshots / demo** — visual overview for new visitors
-- [ ] **Architecture docs** — domain layout, actions pattern, team scoping ([`app/Domain/`](../app/Domain/))
+- [x] **Architecture docs** — domain layout, actions, team scoping ([docs/ARCHITECTURE.md](ARCHITECTURE.md))
 - [ ] **Security review** — auth flows, uploads, payment webhooks
 - [x] **Expanded test coverage** — tenant isolation plus report arithmetic (P&L / TB / BS / cash flow) and invoice overpayment rejection
 
