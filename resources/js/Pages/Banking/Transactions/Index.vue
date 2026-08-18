@@ -17,6 +17,8 @@ type TransactionRow = {
     currency: string;
     direction: 'debit' | 'credit';
     running_balance: string | null;
+    reconciliation_status: 'unreviewed' | 'partially_matched' | 'matched' | 'excluded';
+    reconciliation_status_label: string;
     account: {
         id: number;
         name: string;
@@ -69,6 +71,13 @@ const formatAmount = (row: TransactionRow) => {
 
 const accountLabel = (account: TransactionRow['account']) =>
     account.bank_name ? `${account.name} (${account.bank_name})` : account.name;
+
+const statusVariant = (status: TransactionRow['reconciliation_status']) => {
+    if (status === 'matched') return 'success';
+    if (status === 'partially_matched') return 'info';
+    if (status === 'excluded') return 'neutral';
+    return 'warning';
+};
 
 const applyFilters = (page = 1) => {
     router.get(route('banking.transactions.index'), {
@@ -163,15 +172,18 @@ const clearFilters = () => {
                             <th class="px-3 py-2 font-medium text-slate-600">Description</th>
                             <th class="px-3 py-2 font-medium text-slate-600">Reference</th>
                             <th class="px-3 py-2 font-medium text-slate-600 text-right">Amount</th>
+                            <th class="px-3 py-2 font-medium text-slate-600">Status</th>
                             <th class="px-3 py-2 font-medium text-slate-600 text-right">Balance</th>
                             <th class="px-3 py-2 font-medium text-slate-600">Source file</th>
+                            <th class="px-3 py-2 font-medium text-slate-600"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr
                             v-for="row in transactions.data"
                             :key="row.id"
-                            class="border-b border-slate-100 hover:bg-slate-50/80"
+                            class="cursor-pointer border-b border-slate-100 hover:bg-slate-50/80"
+                            @click="router.visit(route('banking.reconciliation.index', { selected: row.id, status: 'all' }))"
                         >
                             <td class="whitespace-nowrap px-3 py-2 text-slate-700">{{ row.transaction_date }}</td>
                             <td class="px-3 py-2 text-slate-600">{{ accountLabel(row.account) }}</td>
@@ -185,11 +197,25 @@ const clearFilters = () => {
                             >
                                 {{ formatAmount(row) }}
                             </td>
+                            <td class="whitespace-nowrap px-3 py-2">
+                                <AppBadge :variant="statusVariant(row.reconciliation_status)">
+                                    {{ row.reconciliation_status_label }}
+                                </AppBadge>
+                            </td>
                             <td class="whitespace-nowrap px-3 py-2 text-right text-slate-600 tabular-nums">
                                 {{ row.running_balance != null ? useFormatCurrency(Number(row.running_balance), row.currency) : '—' }}
                             </td>
                             <td class="max-w-[10rem] truncate px-3 py-2 text-xs text-slate-500" :title="row.import?.original_filename">
                                 {{ row.import?.original_filename ?? '—' }}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right" @click.stop>
+                                <AppButton
+                                    variant="ghost"
+                                    size="sm"
+                                    @click="router.visit(route('banking.reconciliation.index', { selected: row.id, status: 'all' }))"
+                                >
+                                    Review
+                                </AppButton>
                             </td>
                         </tr>
                     </tbody>

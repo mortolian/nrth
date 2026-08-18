@@ -75,6 +75,8 @@ class BankingTransactionController extends Controller
                 'currency' => $transaction->currency,
                 'direction' => $transaction->direction->value,
                 'running_balance' => $transaction->running_balance !== null ? (string) $transaction->running_balance : null,
+                'reconciliation_status' => $transaction->reconciliation_status?->value ?? 'unreviewed',
+                'reconciliation_status_label' => $transaction->reconciliation_status?->label() ?? 'Unreviewed',
                 'account' => [
                     'id' => $transaction->account->id,
                     'name' => $transaction->account->name,

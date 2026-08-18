@@ -53,6 +53,7 @@ export function useBankingTabs() {
     return computed((): AppTabItem[] =>
         [
             { id: 'transactions', label: 'Transactions', href: route('banking.transactions.index') },
+            { id: 'reconciliation', label: 'Reconciliation', href: route('banking.reconciliation.index') },
             canTeam('banking.manage')
                 ? { id: 'import', label: 'Import statement', href: route('banking.import.create') }
                 : null,

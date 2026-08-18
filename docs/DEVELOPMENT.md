@@ -129,7 +129,7 @@ Then recreate app containers so env is picked up (`sail up -d` or `./scripts/com
 - Team-owned models use `App\Domain\Shared\HasTeamScope`.
 - Controllers stay thin; call actions/services from `app/Http/Controllers/Web/`.
 - UI: Inertia + Vue 3 in `resources/js/Pages/`.
-- Ledger amounts use `brick/money` and cents; bank import lines use decimal columns separately.
+- Ledger amounts use `brick/money` and cents; bank import lines use decimal columns separately. Bank reconciliation stores allocations in cents and links imported lines to posted accounting transactions without rewriting the ledger.
 - Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
 - Licence disc reminders: the same scheduler runs `vehicles:send-license-disk-reminders` daily at 01:15 for active vehicles whose disc expires within 30 days (opt out under Profile → Notifications).
 - Sending or marking an invoice as sent posts an accrual journal (Dr AR, Cr income accounts + VAT). Subsequent payments clear AR only when that accrual exists.

@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\Accounting\GeneralLedgerController;
 use App\Http\Controllers\Web\Accounting\TransactionController;
 use App\Http\Controllers\Web\BackupsExportsController;
 use App\Http\Controllers\Web\Banking\BankingAccountController;
+use App\Http\Controllers\Web\Banking\BankingReconciliationController;
 use App\Http\Controllers\Web\Banking\BankingStatementImportController;
 use App\Http\Controllers\Web\Banking\BankingTransactionController;
 use App\Http\Controllers\Web\BudgetingController;
@@ -134,6 +135,11 @@ Route::middleware([
     Route::post('/backups-exports/backups/{instanceBackupRun}/retry', [BackupsExportsController::class, 'retryBackup'])
         ->name('backups-exports.backups.retry');
     Route::prefix('banking')->name('banking.')->group(function () {
+        Route::get('/reconciliation', [BankingReconciliationController::class, 'index'])->name('reconciliation.index');
+        Route::post('/reconciliation/{bankingTransaction}/allocations', [BankingReconciliationController::class, 'storeAllocation'])->name('reconciliation.allocations.store');
+        Route::delete('/reconciliation/{bankingTransaction}/allocations/{allocation}', [BankingReconciliationController::class, 'destroyAllocation'])->name('reconciliation.allocations.destroy');
+        Route::post('/reconciliation/{bankingTransaction}/exclude', [BankingReconciliationController::class, 'exclude'])->name('reconciliation.exclude');
+        Route::post('/reconciliation/{bankingTransaction}/reset', [BankingReconciliationController::class, 'reset'])->name('reconciliation.reset');
         Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [BankingAccountController::class, 'store'])->name('accounts.store');

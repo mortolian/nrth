@@ -4,6 +4,7 @@ namespace App\Domain\Accounting\Models;
 
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
+use App\Domain\Banking\Models\BankingTransactionAllocation;
 use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
@@ -102,6 +103,14 @@ class Transaction extends Model implements HasMedia
     public function taxLines(): HasMany
     {
         return $this->hasMany(TaxLine::class);
+    }
+
+    /**
+     * @return HasMany<BankingTransactionAllocation, $this>
+     */
+    public function bankingAllocations(): HasMany
+    {
+        return $this->hasMany(BankingTransactionAllocation::class);
     }
 
     /**

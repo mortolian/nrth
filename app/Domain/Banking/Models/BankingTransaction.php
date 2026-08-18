@@ -2,13 +2,16 @@
 
 namespace App\Domain\Banking\Models;
 
+use App\Domain\Banking\Enums\ReconciliationStatus;
 use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
+use App\Models\User;
 use Database\Factories\BankingTransactionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BankingTransaction extends Model
 {
@@ -34,6 +37,10 @@ class BankingTransaction extends Model
         'source_hash',
         'duplicate_key',
         'metadata',
+        'reconciliation_status',
+        'exclusion_note',
+        'excluded_by',
+        'excluded_at',
     ];
 
     /**
@@ -48,6 +55,8 @@ class BankingTransaction extends Model
             'running_balance' => 'decimal:2',
             'direction' => TransactionDirection::class,
             'metadata' => 'array',
+            'reconciliation_status' => ReconciliationStatus::class,
+            'excluded_at' => 'datetime',
         ];
     }
 
@@ -73,6 +82,22 @@ class BankingTransaction extends Model
     public function import(): BelongsTo
     {
         return $this->belongsTo(BankingStatementImport::class, 'banking_statement_import_id');
+    }
+
+    /**
+     * @return HasMany<BankingTransactionAllocation, $this>
+     */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(BankingTransactionAllocation::class, 'banking_transaction_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function excludedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'excluded_by');
     }
 
     protected static function newFactory(): BankingTransactionFactory

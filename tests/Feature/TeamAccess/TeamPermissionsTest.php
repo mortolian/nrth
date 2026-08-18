@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\TeamAccess;
 
+use App\Domain\Banking\Enums\TransactionDirection;
+use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Models\Team;
@@ -241,6 +244,34 @@ class TeamPermissionsTest extends TestCase
         $this->actingAs($viewer)
             ->get(route('vehicles.index'))
             ->assertOk();
+    }
+
+    public function test_viewer_cannot_exclude_bank_reconciliation_line(): void
+    {
+        [$owner, $viewer] = $this->ownerAndMember(RolePresets::VIEWER);
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+
+        $account = BankingAccount::factory()->for($team)->create();
+        $line = BankingTransaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'account_id' => $account->id,
+            'transaction_date' => '2026-08-11',
+            'description' => 'Personal debit',
+            'amount' => '12.00',
+            'currency' => 'ZAR',
+            'direction' => TransactionDirection::Debit,
+            'source_hash' => hash('sha256', 'viewer-recon'),
+            'duplicate_key' => hash('sha256', 'viewer-recon-key'),
+        ]);
+
+        $this->actingAs($viewer)
+            ->get(route('banking.reconciliation.index'))
+            ->assertOk();
+
+        $this->actingAs($viewer)
+            ->post(route('banking.reconciliation.exclude', $line))
+            ->assertForbidden();
     }
 
     /**

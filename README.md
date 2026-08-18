@@ -25,7 +25,7 @@
 - **Expenses & suppliers** — receipts, AI document fill, categories, VAT on purchases
 - **Travel** — vehicles and a business/private trip log book (CSV export; smart AI import for fleet/GPS exports when AI is enabled); licence disc expiry with email reminder about one month before
 - **Accounting** — chart of accounts, journal, general ledger, account statements
-- **Banking** — import CSV/OFX statements, duplicate detection, transaction list
+- **Banking** — import CSV/OFX statements, duplicate detection, match or exclude imported lines (including mixed personal/business accounts)
 - **Tax** — VAT returns and rates (configure during setup wizard)
 - **Teams** — multi-user companies via Jetstream
 - **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included

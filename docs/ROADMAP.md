@@ -15,7 +15,7 @@ These areas exist and are usable, but expect rough edges and breaking changes:
 | **Invoicing & estimates** | Clients, items catalog, recurring invoices, discounts, note templates, income accounts on send, PDFs, email, payments, Stripe/PayFast pay links, multi-currency |
 | **Expenses & suppliers** | Receipts, VAT on purchases, categories, supplier records |
 | **Accounting** | Chart of accounts, journal, general ledger, account statements |
-| **Banking** | CSV/OFX import, duplicate detection, transaction list |
+| **Banking** | CSV/OFX import, duplicate detection, transaction list, match/exclude reconciliation |
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
 | **Teams** | Multi-user businesses via Jetstream |
@@ -31,7 +31,7 @@ See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.
 Planned focus areas — not committed dates or ordering:
 
 - [ ] **Stabilise data models** — fewer breaking migrations; clearer upgrade path between tags
-- [ ] **Bank reconciliation** — match imported transactions to invoices, expenses, and journal entries
+- [x] **Bank reconciliation** — match imported transactions to invoices, expenses, and journal entries; exclude personal/out-of-scope lines on mixed accounts
 - [ ] **Backup & restore docs** — prominent Spatie Backup guidance for self-hosters
 - [ ] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings
 - [ ] **README screenshots / demo** — visual overview for new visitors

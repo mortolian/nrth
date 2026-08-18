@@ -5,13 +5,13 @@ namespace App\Http\Middleware;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Support\BankingPaymentAccounts;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Invoicing\Enums\PaymentMethodOptions;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
 use App\Support\Modules\ModuleCatalog;
 use App\Support\TeamAccess\TeamAccess;
-use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
@@ -180,6 +180,7 @@ class HandleInertiaRequests extends Middleware
             $can('expenses.view') ? ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')] : null,
             $can('suppliers.view') ? ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')] : null,
             $can('banking.view') ? ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')] : null,
+            $can('banking.view') ? ['id' => 'banking-reconciliation', 'label' => 'Bank Reconciliation', 'href' => route('banking.reconciliation.index')] : null,
             $can('banking.view') ? ['id' => 'banking-accounts', 'label' => 'Bank Accounts', 'href' => route('banking.accounts.index')] : null,
             ($moduleOn(ModuleCatalog::TRAVEL) && $can('vehicles.view'))
                 ? ['id' => 'vehicles-trips', 'label' => 'Trip Log', 'href' => route('vehicles.trips.index')]
