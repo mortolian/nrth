@@ -74,7 +74,7 @@ Security, licensing, and optional infrastructure improvements.
 - [ ] **Composer / dependency license scan in CI** (optional) — Add a license compliance check to [.github/workflows/](../.github/workflows/) (e.g. `composer licenses` or a dedicated action)
 - [ ] **Publish Docker image to GHCR** (optional) — Simplify self-hosting; reference from [SELF_HOST.md](SELF_HOST.md) and [compose.yaml](../compose.yaml)
 - [ ] **Hosted docs site** (optional) — e.g. GitHub Pages or Read the Docs for [docs/](.)
-- [ ] **Alpha/beta disclaimer review** — If a public demo exists, ensure disclaimers match [README.md](../README.md) alpha notice and data-handling expectations
+- [x] **Alpha/beta disclaimer review** — README, ROADMAP, and SECURITY say **beta**; remaining work and experimental surfaces: [BETA.md](BETA.md)
 
 ---
 
@@ -107,6 +107,6 @@ One install script for everyone; deploy script for updates.
 
 ## Notes
 
-- **Do not** treat unchecked items as blockers for a soft alpha launch if the Quick launch checklist is complete — Priorities 2–3 can ship incrementally after going public.
+- **Do not** treat unchecked items as blockers for a soft beta launch if the Quick launch checklist is complete — Priorities 2–3 can ship incrementally after going public. Remaining product/process work: [BETA.md](BETA.md).
 - Update this file as items are completed (change `[ ]` to `[x]`).
 - For contribution workflow, see [CONTRIBUTING.md](../CONTRIBUTING.md). For security reporting, see [SECURITY.md](../SECURITY.md).

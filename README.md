@@ -12,10 +12,10 @@
 <p align="center">
   <a href="https://github.com/mortolian/nrth/actions/workflows/tests.yml"><img src="https://github.com/mortolian/nrth/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/mortolian/nrth" alt="License"></a>
-  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Alpha">
+  <img src="https://img.shields.io/badge/status-beta-blue" alt="Beta">
 </p>
 
-> **Early development (alpha).** Features and data models are still changing. Not financial or tax advice — evaluate carefully before production use. See [SECURITY.md](SECURITY.md).
+> **Beta.** Core invoicing, expenses, VAT, ledger, and bank reconciliation are usable for self-hosted books. Not financial or tax advice, not a 1.0 stability guarantee — evaluate carefully before production use. Contracting retainer invoices and provisional tax are experimental. Remaining work: **[docs/BETA.md](docs/BETA.md)**. See [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -77,7 +77,8 @@ Details, Docker dev workflow, and tests: **[docs/DEVELOPMENT.md](docs/DEVELOPMEN
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Domains, actions, team scoping |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer-only personal dev server |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Alpha scope, plans, and out-of-scope items |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Beta scope, plans, and out-of-scope items |
+| [docs/BETA.md](docs/BETA.md) | Remaining work before a beta GitHub Release and experimental surfaces |
 | [docs/RELEASE.md](docs/RELEASE.md) | Automated releases and changelog |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 

@@ -72,6 +72,8 @@ class OptionalModulesTest extends TestCase
                 ->where('modules.0.enabled', false)
                 ->where('modules.1.enabled', false)
                 ->where('modules.2.enabled', false)
+                ->where('modules.2.experimental', true)
+                ->where('modules.0.experimental', false)
                 ->where('modules.3.enabled', false));
     }
 }

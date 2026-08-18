@@ -20,6 +20,7 @@ Docs are part of the product surface for self-hosters and contributors. When you
 | Versioning, changelog, Release Please | [docs/RELEASE.md](docs/RELEASE.md) |
 | Team roles / permissions | [docs/TEAM_ACCESS.md](docs/TEAM_ACCESS.md) (and this file’s checklist below) |
 | Domain layout / request flow | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Beta remaining work / experimental surfaces | [docs/BETA.md](docs/BETA.md) |
 | Contributing / PR expectations | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Security reporting or trust boundaries | [SECURITY.md](SECURITY.md) |
 

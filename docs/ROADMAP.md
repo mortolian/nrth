@@ -1,14 +1,14 @@
 # Roadmap
 
-NRTH is in **alpha**. This document describes what works today, what we plan next, and what is intentionally out of scope for now. Priorities may shift based on feedback — open a [Discussion](https://github.com/mortolian/nrth/discussions) or [issue](https://github.com/mortolian/nrth/issues) to suggest changes.
+NRTH is in **beta**. This document describes what works today, what we plan next, and what is intentionally out of scope. Priorities may shift based on feedback — open a [Discussion](https://github.com/mortolian/nrth/discussions) or [issue](https://github.com/mortolian/nrth/issues) to suggest changes.
 
-**Status:** Alpha · **Current release:** [v0.1.0](https://github.com/mortolian/nrth/releases/tag/v0.1.0)
+**Status:** Beta · **Latest tag:** [v0.1.3](https://github.com/mortolian/nrth/releases/tag/v0.1.3) · Remaining work: **[BETA.md](BETA.md)**
 
 ---
 
-## In alpha today
+## In beta today
 
-These areas exist and are usable, but expect rough edges and breaking changes:
+These areas exist and are usable. Expect rough edges on experimental surfaces (see [BETA.md](BETA.md)); 1.0 is not promised yet.
 
 | Area | Notes |
 |------|-------|
@@ -19,16 +19,16 @@ These areas exist and are usable, but expect rough edges and breaking changes:
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
 | **Teams** | Multi-user businesses via Jetstream |
-| **Optional modules** | Settings → Features; Travel, Planning, Contracting, Wealth off by default for new businesses |
+| **Optional modules** | Settings → Features; Travel, Planning, Contracting, Wealth off by default for new businesses. **Contracting** is experimental. |
 | **Self-hosting** | Docker Compose install via `scripts/install.sh` |
+
+**Experimental (not beta-quality):** Contracting retainer invoice generate (ZAR, VAT 0, skips the invoicing pipeline); provisional tax estimates (`LIKE` payment match, rough individual tables, Record Payment is not wired). Details: [BETA.md](BETA.md#1-contracting-and-provisional-tax--still-experimental).
 
 See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.
 
 ---
 
-## Near term (toward beta)
-
-Planned focus areas — not committed dates or ordering:
+## Near term (closed for this beta)
 
 - [x] **Stabilise data models** — additive schema from 2026-08-18; tag-to-tag upgrades via `./scripts/update --ref` ([docs/UPGRADE.md](UPGRADE.md))
 - [x] **Bank reconciliation** — match imported transactions to invoices, expenses, and journal entries; exclude personal/out-of-scope lines on mixed accounts
@@ -39,6 +39,8 @@ Planned focus areas — not committed dates or ordering:
 - [x] **Security review** — auth, uploads, public pay, Stripe/PayFast webhooks, invitation/email-change hardening ([SECURITY.md](../SECURITY.md))
 - [x] **Expanded test coverage** — tenant isolation plus report arithmetic (P&L / TB / BS / cash flow) and invoice overpayment rejection
 
+Still open as **process / product decisions**, not new near-term features: [BETA.md](BETA.md).
+
 Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and [Discussions](https://github.com/mortolian/nrth/discussions).
 
 ---
@@ -47,6 +49,7 @@ Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and
 
 Ideas under consideration, not scheduled:
 
+- Harden or hide Contracting retainer invoices and provisional tax ([BETA.md](BETA.md#1-contracting-and-provisional-tax--still-experimental))
 - Wealth module refinements (CSV import, multi-currency portfolios)
 - Additional bank statement formats and bank-specific CSV presets
 - Expense rules (recurring expenses)
@@ -60,7 +63,7 @@ Ideas under consideration, not scheduled:
 
 ## Explicitly out of scope (for now)
 
-To set expectations during alpha:
+To set expectations during beta:
 
 | Topic | Why |
 |-------|-----|
@@ -69,7 +72,7 @@ To set expectations during alpha:
 | **Multi-country tax engines** | SA-first; international currency support ≠ international tax rules |
 | **Managed SaaS hosting by maintainers** | Self-hosted only; no official nrth.cloud at this stage |
 | **Mobile native apps** | Web UI only |
-| **Full ERP** | Inventory, payroll, CRM, etc. are not goals for alpha/beta |
+| **Full ERP** | Inventory, payroll, CRM, etc. are not goals for beta |
 
 ---
 

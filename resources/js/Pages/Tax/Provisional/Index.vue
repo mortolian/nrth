@@ -55,7 +55,7 @@ const applyManualEstimate = () => {
         section="provisional"
         :tabs="taxTabs"
         document-title="Provisional Tax"
-        :subtitle="`${tax_year.label} Tax Year · ${tax_year.start} — ${tax_year.end}`"
+        :subtitle="`Experimental estimate · ${tax_year.label} tax year · ${tax_year.start} — ${tax_year.end}`"
     >
         <div class="mt-5 grid gap-4 xl:grid-cols-2">
             <AppCard v-for="period in periods" :key="period.id">
@@ -72,7 +72,10 @@ const applyManualEstimate = () => {
                     <p><span class="text-slate-500">Suggested payment:</span> <span class="font-semibold text-slate-900">{{ formatCents(period.suggested_payment) }}</span></p>
                     <p><span class="text-slate-500">Safe harbour amount:</span> {{ formatCents(period.safe_harbour) }}</p>
                 </div>
-                <AppButton class="mt-4" variant="secondary">Record Payment</AppButton>
+                <AppButton class="mt-4" variant="secondary" type="button" disabled>
+                    Record Payment
+                </AppButton>
+                <p class="mt-2 text-xs text-slate-500">Not available yet. Record a journal payment whose description or reference includes “provisional tax” to list it below.</p>
             </AppCard>
         </div>
 
@@ -105,8 +108,10 @@ const applyManualEstimate = () => {
                 <AppButton variant="secondary" @click="applyManualEstimate">Apply estimate</AppButton>
             </div>
 
-            <p class="mt-4 text-sm text-amber-700">
-                SA tax tables are used for rough calculation. This is an estimate only - consult your accountant for final provisional tax amounts.
+            <p class="mt-4 text-sm text-amber-800">
+                Experimental. Rough SA individual tables only — not a filing engine and not tax advice.
+                Recorded payments are matched by description/reference text containing “provisional” and “tax”.
+                The period Record Payment button is not wired. Consult your accountant for amounts you file.
             </p>
         </AppCard>
 

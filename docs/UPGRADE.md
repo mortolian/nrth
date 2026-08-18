@@ -96,7 +96,7 @@ Contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 | Track | Use when |
 |-------|----------|
-| `./scripts/update` (default `master`) | You want the latest development tree. Still alpha-shaped; `master` can move quickly. |
+| `./scripts/update` (default `master`) | You want the latest development tree. Beta-labelled; `master` can still move quickly. Prefer a tag for live books. |
 | `./scripts/update --ref v0.x.y` | You want a known GitHub Release. Recommended for a live books instance. |
 
 `1.0` is not promised until data models, this upgrade path, and core workflows stay stable enough for production-minded self-hosters ([ROADMAP.md](ROADMAP.md)).

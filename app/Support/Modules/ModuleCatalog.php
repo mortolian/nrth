@@ -13,7 +13,7 @@ final class ModuleCatalog
     public const CONTRACTING = 'contracting';
 
     /**
-     * @return array<string, array{label: string, description: string, default_enabled: bool}>
+     * @return array<string, array{label: string, description: string, default_enabled: bool, experimental: bool}>
      */
     public static function definitions(): array
     {
@@ -22,21 +22,25 @@ final class ModuleCatalog
                 'label' => 'Travel',
                 'description' => 'Vehicles, trip log book, licence reminders, and trip imports.',
                 'default_enabled' => false,
+                'experimental' => false,
             ],
             self::PLANNING => [
                 'label' => 'Planning',
                 'description' => 'Category budgets, envelopes, and variance tracking.',
                 'default_enabled' => false,
+                'experimental' => false,
             ],
             self::CONTRACTING => [
                 'label' => 'Contracting',
-                'description' => 'Client contracts and generate invoices from contract terms.',
+                'description' => 'Experimental. Client contracts and a retainer invoice helper. Generated drafts are ZAR with no VAT and skip the normal invoicing pipeline.',
                 'default_enabled' => false,
+                'experimental' => true,
             ],
             self::WEALTH => [
                 'label' => 'Wealth',
                 'description' => 'Track investment accounts, savings, retirement funds, and portfolio history.',
                 'default_enabled' => false,
+                'experimental' => false,
             ],
         ];
     }
@@ -60,7 +64,7 @@ final class ModuleCatalog
     }
 
     /**
-     * @return list<array{name: string, label: string, description: string, default_enabled: bool}>
+     * @return list<array{name: string, label: string, description: string, default_enabled: bool, experimental: bool}>
      */
     public static function forUi(): array
     {
@@ -72,6 +76,7 @@ final class ModuleCatalog
                 'label' => $meta['label'],
                 'description' => $meta['description'],
                 'default_enabled' => $meta['default_enabled'],
+                'experimental' => $meta['experimental'],
             ];
         }
 

@@ -3,6 +3,7 @@ import { useForm } from '@inertiajs/vue3';
 import SettingsShell from '@/Components/SettingsShell.vue';
 import AppCard from '@/Components/AppCard.vue';
 import AppButton from '@/Components/AppButton.vue';
+import AppBadge from '@/Components/AppBadge.vue';
 import FormActions from '@/Components/FormActions.vue';
 
 type ModuleRow = {
@@ -11,6 +12,7 @@ type ModuleRow = {
     description: string;
     default_enabled: boolean;
     enabled: boolean;
+    experimental: boolean;
 };
 
 const props = defineProps<{
@@ -54,8 +56,14 @@ const submit = () => {
                             class="mt-1 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                         >
                         <label :for="`module-${row.name}`" class="min-w-0 flex-1 cursor-pointer">
-                            <span class="block text-sm font-medium text-slate-900">
+                            <span class="flex items-center gap-2 text-sm font-medium text-slate-900">
                                 {{ moduleMeta(row.name)?.label ?? row.name }}
+                                <AppBadge
+                                    v-if="moduleMeta(row.name)?.experimental"
+                                    variant="warning"
+                                >
+                                    Experimental
+                                </AppBadge>
                             </span>
                             <span class="mt-1 block text-sm text-slate-500">
                                 {{ moduleMeta(row.name)?.description }}

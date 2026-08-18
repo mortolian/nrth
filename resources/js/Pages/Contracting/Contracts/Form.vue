@@ -154,7 +154,7 @@ const generateRetainerInvoice = () => {
             { label: isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <PageHeader :title="isEditing ? 'Edit Contract' : 'Create Contract'" subtitle="Define billing terms and upload signed agreement" />
+        <PageHeader :title="isEditing ? 'Edit Contract' : 'Create Contract'" subtitle="Experimental. Define billing terms and upload a signed agreement. Retainer generate is a draft helper, not a VAT-complete invoice." />
 
         <AppCard class="mt-5">
             <form @submit.prevent="submit">
@@ -275,9 +275,9 @@ const generateRetainerInvoice = () => {
                     </div>
                 </div>
 
-                <div v-if="values.billing_type === 'retainer'" class="mt-5 rounded-md border border-brand-200 bg-brand-50 p-3 text-sm">
-                    <p class="font-medium text-brand-900">Retainer invoicing</p>
-                    <p class="mt-1 text-brand-800">Next invoice due date: {{ contract?.next_invoice_due_date || 'Will be set on save' }}</p>
+                <div v-if="values.billing_type === 'retainer'" class="mt-5 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+                    <p class="font-medium text-amber-900">Retainer invoicing (experimental)</p>
+                    <p class="mt-1 text-amber-800">Creates a draft in ZAR with VAT at 0%. Edit the invoice before sending. Next due: {{ contract?.next_invoice_due_date || 'Will be set on save' }}</p>
                     <AppButton
                         v-if="isEditing"
                         class="mt-2"

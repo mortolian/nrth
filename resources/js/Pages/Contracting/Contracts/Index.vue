@@ -54,7 +54,7 @@ const applyFilters = (page = 1) => {
             { label: 'Contracts' },
         ]"
     >
-        <PageHeader title="Client Contracts" subtitle="Manage active agreements and billing structures">
+        <PageHeader title="Client Contracts" subtitle="Experimental. Manage agreements; retainer Generate Invoice creates a ZAR draft with no VAT and skips the normal invoicing pipeline.">
             <template #actions>
                 <AppButton variant="primary" @click="router.visit(route('contracting.contracts.create'))">New Contract</AppButton>
             </template>

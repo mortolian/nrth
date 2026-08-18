@@ -63,13 +63,13 @@ Exceptions/   # when needed
 | **Invoicing** | Clients, invoices, estimates, items, recurring, payments, PDFs, online pay sessions |
 | **Banking** | Bank accounts (linked to GL), statement import, imported lines, recon match/exclude |
 | **Expenses** | Receipt parse helpers used by the expenses UI (posted expenses are accounting transactions) |
-| **Tax** | VAT rates/periods/returns, provisional-tax scaffolding |
+| **Tax** | VAT rates/periods/returns; provisional-tax estimates are experimental ([BETA.md](BETA.md)) |
 | **Takeout** | Team data export jobs (Settings → Backups & exports) |
 | **Backup** | Instance backup runs (operator / `./scripts/backup`) |
 | **Instance** | Install-wide operators, mail, timezone, backup retention |
 | **Vehicles** | Travel: vehicles, trips, licence reminders, trip imports |
 | **Budgeting** | Planning: category budgets |
-| **Contracting** | Client contracts and retainer invoice generation (early) |
+| **Contracting** | Client contracts and retainer invoice generation (**experimental** — [BETA.md](BETA.md)) |
 | **Ai** | Provider catalog used by receipt/document/trip import |
 | **Shared** | [`HasTeamScope`](../app/Domain/Shared/HasTeamScope.php) / [`TeamScope`](../app/Domain/Shared/Scopes/TeamScope.php) |
 

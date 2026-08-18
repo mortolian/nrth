@@ -1,6 +1,6 @@
 # Contributing to nrth
 
-Thank you for your interest in contributing. This project is in **early development** — clear issues, small pull requests, and good tests are especially welcome.
+Thank you for your interest in contributing. This project is in **beta** — clear issues, small pull requests, and good tests are especially welcome. Remaining work: [docs/BETA.md](docs/BETA.md).
 
 ## Before you start
 

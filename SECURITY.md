@@ -84,4 +84,4 @@ Residual (accepted for self-host / later hardening):
 
 ## Disclaimer
 
-nrth is accounting software provided as-is. It is not a substitute for professional financial or tax advice. Use at your own risk.
+nrth is accounting software provided as-is, currently in **beta**. It is not a substitute for professional financial or tax advice. Use at your own risk. See [docs/BETA.md](docs/BETA.md) for experimental surfaces and remaining release steps.
