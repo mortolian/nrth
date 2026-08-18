@@ -12,6 +12,7 @@ use App\Domain\Banking\Actions\AllocateBankingTransactionAction;
 use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingTransaction;
+use App\Domain\Banking\Services\BankingReconciliationTotals;
 use App\Domain\Banking\Services\SuggestReconciliationCandidates;
 use App\Models\Team;
 use App\Models\User;
@@ -41,19 +42,25 @@ class BankingReconciliationDomainTest extends TestCase
         return [$user, $team, $banking, $expense, $bankGl];
     }
 
-    private function bankLine(Team $team, BankingAccount $account, string $amount, string $date = '2026-08-12'): BankingTransaction
-    {
+    private function bankLine(
+        Team $team,
+        BankingAccount $account,
+        string $amount,
+        string $date = '2026-08-12',
+        TransactionDirection $direction = TransactionDirection::Debit,
+        string $description = 'Card purchase Corner Cafe',
+    ): BankingTransaction {
         return BankingTransaction::queryWithoutTeamScope()->create([
             'team_id' => $team->id,
             'account_id' => $account->id,
             'transaction_date' => $date,
-            'description' => 'Card purchase Corner Cafe',
+            'description' => $description,
             'reference' => 'REF-CAFE',
             'amount' => $amount,
             'currency' => 'ZAR',
-            'direction' => TransactionDirection::Debit,
-            'source_hash' => hash('sha256', $amount.$date.uniqid()),
-            'duplicate_key' => hash('sha256', 'dup-'.$amount.$date.uniqid()),
+            'direction' => $direction,
+            'source_hash' => hash('sha256', $amount.$date.uniqid('', true)),
+            'duplicate_key' => hash('sha256', 'dup-'.$amount.$date.uniqid('', true)),
         ]);
     }
 
@@ -115,5 +122,83 @@ class BankingReconciliationDomainTest extends TestCase
             (int) $team->id,
             (int) $user->id,
         );
+    }
+
+    public function test_transfer_can_be_matched_on_both_bank_accounts(): void
+    {
+        [$user, $team, $fromBanking, , $fromGl] = $this->setupTeam();
+
+        $toGl = Account::factory()->for($team)->asset()->create(['code' => '1020', 'is_system' => true]);
+        $toBanking = BankingAccount::factory()->for($team)->create(['gl_account_id' => $toGl->id]);
+
+        $transfer = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'type' => TransactionType::Transfer,
+            'status' => TransactionStatus::Posted,
+            'description' => 'Move to savings',
+            'transaction_date' => '2026-08-12',
+            'posted_at' => now(),
+            'created_by' => $user->id,
+        ]);
+        JournalEntry::query()->create([
+            'transaction_id' => $transfer->id,
+            'account_id' => $toGl->id,
+            'type' => EntryType::Debit,
+            'amount_cents' => 10000,
+            'currency' => 'ZAR',
+        ]);
+        JournalEntry::query()->create([
+            'transaction_id' => $transfer->id,
+            'account_id' => $fromGl->id,
+            'type' => EntryType::Credit,
+            'amount_cents' => 10000,
+            'currency' => 'ZAR',
+        ]);
+        $transfer = $transfer->fresh(['journalEntries']);
+        $this->assertNotNull($transfer);
+
+        $outflow = $this->bankLine(
+            $team,
+            $fromBanking,
+            '100.00',
+            '2026-08-12',
+            TransactionDirection::Debit,
+            'Transfer to savings',
+        );
+        $inflow = $this->bankLine(
+            $team,
+            $toBanking,
+            '100.00',
+            '2026-08-12',
+            TransactionDirection::Credit,
+            'Transfer from cheque',
+        );
+
+        app(AllocateBankingTransactionAction::class)->execute(
+            $outflow,
+            $transfer,
+            10000,
+            (int) $team->id,
+            (int) $user->id,
+        );
+
+        $totals = app(BankingReconciliationTotals::class);
+        $this->assertSame(0, $totals->remainingTransactionCents($transfer->fresh(['journalEntries']), $outflow));
+        $this->assertSame(10000, $totals->remainingTransactionCents($transfer->fresh(['journalEntries']), $inflow));
+
+        $candidates = app(SuggestReconciliationCandidates::class)->for($inflow);
+        $this->assertNotEmpty($candidates);
+        $this->assertSame($transfer->id, $candidates[0]['transaction']->id);
+        $this->assertSame(10000, $candidates[0]['suggested_amount_cents']);
+
+        app(AllocateBankingTransactionAction::class)->execute(
+            $inflow,
+            $transfer,
+            10000,
+            (int) $team->id,
+            (int) $user->id,
+        );
+
+        $this->assertSame(0, $totals->remainingTransactionCents($transfer->fresh(['journalEntries']), $inflow));
     }
 }

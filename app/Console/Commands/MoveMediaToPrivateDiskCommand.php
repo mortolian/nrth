@@ -4,7 +4,9 @@ namespace App\Console\Commands;
 
 use App\Support\MediaDisks;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Throwable;
 
@@ -56,15 +58,12 @@ class MoveMediaToPrivateDiskCommand extends Command
         $prefix = (string) $media->getKey();
         $files = $from->allFiles($prefix);
 
+        if ($files === []) {
+            throw new RuntimeException("No files found on disk [{$oldDisk}].");
+        }
+
         foreach ($files as $file) {
-            $stream = $from->readStream($file);
-            if ($stream === null) {
-                continue;
-            }
-            $to->writeStream($file, $stream);
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
+            $this->copyFileOrFail($from, $to, $file);
         }
 
         $media->disk = $newDisk;
@@ -76,6 +75,26 @@ class MoveMediaToPrivateDiskCommand extends Command
 
         foreach ($files as $file) {
             $from->delete($file);
+        }
+    }
+
+    private function copyFileOrFail(Filesystem $from, Filesystem $to, string $path): void
+    {
+        $stream = $from->readStream($path);
+        if (! is_resource($stream)) {
+            throw new RuntimeException("Could not read [{$path}] from the source disk.");
+        }
+
+        try {
+            $written = $to->writeStream($path, $stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        if ($written !== true || ! $to->exists($path)) {
+            throw new RuntimeException("Could not write [{$path}] to the destination disk.");
         }
     }
 }

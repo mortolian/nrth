@@ -59,6 +59,56 @@ class PrivateMediaDiskTest extends TestCase
         $this->assertFalse(Storage::disk('public')->exists($relative));
     }
 
+    public function test_move_command_keeps_public_media_when_source_files_are_missing(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        $invoice = Invoice::factory()->for($team)->create();
+        $media = $invoice
+            ->addMedia(UploadedFile::fake()->create('INV-missing.pdf', 20, 'application/pdf'))
+            ->toMediaCollection('invoice-pdfs', 'public');
+
+        foreach (Storage::disk('public')->allFiles((string) $media->getKey()) as $file) {
+            Storage::disk('public')->delete($file);
+        }
+
+        $this->artisan('nrth:move-media-to-private-disk')->assertFailed();
+
+        $media->refresh();
+        $this->assertSame('public', $media->disk);
+    }
+
+    public function test_move_command_keeps_public_media_when_destination_write_fails(): void
+    {
+        Storage::fake('local');
+        Storage::fake('public');
+
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+
+        $invoice = Invoice::factory()->for($team)->create();
+        $media = $invoice
+            ->addMedia(UploadedFile::fake()->create('INV-write-fail.pdf', 20, 'application/pdf'))
+            ->toMediaCollection('invoice-pdfs', 'public');
+
+        $relative = $media->getPathRelativeToRoot();
+        $failing = \Mockery::mock(Storage::disk('local'))->makePartial();
+        $failing->shouldReceive('writeStream')->andReturn(false);
+        Storage::set('local', $failing);
+
+        $this->artisan('nrth:move-media-to-private-disk')->assertFailed();
+
+        $media->refresh();
+        $this->assertSame('public', $media->disk);
+        $this->assertTrue(Storage::disk('public')->exists($relative));
+    }
+
     public function test_logos_remain_on_the_public_disk(): void
     {
         Storage::fake('public');

@@ -6,6 +6,7 @@ use App\Domain\Accounting\Enums\EntryType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Enums\TransactionDirection;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Banking\Models\BankingTransactionAllocation;
 use App\Domain\Banking\Support\BankingMoney;
@@ -81,10 +82,42 @@ final class BankingReconciliationTotals
         return $debits;
     }
 
-    public function allocatedTransactionCents(Transaction $transaction, ?int $exceptAllocationId = null): int
-    {
+    /**
+     * Allocations that consume matchable amount on this statement's GL (or feed
+     * account when no GL is linked). A transfer hitting two bank GLs can be
+     * matched on both sides; only same-GL allocations reduce remaining.
+     */
+    public function allocatedTransactionCents(
+        Transaction $transaction,
+        BankingTransaction $bankLine,
+        ?int $exceptAllocationId = null,
+    ): int {
+        $bankLine->loadMissing('account');
+        $glAccountId = $bankLine->account?->gl_account_id !== null
+            ? (int) $bankLine->account->gl_account_id
+            : null;
+
+        $relatedBankLineIds = BankingTransaction::queryWithoutTeamScope()
+            ->where('team_id', $bankLine->team_id)
+            ->when(
+                $glAccountId !== null,
+                function ($query) use ($glAccountId): void {
+                    $query->whereIn(
+                        'account_id',
+                        BankingAccount::queryWithoutTeamScope()
+                            ->where('gl_account_id', $glAccountId)
+                            ->select('id')
+                    );
+                },
+                function ($query) use ($bankLine): void {
+                    $query->where('account_id', $bankLine->account_id);
+                }
+            )
+            ->select('id');
+
         $query = BankingTransactionAllocation::queryWithoutTeamScope()
-            ->where('transaction_id', $transaction->id);
+            ->where('transaction_id', $transaction->id)
+            ->whereIn('banking_transaction_id', $relatedBankLineIds);
 
         if ($exceptAllocationId !== null) {
             $query->where('id', '!=', $exceptAllocationId);
@@ -105,7 +138,7 @@ final class BankingReconciliationTotals
         return max(
             0,
             $this->matchableTransactionCents($transaction, $bankLine)
-            - $this->allocatedTransactionCents($transaction, $exceptAllocationId)
+            - $this->allocatedTransactionCents($transaction, $bankLine, $exceptAllocationId)
         );
     }
 }
