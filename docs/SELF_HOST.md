@@ -1,6 +1,6 @@
 # Self-hosting nrth
 
-Day-to-day install and updates: **[INSTALL.md](INSTALL.md)** (two commands). This page covers HTTPS, backups, and recovery.
+Day-to-day install and updates: **[INSTALL.md](INSTALL.md)**. This page covers HTTPS, instance backup, restore, and recovery.
 
 For laptop development: [DEVELOPMENT.md](DEVELOPMENT.md).
 
@@ -48,32 +48,69 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 2. Set the instance default under **Settings → Instance → Timezone** (or `APP_TIMEZONE` in `.env` as the install fallback, e.g. `Africa/Johannesburg`). Each business can override under **Settings → Business**. Schedules and backups use the instance default; the sidebar clock uses the current business timezone (or the instance default when unset).
 3. HTTPS on 443; firewall only 80/443 (not `:8000`, and not Postgres/Redis/Mailpit)
 4. Outbound email: configure SMTP under **Settings → Instance → Outbound email**, or set `MAIL_*` in `.env` (Mailpit is for testing — do not expose `:8025` publicly). Instance SMTP overrides `.env` when enabled (applied on each Octane request and Horizon job — no worker restart required after saving). Use a **From** address on a domain your provider has verified (not `example.com`); that From is also used for instance backup status emails, which go to instance operators. A backup zip is still marked Ready if the status email fails to send.
-5. Host-level backups of Postgres + `storage` volumes, plus in-app instance backups
+5. Instance backups (`./scripts/backup`) plus a host-level snapshot of Postgres + `storage` volumes — see [Backups and restore](#backups-and-restore)
 6. Never commit `.env`
 
 ---
 
-## Backups
+## Backups and restore
 
-Laravel schedules `nrth:backup-run` (03:00) and `nrth:backup-rotate` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices and `vehicles:send-license-disk-reminders` (01:15) for licence disc expiry emails. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage runs under **Settings → Backups & exports → Instance backup**, and operators under **Settings → Instance → Operators**.
+Instance backups are [Spatie Laravel Backup](https://spatie.be/docs/laravel-backup) (`config/backup.php`) wrapped as `nrth:backup-run`. Use **`./scripts/backup`** or **Settings → Backups & exports** so the run is tracked, typed, and rotated. Do not call `php artisan backup:run` by hand on a live install.
 
-Before `./scripts/update`, take a backup and wait until the zip is ready:
+The first admin is an **instance operator**. Manage backups under **Settings → Backups & exports → Instance backup**, and operators under **Settings → Instance → Operators**. Optional break-glass: `NRTH_OPERATOR_EMAILS` in `.env`. Existing installs with no operators: `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` (also run by `./scripts/update`).
+
+Keep the Compose **`scheduler`** service running (or an equivalent cron for `php artisan schedule:run`). It also runs recurring invoices (`01:30`) and licence-disc reminder emails (`01:15`).
+
+| | Data takeout | Instance backup |
+|--|--------------|-----------------|
+| Who | Team owner | Instance operator |
+| What | Period tax/audit zip | Whole install (Postgres + app files) |
+| Restore | N/A | CLI via **Settings → Backups & exports → Instance restore guide** (no one-click in-app restore) |
+
+### Take a backup
+
+Before every live upgrade:
 
 ```bash
 cd /opt/nrth
 ./scripts/backup && ./scripts/update
 ```
 
-`./scripts/backup` runs the same instance backup as the UI, in the `app` container, and waits until the run is Ready (or fails). It does not pull git or migrate. Use `./scripts/backup --queue` only if you want Horizon to process the job in the background.
+| How | When |
+|-----|------|
+| `./scripts/backup` | On demand; waits until the zip is Ready. Does not pull git or migrate. |
+| `./scripts/backup --queue` | Enqueue only (Horizon must be running) |
+| Settings → Backups & exports | Same job as the script; queued on Horizon’s `long` queue |
+| Nightly `nrth:backup-run` at **03:00** | Automatic when `scheduler` is up |
 
-Retention is typed and count-based: each daily zip can also count as weekly (configurable weekday), monthly (month-end), and yearly (31 Dec). Settings under **Settings → Backups & exports → Backup retention** control how many of each type to keep; rotation deletes zips that are no longer needed by any type. An optional size cap is also available.
+`./scripts/update` does **not** take a backup on its own.
+
+### What is in the zip
+
+Each zip is a full instance snapshot:
+
+- A Postgres dump (`db-dumps/*.sql`) via `pg_dump` with `--no-owner --no-acl`. The client in the app image must match Compose Postgres **16**.
+- Application files from the project tree. Spatie excludes `vendor`, `node_modules`, and `storage/framework`. Uploads under `storage/app/private` are included.
+- Local zips are written to **`storage/app/private/{APP_NAME}/`** (default `APP_NAME=nrth` → `storage/app/private/nrth/*.zip`). That directory lives on the Compose `storage_data` volume.
+
+A host-level snapshot of the Postgres volume (`mysql_data`) plus `storage_data` is still a good extra, especially before risky host work. It is not a substitute for a Ready instance zip when you want the in-app restore guide.
+
+### Encryption and status email
+
+| Setting | Purpose |
+|---------|---------|
+| `BACKUP_ARCHIVE_PASSWORD` in `.env` | Optional AES password for the zip. Store it off-host too — without it, restore cannot unzip. After changing it, refresh config (`./scripts/update` or `php artisan config:cache`). The restore guide notes when encryption is on. |
+| Instance SMTP (**Settings → Instance → Outbound email**) | From address for backup status mail. A zip is still marked Ready if the email fails. |
+| Recipients | Instance operators. `BACKUP_NOTIFICATION_EMAIL` is only the Spatie fallback when no operators are configured. Use a verified From domain (not `example.com`). |
+
+You do not need to edit `config/backup.php` for day-to-day operation. Offsite disks and retention are set in the UI; the scheduler runs **`nrth:backup-rotate`**, not Spatie’s `backup:clean`.
 
 ### Offsite destinations
 
-Backups are always written to the local disk. Operators can also mirror each zip to offsite targets under **Settings → Backups & exports → Offsite destinations**:
+Backups are always written to the local disk first. Operators can also mirror each zip under **Settings → Backups & exports → Offsite destinations**:
 
-- **S3-compatible** — AWS S3, Cloudflare R2, MinIO, etc. Credentials are stored encrypted in instance settings (no `.env` AWS_* required for backups when using the UI). Use **Test S3** after saving.
-- **Path / NFS** — an absolute path inside the container. Mount the share into both the `app` and `scheduler` (and queue worker) services, for example:
+- **S3-compatible** — AWS S3, Cloudflare R2, MinIO, etc. Credentials are stored encrypted in instance settings (no `.env` `AWS_*` required for backups when using the UI). Use **Test S3** after saving.
+- **Path / NFS** — an absolute path **inside the container**. Mount the share into `app`, `horizon`, and `scheduler`, for example:
 
 ```yaml
 volumes:
@@ -82,19 +119,23 @@ volumes:
 
 Then set the path to `/mnt/backups` in the UI and use **Test path**.
 
-Rotation and manual delete remove the zip from **every** configured destination. Downloads and the restore guide still use the **local** copy (copy an offsite zip back to the local backup directory if you need to restore from offsite only).
+Rotation and manual delete remove the zip from **every** configured destination. Downloads and the restore guide use the **local** copy — copy an offsite zip back into `storage/app/private/{APP_NAME}/` if you only have the offsite file.
 
-| | Data takeout | Instance backup |
-|--|--------------|-----------------|
-| Who | Team owner | Instance operator |
-| What | Period tax/audit zip | Whole install (DB + files) |
-| Restore | N/A | CLI via **Settings → Backups & exports → Instance restore guide** (generated script; not one-click in-app) |
+### Retention
 
-Optional break-glass: `NRTH_OPERATOR_EMAILS` in `.env`. Existing installs with no operators: `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` (also run by `./scripts/update`).
+Each daily zip can also count as weekly (configurable weekday), monthly (month-end), and yearly (31 Dec). **Settings → Backups & exports → Backup retention** sets how many of each type to keep; `nrth:backup-rotate` at **03:30** deletes zips that no type still needs. An optional size cap is also available.
 
 ### Restore (CLI)
 
-There is no in-app one-click restore. Operators open **Settings → Backups & exports → Instance restore guide** (or **Restore guide** on a ready backup row), pick a ready zip, and copy/download a shell script for `./scripts/compose.sh` (self-host) or Sail. The script extracts the dump, stops app services, replaces the Postgres database, then starts services again. Review the script before running — it replaces the live database.
+There is no in-app one-click restore — it would overwrite the live database while the app is running.
+
+1. Confirm a **Ready** zip exists locally (download it from the UI, or copy it back from offsite).
+2. Open **Settings → Backups & exports → Instance restore guide** (or **Restore guide** on a ready row).
+3. Pick the zip and runtime (`./scripts/compose.sh` for self-host, Sail for laptop). Copy or download the generated script.
+4. Review it. It extracts the SQL dump, stops app services (Postgres stays up), **drops and recreates** the database, imports the dump, then starts services again. Uploaded files are an optional extra step printed at the end.
+5. If you are rolling back an upgrade, restore data first, then point code at the previous tag: `./scripts/update --ref v0.x.y` ([UPGRADE.md](UPGRADE.md)).
+
+App code still comes from git. The zip is not a full OS image.
 
 ### Optional AI
 
@@ -150,9 +191,10 @@ optional `dev` profile, so self-hosted stacks do not start them unless you opt i
 | Docker permission denied | `./scripts/compose.sh …` or `newgrp docker` |
 | Vite manifest missing | `./scripts/compose.sh exec app npm ci && npm run build` |
 | Queues stuck | `./scripts/compose.sh restart horizon` |
-| Backup dump process failed | Image `pg_dump` must match Postgres major (compose uses 16). Rebuild: `./vendor/bin/sail build --no-cache` then `./vendor/bin/sail up -d` |
-| Backup / takeout log permission denied | `./vendor/bin/sail up -d --force-recreate horizon app scheduler` then retry. Entrypoint makes `storage` world-writable; Horizon runs as root like Octane. |
-| Backup stuck “already running” | `./vendor/bin/sail artisan cache:clear` then retry |
+| Backup dump process failed | Image `pg_dump` must match Postgres **16**. Self-host: `./scripts/compose.sh build --no-cache && ./scripts/compose.sh up -d`. Local Sail: `./vendor/bin/sail build --no-cache` then `up -d` |
+| Backup / takeout log permission denied | Recreate app services so the entrypoint can fix `storage` permissions: `./scripts/compose.sh up -d --force-recreate horizon app scheduler` |
+| `./scripts/backup` failed / still queued | Default `./scripts/backup` waits in the `app` container (no Horizon). `--queue` and the UI need Horizon. Check **Settings → Backups & exports**. A queued/processing run older than 75 minutes is marked failed automatically. |
+| Restore unzip fails | If `BACKUP_ARCHIVE_PASSWORD` is set, decrypt with that password. Copy an offsite-only zip back to `storage/app/private/{APP_NAME}/` first. |
 | DB password mismatch | `./scripts/repair.sh` |
 
 Useful:

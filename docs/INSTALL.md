@@ -69,7 +69,20 @@ Full tag-to-tag notes, rollback, and schema policy: **[UPGRADE.md](UPGRADE.md)**
 
 ---
 
-## 3. Optional: update on every git push
+## 3. Backups (live instance)
+
+Canonical guide: **[SELF_HOST.md](SELF_HOST.md)** (what is in the zip, offsite, retention, restore).
+
+```bash
+cd /opt/nrth
+./scripts/backup
+```
+
+That is the same instance backup as **Settings → Backups & exports**. Restore is CLI-only (Instance restore guide). There is no in-app one-click restore.
+
+---
+
+## 4. Optional: update on every git push
 
 Install a self-hosted runner once (`install.sh --auto-deploy`, label `nrth-server`). The workflow [deploy-server.yml](../.github/workflows/deploy-server.yml) runs `./scripts/update` on push to `master`. Details: [PERSONAL_SERVER.md](PERSONAL_SERVER.md).
 
@@ -101,6 +114,7 @@ Full list: run `./scripts/install.sh --help`.
 | Docker permission denied | Use `./scripts/compose.sh …`, or `newgrp docker` |
 | DB password mismatch after `.env` edit | `./scripts/repair.sh` |
 | Queues stuck | `./scripts/compose.sh restart horizon` |
+| Backup / restore | [SELF_HOST.md](SELF_HOST.md) — `./scripts/backup`, Instance restore guide |
 
 More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
 
@@ -110,7 +124,7 @@ More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
 
 | Doc | For |
 |-----|-----|
-| [SELF_HOST.md](SELF_HOST.md) | HTTPS, backups, troubleshooting |
+| [SELF_HOST.md](SELF_HOST.md) | HTTPS, instance backup & restore, troubleshooting |
 | [UPGRADE.md](UPGRADE.md) | Tag-to-tag upgrades and rollback |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local contributor setup |
 | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | Maintainer push-to-deploy |

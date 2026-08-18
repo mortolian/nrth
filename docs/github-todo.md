@@ -61,7 +61,7 @@ Deeper docs for contributors and self-hosters.
 - [ ] **docs/ARCHITECTURE.md** — Document domains, actions pattern, team scoping ([app/Domain/](../app/Domain/), [TeamScope](../app/Domain/Shared/Scopes/TeamScope.php)), and high-level request/data flow
 - [x] **docs/ROADMAP.md** — Planned features, alpha scope, and what is explicitly out of scope for now
 - [ ] **.env.example production warnings** — Add prominent comments for default passwords and secrets ([.env.example](../.env.example): `DB_PASSWORD`, `APP_KEY`, etc.)
-- [ ] **Spatie Backup documentation** — Document [config/backup.php](../config/backup.php) and backup/restore steps more prominently in [SELF_HOST.md](SELF_HOST.md) or [INSTALL.md](INSTALL.md) if self-hosters need it
+- [x] **Spatie Backup documentation** — Instance backup, restore, `config/backup.php` operator notes, and env keys in [SELF_HOST.md](SELF_HOST.md) / [INSTALL.md](INSTALL.md)
 - [ ] **Multi-tenant security note** — Add guidance for self-hosters on team isolation, registration settings, and hardening a multi-tenant deployment (relevant to Jetstream teams model)
 
 ---
@@ -101,7 +101,7 @@ One install script for everyone; deploy script for updates.
 | **Maintainer personal server** | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | [scripts/update](../scripts/update); optional `install.sh --auto-deploy` + [deploy-server.yml](../.github/workflows/deploy-server.yml) |
 
 - [x] Ensure [PERSONAL_SERVER.md](PERSONAL_SERVER.md) is clearly labeled **maintainer-only** in README or hosting index so self-hosters do not follow the wrong path
-- [ ] Confirm [SELF_HOST.md](SELF_HOST.md) is linked from [README.md](../README.md) and [INSTALL.md](INSTALL.md) as the primary self-host entry point
+- [x] Confirm [SELF_HOST.md](SELF_HOST.md) is linked from [README.md](../README.md) and [INSTALL.md](INSTALL.md) as the primary self-host entry point
 
 ---
 

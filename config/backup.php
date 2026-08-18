@@ -11,6 +11,14 @@ use Spatie\Backup\Tasks\Cleanup\Strategies\DefaultStrategy;
 use Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays;
 use Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes;
 
+/*
+ * Spatie Laravel Backup. Operators should not edit this file for day-to-day use.
+ * Take backups with ./scripts/backup or Settings → Backups & exports.
+ * Offsite destinations and retention counts are configured in the UI.
+ * The scheduler runs nrth:backup-run / nrth:backup-rotate (not backup:clean).
+ * See docs/SELF_HOST.md.
+ */
+
 return [
 
     'backup' => [

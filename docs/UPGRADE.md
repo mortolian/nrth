@@ -68,7 +68,7 @@ Inspect pending migrations any time:
 
 ## Rollback
 
-1. Restore the instance backup taken before the upgrade ([SELF_HOST.md](SELF_HOST.md) — Restore CLI). Restoring replaces the live database.
+1. Restore the instance backup taken before the upgrade ([SELF_HOST.md](SELF_HOST.md) — Restore). Restoring replaces the live database.
 2. Point the code tree at the previous tag:
 
 ```bash

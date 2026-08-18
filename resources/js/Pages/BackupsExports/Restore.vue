@@ -94,8 +94,10 @@ fi
 echo "Using dump: $DUMP"
 $RUNNER exec -T app cat "$DUMP" > "$HOST_DUMP"
 
-echo "Stopping app + worker + scheduler (postgres stays up)…"
-$RUNNER stop app worker scheduler
+echo "Stopping app services (postgres stays up)…"
+$RUNNER stop app scheduler
+$RUNNER stop horizon 2>/dev/null || true
+$RUNNER stop worker 2>/dev/null || true
 
 echo "Recreating database $DB_NAME…"
 $RUNNER exec -T postgres psql -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DB_NAME' AND pid <> pg_backend_pid();"
@@ -107,7 +109,9 @@ $RUNNER exec -T -i postgres psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 
 rm -f "$HOST_DUMP"
 
 echo "Starting services…"
-$RUNNER start app worker scheduler
+$RUNNER start app scheduler
+$RUNNER start horizon 2>/dev/null || true
+$RUNNER start worker 2>/dev/null || true
 
 echo "Cleaning up extract dir…"
 $RUNNER exec -T app rm -rf "$WORKDIR"

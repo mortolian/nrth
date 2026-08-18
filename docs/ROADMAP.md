@@ -32,7 +32,7 @@ Planned focus areas — not committed dates or ordering:
 
 - [x] **Stabilise data models** — additive schema from 2026-08-18; tag-to-tag upgrades via `./scripts/update --ref` ([docs/UPGRADE.md](UPGRADE.md))
 - [x] **Bank reconciliation** — match imported transactions to invoices, expenses, and journal entries; exclude personal/out-of-scope lines on mixed accounts
-- [ ] **Backup & restore docs** — prominent Spatie Backup guidance for self-hosters
+- [x] **Backup & restore docs** — instance backup (`./scripts/backup`), offsite, retention, and CLI restore ([docs/SELF_HOST.md](SELF_HOST.md))
 - [ ] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings
 - [ ] **README screenshots / demo** — visual overview for new visitors
 - [ ] **Architecture docs** — domain layout, actions pattern, team scoping ([`app/Domain/`](../app/Domain/))
