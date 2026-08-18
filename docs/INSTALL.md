@@ -1,6 +1,6 @@
 # Getting started
 
-Install once. Update with one command. That’s the whole happy path.
+Install once. Backup, then update. That’s the whole happy path.
 
 **Before any install:** make sure this machine is backed up. Piped/non-interactive installs require `--accept-data-risk`.
 
@@ -46,16 +46,26 @@ Always use `./scripts/compose.sh` for Docker Compose (it handles sudo/docker gro
 
 ## 2. Update (every time)
 
+On a live instance, backup first, then update:
+
 ```bash
 cd /opt/nrth
-./scripts/update
+./scripts/backup && ./scripts/update
 ```
 
 Mode defaults to a **full** update (migrate, caches, asset build, verify). With `APP_ENV=production`, it also runs `app:update` (maintenance mode). On self-hosted installs, it also warns if the instance still looks like contributor mode (`APP_ENV=local`). Optional: `./scripts/update production` or `./scripts/update dev`.
 
+Pin to a GitHub Release tag instead of tracking `master`:
+
+```bash
+./scripts/backup && ./scripts/update --ref v0.1.3
+```
+
 `./scripts/deploy.sh` still works as an alias.
 
 Re-running `install.sh` on an existing install also runs `./scripts/update` (data preserved).
+
+Full tag-to-tag notes, rollback, and schema policy: **[UPGRADE.md](UPGRADE.md)**.
 
 ---
 
@@ -101,6 +111,7 @@ More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
 | Doc | For |
 |-----|-----|
 | [SELF_HOST.md](SELF_HOST.md) | HTTPS, backups, troubleshooting |
+| [UPGRADE.md](UPGRADE.md) | Tag-to-tag upgrades and rollback |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local contributor setup |
 | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | Maintainer push-to-deploy |
 | [RELEASE.md](RELEASE.md) | Versioning / Release Please (maintainers) |

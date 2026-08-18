@@ -880,7 +880,7 @@ print_success() {
         echo "  1. Sign in at the URL above with your admin credentials"
         echo "  2. Complete the in-app setup wizard (company details and preferences)"
     fi
-    echo "  3. After upgrades: ./scripts/update"
+    echo "  3. After upgrades: ./scripts/backup && ./scripts/update"
     if [[ "$MODE" == "production" ]]; then
         echo "  4. Production checklist: ${ROOT_DIR}/docs/SELF_HOST.md"
         if grep -qE '^COMPOSE_PROFILES=.*proxy' "$ROOT_DIR/.env" 2>/dev/null; then

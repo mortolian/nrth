@@ -34,7 +34,7 @@ Community and documentation foundations are in place:
 - [x] [DEVELOPMENT.md](DEVELOPMENT.md) (dev details moved from README)
 - [x] [INSTALL.md](INSTALL.md) updated with community doc links
 - [x] Clone URLs fixed to `mortolian/nrth` in docs
-- [x] Hosting guides: [SELF_HOST.md](SELF_HOST.md), [PERSONAL_SERVER.md](PERSONAL_SERVER.md), [scripts/install.sh](../scripts/install.sh), [scripts/update](../scripts/update)
+- [x] Hosting guides: [SELF_HOST.md](SELF_HOST.md), [PERSONAL_SERVER.md](PERSONAL_SERVER.md), [scripts/install.sh](../scripts/install.sh), [scripts/update](../scripts/update), [scripts/backup](../scripts/backup)
 
 ---
 
@@ -57,6 +57,7 @@ GitHub presence, first release, and visible polish.
 
 Deeper docs for contributors and self-hosters.
 
+- [x] **docs/UPGRADE.md** — Tag-to-tag upgrades, backup-before-migrate, additive schema policy from 2026-08-18
 - [ ] **docs/ARCHITECTURE.md** — Document domains, actions pattern, team scoping ([app/Domain/](../app/Domain/), [TeamScope](../app/Domain/Shared/Scopes/TeamScope.php)), and high-level request/data flow
 - [x] **docs/ROADMAP.md** — Planned features, alpha scope, and what is explicitly out of scope for now
 - [ ] **.env.example production warnings** — Add prominent comments for default passwords and secrets ([.env.example](../.env.example): `DB_PASSWORD`, `APP_KEY`, etc.)

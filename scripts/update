@@ -10,15 +10,22 @@
 # affects tracked files in this clone (not Postgres, Redis, or storage volumes).
 #
 # Usage:
-#   ./scripts/update                 # full update (recommended)
-#   ./scripts/update production      # same + app:update maintenance path
-#   ./scripts/update dev             # migrate/queues only; still rebuilds assets + route cache
+#   ./scripts/backup && ./scripts/update              # backup, then pull origin/master
+#   ./scripts/backup && ./scripts/update --ref v0.1.3  # backup, then a release tag
+#   ./scripts/update                      # pull origin/master (or GIT_BRANCH)
+#   ./scripts/update --ref v0.1.3         # checkout a release tag, then migrate
+#   ./scripts/update production           # same + app:update maintenance path
+#   ./scripts/update --ref v0.1.3 production
+#   ./scripts/update dev                  # migrate/queues only; still rebuilds assets
 #
 # Environment:
 #   SKIP_GIT=1          Skip git pull (CI already updated the tree)
 #   SKIP_ASSETS=1       Skip npm ci / npm run build (not recommended on servers)
-#   GIT_BRANCH=master   Branch to pull (default: master)
+#   GIT_BRANCH=master   Branch to pull when --ref is not set (default: master)
+#   GIT_REF=v0.1.3      Same as --ref (tag, branch, or commit)
 #   COMPOSE=...         Override compose command (default: scripts/compose.sh)
+#
+# See docs/UPGRADE.md for backup, tag-to-tag upgrades, and rollback.
 
 set -euo pipefail
 
@@ -26,19 +33,43 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 usage() {
-    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 GIT_BRANCH="${GIT_BRANCH:-master}"
+GIT_REF="${GIT_REF:-}"
 COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
 SKIP_ASSETS="${SKIP_ASSETS:-0}"
+MODE_ARG=""
 
-case "${1:-}" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-esac
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --ref)
+            if [[ $# -lt 2 ]]; then
+                echo "error: --ref requires a tag, branch, or commit" >&2
+                exit 1
+            fi
+            GIT_REF="$2"
+            shift 2
+            ;;
+        --ref=*)
+            GIT_REF="${1#--ref=}"
+            shift
+            ;;
+        production|prod|dev|development|local)
+            MODE_ARG="$1"
+            shift
+            ;;
+        *)
+            echo "error: unknown argument '${1}' (use production, dev, --ref <tag>, or --help)" >&2
+            exit 1
+            ;;
+    esac
+done
 
 hash_file() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -119,7 +150,39 @@ resolve_mode() {
     fi
 }
 
-MODE="$(resolve_mode "${1:-}")"
+read_version() {
+    if [[ -f version.txt ]]; then
+        tr -d '[:space:]' < version.txt
+    else
+        echo "unknown"
+    fi
+}
+
+checkout_update_ref() {
+    if [[ -n "$GIT_REF" ]]; then
+        echo "==> Fetching tags and origin/${GIT_BRANCH}"
+        git fetch origin --tags --force
+        git fetch origin "${GIT_BRANCH}"
+        echo "==> Checking out ${GIT_REF} (code tree only; volumes preserved)"
+        if git rev-parse --verify "refs/tags/${GIT_REF}" >/dev/null 2>&1; then
+            git checkout --force --detach "refs/tags/${GIT_REF}"
+        elif git rev-parse --verify "origin/${GIT_REF}" >/dev/null 2>&1; then
+            git reset --hard "origin/${GIT_REF}"
+        elif git rev-parse --verify "${GIT_REF}^{commit}" >/dev/null 2>&1; then
+            git checkout --force --detach "${GIT_REF}"
+        else
+            echo "error: unknown ref '${GIT_REF}' (tag, branch, or commit)" >&2
+            exit 1
+        fi
+        return
+    fi
+
+    echo "==> Pulling latest from origin/${GIT_BRANCH} (git reset --hard — code tree only)"
+    git fetch origin "${GIT_BRANCH}"
+    git reset --hard "origin/${GIT_BRANCH}"
+}
+
+MODE="$(resolve_mode "${MODE_ARG}")"
 
 if [[ ! -f compose.yaml ]]; then
     echo "compose.yaml not found. Run this script from the project root."
@@ -136,27 +199,32 @@ if [[ "${SKIP_GIT:-0}" != "1" ]] && [[ -d .git ]] && [[ "$(id -u)" -ne 0 ]]; the
     fi
 fi
 
+echo "==> Upgrade safety"
+echo "    Volumes and the database are not wiped. Pending migrations are applied only."
+    echo "    Before a live upgrade, run ./scripts/backup (or take a backup in Settings → Backups & exports)."
+    echo "    Rollback: restore that backup, then ./scripts/update --ref <previous-tag>. Details: docs/UPGRADE.md"
+
 BEFORE_COMMIT=""
+BEFORE_VERSION="$(read_version)"
 if [[ -d .git ]]; then
     BEFORE_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || true)"
 fi
 
 if [[ "${SKIP_GIT:-0}" != "1" ]]; then
     if [[ -d .git ]] && { ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; }; then
-        echo "warning: uncommitted changes in ${ROOT_DIR} will be discarded by git reset --hard"
+        echo "warning: uncommitted changes in ${ROOT_DIR} will be discarded by git reset --hard / checkout"
         echo "         (Docker volumes and database data are not affected)"
     fi
-    echo "==> Pulling latest from origin/${GIT_BRANCH} (git reset --hard — code tree only)"
-    git fetch origin "${GIT_BRANCH}"
-    git reset --hard "origin/${GIT_BRANCH}"
+    checkout_update_ref
 fi
 
 AFTER_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 AFTER_SHORT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 AFTER_SUBJECT="$(git log -1 --pretty=%s 2>/dev/null || echo '')"
+AFTER_VERSION="$(read_version)"
 REMOTE_COMMIT="$(git rev-parse "origin/${GIT_BRANCH}" 2>/dev/null || echo '')"
 
-if [[ -n "$REMOTE_COMMIT" && "$AFTER_COMMIT" != "$REMOTE_COMMIT" ]]; then
+if [[ -z "$GIT_REF" && -n "$REMOTE_COMMIT" && "$AFTER_COMMIT" != "$REMOTE_COMMIT" ]]; then
     echo "error: HEAD (${AFTER_SHORT}) does not match origin/${GIT_BRANCH} ($(git rev-parse --short "$REMOTE_COMMIT"))." >&2
     exit 1
 fi
@@ -164,6 +232,14 @@ fi
 echo "==> Code: ${AFTER_SHORT} — ${AFTER_SUBJECT}"
 if [[ -n "$BEFORE_COMMIT" && "$BEFORE_COMMIT" != "$AFTER_SHORT" ]]; then
     echo "    (was ${BEFORE_COMMIT})"
+fi
+if [[ "$BEFORE_VERSION" != "$AFTER_VERSION" ]]; then
+    echo "    Version: ${BEFORE_VERSION} → ${AFTER_VERSION}"
+else
+    echo "    Version: ${AFTER_VERSION}"
+fi
+if [[ -n "$GIT_REF" ]]; then
+    echo "    Ref: ${GIT_REF}"
 fi
 
 echo "==> Ensuring stack is up (applies compose/.env changes; volumes preserved)"
@@ -238,9 +314,11 @@ refresh_caches() {
 
 if [[ "$MODE" == "production" ]]; then
     echo "==> Running production update (maintenance mode, migrate, caches, workers)"
+    run_app php artisan nrth:upgrade-status || true
     run_app php artisan app:update
 else
     echo "==> Running update (migrate + queue restart + caches) [mode=${MODE}]"
+    run_app php artisan nrth:upgrade-status || true
     run_app php artisan migrate --force --no-interaction
     run_app php artisan nrth:promote-first-operator
     run_app php artisan queue:restart
@@ -307,8 +385,17 @@ fi
 echo ""
 echo "Update finished ($(date -u +"%Y-%m-%d %H:%M:%S UTC"))."
 echo "  Mode: ${MODE} (APP_ENV=$(read_app_env))"
+if [[ "$BEFORE_VERSION" != "$AFTER_VERSION" ]]; then
+    echo "  Version: ${BEFORE_VERSION} → ${AFTER_VERSION}"
+else
+    echo "  Version: ${AFTER_VERSION}"
+fi
+if [[ -n "$GIT_REF" ]]; then
+    echo "  Ref: ${GIT_REF}"
+else
+    echo "  Matches origin/${GIT_BRANCH}: yes"
+fi
 echo "  Commit: ${AFTER_SHORT} — ${AFTER_SUBJECT}"
-echo "  Matches origin/${GIT_BRANCH}: yes"
 echo "  Assets rebuilt: $([[ "$BUILT_ASSETS" -eq 1 ]] && echo yes || echo no)"
 echo "  Data: volumes and database preserved; pending migrations applied only"
 if [[ "$ENV_WARNING" -eq 1 ]]; then

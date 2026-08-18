@@ -30,7 +30,7 @@ See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.
 
 Planned focus areas — not committed dates or ordering:
 
-- [ ] **Stabilise data models** — fewer breaking migrations; clearer upgrade path between tags
+- [x] **Stabilise data models** — additive schema from 2026-08-18; tag-to-tag upgrades via `./scripts/update --ref` ([docs/UPGRADE.md](UPGRADE.md))
 - [x] **Bank reconciliation** — match imported transactions to invoices, expenses, and journal entries; exclude personal/out-of-scope lines on mixed accounts
 - [ ] **Backup & restore docs** — prominent Spatie Backup guidance for self-hosters
 - [ ] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings
@@ -75,8 +75,9 @@ To set expectations during alpha:
 
 ## Versioning
 
-- **`master`** — active development; may break without notice during alpha.
-- **Tags (`v0.x.y`)** — created automatically when you merge a Release Please PR; see [docs/RELEASE.md](RELEASE.md).
+- **`master`** — active development; still the default `./scripts/update` target.
+- **Tags (`v0.x.y`)** — created automatically when you merge a Release Please PR; see [docs/RELEASE.md](RELEASE.md). Self-hosters who want a known release should use `./scripts/update --ref v0.x.y` ([docs/UPGRADE.md](UPGRADE.md)).
+- **Schema** — from 2026-08-18, new migrations are additive (no drop/rename in `up()`). Older alpha tags may have included breaking migrations.
 - **1.0** — not planned until data models, install/upgrade story, and core workflows are stable enough for production-minded self-hosters.
 
 ---

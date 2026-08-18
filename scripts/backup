@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# Take an instance backup (database + files) and wait until it is ready.
+#
+# Intended to run before ./scripts/update on a live install:
+#   ./scripts/backup && ./scripts/update
+#   ./scripts/backup && ./scripts/update --ref v0.1.3
+#
+# Uses the same Spatie instance backup as Settings → Backups & exports.
+# Does not pull git, rebuild assets, or run migrations.
+#
+# Usage:
+#   ./scripts/backup              # wait until ready or failed (default)
+#   ./scripts/backup --queue      # queue only (Horizon must process the job)
+#
+# Environment:
+#   COMPOSE=...                   Override compose command (default: scripts/compose.sh)
+#   BACKUP_WAIT_TIMEOUT=3900      Seconds to wait if a backup is already running
+#
+# See docs/UPGRADE.md and docs/SELF_HOST.md.
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+usage() {
+    sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+COMPOSE="${COMPOSE:-$ROOT_DIR/scripts/compose.sh}"
+WAIT=1
+BACKUP_WAIT_TIMEOUT="${BACKUP_WAIT_TIMEOUT:-3900}"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --queue)
+            WAIT=0
+            shift
+            ;;
+        --wait)
+            WAIT=1
+            shift
+            ;;
+        *)
+            echo "error: unknown argument '${1}' (use --queue, --wait, or --help)" >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ ! -f compose.yaml ]]; then
+    echo "compose.yaml not found. Run this script from the project root." >&2
+    exit 1
+fi
+
+echo "==> Ensuring stack is up (volumes preserved)"
+$COMPOSE up -d
+
+echo "==> Instance backup"
+if [[ "$WAIT" -eq 1 ]]; then
+    echo "    Waiting until the zip is ready (no git pull, no migrate)"
+    $COMPOSE exec -T app php artisan nrth:backup-run --wait --wait-timeout="${BACKUP_WAIT_TIMEOUT}"
+else
+    echo "    Queueing (Horizon worker must be running)"
+    $COMPOSE exec -T app php artisan nrth:backup-run
+fi
+
+echo ""
+echo "Backup finished ($(date -u +"%Y-%m-%d %H:%M:%S UTC"))."
+echo "  Next: ./scripts/update"
+echo "  Restore: Settings → Backups & exports → Instance restore guide"
+echo "  Details: docs/UPGRADE.md"

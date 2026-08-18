@@ -84,6 +84,8 @@ After that, Release Please uses `v0.1.0` as the baseline and only includes new c
 
 You do not need to run `git tag` or fill in the GitHub Releases UI for routine releases.
 
+Self-hosters upgrade between tags with `./scripts/backup && ./scripts/update --ref v0.x.y` — see [UPGRADE.md](UPGRADE.md).
+
 ## Skipping a release
 
 Leave the Release PR open. It accumulates commits until you merge it. Close it only if you opened it by mistake — Release Please will open a new one on the next qualifying push.

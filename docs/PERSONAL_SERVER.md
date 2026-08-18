@@ -36,16 +36,21 @@ cd /opt/nrth
 ./scripts/update
 ```
 
+On a live books instance, backup first: `./scripts/backup && ./scripts/update` ([UPGRADE.md](UPGRADE.md)).
+
 **Automatic:** push to `master` → Actions job on the self-hosted runner runs `./scripts/update`.
 
 `./scripts/update` always:
 
-1. Resets the tree to `origin/master` and prints the commit
+1. Resets the tree to `origin/master` (or `--ref` / `GIT_REF`) and prints the commit and version
 2. Rebuilds Vite assets (`npm run build`)
 3. Removes dev-only services and any stale `public/hot`
-4. Refreshes Laravel config/route/view caches
-5. Restarts the app container
-6. Verifies `expenses.parse-receipt` exists and the Vite manifest is present
+4. Shows pending migrations (`nrth:upgrade-status`), then migrates
+5. Refreshes Laravel config/route/view caches
+6. Restarts the app container
+7. Verifies `expenses.parse-receipt` exists and the Vite manifest is present
+
+Tag-to-tag upgrades: [UPGRADE.md](UPGRADE.md).
 
 If verification fails, the script exits non-zero. Use `SKIP_ASSETS=1` only when you intentionally skip the frontend build.
 

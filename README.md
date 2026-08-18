@@ -62,6 +62,7 @@ Details, Docker dev workflow, architecture, and tests: **[docs/DEVELOPMENT.md](d
 | Guide | Description |
 |-------|-------------|
 | [docs/INSTALL.md](docs/INSTALL.md) | Installation hub |
+| [docs/UPGRADE.md](docs/UPGRADE.md) | Tag-to-tag upgrades, backups, rollback |
 | [docs/SELF_HOST.md](docs/SELF_HOST.md) | Self-host with Docker |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer-only personal dev server |

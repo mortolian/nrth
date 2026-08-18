@@ -77,8 +77,14 @@ Or use the unified installer from a clone: `./scripts/install.sh --dev`
 
 ## Database migrations
 
-- Name migrations clearly and keep them reversible when possible.
-- Do not edit migrations that may already be applied in the wild — add a new migration instead.
+Released schema is upgraded in place (`./scripts/update` / `php artisan migrate`). From **2026-08-18** onward:
+
+- **Additive `up()` only** — add tables, columns, and indexes. Do not `dropColumn`, `renameColumn`, or drop tables in `up()`.
+- Do **not** edit migrations that may already be applied — add a new migration instead.
+- Name migrations clearly and keep `down()` reversible when practical.
+- If a change cannot be additive, use expand/contract (add the new shape, backfill, then remove the old shape in a later release) and call it out as breaking in the PR / release notes.
+
+CI asserts this policy in `tests/Unit/Support/Upgrade/AdditiveMigrationPolicyTest.php`. Operator upgrade path: [docs/UPGRADE.md](docs/UPGRADE.md).
 
 ## Documentation
 

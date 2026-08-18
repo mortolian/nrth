@@ -57,6 +57,15 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 Laravel schedules `nrth:backup-run` (03:00) and `nrth:backup-rotate` (03:30), plus `invoices:generate-recurring` (01:30) for recurring invoices and `vehicles:send-license-disk-reminders` (01:15) for licence disc expiry emails. Keep the Compose `scheduler` service running (or an equivalent cron calling `php artisan schedule:run`). The first admin is an **instance operator** — manage runs under **Settings → Backups & exports → Instance backup**, and operators under **Settings → Instance → Operators**.
 
+Before `./scripts/update`, take a backup and wait until the zip is ready:
+
+```bash
+cd /opt/nrth
+./scripts/backup && ./scripts/update
+```
+
+`./scripts/backup` runs the same instance backup as the UI, in the `app` container, and waits until the run is Ready (or fails). It does not pull git or migrate. Use `./scripts/backup --queue` only if you want Horizon to process the job in the background.
+
 Retention is typed and count-based: each daily zip can also count as weekly (configurable weekday), monthly (month-end), and yearly (31 Dec). Settings under **Settings → Backups & exports → Backup retention** control how many of each type to keep; rotation deletes zips that are no longer needed by any type. An optional size cap is also available.
 
 ### Offsite destinations
@@ -114,9 +123,12 @@ Env values are used only when the business setting is empty.
 
 ## Update
 
+Tag-to-tag upgrades, backups, and rollback: **[UPGRADE.md](UPGRADE.md)**.
+
 ```bash
 cd /opt/nrth
-./scripts/update
+./scripts/backup && ./scripts/update
+# or pin a release: ./scripts/backup && ./scripts/update --ref v0.1.3
 ```
 
 Data-safe: no volume wipe, incremental migrate only. The updater rebuilds `public/build`,

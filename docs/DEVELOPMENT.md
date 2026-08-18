@@ -176,6 +176,9 @@ Interactive admin user and business team. Further setup (business profile, chart
 |---------|---------|
 | `php artisan app:install` | First install |
 | `php artisan app:update` | Production upgrade (migrate, caches, workers) |
+| `php artisan nrth:upgrade-status` | Version + pending migrations |
+| `./scripts/backup` | Instance backup (wait until ready); run before `./scripts/update` |
+| `./scripts/update --ref v0.x.y` | Self-host upgrade to a release tag ([UPGRADE.md](UPGRADE.md)) |
 | `php artisan horizon` | Queue dashboard (local) |
 | `composer test` | Run test suite |
 

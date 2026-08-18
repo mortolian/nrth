@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Upgrade\SchemaUpgradeStatus;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Throwable;
@@ -12,9 +13,22 @@ class AppUpdateCommand extends Command
 
     protected $description = 'Maintenance mode, migrate, rebuild caches, signal queue workers, then bring the application back online.';
 
-    public function handle(): int
+    public function handle(SchemaUpgradeStatus $status): int
     {
         $this->components->info(config('app.name').' application update');
+        $this->line('  Version: '.$status->applicationVersion().' (version.txt '.$status->versionFile().')');
+        $this->components->warn('Take an instance backup before upgrading a live database: ./scripts/backup. See docs/UPGRADE.md.');
+        $this->newLine();
+
+        $pending = $status->pendingMigrationNames();
+        if ($pending === []) {
+            $this->components->info('No pending migrations.');
+        } else {
+            $this->components->info('Pending migrations ('.count($pending).'):');
+            foreach ($pending as $name) {
+                $this->line('  - '.$name);
+            }
+        }
         $this->newLine();
 
         try {
