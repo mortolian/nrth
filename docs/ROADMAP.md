@@ -37,7 +37,7 @@ Planned focus areas — not committed dates or ordering:
 - [ ] **README screenshots / demo** — visual overview for new visitors
 - [ ] **Architecture docs** — domain layout, actions pattern, team scoping ([`app/Domain/`](../app/Domain/))
 - [ ] **Security review** — auth flows, uploads, payment webhooks
-- [ ] **Expanded test coverage** — critical money and tenant-isolation paths
+- [x] **Expanded test coverage** — tenant isolation plus report arithmetic (P&L / TB / BS / cash flow) and invoice overpayment rejection
 
 Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and [Discussions](https://github.com/mortolian/nrth/discussions).
 

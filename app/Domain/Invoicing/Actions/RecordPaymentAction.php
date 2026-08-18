@@ -44,6 +44,8 @@ class RecordPaymentAction
                 ]);
             }
 
+            $this->assertDoesNotExceedAmountDue($invoice, $dto->amountCents);
+
             $team = $invoice->team ?? Team::query()->findOrFail($dto->teamId);
             (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
             (new EnsureDefaultBankingAccount)->execute($team);
@@ -383,6 +385,17 @@ class RecordPaymentAction
         $invoice->save();
 
         return $payment->refresh();
+    }
+
+    private function assertDoesNotExceedAmountDue(Invoice $invoice, int $amountCents): void
+    {
+        $due = max(0, (int) $invoice->getRawOriginal('total_cents') - (int) $invoice->getRawOriginal('amount_paid_cents'));
+
+        if ($amountCents > $due) {
+            throw ValidationException::withMessages([
+                'amount_cents' => __('Payment cannot exceed the amount due.'),
+            ]);
+        }
     }
 
     private function getRequiredAccount(int $teamId, string $code, string $label): Account

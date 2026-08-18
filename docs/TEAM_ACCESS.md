@@ -79,4 +79,4 @@ Wealth catalog keys are `wealth.view` and `wealth.manage`. **Travel**, **Plannin
 
 Feature coverage lives under [`tests/Feature/TeamAccess/`](../tests/Feature/TeamAccess/). Prefer HTTP 403 assertions plus `TeamAccess::allows` for custom role matrices.
 
-Cross-business isolation (owner of business B cannot open or mutate business A’s invoices, expenses, ledger, reports, VAT, or banking) lives under [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/).
+Cross-business isolation (owner of business B cannot open or mutate business A’s invoices, expenses, ledger, reports, VAT, or banking) lives under [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/). Report arithmetic on a known journal (P&L, trial balance, balance sheet, cash flow) lives under [`tests/Feature/Reports/`](../tests/Feature/Reports/).
