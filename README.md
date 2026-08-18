@@ -30,6 +30,16 @@
 - **Teams** — multi-user companies via Jetstream
 - **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included
 
+## Screenshots
+
+Demo workspace — invoice, bank reconciliation, and profit & loss.
+
+![Invoice](images/invoice.png)
+
+![Bank reconciliation](images/reconciliation.png)
+
+![Profit and loss](images/profit-loss.png)
+
 ## Quick start (Docker)
 
 The fastest way to try nrth with the full stack:
@@ -63,7 +73,7 @@ Details, Docker dev workflow, and tests: **[docs/DEVELOPMENT.md](docs/DEVELOPMEN
 |-------|-------------|
 | [docs/INSTALL.md](docs/INSTALL.md) | Installation hub |
 | [docs/UPGRADE.md](docs/UPGRADE.md) | Tag-to-tag upgrades, backups, rollback |
-| [docs/SELF_HOST.md](docs/SELF_HOST.md) | HTTPS, instance backup & restore |
+| [docs/SELF_HOST.md](docs/SELF_HOST.md) | HTTPS, multi-tenant hardening, instance backup & restore |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Local development |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Domains, actions, team scoping |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer-only personal dev server |

@@ -13,7 +13,7 @@ Minimum items to complete **before** making the repository public:
 - [x] Set GitHub repo **About** description, website URL, and **topics**
 - [x] Upload **social preview image** (Settings → General → Social preview)
 - [ ] Create first **GitHub Release** (`v0.1.0` or later) with [CHANGELOG](../CHANGELOG.md) notes
-- [ ] Add **screenshots or demo** to [README.md](../README.md) ([images/](images/))
+- [x] Add **screenshots or demo** to [README.md](../README.md) ([images/](../images/))
 - [x] Enable **GitHub Discussions**
 - [x] Enable **private vulnerability reporting** (Settings → Security → Private vulnerability reporting)
 - [ ] Expand [CHANGELOG.md](../CHANGELOG.md) beyond the initial `0.1.0` entry
@@ -45,7 +45,7 @@ GitHub presence, first release, and visible polish.
 - [x] **GitHub repo description + topics** — Set in Settings → General → About. Suggested topics: `laravel`, `accounting`, `invoicing`, `vue`, `south-africa`, `self-hosted`, `bookkeeping`, `saas`
 - [x] **Social preview image** — Logo + tagline (1200×630 px recommended). Upload under Settings → General → Social preview
 - [ ] **First GitHub Release** — Tag `v0.1.0` (or current version) with release notes drawn from [CHANGELOG.md](../CHANGELOG.md)
-- [ ] **Screenshots or demo in README** — Add assets under [images/](images/) and reference them in [README.md](../README.md)
+- [x] **Screenshots or demo in README** — [images/](../images/) embedded in [README.md](../README.md)
 - [x] **Enable GitHub Discussions** — Settings → General → Features → Discussions (for Q&A, ideas, and community support)
 - [x] **Enable private vulnerability reporting** — Settings → Security → Private vulnerability reporting (complements [SECURITY.md](../SECURITY.md) GitHub Advisories link)
 - [ ] **Optional: verify security contact email** — [SECURITY.md](../SECURITY.md) lists `security@mortolian.com`; confirm the inbox is monitored or update the address
@@ -60,9 +60,9 @@ Deeper docs for contributors and self-hosters.
 - [x] **docs/UPGRADE.md** — Tag-to-tag upgrades, backup-before-migrate, additive schema policy from 2026-08-18
 - [x] **docs/ARCHITECTURE.md** — Domains, actions, team scoping, request flow ([ARCHITECTURE.md](ARCHITECTURE.md))
 - [x] **docs/ROADMAP.md** — Planned features, alpha scope, and what is explicitly out of scope for now
-- [ ] **.env.example production warnings** — Add prominent comments for default passwords and secrets ([.env.example](../.env.example): `DB_PASSWORD`, `APP_KEY`, etc.)
+- [x] **.env.example production warnings** — Comments on `APP_KEY`, `APP_DEBUG`, `DB_PASSWORD`, `APP_ALLOW_HTTP`, `PAYFAST_SANDBOX` ([.env.example](../.env.example))
 - [x] **Spatie Backup documentation** — Instance backup, restore, `config/backup.php` operator notes, and env keys in [SELF_HOST.md](SELF_HOST.md) / [INSTALL.md](INSTALL.md)
-- [ ] **Multi-tenant security note** — Add guidance for self-hosters on team isolation, registration settings, and hardening a multi-tenant deployment (relevant to Jetstream teams model)
+- [x] **Multi-tenant security note** — Registration, isolation, operators vs owners, production `.env` ([SELF_HOST.md](SELF_HOST.md#multi-tenant-hardening))
 
 ---
 

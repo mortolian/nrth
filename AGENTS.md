@@ -16,7 +16,7 @@ Docs are part of the product surface for self-hosters and contributors. When you
 | Local PHP/Node or Sail workflow | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 | Installer flags, first-run, env vars for operators | [docs/INSTALL.md](docs/INSTALL.md), [.env.example](.env.example) |
 | Tag-to-tag upgrades / migrate story | [docs/UPGRADE.md](docs/UPGRADE.md), [docs/INSTALL.md](docs/INSTALL.md) |
-| Docker / Compose / production self-host | [docs/SELF_HOST.md](docs/SELF_HOST.md), [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) if relevant |
+| Docker / Compose / production self-host | [docs/SELF_HOST.md](docs/SELF_HOST.md) (HTTPS, backups, multi-tenant hardening), [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) if relevant |
 | Versioning, changelog, Release Please | [docs/RELEASE.md](docs/RELEASE.md) |
 | Team roles / permissions | [docs/TEAM_ACCESS.md](docs/TEAM_ACCESS.md) (and this file’s checklist below) |
 | Domain layout / request flow | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |

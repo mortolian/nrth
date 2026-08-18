@@ -57,7 +57,7 @@ If you run your own instance:
 - Keep `APP_DEBUG=false` in production
 - Use HTTPS and strong passwords for database, Redis, and MinIO
 - Apply updates from `master` or tagged releases promptly
-- See [docs/SELF_HOST.md](docs/SELF_HOST.md)
+- See [docs/SELF_HOST.md](docs/SELF_HOST.md) (HTTPS, backups, [multi-tenant hardening](docs/SELF_HOST.md#multi-tenant-hardening))
 
 ### Beta review (2026-08-18)
 
@@ -80,7 +80,7 @@ Residual (accepted for self-host / later hardening):
 - Email verification is off (`MustVerifyEmail` unused). Invitees must already have an account; public registration is disabled
 - PayFast does not call PayFast’s extra server-to-server confirm step; passphrase + signature + amount match is the bar
 - Optional AI `base_url` can point at an operator-chosen host (`settings.business`)
-- Multi-tenant operator guide (production `.env` warnings) is still a separate doc item
+- Multi-tenant operator guide: [docs/SELF_HOST.md](docs/SELF_HOST.md#multi-tenant-hardening) (production `.env` warnings in `.env.example`)
 
 ## Disclaimer
 

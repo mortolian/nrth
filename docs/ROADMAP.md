@@ -33,8 +33,8 @@ Planned focus areas — not committed dates or ordering:
 - [x] **Stabilise data models** — additive schema from 2026-08-18; tag-to-tag upgrades via `./scripts/update --ref` ([docs/UPGRADE.md](UPGRADE.md))
 - [x] **Bank reconciliation** — match imported transactions to invoices, expenses, and journal entries; exclude personal/out-of-scope lines on mixed accounts
 - [x] **Backup & restore docs** — instance backup (`./scripts/backup`), offsite, retention, and CLI restore ([docs/SELF_HOST.md](SELF_HOST.md))
-- [ ] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings
-- [ ] **README screenshots / demo** — visual overview for new visitors
+- [x] **Multi-tenant hardening guide** — registration, team isolation, production `.env` warnings ([docs/SELF_HOST.md](SELF_HOST.md#multi-tenant-hardening))
+- [x] **README screenshots / demo** — visual overview for new visitors
 - [x] **Architecture docs** — domain layout, actions, team scoping ([docs/ARCHITECTURE.md](ARCHITECTURE.md))
 - [x] **Security review** — auth, uploads, public pay, Stripe/PayFast webhooks, invitation/email-change hardening ([SECURITY.md](../SECURITY.md))
 - [x] **Expanded test coverage** — tenant isolation plus report arithmetic (P&L / TB / BS / cash flow) and invoice overpayment rejection

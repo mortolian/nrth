@@ -2,7 +2,7 @@
 
 This document is for **contributors**. It describes how an authenticated request becomes a ledger change: domains, actions, team scoping, and the public/instance edges.
 
-Operator install and upgrades: [INSTALL.md](INSTALL.md), [SELF_HOST.md](SELF_HOST.md), [UPGRADE.md](UPGRADE.md).  
+Operator install and upgrades: [INSTALL.md](INSTALL.md), [SELF_HOST.md](SELF_HOST.md) (including [multi-tenant hardening](SELF_HOST.md#multi-tenant-hardening)), [UPGRADE.md](UPGRADE.md).  
 Local setup: [DEVELOPMENT.md](DEVELOPMENT.md).  
 Roles and permission keys: [TEAM_ACCESS.md](TEAM_ACCESS.md).
 

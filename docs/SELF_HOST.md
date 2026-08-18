@@ -1,6 +1,6 @@
 # Self-hosting nrth
 
-Day-to-day install and updates: **[INSTALL.md](INSTALL.md)**. This page covers HTTPS, instance backup, restore, and recovery.
+Day-to-day install and updates: **[INSTALL.md](INSTALL.md)**. This page covers HTTPS, multi-tenant hardening, instance backup, restore, and recovery.
 
 For laptop development: [DEVELOPMENT.md](DEVELOPMENT.md).
 
@@ -52,6 +52,64 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 5. Instance backups (`./scripts/backup`) plus a host-level snapshot of Postgres + `storage` volumes — see [Backups and restore](#backups-and-restore)
 6. Never commit `.env`
 7. Leave `PAYFAST_SANDBOX` unset or `false` on a live host (sandbox ITNs can mark invoices paid). `MEDIA_DISK` should stay `local` (private) unless you have configured private object storage.
+8. If more than one business will use this instance, read [Multi-tenant hardening](#multi-tenant-hardening).
+
+---
+
+## Multi-tenant hardening
+
+nrth is **one Compose instance**, not a hosted SaaS control plane. A Jetstream **team** is a business. Several businesses can share the same install; each row of books is scoped with `team_id`. Treat that as a safety net plus [TeamAccess](TEAM_ACCESS.md) permissions — not as an excuse to skip production `.env` hygiene.
+
+### Registration and invitations
+
+Public self-registration is **off** (`Features::registration()` is omitted). `/register` is 404.
+
+- The installer-created admin (first user) is the way into a new instance. That user is also an **instance operator**.
+- Invitees must **already have an account**. The join link expires after 7 days. A new email cannot self-register.
+- Changing profile email requires the current password and clears `email_verified_at`, so the new address does not auto-join pending invitations or match `NRTH_OPERATOR_EMAILS` until that mailbox is treated as verified.
+
+Details: [TEAM_ACCESS.md](TEAM_ACCESS.md) (invitations), [ARCHITECTURE.md](ARCHITECTURE.md) (instance vs team).
+
+### Isolation
+
+| Layer | What it does |
+|-------|----------------|
+| Eloquent `TeamScope` | Most models only see the current business |
+| `team_id` checks | Controllers still `abort_unless` the record belongs to the current team |
+| TeamAccess | Owner / Accountant / Viewer / custom roles (`authorizeTeam`) |
+| Isolation tests | [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/) — business B cannot read or mutate business A |
+
+`queryWithoutTeamScope()` is required on unauthenticated edges (public pay, Stripe/PayFast webhooks). Those paths **must** filter by team from the URL, token, or signed payload — never from the session. See [ARCHITECTURE.md](ARCHITECTURE.md#unauthenticated-edges).
+
+### Email verification
+
+Email verification is **off** (`MustVerifyEmail` unused). That matches a typical single-operator self-host. If you invite several people over the internet, turn verification on and keep registration disabled.
+
+### Operators vs business owners
+
+| Role | Scope |
+|------|--------|
+| **Instance operator** | Settings → Instance (SMTP, operators, timezone), instance backups |
+| **Business owner** | That team’s books, members, takeout |
+| `NRTH_OPERATOR_EMAILS` | Break-glass operator emails in `.env` (union with the DB flag) |
+
+Do not grant instance operator to every team owner on a shared install.
+
+### Production `.env`
+
+The checked-in [.env.example](../.env.example) is a **local template**. Before the instance is reachable beyond a trusted LAN:
+
+| Key | Production |
+|-----|------------|
+| `APP_ENV` | `production` |
+| `APP_DEBUG` | `false` |
+| `APP_KEY` | Generated (`php artisan key:generate`); never empty |
+| `DB_PASSWORD` | Unique; not the example `dbpassword` |
+| `APP_ALLOW_HTTP` | `false` (HTTPS; see [HTTPS](#https)) |
+| `PAYFAST_SANDBOX` | `false` or unset |
+| PayFast passphrase / Stripe webhook secret | Required in business settings when that gateway is enabled |
+
+Also: never commit `.env`; do not publish Octane `:8000` or Postgres/Redis on a public interface. Full HTTPS and backup checklist is above.
 
 ---
 

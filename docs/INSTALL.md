@@ -28,7 +28,7 @@ From a git clone: `./scripts/install.sh --production` (or `--lan`).
 
 The installer installs Docker if needed, writes `.env`, starts Compose, and runs `app:install` (admin + business). Open the URL it prints and sign in.
 
-Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance.
+Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance. Several businesses can share one install; isolation and production `.env` warnings: **[SELF_HOST.md — Multi-tenant hardening](SELF_HOST.md#multi-tenant-hardening)**.
 
 For safety, self-hosted installs do **not** start the optional Vite HMR or Mailpit services by default.
 Deployed instances should serve built assets from `public/build`, and Postgres/Redis host ports bind to `127.0.0.1`.
@@ -116,7 +116,7 @@ Full list: run `./scripts/install.sh --help`.
 | Queues stuck | `./scripts/compose.sh restart horizon` |
 | Backup / restore | [SELF_HOST.md](SELF_HOST.md) — `./scripts/backup`, Instance restore guide |
 
-More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
+More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, multi-tenant hardening, backups, recovery).
 
 ---
 
@@ -124,7 +124,7 @@ More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, backups, recovery).
 
 | Doc | For |
 |-----|-----|
-| [SELF_HOST.md](SELF_HOST.md) | HTTPS, instance backup & restore, troubleshooting |
+| [SELF_HOST.md](SELF_HOST.md) | HTTPS, multi-tenant hardening, instance backup & restore |
 | [UPGRADE.md](UPGRADE.md) | Tag-to-tag upgrades and rollback |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local contributor setup |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Domains, actions, team scoping (contributors) |
