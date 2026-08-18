@@ -92,13 +92,14 @@ class AppInstallCommand extends Command
 
         try {
             DB::transaction(function () use ($name, $email, $password, $businessName, &$user, &$team): void {
-                $user = User::query()->create([
+                $user = new User;
+                $user->forceFill([
                     'name' => $name,
                     'email' => $email,
                     'password' => $password,
                     'email_verified_at' => now(),
                     'is_instance_operator' => true,
-                ]);
+                ])->save();
 
                 $team = $user->ownedTeams()->create([
                     'name' => $businessName,

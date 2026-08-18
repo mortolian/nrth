@@ -220,6 +220,41 @@ class AcceptTeamInvitationTest extends TestCase
             ->assertRedirect(route('dashboard'));
     }
 
+    public function test_login_joins_invitations_for_users_created_without_verified_at(): void
+    {
+        if (! JetstreamFeatures::sendsTeamInvitations()) {
+            $this->markTestSkipped('Team invitations not enabled.');
+        }
+
+        $owner = User::factory()->withPersonalTeam()->create([
+            'completed_onboarding_at' => now(),
+        ]);
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $invitee = User::query()->create([
+            'name' => 'Created User',
+            'email' => 'created-login@example.com',
+            'password' => 'password',
+        ]);
+
+        $this->assertNotNull($invitee->fresh()->email_verified_at);
+
+        $team->teamInvitations()->create([
+            'email' => 'created-login@example.com',
+            'role' => 'viewer',
+        ]);
+
+        $this->post('/login', [
+            'email' => 'created-login@example.com',
+            'password' => 'password',
+        ])->assertRedirect(config('fortify.home'));
+
+        $invitee->refresh();
+        $this->assertTrue($invitee->belongsToTeam($team));
+        $this->assertSame($team->id, $invitee->current_team_id);
+    }
+
     public function test_login_does_not_join_invitations_when_email_is_unverified(): void
     {
         if (! JetstreamFeatures::sendsTeamInvitations()) {

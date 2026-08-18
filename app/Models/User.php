@@ -64,6 +64,16 @@ class User extends Authenticatable
 
     protected static function booted(): void
     {
+        static::creating(function (User $user): void {
+            // email_verified_at is not fillable (and MustVerifyEmail is unused), so
+            // User::create() would otherwise leave it null and skip invitation
+            // auto-join / NRTH_OPERATOR_EMAILS. Explicit unverified() factory
+            // states still win because they mark the attribute dirty.
+            if (! $user->isDirty('email_verified_at')) {
+                $user->email_verified_at = now();
+            }
+        });
+
         static::created(function (User $user): void {
             if (static::query()->count() === 1 && ! $user->is_instance_operator) {
                 $user->forceFill(['is_instance_operator' => true])->saveQuietly();

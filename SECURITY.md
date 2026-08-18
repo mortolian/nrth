@@ -68,16 +68,16 @@ Reviewed auth, uploads, public pay, and Stripe/PayFast webhooks. Changes shipped
 - Business logos reject SVG; expense receipts are limited to JPEG/PNG/GIF/WebP/PDF
 - Invoice PDFs, receipts, and signed contracts are stored on the **private** media disk (not `/storage/…` after `storage:link`). Logos stay on the public disk. `./scripts/update` runs `nrth:move-media-to-private-disk`
 - DomPDF does not fetch remote URLs from invoice markdown
-- Online payment completion loads invoices without TeamScope (webhooks are unauthenticated HTTP)
+- Online payment completion loads invoices without TeamScope (webhooks are unauthenticated HTTP). Starting a new Stripe/PayFast checkout cancels earlier pending sessions in the database; Stripe Checkout Sessions are expired at the gateway when possible. Completing payment still records a **Cancelled** session if that checkout is paid and the invoice is still due (retry then pay the first link). A second successful gateway payment is rejected by the overpayment check.
 - PayFast sandbox defaults to **off** (`PAYFAST_SANDBOX=false`); the public “payment completed” banner only shows after a completed checkout session
-- Changing your email requires the current password and clears `email_verified_at`, so a new address cannot auto-join pending invitations or match `NRTH_OPERATOR_EMAILS` until that mailbox is treated as verified
+- Changing your email requires the current password. A safe new address is marked verified again. If the new address matches a pending invitation or `NRTH_OPERATOR_EMAILS`, `email_verified_at` stays empty so it cannot auto-join or grant operator access. Accounts created via install or `User::create()` persist `email_verified_at` even though `MustVerifyEmail` is unused.
 - Session idle timeout applies to the full `web` stack (including Jetstream profile and team pages)
 - Invitation join links expire after 7 days
 - `is_instance_operator` is not mass-assignable
 
 Residual (accepted for self-host / later hardening):
 
-- Email verification is off (`MustVerifyEmail` unused). Invitees must already have an account; public registration is disabled
+- Email verification is off (`MustVerifyEmail` unused as a login gate). New accounts still get `email_verified_at` at creation. Invitees must already have an account; public registration is disabled
 - PayFast does not call PayFast’s extra server-to-server confirm step; passphrase + signature + amount match is the bar
 - Optional AI `base_url` can point at an operator-chosen host (`settings.business`)
 - Multi-tenant operator guide: [docs/SELF_HOST.md](docs/SELF_HOST.md#multi-tenant-hardening) (production `.env` warnings in `.env.example`)

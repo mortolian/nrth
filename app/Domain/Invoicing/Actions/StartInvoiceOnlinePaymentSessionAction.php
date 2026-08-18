@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
 use Stripe\Checkout\Session;
 use Stripe\StripeClient;
+use Throwable;
 
 class StartInvoiceOnlinePaymentSessionAction
 {
@@ -96,7 +97,7 @@ class StartInvoiceOnlinePaymentSessionAction
             ]);
         }
 
-        $this->cancelPendingSessions($team, $invoice, 'stripe');
+        $this->cancelPendingSessions($team, $invoice, 'stripe', $secret);
 
         $session = InvoiceOnlinePaymentSession::query()->create([
             'team_id' => $team->id,
@@ -258,13 +259,38 @@ class StartInvoiceOnlinePaymentSessionAction
         ];
     }
 
-    private function cancelPendingSessions(Team $team, Invoice $invoice, string $provider): void
+    private function cancelPendingSessions(Team $team, Invoice $invoice, string $provider, ?string $stripeSecret = null): void
     {
-        InvoiceOnlinePaymentSession::queryWithoutTeamScope()
+        $pending = InvoiceOnlinePaymentSession::queryWithoutTeamScope()
             ->where('team_id', $team->id)
             ->where('invoice_id', $invoice->id)
             ->where('provider', $provider)
             ->where('status', OnlinePaymentSessionStatus::Pending)
+            ->get();
+
+        if ($pending->isEmpty()) {
+            return;
+        }
+
+        if ($provider === 'stripe' && is_string($stripeSecret) && $stripeSecret !== '') {
+            $stripe = new StripeClient(['api_key' => $stripeSecret]);
+            foreach ($pending as $old) {
+                $checkoutId = $old->provider_checkout_id;
+                if (! is_string($checkoutId) || $checkoutId === '') {
+                    continue;
+                }
+
+                try {
+                    $stripe->checkout->sessions->expire($checkoutId);
+                } catch (Throwable) {
+                    // Already complete, expired, or unreachable. Complete still
+                    // records a paid Cancelled session when the invoice is due.
+                }
+            }
+        }
+
+        InvoiceOnlinePaymentSession::queryWithoutTeamScope()
+            ->whereIn('id', $pending->modelKeys())
             ->update(['status' => OnlinePaymentSessionStatus::Cancelled]);
     }
 }

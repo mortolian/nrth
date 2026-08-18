@@ -36,7 +36,7 @@ class CompleteInvoiceOnlinePaymentSessionAction
                 return;
             }
 
-            if ($locked->status !== OnlinePaymentSessionStatus::Pending) {
+            if (! $locked->status->canCompleteGatewayPayment()) {
                 throw ValidationException::withMessages([
                     'session' => __('This payment session is no longer active.'),
                 ]);

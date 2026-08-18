@@ -66,7 +66,7 @@ Public self-registration is **off** (`Features::registration()` is omitted). `/r
 
 - The installer-created admin (first user) is the way into a new instance. That user is also an **instance operator**.
 - Invitees must **already have an account**. The join link expires after 7 days. A new email cannot self-register.
-- Changing profile email requires the current password and clears `email_verified_at`, so the new address does not auto-join pending invitations or match `NRTH_OPERATOR_EMAILS` until that mailbox is treated as verified.
+- Changing profile email requires the current password. A safe new address is marked verified again. If it matches a pending invitation or `NRTH_OPERATOR_EMAILS`, `email_verified_at` stays empty so the new address does not auto-join or gain operator access. Installer and `User::create()` accounts persist that timestamp even though email verification is not a login gate.
 
 Details: [TEAM_ACCESS.md](TEAM_ACCESS.md) (invitations), [ARCHITECTURE.md](ARCHITECTURE.md) (instance vs team).
 

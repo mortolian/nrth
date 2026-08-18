@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Laravel\Jetstream\Features as JetstreamFeatures;
 use Tests\TestCase;
 
@@ -43,7 +44,7 @@ class ProfileInformationTest extends TestCase
         $this->assertNotNull($user->fresh()->email_verified_at);
     }
 
-    public function test_email_change_with_password_clears_verification(): void
+    public function test_email_change_with_password_retrusts_a_safe_address(): void
     {
         $this->actingAs($user = User::factory()->create([
             'email' => 'old@example.com',
@@ -59,7 +60,7 @@ class ProfileInformationTest extends TestCase
         $user->refresh();
         $this->assertEquals('Test Name', $user->name);
         $this->assertEquals('new@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
+        $this->assertNotNull($user->email_verified_at);
     }
 
     public function test_email_change_does_not_claim_pending_invitations(): void
@@ -99,5 +100,30 @@ class ProfileInformationTest extends TestCase
         $attacker->refresh();
         $this->assertFalse($attacker->belongsToTeam($team));
         $this->assertCount(1, $team->fresh()->teamInvitations);
+    }
+
+    public function test_email_change_to_env_operator_address_does_not_grant_access(): void
+    {
+        User::factory()->withPersonalTeam()->create();
+
+        Config::set('nrth.operator_emails', ['ops@example.com']);
+
+        $this->actingAs($user = User::factory()->withPersonalTeam()->create([
+            'email' => 'staff@example.com',
+            'password' => bcrypt('password'),
+            'is_instance_operator' => false,
+        ]));
+
+        $this->put('/user/profile-information', [
+            'name' => $user->name,
+            'email' => 'ops@example.com',
+            'current_password' => 'password',
+        ]);
+
+        $user->refresh();
+        $this->assertEquals('ops@example.com', $user->email);
+        $this->assertNull($user->email_verified_at);
+
+        $this->get(route('settings.instance'))->assertForbidden();
     }
 }

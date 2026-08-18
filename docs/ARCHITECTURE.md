@@ -182,7 +182,7 @@ These routes are outside the logged-in group. They must not trust `current_team_
 | Surface | Mechanism |
 |---------|-----------|
 | Public invoice pay `/pay/{token}` | Opaque 32-hex token; [`PublicInvoicePayController`](../app/Http/Controllers/Web/PublicInvoicePayController.php) loads invoices with `queryWithoutTeamScope()` |
-| Stripe / PayFast webhooks | `/webhooks/payments/{provider}/{team}` — CSRF excluded for those two path prefixes in [`bootstrap/app.php`](../bootstrap/app.php); team from the URL, not the session. Completion loads the invoice with `queryWithoutTeamScope()` and row lock. Stripe verifies `Stripe-Signature` with the team webhook secret. PayFast verifies ITN MD5 with the **required** merchant passphrase (sandbox is off unless `PAYFAST_SANDBOX=true`). |
+| Stripe / PayFast webhooks | `/webhooks/payments/{provider}/{team}` — CSRF excluded for those two path prefixes in [`bootstrap/app.php`](../bootstrap/app.php); team from the URL, not the session. Completion loads the invoice with `queryWithoutTeamScope()` and row lock. Starting a new checkout expires Stripe sessions when possible and marks earlier local sessions Cancelled; a later ITN/webhook for that cancelled checkout still records payment if the invoice is due. Stripe verifies `Stripe-Signature` with the team webhook secret. PayFast verifies ITN MD5 with the **required** merchant passphrase (sandbox is off unless `PAYFAST_SANDBOX=true`). |
 | Signed team invitation | `/invitations/{invitation}` — temporary signature (7 days) |
 
 ## Frontend
