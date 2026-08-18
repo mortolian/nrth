@@ -78,3 +78,5 @@ Wealth catalog keys are `wealth.view` and `wealth.manage`. **Travel**, **Plannin
 ## Tests
 
 Feature coverage lives under [`tests/Feature/TeamAccess/`](../tests/Feature/TeamAccess/). Prefer HTTP 403 assertions plus `TeamAccess::allows` for custom role matrices.
+
+Cross-business isolation (owner of business B cannot open or mutate business A’s invoices, expenses, ledger, reports, VAT, or banking) lives under [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/).
