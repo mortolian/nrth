@@ -8,7 +8,7 @@ NRTH is in **beta**. This document describes what works today, what we plan next
 
 ## In beta today
 
-These areas exist and are usable. Expect rough edges on experimental surfaces (see [BETA.md](BETA.md)); 1.0 is not promised yet.
+These areas exist and are usable. 1.0 is not promised yet.
 
 | Area | Notes |
 |------|-------|
@@ -19,10 +19,8 @@ These areas exist and are usable. Expect rough edges on experimental surfaces (s
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
 | **Teams** | Multi-user businesses via Jetstream |
-| **Optional modules** | Settings → Features; Travel, Planning, Contracting, Wealth off by default for new businesses. **Contracting** is experimental. |
+| **Optional modules** | Settings → Features; Travel, Planning, and Wealth off by default for new businesses. |
 | **Self-hosting** | Docker Compose install via `scripts/install.sh` |
-
-**Experimental (not beta-quality):** Contracting retainer invoice generate (ZAR, VAT 0, skips the invoicing pipeline); provisional tax estimates (`LIKE` payment match, rough individual tables, Record Payment is not wired). Details: [BETA.md](BETA.md#1-contracting-and-provisional-tax--still-experimental).
 
 See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.
 
@@ -49,7 +47,6 @@ Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and
 
 Ideas under consideration, not scheduled:
 
-- Harden or hide Contracting retainer invoices and provisional tax ([BETA.md](BETA.md#1-contracting-and-provisional-tax--still-experimental))
 - Wealth module refinements (CSV import, multi-currency portfolios)
 - Additional bank statement formats and bank-specific CSV presets
 - Expense rules (recurring expenses)

@@ -421,7 +421,7 @@ const liveInvoicePreview = computed(() => {
                         <h1 class="text-2xl font-semibold tracking-tight text-slate-900">Welcome to {{ appDisplayName }}</h1>
                         <p class="mt-3 text-sm leading-relaxed text-slate-600">
                             {{ appDisplayName }} helps South African small businesses invoice clients, track expenses, stay on top of
-                            VAT and provisional tax, and understand profit with clear reports — without spreadsheet chaos.
+                            VAT, and understand profit with clear reports — without spreadsheet chaos.
                         </p>
                     </div>
                     <div class="flex justify-end gap-3">

@@ -84,7 +84,6 @@ final class TakeoutBuilder
                 'expenses' => $expenses->count(),
                 'expense_receipts' => $expenses->filter(fn ($t) => (int) $t->media_count > 0)->count(),
                 'bank_statement_files' => $this->collector->bankStatementImports($run)->count(),
-                'contracts' => $this->collector->contracts($run)->count(),
             ],
             'warnings' => $gaps,
         ];
@@ -119,7 +118,6 @@ final class TakeoutBuilder
             '- Expenses: '.($counts['expenses'] ?? 0),
             '- Expense receipts: '.($counts['expense_receipts'] ?? 0),
             '- Bank statement files: '.($counts['bank_statement_files'] ?? 0),
-            '- Contracts: '.($counts['contracts'] ?? 0),
             '',
         ];
 

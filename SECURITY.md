@@ -66,7 +66,7 @@ Reviewed auth, uploads, public pay, and Stripe/PayFast webhooks. Changes shipped
 - PayFast **passphrase is required** when the gateway is enabled; ITN is rejected if it is missing (unsigned MD5 is not accepted)
 - Stripe **webhook signing secret is required** when Stripe is enabled
 - Business logos reject SVG; expense receipts are limited to JPEG/PNG/GIF/WebP/PDF
-- Invoice PDFs, receipts, and signed contracts are stored on the **private** media disk (not `/storage/…` after `storage:link`). Logos stay on the public disk. `./scripts/update` runs `nrth:move-media-to-private-disk`
+- Invoice PDFs and receipts are stored on the **private** media disk (not `/storage/…` after `storage:link`). Logos stay on the public disk. `./scripts/update` runs `nrth:move-media-to-private-disk`
 - DomPDF does not fetch remote URLs from invoice markdown
 - Online payment completion loads invoices without TeamScope (webhooks are unauthenticated HTTP). Starting a new Stripe/PayFast checkout cancels earlier pending sessions in the database; Stripe Checkout Sessions are expired at the gateway when possible. Completing payment still records a **Cancelled** session if that checkout is paid and the invoice is still due (retry then pay the first link). A second successful gateway payment is rejected by the overpayment check.
 - PayFast sandbox defaults to **off** (`PAYFAST_SANDBOX=false`); the public “payment completed” banner only shows after a completed checkout session
@@ -84,4 +84,4 @@ Residual (accepted for self-host / later hardening):
 
 ## Disclaimer
 
-nrth is accounting software provided as-is, currently in **beta**. It is not a substitute for professional financial or tax advice. Use at your own risk. See [docs/BETA.md](docs/BETA.md) for experimental surfaces and remaining release steps.
+nrth is accounting software provided as-is, currently in **beta**. It is not a substitute for professional financial or tax advice. Use at your own risk. See [docs/BETA.md](docs/BETA.md) for remaining release steps.

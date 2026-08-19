@@ -11,7 +11,7 @@ class OptionalModulesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_travel_planning_and_contracting_are_disabled_by_default(): void
+    public function test_travel_and_planning_are_disabled_by_default(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();
         $team = $owner->currentTeam;
@@ -19,7 +19,6 @@ class OptionalModulesTest extends TestCase
         foreach ([
             ModuleCatalog::TRAVEL => 'vehicles.trips.index',
             ModuleCatalog::PLANNING => 'budgeting.index',
-            ModuleCatalog::CONTRACTING => 'contracting.contracts.index',
         ] as $module => $routeName) {
             $this->assertFalse($team->moduleEnabled($module), $module);
 
@@ -39,7 +38,6 @@ class OptionalModulesTest extends TestCase
                 'modules' => [
                     ['name' => ModuleCatalog::TRAVEL, 'enabled' => true],
                     ['name' => ModuleCatalog::PLANNING, 'enabled' => true],
-                    ['name' => ModuleCatalog::CONTRACTING, 'enabled' => true],
                     ['name' => ModuleCatalog::WEALTH, 'enabled' => false],
                 ],
             ])
@@ -48,14 +46,12 @@ class OptionalModulesTest extends TestCase
         $team = $team->fresh();
         $this->assertTrue($team->moduleEnabled(ModuleCatalog::TRAVEL));
         $this->assertTrue($team->moduleEnabled(ModuleCatalog::PLANNING));
-        $this->assertTrue($team->moduleEnabled(ModuleCatalog::CONTRACTING));
 
         $this->actingAs($owner)->get(route('vehicles.trips.index'))->assertOk();
         $this->actingAs($owner)->get(route('budgeting.index'))->assertOk();
-        $this->actingAs($owner)->get(route('contracting.contracts.index'))->assertOk();
     }
 
-    public function test_features_page_lists_travel_planning_contracting_and_wealth(): void
+    public function test_features_page_lists_travel_planning_and_wealth(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();
 
@@ -64,16 +60,15 @@ class OptionalModulesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Settings/Features')
-                ->has('modules', 4)
+                ->has('modules', 3)
                 ->where('modules.0.name', ModuleCatalog::TRAVEL)
                 ->where('modules.1.name', ModuleCatalog::PLANNING)
-                ->where('modules.2.name', ModuleCatalog::CONTRACTING)
-                ->where('modules.3.name', ModuleCatalog::WEALTH)
+                ->where('modules.2.name', ModuleCatalog::WEALTH)
                 ->where('modules.0.enabled', false)
                 ->where('modules.1.enabled', false)
                 ->where('modules.2.enabled', false)
-                ->where('modules.2.experimental', true)
                 ->where('modules.0.experimental', false)
-                ->where('modules.3.enabled', false));
+                ->where('modules.1.experimental', false)
+                ->where('modules.2.experimental', false));
     }
 }

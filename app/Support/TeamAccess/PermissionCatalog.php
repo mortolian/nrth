@@ -43,8 +43,6 @@ final class PermissionCatalog
             'accounting.delete' => ['label' => 'Delete accounting entries', 'group' => 'Accounting'],
             'budgets.view' => ['label' => 'View budgets', 'group' => 'Planning'],
             'budgets.manage' => ['label' => 'Manage budgets', 'group' => 'Planning'],
-            'contracts.view' => ['label' => 'View contracts', 'group' => 'Contracting'],
-            'contracts.manage' => ['label' => 'Manage contracts', 'group' => 'Contracting'],
             'tax.view' => ['label' => 'View tax', 'group' => 'Tax'],
             'tax.manage' => ['label' => 'Manage tax', 'group' => 'Tax'],
             'reports.view' => ['label' => 'View reports', 'group' => 'Reports'],

@@ -27,7 +27,6 @@ abstract class TestCase extends BaseTestCase
         $modules ??= [
             ModuleCatalog::TRAVEL,
             ModuleCatalog::PLANNING,
-            ModuleCatalog::CONTRACTING,
         ];
 
         foreach ($modules as $name) {

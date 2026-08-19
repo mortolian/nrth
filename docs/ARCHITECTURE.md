@@ -63,13 +63,12 @@ Exceptions/   # when needed
 | **Invoicing** | Clients, invoices, estimates, items, recurring, payments, PDFs, online pay sessions |
 | **Banking** | Bank accounts (linked to GL), statement import, imported lines, recon match/exclude |
 | **Expenses** | Receipt parse helpers used by the expenses UI (posted expenses are accounting transactions) |
-| **Tax** | VAT rates/periods/returns; provisional-tax estimates are experimental ([BETA.md](BETA.md)) |
+| **Tax** | VAT rates, periods, and returns |
 | **Takeout** | Team data export jobs (Settings → Backups & exports) |
 | **Backup** | Instance backup runs (operator / `./scripts/backup`) |
 | **Instance** | Install-wide operators, mail, timezone, backup retention |
 | **Vehicles** | Travel: vehicles, trips, licence reminders, trip imports |
 | **Budgeting** | Planning: category budgets |
-| **Contracting** | Client contracts and retainer invoice generation (**experimental** — [BETA.md](BETA.md)) |
 | **Ai** | Provider catalog used by receipt/document/trip import |
 | **Shared** | [`HasTeamScope`](../app/Domain/Shared/HasTeamScope.php) / [`TeamScope`](../app/Domain/Shared/Scopes/TeamScope.php) |
 
@@ -150,16 +149,15 @@ Tests: [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/) (bu
 
 ## Optional modules
 
-Catalog: [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php) — `travel`, `planning`, `contracting`, `wealth`. Toggle per team under **Settings → Features** (`team_modules`). Disabled modules drop out of nav and return **403**; data is not deleted. New businesses start with all four **off**.
+Catalog: [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php) — `travel`, `planning`, `wealth`. Toggle per team under **Settings → Features** (`team_modules`). Disabled modules drop out of nav and return **403**; data is not deleted. New businesses start with all three **off**.
 
 | Module | Code | Route gate |
 |--------|------|------------|
 | Travel | `app/Domain/Vehicles` | `team.module:travel` |
 | Planning | `app/Domain/Budgeting` | `team.module:planning` |
-| Contracting | `app/Domain/Contracting` | `team.module:contracting` |
 | Wealth | `app/Modules/Wealth` | `team.module:wealth` (registered in `WealthServiceProvider`) |
 
-Wealth is the template for a future bounded module (own migrations, routes, Inertia pages). Travel / Planning / Contracting still live under `app/Domain`.
+Wealth is the template for a future bounded module (own migrations, routes, Inertia pages). Travel and Planning still live under `app/Domain`.
 
 ## Instance vs team
 

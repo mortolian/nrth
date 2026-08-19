@@ -4,7 +4,6 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     Bell,
     BookOpen,
-    Briefcase,
     Building2,
     Calculator,
     Car,
@@ -162,15 +161,6 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
-    if (moduleEnabled('contracting') && canTeam('contracts.view')) {
-        items.push({
-            label: 'Contracting',
-            href: route('contracting.contracts.index'),
-            icon: Briefcase,
-            matchPrefixes: ['/contracting'],
-        });
-    }
-
     if (moduleEnabled('wealth') && canTeam('wealth.view')) {
         items.push({
             label: 'Wealth',
@@ -281,9 +271,6 @@ const commandPaletteData = computed<PaletteData>(() => ({
         { id: 'accounting-transactions', label: 'Accounting Transactions', href: route('accounting.transactions.index') },
         ...(moduleEnabled('planning')
             ? [{ id: 'budgets', label: 'Budgets', href: route('budgeting.index') }]
-            : []),
-        ...(moduleEnabled('contracting')
-            ? [{ id: 'contracts', label: 'Contracts', href: route('contracting.contracts.index') }]
             : []),
         { id: 'profile', label: 'Settings', href: route('settings.index') },
     ],

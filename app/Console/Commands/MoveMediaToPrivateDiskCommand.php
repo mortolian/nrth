@@ -14,7 +14,7 @@ class MoveMediaToPrivateDiskCommand extends Command
 {
     protected $signature = 'nrth:move-media-to-private-disk';
 
-    protected $description = 'Move invoice PDFs, receipts, and contracts off the public disk onto the private media disk.';
+    protected $description = 'Move invoice PDFs and receipts off the public disk onto the private media disk.';
 
     public function handle(): int
     {

@@ -11,7 +11,6 @@ use App\Domain\Accounting\Services\LedgerService;
 use App\Domain\Accounting\Services\ProfitLossReportService;
 use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Models\BankingTransaction;
-use App\Domain\Contracting\Models\Contract;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Payment;
@@ -144,33 +143,6 @@ final class TakeoutDataCollector
             ->whereDate('period_start', '<=', $run->to_date->toDateString())
             ->whereDate('period_end', '>=', $run->from_date->toDateString())
             ->orderBy('period_start')
-            ->get();
-    }
-
-    /**
-     * @return Collection<int, Contract>
-     */
-    public function contracts(TakeoutRun $run): Collection
-    {
-        $clientIds = $this->invoices($run)->pluck('client_id')->unique()->filter();
-
-        return Contract::queryWithoutTeamScope()
-            ->with(['client:id,name', 'media'])
-            ->where('team_id', $run->team_id)
-            ->where(function ($query) use ($run, $clientIds): void {
-                $query->where(function ($overlap) use ($run): void {
-                    $overlap->whereDate('start_date', '<=', $run->to_date->toDateString())
-                        ->where(function ($end) use ($run): void {
-                            $end->whereNull('end_date')
-                                ->orWhereDate('end_date', '>=', $run->from_date->toDateString());
-                        });
-                });
-
-                if ($clientIds->isNotEmpty()) {
-                    $query->orWhereIn('client_id', $clientIds);
-                }
-            })
-            ->orderBy('start_date')
             ->get();
     }
 

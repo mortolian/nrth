@@ -97,7 +97,6 @@ export function useTaxTabs() {
             canTeam('tax.manage')
                 ? { id: 'vat-rates', label: 'VAT rates', href: route('tax.vat-rates.index') }
                 : null,
-            { id: 'provisional', label: 'Tax Periods', href: route('tax.provisional.index') },
         ].filter(Boolean) as AppTabItem[],
     );
 }

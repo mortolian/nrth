@@ -14,13 +14,11 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
-use App\Domain\Tax\Actions\CreateTaxPeriodAction;
 use App\Domain\Tax\Actions\GenerateVATReturnAction;
 use App\Domain\Tax\Enums\TaxPeriodStatus;
 use App\Domain\Tax\Enums\TaxPeriodType;
 use App\Domain\Tax\Models\TaxPeriod;
 use App\Domain\Tax\Models\TaxRate;
-use App\Domain\Tax\Services\ProvisionalTaxService;
 use App\Domain\Tax\Services\VATService;
 use App\Models\Team;
 use App\Models\User;
@@ -35,23 +33,6 @@ class TaxDomainTest extends TestCase
     {
         $user->forceFill(['current_team_id' => $team->id])->save();
         $this->actingAs($user);
-    }
-
-    public function test_create_tax_period_action_creates_vat_and_provisional_periods(): void
-    {
-        $user = User::factory()->withPersonalTeam()->create();
-        $team = $user->currentTeam;
-        $this->actingTeamContext($user, $team);
-
-        $action = new CreateTaxPeriodAction(new ProvisionalTaxService);
-        $result = $action->execute($team->id, 2026);
-
-        $this->assertCount(6, $result['vat']);
-        $this->assertCount(2, $result['provisional']);
-        $this->assertSame(
-            8,
-            TaxPeriod::queryWithoutTeamScope()->where('team_id', $team->id)->count()
-        );
     }
 
     public function test_generate_vat_return_action_submits_period_with_output_and_input_vat(): void
@@ -133,16 +114,5 @@ class TaxDomainTest extends TestCase
         $this->assertSame(5_00, (int) $vatReturn->getRawOriginal('net_vat_cents'));
         $this->assertSame(TaxPeriodStatus::Submitted, $period->fresh()->status);
         $this->assertNotNull($period->fresh()->submitted_at);
-    }
-
-    public function test_provisional_tax_service_returns_sa_tax_windows(): void
-    {
-        $service = new ProvisionalTaxService;
-        $periods = $service->getProvisionalPeriods(2026);
-
-        $this->assertSame('2026-03-01', $periods[0]['start']->toDateString());
-        $this->assertSame('2026-08-31', $periods[0]['end']->toDateString());
-        $this->assertSame('2026-09-01', $periods[1]['start']->toDateString());
-        $this->assertSame('2027-02-28', $periods[1]['end']->toDateString());
     }
 }

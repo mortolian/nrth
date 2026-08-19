@@ -131,4 +131,4 @@ More detail: [SELF_HOST.md](SELF_HOST.md) (HTTPS, multi-tenant hardening, backup
 | [PERSONAL_SERVER.md](PERSONAL_SERVER.md) | Maintainer push-to-deploy |
 | [RELEASE.md](RELEASE.md) | Versioning / Release Please (maintainers) |
 | [ROADMAP.md](ROADMAP.md) | Beta scope and out of scope |
-| [BETA.md](BETA.md) | Remaining work (experimental surfaces, next GitHub Release, disclaimers) |
+| [BETA.md](BETA.md) | Remaining work (next GitHub Release, disclaimers) |

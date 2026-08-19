@@ -357,15 +357,6 @@ class BackupsExportsController extends Controller
                 'warning' => null,
             ],
             [
-                'key' => 'contracts',
-                'label' => 'Contracts',
-                'count' => $preview['contracts_count'],
-                'total' => 0,
-                'warning' => $preview['contracts_missing_signed_file'] > 0
-                    ? "{$preview['contracts_missing_signed_file']} without signed file"
-                    : null,
-            ],
-            [
                 'key' => 'bank_statements',
                 'label' => 'Bank statements',
                 'count' => $preview['bank_statement_files'],

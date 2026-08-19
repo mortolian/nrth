@@ -27,7 +27,6 @@ final class TakeoutFigureExporter
         $this->exportPaymentsRegister($figuresDirectory, $run);
         $this->exportBankTransactions($figuresDirectory, $run);
         $this->exportVatPeriods($figuresDirectory, $run);
-        $this->exportContractsRegister($figuresDirectory, $run, $documents);
     }
 
     private function exportIncomeStatement(string $directory, TakeoutRun $run): void
@@ -219,28 +218,5 @@ final class TakeoutFigureExporter
         })->all();
 
         $this->writer->writePair($directory, 'vat-periods', $headers, $rows);
-    }
-
-    private function exportContractsRegister(string $directory, TakeoutRun $run, TakeoutDocumentExportResult $documents): void
-    {
-        $headers = [
-            'id', 'title', 'client_name', 'status', 'billing_type',
-            'start_date', 'end_date', 'contract_value_cents', 'has_signed_file', 'signed_filename',
-        ];
-
-        $rows = $this->collector->contracts($run)->map(fn ($contract): array => [
-            $contract->id,
-            $contract->title,
-            $contract->client?->name,
-            $contract->status,
-            $contract->billing_type,
-            $contract->start_date?->toDateString(),
-            $contract->end_date?->toDateString(),
-            (int) $contract->contract_value_cents,
-            $contract->getFirstMedia('signed-contract') !== null ? 'yes' : 'no',
-            $documents->contractSignedFilenames[$contract->id] ?? '',
-        ])->all();
-
-        $this->writer->writePair($directory, 'contracts-register', $headers, $rows);
     }
 }

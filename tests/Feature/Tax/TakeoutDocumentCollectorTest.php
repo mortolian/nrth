@@ -12,7 +12,6 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Models\BankingTransaction;
-use App\Domain\Contracting\Models\Contract;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
@@ -30,7 +29,7 @@ class TakeoutDocumentCollectorTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_takeout_zip_includes_documents_for_invoices_receipts_bank_and_contracts(): void
+    public function test_takeout_zip_includes_documents_for_invoices_receipts_and_bank_statements(): void
     {
         Storage::fake('local');
 
@@ -86,20 +85,6 @@ class TakeoutDocumentCollectorTest extends TestCase
             'duplicate_key' => hash('sha256', 'unique-'.uniqid()),
         ]);
 
-        $contract = Contract::queryWithoutTeamScope()->create([
-            'team_id' => $team->id,
-            'client_id' => $client->id,
-            'title' => 'Master Agreement',
-            'status' => 'active',
-            'billing_type' => 'fixed',
-            'start_date' => '2026-01-01',
-            'contract_value_cents' => 100_000_00,
-        ]);
-        $contractPdf = storage_path('app/private/tmp-contract.pdf');
-        File::put($contractPdf, '%PDF-1.4 contract');
-        $contract->addMedia($contractPdf)->usingFileName('msa.pdf')->toMediaCollection('signed-contract');
-        File::delete($contractPdf);
-
         $run = TakeoutRun::factory()->for($team)->create([
             'requested_by' => $user->id,
             'from_date' => '2026-06-01',
@@ -117,7 +102,6 @@ class TakeoutDocumentCollectorTest extends TestCase
         $this->assertNotFalse($zip->locateName($root.'/documents/invoices/2026-06-15_INV-2026-0099_Acme-Corp.pdf'));
         $this->assertNotFalse($zip->locateName($root.'/documents/expense-receipts/2026-06-20_Stationery-Co_R200.00.pdf'));
         $this->assertTrue($this->bankStatementInZip($zip, $root));
-        $this->assertNotFalse($zip->locateName($root.'/documents/contracts/2026-01-01_Acme-Corp_Master-Agreement.pdf'));
 
         $zip->close();
     }

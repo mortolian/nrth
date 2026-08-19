@@ -194,9 +194,6 @@ class HandleInertiaRequests extends Middleware
             ($moduleOn(ModuleCatalog::PLANNING) && $can('budgets.view'))
                 ? ['id' => 'budgets', 'label' => 'Budgets', 'href' => route('budgeting.index')]
                 : null,
-            ($moduleOn(ModuleCatalog::CONTRACTING) && $can('contracts.view'))
-                ? ['id' => 'contracts', 'label' => 'Contracts', 'href' => route('contracting.contracts.index')]
-                : null,
             ($moduleOn(ModuleCatalog::WEALTH) && $can('wealth.view'))
                 ? ['id' => 'wealth', 'label' => 'Wealth', 'href' => route('wealth.index')]
                 : null,
@@ -213,7 +210,6 @@ class HandleInertiaRequests extends Middleware
                 ...array_values(array_filter([
                     $can('tax.view') ? ['id' => 'vat-returns', 'label' => 'VAT Returns', 'href' => route('tax.vat.index')] : null,
                     $can('tax.manage') ? ['id' => 'vat-rates', 'label' => 'VAT Rates', 'href' => route('tax.vat-rates.index')] : null,
-                    $can('tax.view') ? ['id' => 'tax-periods', 'label' => 'Tax Periods', 'href' => route('tax.provisional.index')] : null,
                     $can('tax.manage') ? ['id' => 'tax-documents', 'label' => 'Tax Documents', 'href' => route('tax.documents.index')] : null,
                     $can('reports.view') ? ['id' => 'profit-loss', 'label' => 'Profit And Loss', 'href' => route('reports.profit-loss')] : null,
                     $can('reports.view') ? ['id' => 'balance-sheet', 'label' => 'Balance Sheet', 'href' => route('reports.balance-sheet')] : null,

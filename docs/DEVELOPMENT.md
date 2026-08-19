@@ -130,7 +130,7 @@ Canonical map of domains, actions, team scoping, and request flow: **[ARCHITECTU
 
 ### Product notes for local work
 
-- Optional modules (`travel`, `planning`, `contracting`, `wealth`): **Settings → Features**. See [ARCHITECTURE.md](ARCHITECTURE.md#optional-modules).
+- Optional modules (`travel`, `planning`, `wealth`): **Settings → Features**. See [ARCHITECTURE.md](ARCHITECTURE.md#optional-modules).
 - Instance default timezone: **Settings → Instance → Timezone** (operators; stored in `instance_settings`, fallback `APP_TIMEZONE`). Per-business override: **Settings → Business** (`business_settings.timezone`). Sidebar clock uses the current business effective timezone.
 - Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
 - Licence disc reminders: the same scheduler runs `vehicles:send-license-disk-reminders` daily at 01:15 for active vehicles whose disc expires within 30 days (opt out under Profile → Notifications).

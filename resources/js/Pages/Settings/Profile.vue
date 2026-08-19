@@ -11,7 +11,6 @@ import LeaveCurrentBusinessForm from '@/Pages/Settings/Partials/LeaveCurrentBusi
 type Preferences = {
     notify_invoice_overdue: boolean;
     notify_vat_due: boolean;
-    notify_provisional_tax: boolean;
     notify_license_disk: boolean;
     date_format: string;
     theme: string;

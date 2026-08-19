@@ -4,7 +4,6 @@ namespace App\Domain\Takeout\Services;
 
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Models\BankingStatementImport;
-use App\Domain\Contracting\Models\Contract;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Services\InvoicePdfService;
@@ -28,7 +27,6 @@ final class TakeoutDocumentCollector
         File::ensureDirectoryExists($documentsDirectory.'/invoices');
         File::ensureDirectoryExists($documentsDirectory.'/expense-receipts');
         File::ensureDirectoryExists($documentsDirectory.'/bank-statements');
-        File::ensureDirectoryExists($documentsDirectory.'/contracts');
 
         $result = new TakeoutDocumentExportResult;
 
@@ -48,13 +46,6 @@ final class TakeoutDocumentCollector
 
         foreach ($this->collector->bankStatementImports($run) as $import) {
             $this->exportBankStatement($documentsDirectory.'/bank-statements', $import, $result);
-        }
-
-        foreach ($this->collector->contracts($run) as $contract) {
-            $filename = $this->exportSignedContract($documentsDirectory.'/contracts', $contract, $result);
-            if ($filename !== null) {
-                $result->contractSignedFilenames[$contract->id] = $filename;
-            }
         }
 
         return $result;
@@ -175,23 +166,6 @@ final class TakeoutDocumentCollector
         File::copy($disk->path($import->stored_path), $dest);
 
         return basename($dest);
-    }
-
-    private function exportSignedContract(string $directory, Contract $contract, TakeoutDocumentExportResult $result): ?string
-    {
-        $media = $contract->getFirstMedia('signed-contract');
-        if ($media === null) {
-            return null;
-        }
-
-        $targetName = sprintf(
-            '%s_%s_%s.pdf',
-            $contract->start_date?->format('Y-m-d') ?? 'unknown-date',
-            TakeoutFilename::sanitize($contract->client?->name ?? 'client'),
-            TakeoutFilename::sanitize($contract->title),
-        );
-
-        return $this->copyMediaFile($directory, $media, $targetName, $result);
     }
 
     private function copyMediaFile(

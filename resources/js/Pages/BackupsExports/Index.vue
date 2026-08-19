@@ -53,8 +53,6 @@ const props = defineProps<{
         expenses_missing_receipts: number;
         bank_statement_files: number;
         vat_periods_count: number;
-        contracts_count: number;
-        contracts_missing_signed_file: number;
         gaps: string[];
     } | null;
     document_categories: Array<{

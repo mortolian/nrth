@@ -11,7 +11,6 @@ use App\Http\Controllers\Web\Banking\BankingReconciliationController;
 use App\Http\Controllers\Web\Banking\BankingStatementImportController;
 use App\Http\Controllers\Web\Banking\BankingTransactionController;
 use App\Http\Controllers\Web\BudgetingController;
-use App\Http\Controllers\Web\Contracting\ContractController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ExpensesController;
 use App\Http\Controllers\Web\InvoicePdfController;
@@ -37,7 +36,6 @@ use App\Http\Controllers\Web\Settings\TeamRoleController;
 use App\Http\Controllers\Web\Settings\TeamSettingsController;
 use App\Http\Controllers\Web\Settings\UserPreferencesController;
 use App\Http\Controllers\Web\SupplierController;
-use App\Http\Controllers\Web\Tax\ProvisionalTaxController;
 use App\Http\Controllers\Web\Tax\TakeoutController;
 use App\Http\Controllers\Web\Tax\TaxDocumentsController;
 use App\Http\Controllers\Web\Tax\VATController;
@@ -209,7 +207,6 @@ Route::middleware([
     Route::put('/tax/vat-rates/{taxRate}', [VatRateController::class, 'update'])->name('tax.vat-rates.update');
     Route::delete('/tax/vat-rates/{taxRate}', [VatRateController::class, 'destroy'])->name('tax.vat-rates.destroy');
     Route::post('/tax/vat/periods/{period}/submit', [VATController::class, 'submit'])->name('tax.vat.submit');
-    Route::get('/tax/provisional', [ProvisionalTaxController::class, 'index'])->name('tax.provisional.index');
     Route::get('/tax/documents', TaxDocumentsController::class)->name('tax.documents.index');
     Route::post('/tax/takeouts', [TakeoutController::class, 'store'])->name('tax.takeouts.store');
     Route::get('/tax/takeouts/{takeoutRun}/download', [TakeoutController::class, 'download'])->name('tax.takeouts.download');
@@ -244,15 +241,6 @@ Route::middleware([
         Route::get('/{vehicle}/edit', [VehicleController::class, 'edit'])->name('edit');
         Route::put('/{vehicle}', [VehicleController::class, 'update'])->name('update');
         Route::delete('/{vehicle}', [VehicleController::class, 'destroy'])->name('destroy');
-    });
-    Route::prefix('contracting')->name('contracting.')->middleware('team.module:contracting')->group(function () {
-        Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
-        Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
-        Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
-        Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
-        Route::get('/contracts/{contract}/signed-document', [ContractController::class, 'showSignedDocument'])->name('contracts.signed-document');
-        Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
-        Route::post('/contracts/{contract}/generate-invoice', [ContractController::class, 'generateInvoice'])->name('contracts.generate-invoice');
     });
     Route::prefix('invoicing')->name('invoicing.')->group(function () {
         Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');

@@ -10,6 +10,11 @@ final class ModuleCatalog
 
     public const PLANNING = 'planning';
 
+    /**
+     * Historical key for migrate:fresh on
+     * 2026_08_12_120000_enable_legacy_modules_for_existing_teams.php.
+     * Not listed in definitions(); Features and moduleEnabled() ignore it.
+     */
     public const CONTRACTING = 'contracting';
 
     /**
@@ -29,12 +34,6 @@ final class ModuleCatalog
                 'description' => 'Category budgets, envelopes, and variance tracking.',
                 'default_enabled' => false,
                 'experimental' => false,
-            ],
-            self::CONTRACTING => [
-                'label' => 'Contracting',
-                'description' => 'Experimental. Client contracts and a retainer invoice helper. Generated drafts are ZAR with no VAT and skip the normal invoicing pipeline.',
-                'default_enabled' => false,
-                'experimental' => true,
             ],
             self::WEALTH => [
                 'label' => 'Wealth',

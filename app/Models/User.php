@@ -105,7 +105,6 @@ class User extends Authenticatable
         return [
             'notify_invoice_overdue' => true,
             'notify_vat_due' => true,
-            'notify_provisional_tax' => true,
             'notify_license_disk' => true,
             'date_format' => 'Y-m-d',
             'theme' => 'system',

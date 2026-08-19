@@ -74,7 +74,7 @@ Security, licensing, and optional infrastructure improvements.
 - [ ] **Composer / dependency license scan in CI** (optional) — Add a license compliance check to [.github/workflows/](../.github/workflows/) (e.g. `composer licenses` or a dedicated action)
 - [ ] **Publish Docker image to GHCR** (optional) — Simplify self-hosting; reference from [SELF_HOST.md](SELF_HOST.md) and [compose.yaml](../compose.yaml)
 - [ ] **Hosted docs site** (optional) — e.g. GitHub Pages or Read the Docs for [docs/](.)
-- [x] **Alpha/beta disclaimer review** — README, ROADMAP, and SECURITY say **beta**; remaining work and experimental surfaces: [BETA.md](BETA.md)
+- [x] **Alpha/beta disclaimer review** — README, ROADMAP, and SECURITY say **beta**; remaining work: [BETA.md](BETA.md)
 
 ---
 
