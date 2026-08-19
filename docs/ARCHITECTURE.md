@@ -159,6 +159,8 @@ Catalog: [`ModuleCatalog`](../app/Support/Modules/ModuleCatalog.php) — `travel
 
 Wealth is the template for a future bounded module (own migrations, routes, Inertia pages). Travel and Planning still live under `app/Domain`.
 
+The unused `contracts` table is leftover from a removed feature. Do not add a domain model for it, and do not drop it in a normal migrate (additive schema from 2026-08-18).
+
 ## Instance vs team
 
 | Concern | Where |
@@ -171,7 +173,7 @@ The first installed user is an instance operator. Public registration is disable
 
 ## Files
 
-Invoice PDFs, expense receipts, payment receipts, and signed contracts use Spatie Media Library on `MEDIA_DISK` (default `local` → `storage/app/private`). They are not served via `public/storage`. Logos stay on the `public` disk. `./scripts/update` runs `nrth:move-media-to-private-disk` for existing public files.
+Invoice PDFs, expense receipts, and payment receipts use Spatie Media Library on `MEDIA_DISK` (default `local` → `storage/app/private`). They are not served via `public/storage`. Logos stay on the `public` disk. `./scripts/update` runs `nrth:move-media-to-private-disk` for existing public files.
 
 ## Unauthenticated edges
 

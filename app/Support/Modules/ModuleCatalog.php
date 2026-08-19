@@ -11,13 +11,6 @@ final class ModuleCatalog
     public const PLANNING = 'planning';
 
     /**
-     * Historical key for migrate:fresh on
-     * 2026_08_12_120000_enable_legacy_modules_for_existing_teams.php.
-     * Not listed in definitions(); Features and moduleEnabled() ignore it.
-     */
-    public const CONTRACTING = 'contracting';
-
-    /**
      * @return array<string, array{label: string, description: string, default_enabled: bool, experimental: bool}>
      */
     public static function definitions(): array

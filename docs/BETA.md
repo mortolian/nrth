@@ -23,7 +23,7 @@ These were the near-term ROADMAP items. They are closed.
 
 Travel and Planning (budgets) are optional modules and are fine to keep as they are. Wealth CSV / multi-currency portfolios stay **after** this remaining list.
 
-Contracting and provisional tax were removed from the product (no nav, routes, or takeout). The `contracts` table and any `tax_periods.type = provisional` rows stay in existing databases because schema upgrades are additive. Features ignores leftover `team_modules` rows named `contracting`.
+The unused `contracts` table remains in the database. Schema upgrades are additive, so it is not dropped. Do not add a model or UI for it.
 
 ---
 

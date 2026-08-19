@@ -6,9 +6,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Existing businesses already used Travel / Planning / Contracting as core nav.
+ * Existing businesses already used Travel / Planning as core nav.
  * Opt them in so enabling modules by default-off does not lock current teams out.
  * New teams still get default_enabled=false (no row → disabled).
+ *
+ * Contracting was later removed from the product. This migration originally
+ * opted teams into `contracting`; leftover rows are deleted in
+ * 2026_08_19_120000_remove_retired_contracting_and_provisional_tax_rows.php.
  */
 return new class extends Migration
 {
@@ -22,7 +26,6 @@ return new class extends Migration
         $modules = [
             ModuleCatalog::TRAVEL,
             ModuleCatalog::PLANNING,
-            ModuleCatalog::CONTRACTING,
         ];
 
         $teamIds = DB::table('teams')->pluck('id');
@@ -59,7 +62,7 @@ return new class extends Migration
             ->whereIn('name', [
                 ModuleCatalog::TRAVEL,
                 ModuleCatalog::PLANNING,
-                ModuleCatalog::CONTRACTING,
+                'contracting',
             ])
             ->delete();
     }
