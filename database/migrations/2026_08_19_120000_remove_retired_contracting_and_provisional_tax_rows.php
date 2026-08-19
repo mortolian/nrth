@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Contracting and provisional tax are no longer product surfaces.
- * Schema stays (additive policy): the unused `contracts` table is not dropped.
- * This only deletes leftover rows that would otherwise confuse later work.
+ * Deletes leftover module/period/permission rows. The `contracts` table is
+ * dropped in 2026_08_19_121000_drop_contracts_table.php.
  */
 return new class extends Migration
 {

@@ -10,10 +10,24 @@ use SplFileInfo;
  * From this cutoff forward, schema changes on existing installs must be additive
  * (new tables/columns/indexes). Destructive up() changes need an expand/contract
  * pair and an explicit breaking note — do not sneak drop/rename into a normal migrate.
+ * One-off exceptions are named in {@see destructiveUpAllowlist()}; the fragment list stays.
  */
 final class AdditiveMigrationPolicy
 {
     public const CUTOFF_DATE = '2026_08_18';
+
+    /**
+     * Migration basenames allowed to drop/rename in up() after the cutoff.
+     * Keep this list tiny and named. Do not disable {@see forbiddenUpFragments()}.
+     *
+     * @return list<string>
+     */
+    public static function destructiveUpAllowlist(): array
+    {
+        return [
+            '2026_08_19_121000_drop_contracts_table.php',
+        ];
+    }
 
     /**
      * @return list<string>

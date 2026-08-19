@@ -6,6 +6,7 @@ use App\Models\TeamRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class RemoveRetiredContractingAndProvisionalTaxRowsTest extends TestCase
@@ -68,5 +69,10 @@ class RemoveRetiredContractingAndProvisionalTaxRowsTest extends TestCase
             $user->fresh()->preferences ?? []
         );
         $this->assertTrue((bool) ($user->fresh()->preferences['notify_vat_due'] ?? false));
+    }
+
+    public function test_contracts_table_is_dropped_after_migrate(): void
+    {
+        $this->assertFalse(Schema::hasTable('contracts'));
     }
 }

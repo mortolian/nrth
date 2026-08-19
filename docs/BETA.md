@@ -23,8 +23,6 @@ These were the near-term ROADMAP items. They are closed.
 
 Travel and Planning (budgets) are optional modules and are fine to keep as they are. Wealth CSV / multi-currency portfolios stay **after** this remaining list.
 
-The unused `contracts` table remains in the database. Schema upgrades are additive, so it is not dropped. Do not add a model or UI for it.
-
 ---
 
 ## 1. Publish a beta GitHub Release (process — not more product code)

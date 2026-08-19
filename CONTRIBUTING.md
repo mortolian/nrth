@@ -83,6 +83,7 @@ Released schema is upgraded in place (`./scripts/update` / `php artisan migrate`
 - Do **not** edit migrations that may already be applied — add a new migration instead.
 - Name migrations clearly and keep `down()` reversible when practical.
 - If a change cannot be additive, use expand/contract (add the new shape, backfill, then remove the old shape in a later release) and call it out as breaking in the PR / release notes.
+- A one-off drop is allowed only by adding the migration basename to [`AdditiveMigrationPolicy::destructiveUpAllowlist()`](app/Support/Upgrade/AdditiveMigrationPolicy.php) and updating the pinned test. Do not remove fragments from the policy.
 
 CI asserts this policy in `tests/Unit/Support/Upgrade/AdditiveMigrationPolicyTest.php`. Operator upgrade path: [docs/UPGRADE.md](docs/UPGRADE.md).
 

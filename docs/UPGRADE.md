@@ -55,7 +55,7 @@ List tags: `git fetch --tags && git tag -l 'v*'`
 | `git reset --hard` / checkout `--ref` | Code tree only |
 | `composer install` / `npm run build` | Dependencies and frontend |
 | `php artisan nrth:upgrade-status` | Shows version + pending migrations |
-| `php artisan nrth:move-media-to-private-disk` | Moves invoice PDFs, receipts, and contracts off the public disk (also run by `./scripts/update`) |
+    | `php artisan nrth:move-media-to-private-disk` | Moves invoice PDFs and receipts off the public disk (also run by `./scripts/update`) |
 | `migrate --force` (or `app:update`) | Incremental schema only |
 | Cache rebuild + Octane restart | No volume wipe |
 
