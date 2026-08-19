@@ -2,6 +2,30 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.4](https://github.com/mortolian/nrth/compare/v0.1.3...v0.1.4) (2026-08-19)
+
+
+### Features
+
+* add payment validation to prevent overpayment ([c0ff31b](https://github.com/mortolian/nrth/commit/c0ff31be52818b245b17446a70cd5f467a6271f1))
+* enhance media relocation command and banking reconciliation logic ([ea3982e](https://github.com/mortolian/nrth/commit/ea3982e2e1ecb93c5344429cb69abc95f5d6ec8d))
+* enhance upgrade process and backup commands ([aa46467](https://github.com/mortolian/nrth/commit/aa464673ff15976436e20fb4ddefdbba2e0ec9ae))
+* implement banking reconciliation features ([2307314](https://github.com/mortolian/nrth/commit/230731488bd66bfe08f78f14b516a852fa12f488))
+
+
+### Bug Fixes
+
+* close invitation theft, public media, and webhook TeamScope gaps ([0f8b939](https://github.com/mortolian/nrth/commit/0f8b9394ebc4f2648383ea136463f61a3fdc83a2))
+* enhance email change logic and payment session handling ([ce2012c](https://github.com/mortolian/nrth/commit/ce2012c7b19c5c68bfcf500f23d0b59ca73c5810))
+
+
+### Documentation
+
+* add ARCHITECTURE.md for domains, actions, and team scoping ([b7c68c0](https://github.com/mortolian/nrth/commit/b7c68c057f2b4a64d1b25425cf2420105d6902f4))
+* add multi-tenant hardening guide and README screenshots ([f15b229](https://github.com/mortolian/nrth/commit/f15b22992cd6b8004c6417273bdbd3e1f2b5b90c))
+* update project status to beta and document remaining work ([ca08517](https://github.com/mortolian/nrth/commit/ca0851735ac248481bead7f4ef27b02ac835a8b1))
+* update TEAM_ACCESS.md to include cross-business isolation details ([905d2f4](https://github.com/mortolian/nrth/commit/905d2f4497f7f43543fea54d485f20b267dbce2e))
+
 ## [0.1.3](https://github.com/mortolian/nrth/compare/v0.1.2...v0.1.3) (2026-08-12)
 
 
