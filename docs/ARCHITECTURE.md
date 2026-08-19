@@ -186,7 +186,7 @@ These routes are outside the logged-in group. They must not trust `current_team_
 ## Frontend
 
 - Inertia v2 + Vue 3 + Tailwind v4 + Ziggy named routes.
-- Shared props (current team, `team_permissions`, flash toasts) come from [`HandleInertiaRequests`](../app/Http/Middleware/HandleInertiaRequests.php). Hide nav/CTAs when a permission is missing; the server still 403s.
+- Shared props (current team, `team_permissions`, flash toasts, `app_version`) come from [`HandleInertiaRequests`](../app/Http/Middleware/HandleInertiaRequests.php). Hide nav/CTAs when a permission is missing; the server still 403s.
 - UI patterns (tables, buttons, form footers, toasts): [`.cursor/rules/ui-patterns.mdc`](../.cursor/rules/ui-patterns.mdc).
 
 ## Tests that document the money path

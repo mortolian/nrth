@@ -31,3 +31,7 @@ Schedule::command('nrth:backup-run')
 Schedule::command('nrth:backup-rotate')
     ->dailyAt('03:30')
     ->withoutOverlapping();
+
+Schedule::command('nrth:check-release')
+    ->hourly()
+    ->withoutOverlapping();

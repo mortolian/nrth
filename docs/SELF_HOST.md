@@ -224,6 +224,8 @@ Env values are used only when the business setting is empty.
 
 ## Update
 
+The sidebar shows the installed version. When a newer GitHub Release exists, it also shows **update available**. That check runs in the scheduler (`nrth:check-release`), not during login. Turn it off with `NRTH_RELEASE_CHECK=false` on air-gapped hosts. Optional: `NRTH_GITHUB_REPOSITORY=owner/repo`.
+
 Tag-to-tag upgrades, backups, and rollback: **[UPGRADE.md](UPGRADE.md)**.
 
 ```bash

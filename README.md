@@ -28,7 +28,7 @@
 - **Banking** — import CSV/OFX statements, duplicate detection, match or exclude imported lines (including mixed personal/business accounts)
 - **Tax** — VAT returns and rates (configure during setup wizard)
 - **Teams** — multi-user companies via Jetstream
-- **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included
+- **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included; sidebar shows the installed version and when a newer GitHub Release is available
 
 ## Screenshots
 

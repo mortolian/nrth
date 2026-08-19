@@ -37,6 +37,7 @@ import CommandPalette from '@/Components/layout/CommandPalette.vue';
 import SessionIdleWatcher from '@/Components/layout/SessionIdleWatcher.vue';
 import { useAppDisplayName } from '@/lib/appName';
 import { useInstanceClock } from '@/Composables/useInstanceClock';
+import AppVersionLabel from '@/Components/AppVersionLabel.vue';
 
 const SETTINGS_SECTION_LABEL = 'Settings';
 
@@ -382,6 +383,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <p class="mt-0.5 text-xs text-slate-500">
                             {{ instanceClock.date }}
                         </p>
+                        <div class="mt-2 border-t border-canvas-200/80 pt-2">
+                            <AppVersionLabel />
+                        </div>
                     </div>
                     <div
                         v-else
@@ -394,6 +398,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                         <p class="text-center text-[9px] leading-tight text-slate-400">
                             {{ instanceClock.timezoneLabel }}
                         </p>
+                        <div class="mt-1 w-full border-t border-canvas-200/80 pt-1">
+                            <AppVersionLabel compact />
+                        </div>
                     </div>
                 </div>
             </aside>
@@ -647,6 +654,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <p class="mt-0.5 text-xs text-slate-500">
                                 {{ instanceClock.date }}
                             </p>
+                            <div class="mt-2 border-t border-canvas-200/80 pt-2">
+                                <AppVersionLabel />
+                            </div>
                         </div>
                     </div>
                 </div>

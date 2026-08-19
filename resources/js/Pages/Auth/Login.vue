@@ -6,6 +6,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
+import AppVersionLabel from '@/Components/AppVersionLabel.vue';
 
 const props = defineProps({
     canResetPassword: Boolean,
@@ -137,6 +138,9 @@ const submit = () => {
                         </Link>
                     </div>
                 </form>
+            </div>
+            <div class="mt-6">
+                <AppVersionLabel align="center" />
             </div>
         </div>
     </div>

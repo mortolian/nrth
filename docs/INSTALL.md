@@ -61,6 +61,8 @@ Pin to a GitHub Release tag instead of tracking `master`:
 ./scripts/backup && ./scripts/update --ref v0.1.3
 ```
 
+The signed-in sidebar shows the installed version (`version.txt`) and **update available** when a newer GitHub Release exists. Air-gapped hosts: `NRTH_RELEASE_CHECK=false`.
+
 `./scripts/deploy.sh` still works as an alias.
 
 Re-running `install.sh` on an existing install also runs `./scripts/update` (data preserved).

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -40,5 +42,24 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertGuest();
+    }
+
+    public function test_users_can_authenticate_when_release_check_is_enabled(): void
+    {
+        Config::set('nrth.releases.check_enabled', true);
+        Http::fake(function () {
+            $this->fail('Login must not call GitHub.');
+        });
+
+        $user = User::factory()->create();
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+        Http::assertNothingSent();
     }
 }

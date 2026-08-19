@@ -24,6 +24,32 @@ final class SchemaUpgradeStatus
     }
 
     /**
+     * Semver shown in the UI and compared to GitHub Releases.
+     * Prefer version.txt (what git checkout / Release Please updates).
+     */
+    public function displayVersion(): string
+    {
+        $fromFile = $this->versionFile();
+        if ($fromFile !== 'unknown') {
+            return self::normalizeVersion($fromFile);
+        }
+
+        $fromConfig = trim($this->applicationVersion());
+
+        return $fromConfig !== '' ? self::normalizeVersion($fromConfig) : '0.0.0';
+    }
+
+    public static function normalizeVersion(string $version): string
+    {
+        $version = trim($version);
+        if ($version === '') {
+            return '0.0.0';
+        }
+
+        return (string) preg_replace('/^[vV]/', '', $version);
+    }
+
+    /**
      * @return list<string>
      */
     public function pendingMigrationNames(): array

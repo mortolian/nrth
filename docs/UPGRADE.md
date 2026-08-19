@@ -4,6 +4,8 @@ Self-hosted instances upgrade in place. Data volumes are kept. Pending Laravel m
 
 Day-to-day install: **[INSTALL.md](INSTALL.md)**. HTTPS and backups: **[SELF_HOST.md](SELF_HOST.md)**.
 
+The signed-in sidebar (and the sign-in screen) show the installed version from `version.txt`. When this instance can reach GitHub, a newer [GitHub Release](https://github.com/mortolian/nrth/releases) also appears there (and on **Settings → Instance**). Air-gapped hosts can set `NRTH_RELEASE_CHECK=false`.
+
 ---
 
 ## Before you upgrade

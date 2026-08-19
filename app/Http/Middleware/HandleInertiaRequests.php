@@ -12,10 +12,13 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
 use App\Support\Modules\ModuleCatalog;
 use App\Support\TeamAccess\TeamAccess;
+use App\Support\Upgrade\SchemaUpgradeStatus;
+use App\Support\Version\GithubReleaseChecker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
+use Throwable;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -59,6 +62,30 @@ class HandleInertiaRequests extends Middleware
             'csrf_token' => fn () => csrf_token(),
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
+            'app_version' => function () {
+                try {
+                    return app(GithubReleaseChecker::class)->forInertia();
+                } catch (Throwable) {
+                    $current = '0.0.0';
+                    try {
+                        $path = base_path('version.txt');
+                        if (is_file($path)) {
+                            $current = SchemaUpgradeStatus::normalizeVersion(
+                                (string) file_get_contents($path)
+                            );
+                        }
+                    } catch (Throwable) {
+                    }
+
+                    return [
+                        'current' => $current,
+                        'latest' => null,
+                        'update_available' => false,
+                        'url' => null,
+                        'docs_url' => 'https://github.com/mortolian/nrth/blob/master/docs/UPGRADE.md',
+                    ];
+                }
+            },
             'app_timezone' => function () use ($request) {
                 $team = $request->user()?->currentTeam;
                 if ($team !== null) {

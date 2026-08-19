@@ -20,7 +20,7 @@ return [
     | Application Version
     |--------------------------------------------------------------------------
     |
-    | Used by self-hosted update tooling and changelog display.
+    | Used by self-hosted update tooling, the in-app version label, and changelog display.
     |
     */
 

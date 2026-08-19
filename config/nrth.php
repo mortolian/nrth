@@ -24,4 +24,21 @@ return [
         explode(',', (string) env('NRTH_OPERATOR_EMAILS', '')),
     ))),
 
+    /*
+    |--------------------------------------------------------------------------
+    | GitHub release check (sidebar “update available”)
+    |--------------------------------------------------------------------------
+    |
+    | Compares version.txt to the latest GitHub Release. Cached; disable on
+    | air-gapped hosts with NRTH_RELEASE_CHECK=false. Tests set this false.
+    |
+    */
+
+    'releases' => [
+        'check_enabled' => filter_var(env('NRTH_RELEASE_CHECK', true), FILTER_VALIDATE_BOOLEAN),
+        'github_repository' => (string) env('NRTH_GITHUB_REPOSITORY', 'mortolian/nrth'),
+        'cache_ttl_seconds' => max(300, (int) env('NRTH_RELEASE_CHECK_TTL', 21600)),
+        'failure_cache_ttl_seconds' => 1800,
+    ],
+
 ];
