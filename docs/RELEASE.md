@@ -2,7 +2,7 @@
 
 nrth uses [Release Please](https://github.com/googleapis/release-please) to automate version bumps, [CHANGELOG.md](../CHANGELOG.md), GitHub Releases, and git tags. You should not edit the changelog by hand for routine releases.
 
-Product status is **beta**. Cutting the next tag after `v0.1.3` is a maintainer step in [BETA.md](BETA.md#2-publish-a-beta-github-release-process--not-more-product-code).
+Product status is **beta**. Tags are cut from `master` (see [Cutting a release](#cutting-a-release-day-to-day)). Work on `master-beta` does not create a GitHub Release until it is merged.
 
 ## How it works
 

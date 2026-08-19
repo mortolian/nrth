@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/status-beta-blue" alt="Beta">
 </p>
 
-> **Beta.** Core invoicing, expenses, VAT, ledger, and bank reconciliation are usable for self-hosted books. Not financial or tax advice, not a 1.0 stability guarantee — evaluate carefully before production use. Remaining work: **[docs/BETA.md](docs/BETA.md)**. See [SECURITY.md](SECURITY.md).
+> **Beta.** Core invoicing, expenses, VAT, ledger, and bank reconciliation are usable for self-hosted books. Not financial or tax advice, not a 1.0 stability guarantee — evaluate carefully before production use. See [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -78,7 +78,6 @@ Details, Docker dev workflow, and tests: **[docs/DEVELOPMENT.md](docs/DEVELOPMEN
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Domains, actions, team scoping |
 | [docs/PERSONAL_SERVER.md](docs/PERSONAL_SERVER.md) | Maintainer-only personal dev server |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Beta scope, plans, and out-of-scope items |
-| [docs/BETA.md](docs/BETA.md) | Remaining work before a beta GitHub Release |
 | [docs/RELEASE.md](docs/RELEASE.md) | Automated releases and changelog |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 

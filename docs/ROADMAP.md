@@ -2,7 +2,7 @@
 
 NRTH is in **beta**. This document describes what works today, what we plan next, and what is intentionally out of scope. Priorities may shift based on feedback — open a [Discussion](https://github.com/mortolian/nrth/discussions) or [issue](https://github.com/mortolian/nrth/issues) to suggest changes.
 
-**Status:** Beta · **Latest tag:** [v0.1.3](https://github.com/mortolian/nrth/releases/tag/v0.1.3) · Remaining work: **[BETA.md](BETA.md)**
+**Status:** Beta · **Latest tag:** [v0.1.3](https://github.com/mortolian/nrth/releases/tag/v0.1.3)
 
 ---
 
@@ -37,9 +37,7 @@ See [README.md](../README.md) and [CHANGELOG.md](../CHANGELOG.md) for details.
 - [x] **Security review** — auth, uploads, public pay, Stripe/PayFast webhooks, invitation/email-change hardening ([SECURITY.md](../SECURITY.md))
 - [x] **Expanded test coverage** — tenant isolation plus report arithmetic (P&L / TB / BS / cash flow) and invoice overpayment rejection
 
-Still open as **process / product decisions**, not new near-term features: [BETA.md](BETA.md).
-
-Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and [Discussions](https://github.com/mortolian/nrth/discussions).
+Track progress via [GitHub issues](https://github.com/mortolian/nrth/issues) and [Discussions](https://github.com/mortolian/nrth/discussions). Tags are cut from `master` via [RELEASE.md](RELEASE.md).
 
 ---
 
