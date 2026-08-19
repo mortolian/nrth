@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.5](https://github.com/mortolian/nrth/compare/v0.1.4...v0.1.5) (2026-08-19)
+
+
+### Features
+
+* implement GitHub release check and version display in UI ([584f5fb](https://github.com/mortolian/nrth/commit/584f5fb6bbd96b2c23976d31cb16cf3727d411d6))
+
 ## [0.1.4](https://github.com/mortolian/nrth/compare/v0.1.3...v0.1.4) (2026-08-19)
 
 
