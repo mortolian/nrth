@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.6](https://github.com/mortolian/nrth/compare/v0.1.5...v0.1.6) (2026-08-21)
+
+
+### Features
+
+* add update functionality for asset valuations and transactions ([733eb8a](https://github.com/mortolian/nrth/commit/733eb8abf904518a4abc75e1925b955f67a9c126))
+
 ## [0.1.5](https://github.com/mortolian/nrth/compare/v0.1.4...v0.1.5) (2026-08-19)
 
 
