@@ -110,10 +110,32 @@ class InvoiceDuplicateViewedAndNotesTest extends TestCase
         $template = NoteTemplate::queryWithoutTeamScope()->where('team_id', $team->id)->first();
         $this->assertNotNull($template);
 
-        $client = Client::factory()->for($team)->create();
+        $client = Client::factory()->for($team)->create([
+            'contact_name' => 'Alex Client',
+            'email' => 'alex@example.com',
+            'address' => [
+                'street' => null,
+                'city' => null,
+                'province' => null,
+                'postal_code' => null,
+                'country' => 'South Africa',
+            ],
+        ]);
         $this->actingAs($owner)
             ->put(route('invoicing.clients.update', $client), [
                 'name' => $client->name,
+                'contact_name' => $client->contact_name,
+                'email' => $client->email,
+                'phone' => null,
+                'vat_number' => null,
+                'registration_number' => null,
+                'address' => [
+                    'street' => null,
+                    'city' => null,
+                    'province' => null,
+                    'postal_code' => null,
+                    'country' => 'South Africa',
+                ],
                 'currency' => 'ZAR',
                 'payment_terms_days' => 30,
                 'is_active' => true,
