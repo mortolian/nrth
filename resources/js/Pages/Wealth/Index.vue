@@ -411,9 +411,6 @@ const chartOptions = computed(() => {
                     >
                         New portfolio
                     </AppButton>
-                    <Link :href="route('wealth.history', portfolioQuery)">
-                        <AppButton variant="secondary" size="sm">History</AppButton>
-                    </Link>
                     <Link :href="route('wealth.allowances.index', portfolioQuery)">
                         <AppButton variant="secondary" size="sm">Allowances</AppButton>
                     </Link>
@@ -628,7 +625,7 @@ const chartOptions = computed(() => {
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Financial year starts</label>
                         <AppSelect v-model="createForm.financial_year_start_month" :options="monthOptions" />
-                        <p class="mt-1 text-xs text-slate-500">Used for FY movement and annual history on this portfolio.</p>
+                        <p class="mt-1 text-xs text-slate-500">Used for FY movement and year-end portfolio value on this portfolio.</p>
                     </div>
                 </div>
             </template>

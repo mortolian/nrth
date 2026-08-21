@@ -30,7 +30,7 @@ final class ModuleCatalog
             ],
             self::WEALTH => [
                 'label' => 'Wealth',
-                'description' => 'Track investment accounts, savings, retirement funds, and portfolio history.',
+                'description' => 'Track investment accounts, savings, retirement funds, and portfolio performance.',
                 'default_enabled' => false,
                 'experimental' => false,
             ],

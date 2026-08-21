@@ -3,14 +3,12 @@
 use App\Modules\Wealth\Http\Controllers\WealthAllowanceController;
 use App\Modules\Wealth\Http\Controllers\WealthAssetController;
 use App\Modules\Wealth\Http\Controllers\WealthDashboardController;
-use App\Modules\Wealth\Http\Controllers\WealthHistoryController;
 use App\Modules\Wealth\Http\Controllers\WealthPortfolioController;
 use App\Modules\Wealth\Http\Controllers\WealthTransactionController;
 use App\Modules\Wealth\Http\Controllers\WealthValuationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', WealthDashboardController::class)->name('index');
-Route::get('/history', WealthHistoryController::class)->name('history');
 
 Route::post('/portfolios', [WealthPortfolioController::class, 'store'])->name('portfolios.store');
 Route::put('/portfolios/{portfolio}', [WealthPortfolioController::class, 'update'])->withTrashed()->name('portfolios.update');
