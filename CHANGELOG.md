@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.14](https://github.com/mortolian/nrth/compare/v0.1.13...v0.1.14) (2026-08-21)
+
+
+### Features
+
+* **clients:** polish list UI and simplify phone/country fields ([67d67df](https://github.com/mortolian/nrth/commit/67d67df69d8934d536176ad2d1f2407a1066bd5a))
+
 ## [0.1.13](https://github.com/mortolian/nrth/compare/v0.1.12...v0.1.13) (2026-08-21)
 
 
