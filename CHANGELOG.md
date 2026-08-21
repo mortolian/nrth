@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.12](https://github.com/mortolian/nrth/compare/v0.1.11...v0.1.12) (2026-08-21)
+
+
+### Features
+
+* **wealth:** remove redundant History page ([507257b](https://github.com/mortolian/nrth/commit/507257b105b35ebc88caa9045fd954095600231e))
+
 ## [0.1.11](https://github.com/mortolian/nrth/compare/v0.1.10...v0.1.11) (2026-08-21)
 
 
