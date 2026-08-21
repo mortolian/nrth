@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Web\Settings;
 
+use App\Domain\Accounting\Enums\AccountType;
+use App\Domain\Accounting\Models\Account;
 use App\Domain\Ai\AiCatalog;
 use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Invoicing\Models\InvoiceNumberSequence;
@@ -37,12 +39,42 @@ class BusinessSettingsController extends Controller
         $settings = $team->mergedBusinessSettings();
         $nextSeq = $sequenceRow?->next_number ?? 1;
 
+        $expenseAccounts = Account::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('type', AccountType::Expense->value)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name'])
+            ->map(fn (Account $account) => [
+                'id' => $account->id,
+                'label' => trim($account->code.' — '.$account->name),
+            ])
+            ->values()
+            ->all();
+
+        $incomeAccounts = Account::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('type', AccountType::Income->value)
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name'])
+            ->map(fn (Account $account) => [
+                'id' => $account->id,
+                'label' => trim($account->code.' — '.$account->name),
+            ])
+            ->values()
+            ->all();
+
         return Inertia::render('Settings/Business', [
             'team' => [
                 'id' => $team->id,
                 'name' => $team->name,
             ],
             'settings' => $settings,
+            'expense_accounts' => $expenseAccounts,
+            'income_accounts' => $incomeAccounts,
+            'default_fx_loss_account_id' => $team->fxLossAccount()?->id,
+            'default_fx_gain_account_id' => $team->fxGainAccount()?->id,
             'bank_accounts' => $team->bankAccounts()->get()->map(fn (TeamBankAccount $b) => [
                 'title' => (string) ($b->title ?? ''),
                 'bank_name' => (string) ($b->bank_name ?? ''),
@@ -166,6 +198,24 @@ class BusinessSettingsController extends Controller
             'invoice_default_footer' => ['nullable', 'string'],
             'invoice_email_subject_template' => ['nullable', 'string', 'max:255'],
             'invoice_email_body_template' => ['nullable', 'string'],
+            'fx_loss_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($query) use ($teamId): void {
+                    $query->where('team_id', $teamId)
+                        ->where('type', AccountType::Expense->value)
+                        ->where('is_active', true);
+                }),
+            ],
+            'fx_gain_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($query) use ($teamId): void {
+                    $query->where('team_id', $teamId)
+                        ->where('type', AccountType::Income->value)
+                        ->where('is_active', true);
+                }),
+            ],
             'vat_registered' => ['required', 'boolean'],
             'vat_period_type' => ['required', Rule::in(['bi_monthly', 'monthly', 'quarterly'])],
             'default_vat_rate' => ['required', 'numeric', 'min:0', 'max:1'],
@@ -325,6 +375,14 @@ class BusinessSettingsController extends Controller
         // Free-form default replaces the legacy tax-rate-id pointer.
         $validated['default_tax_rate_id'] = null;
 
+        foreach (['fx_loss_account_id', 'fx_gain_account_id'] as $fxKey) {
+            if (! array_key_exists($fxKey, $validated) || $validated[$fxKey] === '' || (int) $validated[$fxKey] === 0) {
+                $validated[$fxKey] = null;
+            } else {
+                $validated[$fxKey] = (int) $validated[$fxKey];
+            }
+        }
+
         $validated['payment_pages_enabled'] = (bool) $validated['payment_pages_enabled'];
         foreach (['payfast', 'stripe', 'paypal', 'netcash', 'snapscan', 'zapper'] as $gateway) {
             if (! isset($validated['payment_gateways'][$gateway]) || ! is_array($validated['payment_gateways'][$gateway])) {
@@ -352,6 +410,7 @@ class BusinessSettingsController extends Controller
             'invoice_show_street_address', 'estimate_show_street_address',
             'invoice_default_notes', 'invoice_default_footer',
             'invoice_email_subject_template', 'invoice_email_body_template',
+            'fx_loss_account_id', 'fx_gain_account_id',
             'vat_registered', 'vat_period_type', 'default_vat_rate', 'default_tax_rate_id',
             'payment_pages_enabled',
             'session_idle_timeout_minutes',

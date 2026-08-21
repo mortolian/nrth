@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Domain\Accounting\Enums\AccountType;
+use App\Domain\Accounting\Models\Account;
 use App\Domain\Ai\AiCatalog;
 use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Tax\Models\TaxRate;
@@ -305,6 +307,10 @@ class Team extends JetstreamTeam implements HasMedia
             'invoice_default_notes' => null,
             'invoice_default_footer' => null,
             'invoice_show_street_address' => true,
+            /** Expense account for realised FX losses on foreign invoice payments; null = chart code 5900. */
+            'fx_loss_account_id' => null,
+            /** Income account for realised FX gains on foreign invoice payments; null = chart code 4950. */
+            'fx_gain_account_id' => null,
             'invoice_email_subject_template' => 'Invoice {{number}} from {{business}}',
             'invoice_email_body_template' => "Hi {{client_name}},\n\nPlease find invoice {{number}} attached.\n\nThank you,\n{{business}}",
             'vat_registered' => false,
@@ -704,6 +710,75 @@ class Team extends JetstreamTeam implements HasMedia
     public function chargesVat(): bool
     {
         return filter_var($this->mergedBusinessSettings()['vat_registered'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
+     * Expense account used when booking a foreign-exchange loss on invoice payment.
+     * Preference: explicit override → business setting → system chart code 5900.
+     */
+    public function fxLossAccount(?int $overrideId = null): ?Account
+    {
+        return $this->resolveConfiguredChartAccount(
+            overrideId: $overrideId,
+            settingKey: 'fx_loss_account_id',
+            type: AccountType::Expense,
+            fallbackCode: '5900',
+        );
+    }
+
+    /**
+     * Income account used when booking a foreign-exchange gain on invoice payment.
+     * Preference: explicit override → business setting → system chart code 4950.
+     */
+    public function fxGainAccount(?int $overrideId = null): ?Account
+    {
+        return $this->resolveConfiguredChartAccount(
+            overrideId: $overrideId,
+            settingKey: 'fx_gain_account_id',
+            type: AccountType::Income,
+            fallbackCode: '4950',
+        );
+    }
+
+    private function resolveConfiguredChartAccount(
+        ?int $overrideId,
+        string $settingKey,
+        AccountType $type,
+        string $fallbackCode,
+    ): ?Account {
+        if (! Schema::hasTable('accounts')) {
+            return null;
+        }
+
+        $teamId = (int) $this->id;
+        $candidates = [];
+
+        if ($overrideId !== null && $overrideId > 0) {
+            $candidates[] = $overrideId;
+        }
+
+        $configured = (int) ($this->mergedBusinessSettings()[$settingKey] ?? 0);
+        if ($configured > 0) {
+            $candidates[] = $configured;
+        }
+
+        foreach (array_values(array_unique($candidates)) as $accountId) {
+            $account = Account::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->where('id', $accountId)
+                ->where('type', $type->value)
+                ->where('is_active', true)
+                ->first();
+            if ($account !== null) {
+                return $account;
+            }
+        }
+
+        return Account::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('code', $fallbackCode)
+            ->where('type', $type->value)
+            ->first();
     }
 
     /**

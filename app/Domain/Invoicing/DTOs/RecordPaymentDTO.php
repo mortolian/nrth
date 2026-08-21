@@ -21,5 +21,9 @@ readonly class RecordPaymentDTO
         public ?int $bankAmountBusinessCents = null,
         /** When the payment implies an FX loss, posting requires this to be true. */
         public bool $bookFxLossToExpense = false,
+        /** Optional expense account override for FX loss; null uses business default / chart 5900. */
+        public ?int $fxLossAccountId = null,
+        /** Optional income account override for FX gain; null uses business default / chart 4950. */
+        public ?int $fxGainAccountId = null,
     ) {}
 }

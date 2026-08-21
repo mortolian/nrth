@@ -59,10 +59,12 @@ const props = defineProps<{
 
 const page = usePage<{ csrf_token?: string; vat_enabled?: boolean; team_permissions?: string[] }>();
 const canManageInvoices = computed(() => (page.props.team_permissions ?? []).includes('invoices.manage'));
+const canDeleteInvoices = computed(() => (page.props.team_permissions ?? []).includes('invoices.delete'));
 const selected = ref<number[]>([]);
 const exportingZip = ref(false);
 const paymentDrawerOpen = ref(false);
 const selectedInvoice = ref<InvoiceRow | null>(null);
+const bulkWorking = ref(false);
 
 const recordPaymentInvoice = computed(() => {
     const inv = selectedInvoice.value;
@@ -232,11 +234,17 @@ const onAction = (invoice: InvoiceRow, actionId: string) => {
             },
         });
     } else if (actionId === 'mark_sent') {
-        router.post(route('invoicing.invoices.mark-sent', invoice.id));
+        router.post(route('invoicing.invoices.mark-sent', invoice.id), {}, {
+            preserveScroll: true,
+        });
     } else if (actionId === 'void') {
-        router.post(route('invoicing.invoices.void', invoice.id));
+        router.post(route('invoicing.invoices.void', invoice.id), {}, {
+            preserveScroll: true,
+        });
     } else if (actionId === 'unvoid') {
-        router.post(route('invoicing.invoices.unvoid', invoice.id));
+        router.post(route('invoicing.invoices.unvoid', invoice.id), {}, {
+            preserveScroll: true,
+        });
     } else if (actionId === 'record_payment') {
         selectedInvoice.value = invoice;
         paymentDrawerOpen.value = true;
@@ -258,6 +266,45 @@ const toggleSelected = (id: number, checked: boolean) => {
         return;
     }
     selected.value = selected.value.filter((item) => item !== id);
+};
+
+const clearSelection = () => {
+    selected.value = [];
+};
+
+const bulkMarkSent = () => {
+    if (selected.value.length === 0 || bulkWorking.value || !canManageInvoices.value) {
+        return;
+    }
+    bulkWorking.value = true;
+    router.post(route('invoicing.invoices.bulk-mark-sent'), {
+        invoice_ids: selected.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => clearSelection(),
+        onFinish: () => {
+            bulkWorking.value = false;
+        },
+    });
+};
+
+const bulkVoid = () => {
+    if (selected.value.length === 0 || bulkWorking.value || !canDeleteInvoices.value) {
+        return;
+    }
+    if (!window.confirm(`Void ${selected.value.length} selected invoice(s)? Only sent invoices will be voided.`)) {
+        return;
+    }
+    bulkWorking.value = true;
+    router.post(route('invoicing.invoices.bulk-void'), {
+        invoice_ids: selected.value,
+    }, {
+        preserveScroll: true,
+        onSuccess: () => clearSelection(),
+        onFinish: () => {
+            bulkWorking.value = false;
+        },
+    });
 };
 
 const exportSelectedPdfZip = async () => {
@@ -443,14 +490,48 @@ const exportSelectedPdfZip = async () => {
             <AppCard>
                 <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <h3 class="text-lg font-semibold text-slate-900">Invoice list</h3>
-                    <div class="hidden items-center gap-2 sm:flex">
+                </div>
+
+                <div
+                    v-if="selected.length > 0"
+                    class="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <p class="text-sm text-slate-700">
+                        {{ selected.length }} selected
+                        <button
+                            type="button"
+                            class="ml-2 font-medium text-brand-700 underline decoration-brand-600/40 underline-offset-2 hover:text-brand-600"
+                            @click="clearSelection"
+                        >
+                            Clear
+                        </button>
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <AppButton
+                            v-if="canManageInvoices"
+                            variant="secondary"
+                            size="sm"
+                            :disabled="bulkWorking"
+                            @click="bulkMarkSent"
+                        >
+                            Mark as sent
+                        </AppButton>
+                        <AppButton
+                            v-if="canDeleteInvoices"
+                            variant="secondary"
+                            size="sm"
+                            :disabled="bulkWorking"
+                            @click="bulkVoid"
+                        >
+                            Void
+                        </AppButton>
                         <AppButton
                             variant="secondary"
                             size="sm"
-                            :disabled="selected.length === 0 || exportingZip"
+                            :disabled="exportingZip || bulkWorking"
                             @click="exportSelectedPdfZip"
                         >
-                            {{ exportingZip ? 'Preparing…' : 'Export selected (PDF zip)' }}
+                            {{ exportingZip ? 'Preparing…' : 'Export PDF zip' }}
                         </AppButton>
                     </div>
                 </div>

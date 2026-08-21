@@ -34,6 +34,10 @@ const page = usePage<{
     business_currency?: string;
     invoice_payment_methods?: Array<{ value: string; label: string }>;
     banking_deposit_accounts?: Array<{ id: number; name: string; gl_account_id: number; gl_label: string }>;
+    fx_expense_accounts?: Array<{ id: number; label: string }>;
+    fx_income_accounts?: Array<{ id: number; label: string }>;
+    default_fx_loss_account_id?: number | null;
+    default_fx_gain_account_id?: number | null;
 }>();
 
 const paymentMethods = computed(
@@ -41,6 +45,32 @@ const paymentMethods = computed(
 );
 
 const depositAccounts = computed(() => page.props.banking_deposit_accounts ?? []);
+
+const fxExpenseAccountOptions = computed(() =>
+    (page.props.fx_expense_accounts ?? []).map((account) => ({
+        label: account.label,
+        value: String(account.id),
+    })),
+);
+
+const fxIncomeAccountOptions = computed(() =>
+    (page.props.fx_income_accounts ?? []).map((account) => ({
+        label: account.label,
+        value: String(account.id),
+    })),
+);
+
+const defaultFxLossAccountId = (): number => {
+    const id = Number(page.props.default_fx_loss_account_id ?? 0);
+
+    return id > 0 ? id : 0;
+};
+
+const defaultFxGainAccountId = (): number => {
+    const id = Number(page.props.default_fx_gain_account_id ?? 0);
+
+    return id > 0 ? id : 0;
+};
 
 const defaultDepositAccountId = (): number => {
     const bank = depositAccounts.value.find((option) => option.gl_label.startsWith('1010'));
@@ -85,6 +115,8 @@ const form = ref({
     notes: '',
     bank_amount_business: '',
     book_fx_loss_to_expense: false,
+    fx_loss_account_id: 0,
+    fx_gain_account_id: 0,
 });
 
 const spotHint = ref<{ rate: number; date: string } | null>(null);
@@ -139,6 +171,8 @@ const errorKeys = [
     'invoice_id',
     'bank_amount_business_cents',
     'book_fx_loss_to_expense',
+    'fx_loss_account_id',
+    'fx_gain_account_id',
 ] as const;
 
 const localErrors = ref<{ key: string; message: string }[]>([]);
@@ -168,6 +202,8 @@ const resetForm = () => {
         notes: '',
         bank_amount_business: '',
         book_fx_loss_to_expense: false,
+        fx_loss_account_id: defaultFxLossAccountId(),
+        fx_gain_account_id: defaultFxGainAccountId(),
     };
     spotHint.value = null;
     spotError.value = null;
@@ -292,6 +328,16 @@ const submit = () => {
         }
         if (form.value.book_fx_loss_to_expense) {
             body.book_fx_loss_to_expense = true;
+            if (Number(form.value.fx_loss_account_id || 0) > 0) {
+                body.fx_loss_account_id = Number(form.value.fx_loss_account_id);
+            }
+        }
+        if (
+            fxDifferenceCents.value != null
+            && fxDifferenceCents.value > 0
+            && Number(form.value.fx_gain_account_id || 0) > 0
+        ) {
+            body.fx_gain_account_id = Number(form.value.fx_gain_account_id);
         }
     }
 
@@ -435,7 +481,7 @@ const submit = () => {
                         <template v-if="fxDifferenceCents > 0">
                             <p class="font-medium">Foreign exchange gain</p>
                             <p class="mt-0.5">
-                                {{ formatCo(fxDifferenceCents) }} will be posted to Foreign Exchange Gain (4950).
+                                {{ formatCo(fxDifferenceCents) }} will be posted to the income account selected below.
                             </p>
                         </template>
                         <template v-else>
@@ -445,6 +491,18 @@ const submit = () => {
                                 below.
                             </p>
                         </template>
+                    </div>
+                    <div
+                        v-if="fxDifferenceCents != null && fxDifferenceCents > 0"
+                        class="space-y-1"
+                    >
+                        <label class="mb-1 block text-xs font-medium text-slate-500">FX gain account</label>
+                        <AppSelect
+                            :model-value="String(form.fx_gain_account_id || '')"
+                            :options="fxIncomeAccountOptions"
+                            placeholder="Select income account"
+                            @update:model-value="form.fx_gain_account_id = Number($event || 0)"
+                        />
                     </div>
                     <label
                         v-if="fxDifferenceCents != null && fxDifferenceCents < 0"
@@ -456,10 +514,22 @@ const submit = () => {
                             class="mt-0.5 h-4 w-4 rounded border-slate-300"
                         >
                         <span>
-                            Record foreign exchange loss to expenses (account 5900). Required when the bank amount is
-                            below book value.
+                            Record foreign exchange loss to expenses. Required when the bank amount is below book
+                            value.
                         </span>
                     </label>
+                    <div
+                        v-if="fxDifferenceCents != null && fxDifferenceCents < 0 && form.book_fx_loss_to_expense"
+                        class="space-y-1"
+                    >
+                        <label class="mb-1 block text-xs font-medium text-slate-500">FX loss account</label>
+                        <AppSelect
+                            :model-value="String(form.fx_loss_account_id || '')"
+                            :options="fxExpenseAccountOptions"
+                            placeholder="Select expense account"
+                            @update:model-value="form.fx_loss_account_id = Number($event || 0)"
+                        />
+                    </div>
                 </template>
 
                 <div>

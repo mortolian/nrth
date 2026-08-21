@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\TransactionType;
+use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Support\BankingPaymentAccounts;
 use App\Domain\Instance\Services\InstanceTimezoneSettings;
@@ -112,6 +114,50 @@ class HandleInertiaRequests extends Middleware
                 // Read-only: do not create banking accounts from shared props
                 // (that raced under concurrent Inertia visits and surfaced unique violations).
                 return BankingPaymentAccounts::forInvoiceDeposit((int) $team->id);
+            },
+            'fx_expense_accounts' => function () use ($request) {
+                $team = $request->user()?->currentTeam;
+                if ($team === null || ! Schema::hasTable('accounts')) {
+                    return [];
+                }
+
+                return Account::queryWithoutTeamScope()
+                    ->where('team_id', (int) $team->id)
+                    ->where('type', AccountType::Expense->value)
+                    ->where('is_active', true)
+                    ->orderBy('code')
+                    ->get(['id', 'code', 'name'])
+                    ->map(fn (Account $account) => [
+                        'id' => $account->id,
+                        'label' => trim($account->code.' — '.$account->name),
+                    ])
+                    ->values()
+                    ->all();
+            },
+            'fx_income_accounts' => function () use ($request) {
+                $team = $request->user()?->currentTeam;
+                if ($team === null || ! Schema::hasTable('accounts')) {
+                    return [];
+                }
+
+                return Account::queryWithoutTeamScope()
+                    ->where('team_id', (int) $team->id)
+                    ->where('type', AccountType::Income->value)
+                    ->where('is_active', true)
+                    ->orderBy('code')
+                    ->get(['id', 'code', 'name'])
+                    ->map(fn (Account $account) => [
+                        'id' => $account->id,
+                        'label' => trim($account->code.' — '.$account->name),
+                    ])
+                    ->values()
+                    ->all();
+            },
+            'default_fx_loss_account_id' => function () use ($request) {
+                return $request->user()?->currentTeam?->fxLossAccount()?->id;
+            },
+            'default_fx_gain_account_id' => function () use ($request) {
+                return $request->user()?->currentTeam?->fxGainAccount()?->id;
             },
             'commandPalette' => fn () => $this->commandPaletteData($request),
             'session_idle_timeout_minutes' => fn () => (int) (

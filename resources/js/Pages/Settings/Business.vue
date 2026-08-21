@@ -49,6 +49,10 @@ const props = defineProps<{
     team: { id: number; name: string };
     settings: Settings;
     bank_accounts: BankAccountRow[];
+    expense_accounts?: Array<{ id: number; label: string }>;
+    income_accounts?: Array<{ id: number; label: string }>;
+    default_fx_loss_account_id?: number | null;
+    default_fx_gain_account_id?: number | null;
     logo_url: string | null;
     invoice_next_sequence: number;
     tax_rates: Array<{
@@ -76,6 +80,32 @@ const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
 );
+const expenseAccountOptions = computed(() => [
+    { label: 'Chart default (5900 Foreign Exchange Loss)', value: '' },
+    ...(props.expense_accounts ?? []).map((account) => ({
+        label: account.label,
+        value: String(account.id),
+    })),
+]);
+const incomeAccountOptions = computed(() => [
+    { label: 'Chart default (4950 Foreign Exchange Gain)', value: '' },
+    ...(props.income_accounts ?? []).map((account) => ({
+        label: account.label,
+        value: String(account.id),
+    })),
+]);
+
+const initialFxLossAccountId = (): string => {
+    const fromSettings = Number(props.settings.fx_loss_account_id ?? 0);
+
+    return fromSettings > 0 ? String(fromSettings) : '';
+};
+
+const initialFxGainAccountId = (): string => {
+    const fromSettings = Number(props.settings.fx_gain_account_id ?? 0);
+
+    return fromSettings > 0 ? String(fromSettings) : '';
+};
 const timezoneSelectOptions = computed(() => [
     { value: '', label: `Instance default (${props.instance_timezone || 'UTC'})` },
     ...(Array.isArray(props.timezone_options) ? props.timezone_options : []),
@@ -116,6 +146,8 @@ const form = useForm({
     business_website: String(props.settings.business_website ?? ''),
     invoice_default_payment_terms_days: Number(props.settings.invoice_default_payment_terms_days ?? 30),
     invoice_default_currency: String(props.settings.invoice_default_currency ?? 'ZAR'),
+    fx_loss_account_id: initialFxLossAccountId(),
+    fx_gain_account_id: initialFxGainAccountId(),
     invoice_prefix: String(props.settings.invoice_prefix ?? 'INV'),
     invoice_number_include_month: Boolean(props.settings.invoice_number_include_month ?? false),
     invoice_number_use_random_suffix: Boolean(props.settings.invoice_number_use_random_suffix ?? false),
@@ -378,6 +410,8 @@ const submit = () => {
         business_website: form.business_website,
         invoice_default_payment_terms_days: form.invoice_default_payment_terms_days,
         invoice_default_currency: form.invoice_default_currency,
+        fx_loss_account_id: form.fx_loss_account_id ? Number(form.fx_loss_account_id) : null,
+        fx_gain_account_id: form.fx_gain_account_id ? Number(form.fx_gain_account_id) : null,
         invoice_prefix: form.invoice_prefix,
         invoice_number_include_month: form.invoice_number_include_month,
         invoice_number_use_random_suffix: form.invoice_number_use_random_suffix,
@@ -784,6 +818,31 @@ const resetItemUnits = () => {
                                     :options="currencyOptions"
                                     @update:model-value="form.invoice_default_currency = $event"
                                 />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Foreign exchange loss account</label>
+                                <AppSelect
+                                    :model-value="form.fx_loss_account_id"
+                                    :options="expenseAccountOptions"
+                                    @update:model-value="form.fx_loss_account_id = $event"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Used when a foreign-currency payment clears below book value. You can still change
+                                    the account when recording a payment.
+                                </p>
+                                <p v-if="form.errors.fx_loss_account_id" class="mt-1 text-xs text-rose-600">{{ form.errors.fx_loss_account_id }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500">Foreign exchange gain account</label>
+                                <AppSelect
+                                    :model-value="form.fx_gain_account_id"
+                                    :options="incomeAccountOptions"
+                                    @update:model-value="form.fx_gain_account_id = $event"
+                                />
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Used when a foreign-currency payment clears above book value.
+                                </p>
+                                <p v-if="form.errors.fx_gain_account_id" class="mt-1 text-xs text-rose-600">{{ form.errors.fx_gain_account_id }}</p>
                             </div>
                         </div>
                     </section>

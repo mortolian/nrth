@@ -346,8 +346,52 @@ class InvoiceController extends Controller
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $markInvoiceSentAction->execute($invoice);
 
-        return to_route('invoicing.invoices.show', $invoice->fresh())
-            ->with('success', __('Invoice marked as sent.'));
+        return back()->with('success', __('Invoice marked as sent.'));
+    }
+
+    public function bulkMarkSent(Request $request, MarkInvoiceSentAction $markInvoiceSentAction): RedirectResponse
+    {
+        $this->authorizeTeam('invoices.manage', $request);
+
+        $teamId = (int) $request->user()->current_team_id;
+        $validated = $request->validate([
+            'invoice_ids' => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['required', 'integer'],
+        ]);
+        $ids = array_values(array_unique(array_map('intval', $validated['invoice_ids'])));
+
+        $drafts = Invoice::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereIn('id', $ids)
+            ->where('status', InvoiceStatus::Draft->value)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($drafts as $invoice) {
+            $markInvoiceSentAction->execute($invoice);
+        }
+
+        $marked = $drafts->count();
+        if ($marked === 0) {
+            return back()->with('warning', __('No draft invoices were selected to mark as sent.'));
+        }
+
+        $eligibleOnTeam = Invoice::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereIn('id', $ids)
+            ->count();
+        $skipped = max(0, $eligibleOnTeam - $marked);
+
+        $message = trans_choice(
+            '{1} Marked :count invoice as sent.|[2,*] Marked :count invoices as sent.',
+            $marked,
+            ['count' => $marked]
+        );
+        if ($skipped > 0) {
+            $message .= ' '.__(':count skipped (not draft).', ['count' => $skipped]);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function void(Request $request, Invoice $invoice, VoidInvoiceAction $voidInvoiceAction): RedirectResponse
@@ -356,7 +400,53 @@ class InvoiceController extends Controller
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $voidInvoiceAction->execute($invoice, 'Voided from invoice UI');
 
-        return to_route('invoicing.invoices.index');
+        return back()->with('success', __('Invoice voided.'));
+    }
+
+    public function bulkVoid(Request $request, VoidInvoiceAction $voidInvoiceAction): RedirectResponse
+    {
+        $this->authorizeTeam('invoices.delete', $request);
+
+        $teamId = (int) $request->user()->current_team_id;
+        $validated = $request->validate([
+            'invoice_ids' => ['required', 'array', 'min:1'],
+            'invoice_ids.*' => ['required', 'integer'],
+        ]);
+        $ids = array_values(array_unique(array_map('intval', $validated['invoice_ids'])));
+
+        // Match the list row action: only sent invoices (not drafts).
+        $voidable = Invoice::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereIn('id', $ids)
+            ->where('status', InvoiceStatus::Sent->value)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($voidable as $invoice) {
+            $voidInvoiceAction->execute($invoice, 'Voided from invoice list bulk action');
+        }
+
+        $voided = $voidable->count();
+        if ($voided === 0) {
+            return back()->with('warning', __('No sent invoices were selected to void.'));
+        }
+
+        $eligibleOnTeam = Invoice::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereIn('id', $ids)
+            ->count();
+        $skipped = max(0, $eligibleOnTeam - $voided);
+
+        $message = trans_choice(
+            '{1} Voided :count invoice.|[2,*] Voided :count invoices.',
+            $voided,
+            ['count' => $voided]
+        );
+        if ($skipped > 0) {
+            $message .= ' '.__(':count skipped (not sent).', ['count' => $skipped]);
+        }
+
+        return back()->with('success', $message);
     }
 
     public function unvoid(Request $request, Invoice $invoice, UnvoidInvoiceAction $unvoidInvoiceAction): RedirectResponse
@@ -365,7 +455,7 @@ class InvoiceController extends Controller
         abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
         $unvoidInvoiceAction->execute($invoice);
 
-        return to_route('invoicing.invoices.index');
+        return back()->with('success', __('Invoice restored.'));
     }
 
     public function index(Request $request): Response
@@ -770,6 +860,24 @@ class InvoiceController extends Controller
             'notes' => ['nullable', 'string'],
             'bank_amount_business_cents' => ['nullable', 'integer', 'min:0'],
             'book_fx_loss_to_expense' => ['sometimes', 'boolean'],
+            'fx_loss_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($query) use ($request): void {
+                    $query->where('team_id', (int) $request->user()->current_team_id)
+                        ->where('type', AccountType::Expense->value)
+                        ->where('is_active', true);
+                }),
+            ],
+            'fx_gain_account_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('accounts', 'id')->where(function ($query) use ($request): void {
+                    $query->where('team_id', (int) $request->user()->current_team_id)
+                        ->where('type', AccountType::Income->value)
+                        ->where('is_active', true);
+                }),
+            ],
         ]);
 
         $recordPaymentAction->execute(new RecordPaymentDTO(
@@ -787,6 +895,8 @@ class InvoiceController extends Controller
                 ? (int) $payload['bank_amount_business_cents']
                 : null,
             bookFxLossToExpense: (bool) ($payload['book_fx_loss_to_expense'] ?? false),
+            fxLossAccountId: isset($payload['fx_loss_account_id']) ? (int) $payload['fx_loss_account_id'] : null,
+            fxGainAccountId: isset($payload['fx_gain_account_id']) ? (int) $payload['fx_gain_account_id'] : null,
         ));
 
         return back();

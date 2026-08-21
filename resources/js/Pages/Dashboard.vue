@@ -240,11 +240,17 @@ const onInvoiceAction = (invoice, actionId) => {
             },
         });
     } else if (actionId === 'mark_sent') {
-        router.post(route('invoicing.invoices.mark-sent', invoice.id));
+        router.post(route('invoicing.invoices.mark-sent', invoice.id), {}, {
+            preserveScroll: true,
+        });
     } else if (actionId === 'void') {
-        router.post(route('invoicing.invoices.void', invoice.id));
+        router.post(route('invoicing.invoices.void', invoice.id), {}, {
+            preserveScroll: true,
+        });
     } else if (actionId === 'unvoid') {
-        router.post(route('invoicing.invoices.unvoid', invoice.id));
+        router.post(route('invoicing.invoices.unvoid', invoice.id), {}, {
+            preserveScroll: true,
+        });
     } else if (actionId === 'record_payment') {
         openRecordPayment(invoice);
     } else if (actionId === 'clone') {

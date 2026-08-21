@@ -272,13 +272,11 @@ class RecordPaymentAction
         }
 
         if ($fxDiff > 0) {
-            $gainAccount = Account::queryWithoutTeamScope()
-                ->where('team_id', $dto->teamId)
-                ->where('code', '4950')
-                ->first();
+            $team = $invoice->team ?? Team::query()->find($dto->teamId);
+            $gainAccount = $team?->fxGainAccount($dto->fxGainAccountId);
             if ($gainAccount === null) {
                 throw ValidationException::withMessages([
-                    'bank_amount_business_cents' => __('Missing chart account Foreign Exchange Gain (4950). Run chart setup or contact support.'),
+                    'fx_gain_account_id' => __('Select an income account for foreign exchange gain, or set one under Business settings (default chart code 4950).'),
                 ]);
             }
             JournalEntry::query()->create([
@@ -290,13 +288,11 @@ class RecordPaymentAction
                 'description' => 'Foreign exchange gain on '.$invoice->number,
             ]);
         } elseif ($fxDiff < 0) {
-            $lossAccount = Account::queryWithoutTeamScope()
-                ->where('team_id', $dto->teamId)
-                ->where('code', '5900')
-                ->first();
+            $team = $invoice->team ?? Team::query()->find($dto->teamId);
+            $lossAccount = $team?->fxLossAccount($dto->fxLossAccountId);
             if ($lossAccount === null) {
                 throw ValidationException::withMessages([
-                    'book_fx_loss_to_expense' => __('Missing chart account Foreign Exchange Loss (5900). Run chart setup or contact support.'),
+                    'fx_loss_account_id' => __('Select an expense account for foreign exchange loss, or set one under Business settings (default chart code 5900).'),
                 ]);
             }
             JournalEntry::query()->create([

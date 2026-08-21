@@ -295,6 +295,128 @@ class InvoicingActionsTest extends TestCase
         $this->assertSame('ZAR', $lossLine->getRawOriginal('currency'));
     }
 
+    public function test_record_payment_foreign_invoice_books_fx_loss_to_selected_expense_account(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->actingTeamContext($user, $team);
+
+        Account::factory()->for($team)->asset()->create(['code' => '1010', 'is_system' => true]);
+        Account::factory()->for($team)->asset()->create(['code' => '1100', 'is_system' => true]);
+        Account::factory()->for($team)->liability()->create(['code' => '2100', 'is_system' => true]);
+        Account::factory()->for($team)->income()->create(['code' => '4950', 'is_system' => true]);
+        Account::factory()->for($team)->expense()->create(['code' => '5900', 'is_system' => true]);
+        $customLoss = Account::factory()->for($team)->expense()->create([
+            'code' => '5999',
+            'name' => 'Custom FX Loss',
+            'is_system' => false,
+        ]);
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'currency' => 'USD',
+                'business_currency_code' => 'ZAR',
+                'subtotal_cents' => 100_00,
+                'vat_amount_cents' => 0,
+                'total_cents' => 100_00,
+                'total_business_currency_cents' => 1800_00,
+                'fx_rate_invoice_to_business' => '18',
+                'fx_rate_date' => '2026-04-25',
+                'amount_paid_cents' => 0,
+            ]);
+
+        $action = new RecordPaymentAction(
+            new PostTransactionAction(new LedgerService)
+        );
+
+        $payment = $action->execute(new RecordPaymentDTO(
+            invoiceId: $invoice->id,
+            teamId: $team->id,
+            amountCents: 100_00,
+            paymentDate: '2026-04-26',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
+            method: PaymentMethod::Eft,
+            currency: 'USD',
+            createdBy: $user->id,
+            bankAmountBusinessCents: 1700_00,
+            bookFxLossToExpense: true,
+            fxLossAccountId: $customLoss->id,
+        ));
+
+        $lossLine = JournalEntry::query()
+            ->where('transaction_id', $payment->transaction_id)
+            ->where('account_id', $customLoss->id)
+            ->first();
+        $this->assertNotNull($lossLine);
+        $this->assertSame(100_00, (int) $lossLine->getRawOriginal('amount_cents'));
+    }
+
+    public function test_record_payment_uses_business_setting_fx_loss_account_by_default(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->actingTeamContext($user, $team);
+
+        Account::factory()->for($team)->asset()->create(['code' => '1010', 'is_system' => true]);
+        Account::factory()->for($team)->asset()->create(['code' => '1100', 'is_system' => true]);
+        Account::factory()->for($team)->liability()->create(['code' => '2100', 'is_system' => true]);
+        Account::factory()->for($team)->income()->create(['code' => '4950', 'is_system' => true]);
+        Account::factory()->for($team)->expense()->create(['code' => '5900', 'is_system' => true]);
+        $configuredLoss = Account::factory()->for($team)->expense()->create([
+            'code' => '5800',
+            'name' => 'Configured FX Loss',
+            'is_system' => false,
+        ]);
+
+        $team->forceFill([
+            'business_settings' => array_replace_recursive(
+                $team->mergedBusinessSettings(),
+                ['fx_loss_account_id' => $configuredLoss->id],
+            ),
+        ])->save();
+
+        $invoice = Invoice::factory()
+            ->for($team)
+            ->create([
+                'status' => InvoiceStatus::Sent,
+                'currency' => 'USD',
+                'business_currency_code' => 'ZAR',
+                'subtotal_cents' => 100_00,
+                'vat_amount_cents' => 0,
+                'total_cents' => 100_00,
+                'total_business_currency_cents' => 1800_00,
+                'fx_rate_invoice_to_business' => '18',
+                'fx_rate_date' => '2026-04-25',
+                'amount_paid_cents' => 0,
+            ]);
+
+        $action = new RecordPaymentAction(
+            new PostTransactionAction(new LedgerService)
+        );
+
+        $payment = $action->execute(new RecordPaymentDTO(
+            invoiceId: $invoice->id,
+            teamId: $team->id,
+            amountCents: 100_00,
+            paymentDate: '2026-04-26',
+            bankingAccountId: (int) (new EnsureDefaultBankingAccount)->execute($team)->id,
+            method: PaymentMethod::Eft,
+            currency: 'USD',
+            createdBy: $user->id,
+            bankAmountBusinessCents: 1700_00,
+            bookFxLossToExpense: true,
+        ));
+
+        $lossLine = JournalEntry::query()
+            ->where('transaction_id', $payment->transaction_id)
+            ->where('account_id', $configuredLoss->id)
+            ->first();
+        $this->assertNotNull($lossLine);
+        $this->assertSame(100_00, (int) $lossLine->getRawOriginal('amount_cents'));
+    }
+
     public function test_void_invoice_action_voids_linked_posted_transactions(): void
     {
         $user = User::factory()->withPersonalTeam()->create();
