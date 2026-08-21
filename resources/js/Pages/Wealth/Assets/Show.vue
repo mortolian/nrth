@@ -5,12 +5,14 @@ import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
-import { ChevronDown } from 'lucide-vue-next';
+import { ChevronDown, StickyNote } from 'lucide-vue-next';
 import VChart from 'vue-echarts';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import DialogModal from '@/Components/DialogModal.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import type { RowActionItem } from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
 
@@ -188,6 +190,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const showValuationModal = ref(false);
 const showTransactionModal = ref(false);
+const showNoteModal = ref(false);
+const noteModalTitle = ref('Note');
+const noteModalBody = ref('');
 const savingValuation = ref(false);
 const savingTransaction = ref(false);
 const editingValuationId = ref<number | null>(null);
@@ -385,11 +390,53 @@ const deleteTransaction = (id: number) => {
     });
 };
 
+const openNoteModal = (title: string, notes: string) => {
+    noteModalTitle.value = title;
+    noteModalBody.value = notes;
+    showNoteModal.value = true;
+};
+
+const closeNoteModal = () => {
+    showNoteModal.value = false;
+    noteModalBody.value = '';
+};
+
+const manageRowActions: RowActionItem[] = [
+    { id: 'edit', label: 'Edit' },
+    { id: 'delete', label: 'Remove' },
+];
+
+const onValuationAction = (
+    row: (typeof props.detail.valuations)[number],
+    actionId: string,
+) => {
+    if (actionId === 'edit') {
+        openEditValuationModal(row);
+        return;
+    }
+    if (actionId === 'delete') {
+        deleteValuation(row.id);
+    }
+};
+
+const onTransactionAction = (
+    row: (typeof props.detail.transactions)[number],
+    actionId: string,
+) => {
+    if (actionId === 'edit') {
+        openEditTransactionModal(row);
+        return;
+    }
+    if (actionId === 'delete') {
+        deleteTransaction(row.id);
+    }
+};
+
 const valuationColumns: TableColumn[] = [
     { key: 'date', label: 'Date' },
     { key: 'value', label: 'Value', align: 'right' },
     { key: 'change', label: 'Change', align: 'right' },
-    { key: 'notes', label: 'Notes' },
+    { key: 'notes', label: '', align: 'right' },
     { key: 'actions', label: '', align: 'right' },
 ];
 
@@ -397,7 +444,7 @@ const txColumns: TableColumn[] = [
     { key: 'date', label: 'Date' },
     { key: 'type', label: 'Type' },
     { key: 'amount', label: 'Amount', align: 'right' },
-    { key: 'notes', label: 'Notes' },
+    { key: 'notes', label: '', align: 'right' },
     { key: 'actions', label: '', align: 'right' },
 ];
 
@@ -654,23 +701,24 @@ const toggleTransactionYear = (label: string) => {
                                             </span>
                                         </span>
                                     </td>
-                                    <td class="px-3 py-2 text-slate-500">{{ row.notes || '—' }}</td>
-                                    <td class="px-3 py-2 text-right">
-                                        <div v-if="can_manage" class="flex items-center justify-end gap-3">
-                                            <button
-                                                type="button"
-                                                class="text-xs text-brand-700 hover:underline"
-                                                @click.stop="openEditValuationModal(row)"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="text-xs text-red-600 hover:underline"
-                                                @click.stop="deleteValuation(row.id)"
-                                            >
-                                                Remove
-                                            </button>
+                                    <td class="w-8 px-1 py-2 text-right">
+                                        <button
+                                            v-if="row.notes"
+                                            type="button"
+                                            class="inline-flex rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                            aria-label="View note"
+                                            @click.stop="openNoteModal(`Valuation · ${row.valued_on}`, row.notes)"
+                                        >
+                                            <StickyNote class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                    </td>
+                                    <td class="w-10 px-1 py-2 text-right" @click.stop>
+                                        <div v-if="can_manage" class="flex justify-end">
+                                            <InvoiceRowActionsMenu
+                                                :actions="manageRowActions"
+                                                :aria-label="`Actions for valuation ${row.valued_on}`"
+                                                @select="(id) => onValuationAction(row, id)"
+                                            />
                                         </div>
                                     </td>
                                 </tr>
@@ -737,23 +785,24 @@ const toggleTransactionYear = (label: string) => {
                                     >
                                         {{ formatSigned(row.signed_amount_cents) }}
                                     </td>
-                                    <td class="px-3 py-2 text-slate-500">{{ row.notes || '—' }}</td>
-                                    <td class="px-3 py-2 text-right">
-                                        <div v-if="can_manage" class="flex items-center justify-end gap-3">
-                                            <button
-                                                type="button"
-                                                class="text-xs text-brand-700 hover:underline"
-                                                @click.stop="openEditTransactionModal(row)"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="text-xs text-red-600 hover:underline"
-                                                @click.stop="deleteTransaction(row.id)"
-                                            >
-                                                Remove
-                                            </button>
+                                    <td class="w-8 px-1 py-2 text-right">
+                                        <button
+                                            v-if="row.notes"
+                                            type="button"
+                                            class="inline-flex rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                            aria-label="View note"
+                                            @click.stop="openNoteModal(`${row.type_label} · ${row.occurred_on}`, row.notes)"
+                                        >
+                                            <StickyNote class="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                    </td>
+                                    <td class="w-10 px-1 py-2 text-right" @click.stop>
+                                        <div v-if="can_manage" class="flex justify-end">
+                                            <InvoiceRowActionsMenu
+                                                :actions="manageRowActions"
+                                                :aria-label="`Actions for ${row.type_label} on ${row.occurred_on}`"
+                                                @select="(id) => onTransactionAction(row, id)"
+                                            />
                                         </div>
                                     </td>
                                 </tr>
@@ -792,7 +841,12 @@ const toggleTransactionYear = (label: string) => {
                         </div>
                         <div class="sm:col-span-2">
                             <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                            <AppInput v-model="valuationForm.notes" placeholder="Optional" />
+                            <textarea
+                                v-model="valuationForm.notes"
+                                rows="3"
+                                class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                placeholder="Optional"
+                            />
                         </div>
                     </div>
                 </form>
@@ -848,7 +902,12 @@ const toggleTransactionYear = (label: string) => {
                         </div>
                         <div class="sm:col-span-2">
                             <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                            <AppInput v-model="transactionForm.notes" placeholder="Optional" />
+                            <textarea
+                                v-model="transactionForm.notes"
+                                rows="3"
+                                class="min-h-20 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                placeholder="Optional"
+                            />
                         </div>
                     </div>
                     <p class="text-xs text-slate-500">
@@ -870,6 +929,20 @@ const toggleTransactionYear = (label: string) => {
                         {{ editingTransactionId ? 'Update transaction' : 'Save transaction' }}
                     </AppButton>
                 </div>
+            </template>
+        </DialogModal>
+
+        <DialogModal :show="showNoteModal" max-width="md" @close="closeNoteModal">
+            <template #title>
+                {{ noteModalTitle }}
+            </template>
+            <template #content>
+                <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{{ noteModalBody }}</p>
+            </template>
+            <template #footer>
+                <AppButton variant="secondary" @click="closeNoteModal">
+                    Close
+                </AppButton>
             </template>
         </DialogModal>
     </AppLayout>
