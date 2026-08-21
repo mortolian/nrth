@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.7](https://github.com/mortolian/nrth/compare/v0.1.6...v0.1.7) (2026-08-21)
+
+
+### Features
+
+* **wealth:** compact valuation and transaction row actions ([0de27e3](https://github.com/mortolian/nrth/commit/0de27e30a997086c60282f9e941a771378cd7325))
+
 ## [0.1.6](https://github.com/mortolian/nrth/compare/v0.1.5...v0.1.6) (2026-08-21)
 
 
