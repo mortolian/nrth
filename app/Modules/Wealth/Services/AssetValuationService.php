@@ -38,4 +38,24 @@ final class AssetValuationService
             );
         });
     }
+
+    public function update(
+        WealthAssetValuation $valuation,
+        CarbonInterface $valuedOn,
+        int $valueCents,
+        ?string $notes = null,
+    ): WealthAssetValuation {
+        if ($valueCents < 0) {
+            throw new InvalidArgumentException('Valuation cannot be negative.');
+        }
+
+        $valuation->fill([
+            'valued_on' => $valuedOn->toDateString(),
+            'value_cents' => $valueCents,
+            'notes' => $notes,
+        ]);
+        $valuation->save();
+
+        return $valuation;
+    }
 }

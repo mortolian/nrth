@@ -7,6 +7,7 @@ use App\Modules\Wealth\Enums\WealthAssetType;
 use App\Modules\Wealth\Enums\WealthLiquidity;
 use App\Modules\Wealth\Models\WealthAsset;
 use App\Modules\Wealth\Models\WealthPortfolio;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 final class PortfolioPerformanceService
@@ -135,18 +136,81 @@ final class PortfolioPerformanceService
         $fyPeriodEnd = $asOf->lt($fyEnd) ? $asOf : $fyEnd;
 
         $fy = $this->movement->forAsset($asset, $fyStart, $fyPeriodEnd);
-        $valuations = $asset->valuations()->reorder()->orderByDesc('valued_on')->orderByDesc('id')->limit(60)->get();
-        $transactions = $asset->transactions()->reorder()->orderByDesc('occurred_on')->orderByDesc('id')->limit(60)->get();
+        $startMonth = (int) $portfolio->financial_year_start_month;
 
-        $chartPoints = $asset->valuations()
+        $allValuations = $asset->valuations()
             ->reorder()
             ->orderBy('valued_on')
+            ->orderBy('id')
+            ->get();
+
+        $chartPoints = [];
+        $valuationChangeById = [];
+        foreach ($allValuations as $index => $valuation) {
+            $valueCents = (int) $valuation->value_cents;
+            $previousCents = $index > 0 ? (int) $allValuations[$index - 1]->value_cents : null;
+            $changeCents = $previousCents === null ? null : $valueCents - $previousCents;
+            $changePercent = $this->changePercent($changeCents, $previousCents);
+
+            $valuationChangeById[$valuation->id] = [
+                'change_cents' => $changeCents,
+                'change_percent' => $changePercent,
+            ];
+
+            $chartPoints[] = [
+                'date' => $valuation->valued_on->toDateString(),
+                'label' => $valuation->valued_on->format('d M Y'),
+                'value_cents' => $valueCents,
+                'change_cents' => $changeCents,
+                'change_percent' => $changePercent,
+            ];
+        }
+
+        $valuationRows = $allValuations
+            ->sortByDesc(fn ($valuation) => $valuation->valued_on->timestamp.'-'.$valuation->id)
+            ->values()
+            ->map(function ($valuation) use ($startMonth, $valuationChangeById) {
+                [$rowStart, $rowEnd] = WealthFinancialYear::windowContaining($valuation->valued_on, $startMonth);
+                $change = $valuationChangeById[$valuation->id] ?? [
+                    'change_cents' => null,
+                    'change_percent' => null,
+                ];
+
+                return [
+                    'id' => $valuation->id,
+                    'valued_on' => $valuation->valued_on->toDateString(),
+                    'value_cents' => (int) $valuation->value_cents,
+                    'change_cents' => $change['change_cents'],
+                    'change_percent' => $change['change_percent'],
+                    'year_label' => WealthFinancialYear::labelForWindow($rowStart, $rowEnd),
+                    'currency' => $valuation->currency,
+                    'notes' => $valuation->notes,
+                    'source' => $valuation->source->value,
+                ];
+            })
+            ->all();
+
+        $transactionRows = $asset->transactions()
+            ->reorder()
+            ->orderByDesc('occurred_on')
+            ->orderByDesc('id')
             ->get()
-            ->map(fn ($v) => [
-                'date' => $v->valued_on->toDateString(),
-                'label' => $v->valued_on->format('d M Y'),
-                'value_cents' => (int) $v->value_cents,
-            ])
+            ->map(function ($transaction) use ($startMonth) {
+                [$rowStart, $rowEnd] = WealthFinancialYear::windowContaining($transaction->occurred_on, $startMonth);
+
+                return [
+                    'id' => $transaction->id,
+                    'type' => $transaction->type->value,
+                    'type_label' => $transaction->type->label(),
+                    'occurred_on' => $transaction->occurred_on->toDateString(),
+                    'amount_cents' => (int) $transaction->amount_cents,
+                    'signed_amount_cents' => $transaction->signedFlowCents(),
+                    'year_label' => WealthFinancialYear::labelForWindow($rowStart, $rowEnd),
+                    'currency' => $transaction->currency,
+                    'notes' => $transaction->notes,
+                    'source' => $transaction->source->value,
+                ];
+            })
             ->all();
 
         return [
@@ -172,25 +236,80 @@ final class PortfolioPerformanceService
                 'starts_on' => $fyStart->toDateString(),
                 'ends_on' => $fyEnd->toDateString(),
             ],
-            'valuations' => $valuations->map(fn ($v) => [
-                'id' => $v->id,
-                'valued_on' => $v->valued_on->toDateString(),
-                'value_cents' => (int) $v->value_cents,
-                'currency' => $v->currency,
-                'notes' => $v->notes,
-                'source' => $v->source->value,
-            ])->all(),
-            'transactions' => $transactions->map(fn ($t) => [
-                'id' => $t->id,
-                'type' => $t->type->value,
-                'type_label' => $t->type->label(),
-                'occurred_on' => $t->occurred_on->toDateString(),
-                'amount_cents' => (int) $t->amount_cents,
-                'currency' => $t->currency,
-                'notes' => $t->notes,
-                'source' => $t->source->value,
-            ])->all(),
+            'valuations' => $valuationRows,
+            'transactions' => $transactionRows,
             'chart' => $chartPoints,
+            'yearly_summaries' => $this->yearlySummaries($asset, $asOf),
         ];
+    }
+
+    /**
+     * One row per financial year from the earliest activity through $asOf.
+     *
+     * @return list<array{
+     *     label: string,
+     *     starts_on: string,
+     *     ends_on: string,
+     *     as_of: string,
+     *     is_current: bool,
+     *     opening_cents: int,
+     *     closing_cents: int,
+     *     contributions_cents: int,
+     *     withdrawals_cents: int,
+     *     investment_movement_cents: int
+     * }>
+     */
+    private function yearlySummaries(WealthAsset $asset, CarbonInterface $asOf): array
+    {
+        $startMonth = (int) $asset->portfolio->financial_year_start_month;
+
+        $earliestValuation = $asset->valuations()->reorder()->orderBy('valued_on')->value('valued_on');
+        $earliestTransaction = $asset->transactions()->reorder()->orderBy('occurred_on')->value('occurred_on');
+
+        $dates = array_values(array_filter([$earliestValuation, $earliestTransaction]));
+        if ($dates === []) {
+            return [];
+        }
+
+        $earliest = collect($dates)
+            ->map(fn ($date) => Carbon::parse($date)->startOfDay())
+            ->sort()
+            ->first();
+
+        [$firstStart] = WealthFinancialYear::windowContaining($earliest, $startMonth);
+        $rows = [];
+        $fyStart = $firstStart->copy();
+
+        while ($fyStart->lte($asOf)) {
+            [, $fyEnd] = WealthFinancialYear::windowContaining($fyStart, $startMonth);
+            $periodEnd = $fyEnd->gt($asOf) ? $asOf->copy() : $fyEnd->copy();
+            $movement = $this->movement->forAsset($asset, $fyStart, $periodEnd);
+
+            $rows[] = [
+                'label' => WealthFinancialYear::labelForWindow($fyStart, $fyEnd),
+                'starts_on' => $fyStart->toDateString(),
+                'ends_on' => $fyEnd->toDateString(),
+                'as_of' => $periodEnd->toDateString(),
+                'is_current' => $fyEnd->gt($asOf),
+                'opening_cents' => $movement['opening_cents'],
+                'closing_cents' => $movement['closing_cents'],
+                'contributions_cents' => $movement['contributions_cents'],
+                'withdrawals_cents' => $movement['withdrawals_cents'],
+                'investment_movement_cents' => $movement['investment_movement_cents'],
+            ];
+
+            $fyStart = $fyStart->copy()->addYear();
+        }
+
+        return array_reverse($rows);
+    }
+
+    private function changePercent(?int $changeCents, ?int $previousCents): ?float
+    {
+        if ($changeCents === null || $previousCents === null || $previousCents === 0) {
+            return null;
+        }
+
+        return round(($changeCents / $previousCents) * 100, 2);
     }
 }

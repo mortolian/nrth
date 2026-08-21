@@ -25,9 +25,11 @@ Route::put('/assets/{asset}', [WealthAssetController::class, 'update'])->name('a
 Route::delete('/assets/{asset}', [WealthAssetController::class, 'destroy'])->name('assets.destroy');
 
 Route::post('/assets/{asset}/valuations', [WealthValuationController::class, 'store'])->name('assets.valuations.store');
+Route::put('/assets/{asset}/valuations/{valuation}', [WealthValuationController::class, 'update'])->name('assets.valuations.update');
 Route::delete('/assets/{asset}/valuations/{valuation}', [WealthValuationController::class, 'destroy'])->name('assets.valuations.destroy');
 
 Route::post('/assets/{asset}/transactions', [WealthTransactionController::class, 'store'])->name('assets.transactions.store');
+Route::put('/assets/{asset}/transactions/{transaction}', [WealthTransactionController::class, 'update'])->name('assets.transactions.update');
 Route::delete('/assets/{asset}/transactions/{transaction}', [WealthTransactionController::class, 'destroy'])->name('assets.transactions.destroy');
 
 Route::get('/allowances', [WealthAllowanceController::class, 'index'])->name('allowances.index');
