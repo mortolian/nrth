@@ -5,6 +5,7 @@ namespace App\Modules\Wealth\Calculators;
 use App\Modules\Wealth\Enums\WealthTransactionType;
 use App\Modules\Wealth\Models\WealthAsset;
 use App\Modules\Wealth\Models\WealthAssetTransaction;
+use App\Modules\Wealth\Models\WealthAssetValuation;
 use Brick\Money\Money;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -28,6 +29,22 @@ final class InvestmentMovementCalculator
 
         $opening = $asset->valueCentsAsOf($openingDate);
         $closing = $asset->valueCentsAsOf($periodEnd);
+
+        // Mid-year starts have no valuation before the period. Use the first in-period
+        // valuation as the opening book value so that starting balance is not treated as growth.
+        if ($opening === 0) {
+            $firstInPeriod = WealthAssetValuation::query()
+                ->where('asset_id', $asset->id)
+                ->whereDate('valued_on', '>=', $periodStart->toDateString())
+                ->whereDate('valued_on', '<=', $periodEnd->toDateString())
+                ->orderBy('valued_on')
+                ->orderBy('id')
+                ->first();
+
+            if ($firstInPeriod !== null) {
+                $opening = (int) $firstInPeriod->value_cents;
+            }
+        }
 
         $flows = $this->periodFlows($asset, $periodStart, $periodEnd);
 

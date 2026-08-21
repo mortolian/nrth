@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
+import { ChevronDown } from 'lucide-vue-next';
 import VChart from 'vue-echarts';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
@@ -34,14 +35,53 @@ const props = defineProps<{
         current_value_cents: number;
         financial_year: {
             opening_cents: number;
+            closing_cents: number;
             contributions_cents: number;
             withdrawals_cents: number;
             investment_movement_cents: number;
             label: string;
+            starts_on: string;
+            ends_on: string;
         };
-        valuations: Array<{ id: number; valued_on: string; value_cents: number; notes: string | null; source: string }>;
-        transactions: Array<{ id: number; type: string; type_label: string; occurred_on: string; amount_cents: number; notes: string | null }>;
-        chart: Array<{ date: string; label: string; value_cents: number }>;
+        valuations: Array<{
+            id: number;
+            valued_on: string;
+            value_cents: number;
+            change_cents: number | null;
+            change_percent: number | null;
+            year_label: string;
+            notes: string | null;
+            source: string;
+        }>;
+        transactions: Array<{
+            id: number;
+            type: string;
+            type_label: string;
+            occurred_on: string;
+            amount_cents: number;
+            signed_amount_cents: number;
+            year_label: string;
+            notes: string | null;
+        }>;
+        chart: Array<{
+            date: string;
+            label: string;
+            value_cents: number;
+            change_cents: number | null;
+            change_percent: number | null;
+        }>;
+        yearly_summaries: Array<{
+            label: string;
+            starts_on: string;
+            ends_on: string;
+            as_of: string;
+            is_current: boolean;
+            opening_cents: number;
+            closing_cents: number;
+            contributions_cents: number;
+            withdrawals_cents: number;
+            investment_movement_cents: number;
+        }>;
     };
     transaction_types: Option[];
     can_manage: boolean;
@@ -58,6 +98,21 @@ const formatSigned = (cents: number) => {
     return formatted;
 };
 
+const changeClass = (cents: number | null | undefined) => {
+    const n = Number(cents) || 0;
+    if (n > 0) return 'text-emerald-700';
+    if (n < 0) return 'text-rose-700';
+    return 'text-slate-500';
+};
+
+const formatChangePercent = (percent: number | null | undefined) => {
+    if (percent == null || !Number.isFinite(percent)) return null;
+    const abs = Math.abs(percent).toFixed(1);
+    if (percent > 0) return `+${abs}%`;
+    if (percent < 0) return `−${abs}%`;
+    return '0.0%';
+};
+
 const interestPercent = computed(() =>
     props.detail.asset.interest_rate_bps != null
         ? `${(props.detail.asset.interest_rate_bps / 100).toFixed(2)}%`
@@ -65,7 +120,29 @@ const interestPercent = computed(() =>
 );
 
 const chartOptions = computed(() => ({
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+        trigger: 'axis',
+        formatter: (params: Array<{ dataIndex: number; marker: string; seriesName: string; value: number }>) => {
+            const point = params[0];
+            if (!point) return '';
+            const row = props.detail.chart[point.dataIndex];
+            if (!row) return '';
+
+            const lines = [
+                row.label,
+                `${point.marker} Value: ${formatCents(row.value_cents)}`,
+            ];
+
+            if (row.change_cents != null) {
+                const percent = formatChangePercent(row.change_percent);
+                lines.push(
+                    `Change: ${formatSigned(row.change_cents)}${percent ? ` (${percent})` : ''}`,
+                );
+            }
+
+            return lines.join('<br/>');
+        },
+    },
     grid: { left: 48, right: 16, top: 24, bottom: 32 },
     xAxis: {
         type: 'category',
@@ -83,12 +160,26 @@ const chartOptions = computed(() => ({
     },
     series: [
         {
+            name: 'Value',
             type: 'line',
             smooth: true,
-            data: props.detail.chart.map((p) => p.value_cents),
-            areaStyle: { opacity: 0.08 },
+            data: props.detail.chart.map((p) => ({
+                value: p.value_cents,
+                itemStyle: {
+                    color:
+                        p.change_cents == null
+                            ? '#0f766e'
+                            : p.change_cents > 0
+                              ? '#047857'
+                              : p.change_cents < 0
+                                ? '#be123c'
+                                : '#64748b',
+                },
+            })),
+            areaStyle: { opacity: 0.08, color: '#0f766e' },
             lineStyle: { width: 2, color: '#0f766e' },
-            itemStyle: { color: '#0f766e' },
+            symbol: 'circle',
+            symbolSize: 7,
         },
     ],
 }));
@@ -99,6 +190,8 @@ const showValuationModal = ref(false);
 const showTransactionModal = ref(false);
 const savingValuation = ref(false);
 const savingTransaction = ref(false);
+const editingValuationId = ref<number | null>(null);
+const editingTransactionId = ref<number | null>(null);
 
 const valuationForm = ref({
     valued_on: today(),
@@ -117,16 +210,36 @@ const transactionTypeOptions = computed(() =>
     props.transaction_types.map((o) => ({ label: o.label, value: o.value })),
 );
 
+const valuationModalTitle = computed(() =>
+    editingValuationId.value ? 'Edit valuation' : 'Add valuation',
+);
+
+const transactionModalTitle = computed(() =>
+    editingTransactionId.value ? 'Edit transaction' : 'Add transaction',
+);
+
 const resetValuationForm = () => {
+    editingValuationId.value = null;
     valuationForm.value = { valued_on: today(), value: '', notes: '' };
 };
 
 const resetTransactionForm = () => {
+    editingTransactionId.value = null;
     transactionForm.value = { type: 'contribution', occurred_on: today(), amount: '', notes: '' };
 };
 
 const openValuationModal = () => {
     resetValuationForm();
+    showValuationModal.value = true;
+};
+
+const openEditValuationModal = (row: (typeof props.detail.valuations)[number]) => {
+    editingValuationId.value = row.id;
+    valuationForm.value = {
+        valued_on: row.valued_on,
+        value: (row.value_cents / 100).toFixed(2),
+        notes: row.notes ?? '',
+    };
     showValuationModal.value = true;
 };
 
@@ -141,19 +254,22 @@ const openTransactionModal = () => {
     showTransactionModal.value = true;
 };
 
+const openEditTransactionModal = (row: (typeof props.detail.transactions)[number]) => {
+    editingTransactionId.value = row.id;
+    transactionForm.value = {
+        type: row.type,
+        occurred_on: row.occurred_on,
+        amount: (row.amount_cents / 100).toFixed(2),
+        notes: row.notes ?? '',
+    };
+    showTransactionModal.value = true;
+};
+
 const closeTransactionModal = () => {
     if (savingTransaction.value) return;
     showTransactionModal.value = false;
     resetTransactionForm();
 };
-
-watch(showValuationModal, (open) => {
-    if (open) resetValuationForm();
-});
-
-watch(showTransactionModal, (open) => {
-    if (open) resetTransactionForm();
-});
 
 const submitValuation = () => {
     if (savingValuation.value) return;
@@ -164,28 +280,41 @@ const submitValuation = () => {
         return;
     }
 
+    const payload = {
+        valued_on: valuationForm.value.valued_on,
+        value_cents: Math.round(value * 100),
+        notes: valuationForm.value.notes.trim() || null,
+    };
+
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(editingValuationId.value ? 'Valuation updated.' : 'Valuation saved.');
+            showValuationModal.value = false;
+            resetValuationForm();
+        },
+        onError: () => {
+            toast.error('Could not save valuation.');
+        },
+        onFinish: () => {
+            savingValuation.value = false;
+        },
+    };
+
     savingValuation.value = true;
+    if (editingValuationId.value) {
+        router.put(
+            route('wealth.assets.valuations.update', [props.detail.asset.id, editingValuationId.value]),
+            payload,
+            options,
+        );
+        return;
+    }
+
     router.post(
         route('wealth.assets.valuations.store', props.detail.asset.id),
-        {
-            valued_on: valuationForm.value.valued_on,
-            value_cents: Math.round(value * 100),
-            notes: valuationForm.value.notes.trim() || null,
-        },
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Valuation saved.');
-                showValuationModal.value = false;
-                resetValuationForm();
-            },
-            onError: () => {
-                toast.error('Could not save valuation.');
-            },
-            onFinish: () => {
-                savingValuation.value = false;
-            },
-        },
+        payload,
+        options,
     );
 };
 
@@ -203,29 +332,42 @@ const submitTransaction = () => {
         return;
     }
 
+    const payload = {
+        type: transactionForm.value.type,
+        occurred_on: transactionForm.value.occurred_on,
+        amount_cents: Math.round(amount * 100),
+        notes: transactionForm.value.notes.trim() || null,
+    };
+
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(editingTransactionId.value ? 'Transaction updated.' : 'Transaction recorded.');
+            showTransactionModal.value = false;
+            resetTransactionForm();
+        },
+        onError: () => {
+            toast.error('Could not save transaction.');
+        },
+        onFinish: () => {
+            savingTransaction.value = false;
+        },
+    };
+
     savingTransaction.value = true;
+    if (editingTransactionId.value) {
+        router.put(
+            route('wealth.assets.transactions.update', [props.detail.asset.id, editingTransactionId.value]),
+            payload,
+            options,
+        );
+        return;
+    }
+
     router.post(
         route('wealth.assets.transactions.store', props.detail.asset.id),
-        {
-            type: transactionForm.value.type,
-            occurred_on: transactionForm.value.occurred_on,
-            amount_cents: Math.round(amount * 100),
-            notes: transactionForm.value.notes.trim() || null,
-        },
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Transaction recorded.');
-                showTransactionModal.value = false;
-                resetTransactionForm();
-            },
-            onError: () => {
-                toast.error('Could not save transaction.');
-            },
-            onFinish: () => {
-                savingTransaction.value = false;
-            },
-        },
+        payload,
+        options,
     );
 };
 
@@ -246,6 +388,7 @@ const deleteTransaction = (id: number) => {
 const valuationColumns: TableColumn[] = [
     { key: 'date', label: 'Date' },
     { key: 'value', label: 'Value', align: 'right' },
+    { key: 'change', label: 'Change', align: 'right' },
     { key: 'notes', label: 'Notes' },
     { key: 'actions', label: '', align: 'right' },
 ];
@@ -257,6 +400,77 @@ const txColumns: TableColumn[] = [
     { key: 'notes', label: 'Notes' },
     { key: 'actions', label: '', align: 'right' },
 ];
+
+const yearColumns: TableColumn[] = [
+    { key: 'year', label: 'Financial year' },
+    { key: 'opening', label: 'Opening', align: 'right' },
+    { key: 'closing', label: 'Closing', align: 'right' },
+    { key: 'contributions', label: 'Contributions', align: 'right' },
+    { key: 'withdrawals', label: 'Withdrawals', align: 'right' },
+    { key: 'movement', label: 'Movement', align: 'right' },
+];
+
+type YearGroup<T> = {
+    label: string;
+    is_current: boolean;
+    rows: T[];
+};
+
+const groupByYear = <T extends { year_label: string }>(
+    rows: T[],
+    currentLabel: string,
+): YearGroup<T>[] => {
+    const groups = new Map<string, YearGroup<T>>();
+
+    for (const row of rows) {
+        const existing = groups.get(row.year_label);
+        if (existing) {
+            existing.rows.push(row);
+            continue;
+        }
+
+        groups.set(row.year_label, {
+            label: row.year_label,
+            is_current: row.year_label === currentLabel,
+            rows: [row],
+        });
+    }
+
+    return Array.from(groups.values());
+};
+
+const valuationYearGroups = computed(() =>
+    groupByYear(props.detail.valuations, props.detail.financial_year.label),
+);
+
+const transactionYearGroups = computed(() =>
+    groupByYear(props.detail.transactions, props.detail.financial_year.label),
+);
+
+const expandedValuationYears = ref<string[]>([props.detail.financial_year.label]);
+const expandedTransactionYears = ref<string[]>([props.detail.financial_year.label]);
+
+const isValuationYearExpanded = (label: string) =>
+    expandedValuationYears.value.includes(label);
+
+const isTransactionYearExpanded = (label: string) =>
+    expandedTransactionYears.value.includes(label);
+
+const toggleValuationYear = (label: string) => {
+    if (expandedValuationYears.value.includes(label)) {
+        expandedValuationYears.value = expandedValuationYears.value.filter((year) => year !== label);
+        return;
+    }
+    expandedValuationYears.value = [...expandedValuationYears.value, label];
+};
+
+const toggleTransactionYear = (label: string) => {
+    if (expandedTransactionYears.value.includes(label)) {
+        expandedTransactionYears.value = expandedTransactionYears.value.filter((year) => year !== label);
+        return;
+    }
+    expandedTransactionYears.value = [...expandedTransactionYears.value, label];
+};
 </script>
 
 <template>
@@ -289,27 +503,45 @@ const txColumns: TableColumn[] = [
                 <p class="mt-2 text-xl font-semibold tabular-nums">{{ formatCents(detail.current_value_cents) }}</p>
             </AppCard>
             <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">FY opening</p>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Opening · FY {{ detail.financial_year.label }}
+                </p>
                 <p class="mt-2 text-xl font-semibold tabular-nums">{{ formatCents(detail.financial_year.opening_cents) }}</p>
             </AppCard>
             <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">FY contributions</p>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Contributions · FY {{ detail.financial_year.label }}
+                </p>
                 <p class="mt-2 text-xl font-semibold tabular-nums">{{ formatCents(detail.financial_year.contributions_cents) }}</p>
             </AppCard>
             <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">FY withdrawals</p>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Withdrawals · FY {{ detail.financial_year.label }}
+                </p>
                 <p class="mt-2 text-xl font-semibold tabular-nums">{{ formatCents(detail.financial_year.withdrawals_cents) }}</p>
             </AppCard>
             <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">FY investment movement</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums">{{ formatSigned(detail.financial_year.investment_movement_cents) }}</p>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Movement · FY {{ detail.financial_year.label }}
+                </p>
+                <p
+                    class="mt-2 text-xl font-semibold tabular-nums"
+                    :class="changeClass(detail.financial_year.investment_movement_cents)"
+                >
+                    {{ formatSigned(detail.financial_year.investment_movement_cents) }}
+                </p>
             </AppCard>
         </div>
 
-        <div class="mt-4 flex flex-wrap gap-4 text-sm text-slate-600">
+        <div class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
             <span>Liquidity: <strong class="text-slate-900">{{ detail.asset.liquidity_label }}</strong></span>
             <span>Interest rate: <strong class="text-slate-900">{{ interestPercent }}</strong></span>
-            <span>FY {{ detail.financial_year.label }}</span>
+            <span>
+                FY {{ detail.financial_year.label }}:
+                <strong class="text-slate-900">
+                    {{ detail.financial_year.starts_on }} → {{ detail.financial_year.ends_on }}
+                </strong>
+            </span>
         </div>
         <p v-if="detail.asset.notes" class="mt-2 text-sm text-slate-600">{{ detail.asset.notes }}</p>
 
@@ -321,10 +553,49 @@ const txColumns: TableColumn[] = [
             <p v-else class="text-sm text-slate-500">Add valuations to plot history.</p>
         </AppCard>
 
+        <AppCard class="mt-6">
+            <h3 class="mb-1 text-base font-semibold text-slate-900">Yearly summary</h3>
+            <p class="mb-3 text-sm text-slate-500">
+                Grouped by portfolio financial year. Movement is closing − opening − contributions + withdrawals.
+            </p>
+            <AppTable
+                v-if="detail.yearly_summaries.length"
+                :columns="yearColumns"
+                :show-pagination="false"
+                dense
+                table-class="text-sm"
+                embedded
+            >
+                <tr v-for="row in detail.yearly_summaries" :key="row.starts_on">
+                    <td class="whitespace-nowrap px-3 py-2">
+                        <span class="font-medium text-slate-900">{{ row.label }}</span>
+                        <span v-if="row.is_current" class="ml-2 text-xs font-medium text-brand-700">Current</span>
+                        <div class="text-xs text-slate-500">
+                            {{ row.starts_on }} → {{ row.is_current ? row.as_of : row.ends_on }}
+                        </div>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.opening_cents) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.closing_cents) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.contributions_cents) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.withdrawals_cents) }}</td>
+                    <td
+                        class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium"
+                        :class="changeClass(row.investment_movement_cents)"
+                    >
+                        {{ formatSigned(row.investment_movement_cents) }}
+                    </td>
+                </tr>
+            </AppTable>
+            <p v-else class="text-sm text-slate-500">Add valuations or transactions to build yearly summaries.</p>
+        </AppCard>
+
         <div class="mt-6 grid gap-6 xl:grid-cols-2">
             <AppCard>
                 <div class="mb-3 flex items-center justify-between gap-3">
-                    <h3 class="text-base font-semibold text-slate-900">Valuations</h3>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Valuations</h3>
+                        <p class="text-xs text-slate-500">Grouped by financial year. Older years stay collapsed.</p>
+                    </div>
                     <AppButton
                         v-if="can_manage"
                         variant="secondary"
@@ -334,29 +605,88 @@ const txColumns: TableColumn[] = [
                         Add valuation
                     </AppButton>
                 </div>
-                <AppTable :columns="valuationColumns" :show-pagination="false" dense table-class="text-sm" embedded>
-                    <tr v-for="row in detail.valuations" :key="row.id">
-                        <td class="whitespace-nowrap px-3 py-2">{{ row.valued_on }}</td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.value_cents) }}</td>
-                        <td class="px-3 py-2 text-slate-500">{{ row.notes || '—' }}</td>
-                        <td class="px-3 py-2 text-right">
-                            <button
-                                v-if="can_manage"
-                                type="button"
-                                class="text-xs text-red-600 hover:underline"
-                                @click.stop="deleteValuation(row.id)"
-                            >
-                                Remove
-                            </button>
-                        </td>
-                    </tr>
-                </AppTable>
-                <p v-if="!detail.valuations.length" class="mt-2 text-sm text-slate-500">No valuations yet.</p>
+                <div v-if="valuationYearGroups.length" class="space-y-3">
+                    <div
+                        v-for="group in valuationYearGroups"
+                        :key="`val-${group.label}`"
+                        class="overflow-hidden rounded-lg border border-slate-200"
+                    >
+                        <button
+                            type="button"
+                            class="flex w-full items-center justify-between gap-3 bg-slate-50 px-3 py-2 text-left hover:bg-slate-100"
+                            @click="toggleValuationYear(group.label)"
+                        >
+                            <span class="flex min-w-0 items-center gap-2">
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 text-slate-500 transition-transform"
+                                    :class="{ '-rotate-90': !isValuationYearExpanded(group.label) }"
+                                />
+                                <span class="truncate text-sm font-medium text-slate-900">
+                                    FY {{ group.label }}
+                                </span>
+                                <span
+                                    v-if="group.is_current"
+                                    class="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700"
+                                >
+                                    Current
+                                </span>
+                            </span>
+                            <span class="shrink-0 text-xs text-slate-500">
+                                {{ group.rows.length }} {{ group.rows.length === 1 ? 'entry' : 'entries' }}
+                            </span>
+                        </button>
+                        <div v-show="isValuationYearExpanded(group.label)">
+                            <AppTable :columns="valuationColumns" :show-pagination="false" dense table-class="text-sm" embedded>
+                                <tr v-for="row in group.rows" :key="row.id">
+                                    <td class="whitespace-nowrap px-3 py-2">{{ row.valued_on }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.value_cents) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                        <template v-if="row.change_cents == null">
+                                            <span class="text-slate-400">—</span>
+                                        </template>
+                                        <span v-else :class="changeClass(row.change_cents)">
+                                            {{ formatSigned(row.change_cents) }}
+                                            <span
+                                                v-if="formatChangePercent(row.change_percent)"
+                                                class="ml-1 text-[11px] opacity-80"
+                                            >
+                                                {{ formatChangePercent(row.change_percent) }}
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-500">{{ row.notes || '—' }}</td>
+                                    <td class="px-3 py-2 text-right">
+                                        <div v-if="can_manage" class="flex items-center justify-end gap-3">
+                                            <button
+                                                type="button"
+                                                class="text-xs text-brand-700 hover:underline"
+                                                @click.stop="openEditValuationModal(row)"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="text-xs text-red-600 hover:underline"
+                                                @click.stop="deleteValuation(row.id)"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </AppTable>
+                        </div>
+                    </div>
+                </div>
+                <p v-else class="mt-2 text-sm text-slate-500">No valuations yet.</p>
             </AppCard>
 
             <AppCard>
                 <div class="mb-3 flex items-center justify-between gap-3">
-                    <h3 class="text-base font-semibold text-slate-900">Transactions</h3>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Transactions</h3>
+                        <p class="text-xs text-slate-500">Grouped by financial year. Older years stay collapsed.</p>
+                    </div>
                     <AppButton
                         v-if="can_manage"
                         variant="secondary"
@@ -366,31 +696,78 @@ const txColumns: TableColumn[] = [
                         Add transaction
                     </AppButton>
                 </div>
-                <AppTable :columns="txColumns" :show-pagination="false" dense table-class="text-sm" embedded>
-                    <tr v-for="row in detail.transactions" :key="row.id">
-                        <td class="whitespace-nowrap px-3 py-2">{{ row.occurred_on }}</td>
-                        <td class="whitespace-nowrap px-3 py-2">{{ row.type_label }}</td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.amount_cents) }}</td>
-                        <td class="px-3 py-2 text-slate-500">{{ row.notes || '—' }}</td>
-                        <td class="px-3 py-2 text-right">
-                            <button
-                                v-if="can_manage"
-                                type="button"
-                                class="text-xs text-red-600 hover:underline"
-                                @click.stop="deleteTransaction(row.id)"
-                            >
-                                Remove
-                            </button>
-                        </td>
-                    </tr>
-                </AppTable>
-                <p v-if="!detail.transactions.length" class="mt-2 text-sm text-slate-500">No transactions yet.</p>
+                <div v-if="transactionYearGroups.length" class="space-y-3">
+                    <div
+                        v-for="group in transactionYearGroups"
+                        :key="`tx-${group.label}`"
+                        class="overflow-hidden rounded-lg border border-slate-200"
+                    >
+                        <button
+                            type="button"
+                            class="flex w-full items-center justify-between gap-3 bg-slate-50 px-3 py-2 text-left hover:bg-slate-100"
+                            @click="toggleTransactionYear(group.label)"
+                        >
+                            <span class="flex min-w-0 items-center gap-2">
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 text-slate-500 transition-transform"
+                                    :class="{ '-rotate-90': !isTransactionYearExpanded(group.label) }"
+                                />
+                                <span class="truncate text-sm font-medium text-slate-900">
+                                    FY {{ group.label }}
+                                </span>
+                                <span
+                                    v-if="group.is_current"
+                                    class="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700"
+                                >
+                                    Current
+                                </span>
+                            </span>
+                            <span class="shrink-0 text-xs text-slate-500">
+                                {{ group.rows.length }} {{ group.rows.length === 1 ? 'entry' : 'entries' }}
+                            </span>
+                        </button>
+                        <div v-show="isTransactionYearExpanded(group.label)">
+                            <AppTable :columns="txColumns" :show-pagination="false" dense table-class="text-sm" embedded>
+                                <tr v-for="row in group.rows" :key="row.id">
+                                    <td class="whitespace-nowrap px-3 py-2">{{ row.occurred_on }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2">{{ row.type_label }}</td>
+                                    <td
+                                        class="whitespace-nowrap px-3 py-2 text-right tabular-nums"
+                                        :class="changeClass(row.signed_amount_cents)"
+                                    >
+                                        {{ formatSigned(row.signed_amount_cents) }}
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-500">{{ row.notes || '—' }}</td>
+                                    <td class="px-3 py-2 text-right">
+                                        <div v-if="can_manage" class="flex items-center justify-end gap-3">
+                                            <button
+                                                type="button"
+                                                class="text-xs text-brand-700 hover:underline"
+                                                @click.stop="openEditTransactionModal(row)"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="text-xs text-red-600 hover:underline"
+                                                @click.stop="deleteTransaction(row.id)"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </AppTable>
+                        </div>
+                    </div>
+                </div>
+                <p v-else class="mt-2 text-sm text-slate-500">No transactions yet.</p>
             </AppCard>
         </div>
 
         <DialogModal :show="showValuationModal" max-width="lg" @close="closeValuationModal">
             <template #title>
-                Add valuation
+                {{ valuationModalTitle }}
             </template>
             <template #content>
                 <form id="wealth-valuation-form" class="space-y-4 text-left text-slate-900" @submit.prevent="submitValuation">
@@ -431,7 +808,7 @@ const txColumns: TableColumn[] = [
                         :disabled="savingValuation"
                         @click="submitValuation"
                     >
-                        Save valuation
+                        {{ editingValuationId ? 'Update valuation' : 'Save valuation' }}
                     </AppButton>
                 </div>
             </template>
@@ -439,7 +816,7 @@ const txColumns: TableColumn[] = [
 
         <DialogModal :show="showTransactionModal" max-width="lg" @close="closeTransactionModal">
             <template #title>
-                Add transaction
+                {{ transactionModalTitle }}
             </template>
             <template #content>
                 <form id="wealth-transaction-form" class="space-y-4 text-left text-slate-900" @submit.prevent="submitTransaction">
@@ -490,7 +867,7 @@ const txColumns: TableColumn[] = [
                         :disabled="savingTransaction"
                         @click="submitTransaction"
                     >
-                        Save transaction
+                        {{ editingTransactionId ? 'Update transaction' : 'Save transaction' }}
                     </AppButton>
                 </div>
             </template>

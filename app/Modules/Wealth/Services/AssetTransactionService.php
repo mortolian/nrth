@@ -38,4 +38,30 @@ final class AssetTransactionService
             'source' => $source,
         ]);
     }
+
+    public function update(
+        WealthAssetTransaction $transaction,
+        WealthTransactionType $type,
+        CarbonInterface $occurredOn,
+        int $amountCents,
+        ?string $notes = null,
+    ): WealthAssetTransaction {
+        if ($type !== WealthTransactionType::Adjustment && $amountCents < 0) {
+            throw new InvalidArgumentException('Amount must be non-negative for this transaction type.');
+        }
+
+        if ($type !== WealthTransactionType::Adjustment) {
+            $amountCents = abs($amountCents);
+        }
+
+        $transaction->fill([
+            'type' => $type,
+            'occurred_on' => $occurredOn->toDateString(),
+            'amount_cents' => $amountCents,
+            'notes' => $notes,
+        ]);
+        $transaction->save();
+
+        return $transaction;
+    }
 }
