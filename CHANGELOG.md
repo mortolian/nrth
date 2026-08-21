@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.11](https://github.com/mortolian/nrth/compare/v0.1.10...v0.1.11) (2026-08-21)
+
+
+### Features
+
+* **wealth:** archive/delete flows, editable opening, and year-end value table ([c3c8ba2](https://github.com/mortolian/nrth/commit/c3c8ba2af9acbef9a9e3b1253678e265d4334ae6))
+
 ## [0.1.10](https://github.com/mortolian/nrth/compare/v0.1.9...v0.1.10) (2026-08-21)
 
 
