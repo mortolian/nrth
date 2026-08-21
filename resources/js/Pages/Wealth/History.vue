@@ -13,6 +13,7 @@ import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import HelpTip from '@/Components/HelpTip.vue';
 import {
     filterByChartRange,
+    wealthChartGrid,
     wealthValueAxis,
     WEALTH_CHART_RANGES,
     type WealthChartRange,
@@ -37,7 +38,7 @@ const monthlyChart = computed(() => {
 
     return {
         tooltip: { trigger: 'axis' },
-        grid: { left: 56, right: 16, top: 24, bottom: 40 },
+        grid: wealthChartGrid({ bottom: 40 }),
         xAxis: { type: 'category', data: points.map((p) => p.label), axisLabel: { rotate: 45, fontSize: 10 } },
         yAxis: wealthValueAxis(currency.value),
         series: [{ type: 'line', smooth: true, data: points.map((p) => p.value_cents), lineStyle: { color: '#0f766e' }, itemStyle: { color: '#0f766e' } }],
@@ -46,7 +47,7 @@ const monthlyChart = computed(() => {
 
 const annualChart = computed(() => ({
     tooltip: { trigger: 'axis' },
-    grid: { left: 56, right: 16, top: 24, bottom: 32 },
+    grid: wealthChartGrid(),
     xAxis: { type: 'category', data: props.annual.map((p) => p.label) },
     yAxis: wealthValueAxis(currency.value),
     series: [{ type: 'bar', data: props.annual.map((p) => p.value_cents), itemStyle: { color: '#0f766e' } }],

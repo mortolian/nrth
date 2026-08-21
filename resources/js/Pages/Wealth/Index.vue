@@ -17,6 +17,7 @@ import { useToast } from '@/Composables/useToast';
 import {
     filterByChartRange,
     toIndexedSeries,
+    wealthChartGrid,
     wealthIndexedAxis,
     wealthValueAxis,
     WEALTH_CHART_RANGES,
@@ -248,7 +249,7 @@ const chartOptions = computed(() => {
                 return lines.join('<br/>');
             },
         },
-        grid: { left: 56, right: 16, top: 24, bottom: 32 },
+        grid: wealthChartGrid(),
         xAxis: {
             type: 'category',
             data: points.map((p) => p.label),

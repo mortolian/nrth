@@ -1,5 +1,3 @@
-import { useFormatCurrency } from '@/Composables/useFormatCurrency';
-
 type AxisExtent = { min: number; max: number };
 
 export type WealthChartRange = '1M' | '1Y' | '2Y' | '5Y' | '10Y';
@@ -55,10 +53,64 @@ export function wealthValueAxis(currency: string) {
         axisLabel: {
             color: '#64748b',
             fontSize: 11,
-            formatter: (v: number) => useFormatCurrency(v / 100, currency),
+            hideOverlap: true,
+            formatter: (v: number) => formatAxisMoney(v / 100, currency),
         },
         splitLine: { lineStyle: { color: '#e2e8f0' } },
     };
+}
+
+/** Shared plot margins; containLabel keeps million-scale tick labels visible. */
+export function wealthChartGrid(overrides: Record<string, number | boolean> = {}) {
+    return {
+        left: 8,
+        right: 16,
+        top: 24,
+        bottom: 32,
+        containLabel: true,
+        ...overrides,
+    };
+}
+
+/** Compact axis ticks (R1.2m / R850k). Tooltips keep full currency formatting. */
+export function formatAxisMoney(amount: number, currency: string): string {
+    const abs = Math.abs(amount);
+    const sign = amount < 0 ? '-' : '';
+    const symbol = currencySymbol(currency);
+
+    if (abs >= 1_000_000) {
+        const decimals = abs >= 10_000_000 ? 1 : 2;
+        return `${sign}${symbol}${trimFixed(abs / 1_000_000, decimals)}m`;
+    }
+
+    if (abs >= 10_000) {
+        const decimals = abs >= 100_000 ? 0 : 1;
+        return `${sign}${symbol}${trimFixed(abs / 1_000, decimals)}k`;
+    }
+
+    return `${sign}${symbol}${Math.round(abs).toLocaleString('en-ZA')}`;
+}
+
+function currencySymbol(currency: string): string {
+    try {
+        const part = new Intl.NumberFormat('en-ZA', {
+            style: 'currency',
+            currency,
+            currencyDisplay: 'symbol',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        })
+            .formatToParts(0)
+            .find((entry) => entry.type === 'currency');
+
+        return part?.value ?? `${currency} `;
+    } catch {
+        return `${currency} `;
+    }
+}
+
+function trimFixed(value: number, decimals: number): string {
+    return value.toFixed(decimals).replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
 }
 
 /** Indexed series (first point = 100). */
