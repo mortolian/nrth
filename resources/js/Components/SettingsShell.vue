@@ -6,7 +6,7 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'profile' | 'business' | 'team' | 'note-templates' | 'instance' | 'features' | 'backups';
+    section: 'profile' | 'business' | 'team' | 'instance' | 'features' | 'backups';
     title?: string;
     subtitle?: string;
 }>();
@@ -28,7 +28,6 @@ const sections = computed((): AppTabItem[] => {
     if (canTeam('settings.business')) {
         tabs.push({ id: 'business', label: 'Business', href: route('settings.business') });
         tabs.push({ id: 'features', label: 'Features', href: route('settings.features') });
-        tabs.push({ id: 'note-templates', label: 'Note templates', href: route('settings.note-templates.index') });
     }
 
     if (canTeam('settings.team')) {
@@ -72,8 +71,6 @@ const headerSubtitle = computed(() => {
             return 'Tax data takeouts for your team, and whole-server backups for operators.';
         case 'team':
             return 'People who can access the currently selected business.';
-        case 'note-templates':
-            return 'Named markdown snippets for invoice and estimate notes.';
         case 'instance':
             return 'Install-wide settings for operators — separate from each business.';
         default:

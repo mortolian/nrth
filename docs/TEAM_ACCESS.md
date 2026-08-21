@@ -67,7 +67,7 @@ See [AGENTS.md](../AGENTS.md) for the agent checklist (permissions **and** docum
 - **Accountant** — view and manage operational data (including `items.*` manage, not delete), export reports; cannot delete records or change business/team settings
 - **Viewer** — read-only across domains that have `*.view` (including items)
 
-Money In catalog keys include `invoices.*`, `estimates.*`, `clients.*`, and `items.*` (products/services catalog). Invoice **note templates** live under Settings → Note templates (`settings.business`). Item unit labels are under Settings → Business.
+Money In catalog keys include `invoices.*`, `estimates.*`, `clients.*`, and `items.*` (products/services catalog). Invoice **note templates** live under **Settings → Business → Note templates** (`settings.business`). Item unit labels are under Settings → Business → Units.
 
 Banking catalog keys are `banking.view` and `banking.manage`. **View** covers imported transactions, accounts, and the reconciliation queue. **Manage** covers statement import, account setup, matching imported lines to posted payments/expenses/journal entries, split allocations, excluding personal/out-of-scope lines, and resetting a line to unreviewed. Not every imported line has to be matched — mixed personal/business accounts can leave personal activity excluded or unreviewed.
 

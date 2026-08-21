@@ -27,8 +27,8 @@ class ClientStoreRedirectTest extends TestCase
 
         $response = $this->post(route('invoicing.clients.store'), [
             'name' => 'Return Test Client',
-            'contact_name' => null,
-            'email' => null,
+            'contact_name' => 'Return Contact',
+            'email' => 'return@example.com',
             'phone' => null,
             'vat_number' => null,
             'registration_number' => null,
@@ -37,7 +37,7 @@ class ClientStoreRedirectTest extends TestCase
                 'city' => null,
                 'province' => null,
                 'postal_code' => null,
-                'country' => null,
+                'country' => 'South Africa',
             ],
             'currency' => 'ZAR',
             'payment_terms_days' => 30,
@@ -58,8 +58,8 @@ class ClientStoreRedirectTest extends TestCase
 
         $response = $this->post(route('invoicing.clients.store'), [
             'name' => 'Safe Redirect Client',
-            'contact_name' => null,
-            'email' => null,
+            'contact_name' => 'Safe Contact',
+            'email' => 'safe@example.com',
             'phone' => null,
             'vat_number' => null,
             'registration_number' => null,
@@ -68,7 +68,7 @@ class ClientStoreRedirectTest extends TestCase
                 'city' => null,
                 'province' => null,
                 'postal_code' => null,
-                'country' => null,
+                'country' => 'South Africa',
             ],
             'currency' => 'ZAR',
             'payment_terms_days' => 30,

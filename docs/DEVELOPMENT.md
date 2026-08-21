@@ -134,7 +134,7 @@ Canonical map of domains, actions, team scoping, and request flow: **[ARCHITECTU
 - Instance default timezone: **Settings → Instance → Timezone** (operators; stored in `instance_settings`, fallback `APP_TIMEZONE`). Per-business override: **Settings → Business** (`business_settings.timezone`). Sidebar clock uses the current business effective timezone.
 - Recurring invoices: schedule `php artisan schedule:work` (or cron `schedule:run`) so `invoices:generate-recurring` runs daily at 01:30.
 - Licence disc reminders: the same scheduler runs `vehicles:send-license-disk-reminders` daily at 01:15 for active vehicles whose disc expires within 30 days (opt out under Profile → Notifications).
-- **Note templates** (Settings → Note templates, or command palette “Note Templates”): create named markdown snippets such as “International Banking Details”. Attach them on a client to prefill new invoices/estimates, or insert them while editing a document. Footers/terms stay freeform per document (markdown editor, no shared templates). Example body:
+- **Note templates** (Settings → Business → Note templates, or command palette “Note Templates (Business)”): create named markdown snippets such as “International Banking Details”. Attach them on a client to prefill new invoices/estimates, or insert them while editing a document. Footers/terms stay freeform per document (markdown editor, no shared templates). Example body:
 
 ```markdown
 **Bank:** First National Bank  

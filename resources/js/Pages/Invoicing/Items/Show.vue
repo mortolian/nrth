@@ -58,6 +58,12 @@ const destroyItem = () => {
         <PageHeader :title="item.name" subtitle="Catalog item for invoices and estimates">
             <template #actions>
                 <AppButton
+                    variant="secondary"
+                    @click="router.visit(route('invoicing.items.index'))"
+                >
+                    Back to Items
+                </AppButton>
+                <AppButton
                     v-if="can.manage"
                     variant="primary"
                     @click="router.visit(route('invoicing.items.edit', item.id))"

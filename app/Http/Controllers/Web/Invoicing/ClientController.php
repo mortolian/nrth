@@ -233,8 +233,8 @@ class ClientController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'contact_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'contact_name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50', (new Phone)->country('ZA')->international()],
             'vat_number' => ['nullable', 'regex:/^4\d{9}$/'],
             'registration_number' => ['nullable', 'string', 'max:100'],
@@ -243,7 +243,7 @@ class ClientController extends Controller
             'address.city' => ['nullable', 'string', 'max:255'],
             'address.province' => ['nullable', 'string', 'max:255'],
             'address.postal_code' => ['nullable', 'string', 'max:30'],
-            'address.country' => ['nullable', 'string', 'max:100'],
+            'address.country' => ['required', 'string', 'max:100'],
             'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'payment_terms_days' => ['required', 'integer', 'min:0', 'max:365'],
             'notes' => ['nullable', 'string'],

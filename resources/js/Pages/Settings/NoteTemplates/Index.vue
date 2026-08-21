@@ -5,6 +5,8 @@ import EmptyState from '@/Components/EmptyState.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import SettingsShell from '@/Components/SettingsShell.vue';
+import AppTabs from '@/Components/AppTabs.vue';
+import { businessSettingsTabs } from '@/Composables/useBusinessSettingsTabs';
 import { FileText, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 
 type Template = {
@@ -17,6 +19,8 @@ type Template = {
 };
 
 const props = defineProps<{ templates: Template[] }>();
+
+const businessTabs = businessSettingsTabs({ linkAll: true });
 
 const blankForm = () => ({
     name: '',
@@ -103,10 +107,19 @@ const destroy = (id: number) => {
 
 <template>
     <SettingsShell
-        section="note-templates"
-        title="Note templates"
+        section="business"
+        title="Settings · Business"
         subtitle="Named markdown snippets (e.g. banking details) you can attach to clients and insert on invoices and estimates."
     >
+        <div class="border-b border-slate-200">
+            <AppTabs
+                model-value="note_templates"
+                :tabs="businessTabs"
+                aria-label="Business settings"
+            />
+        </div>
+
+        <div class="mt-6 space-y-6">
         <AppCard v-if="formOpen" class="space-y-3">
             <div>
                 <h3 class="text-sm font-semibold text-slate-900">
@@ -234,5 +247,6 @@ const destroy = (id: number) => {
             <Link :href="route('invoicing.clients.index')" class="font-medium text-brand-700 hover:underline">client</Link>
             and tick the ones that should prefill new invoices and estimates.
         </p>
+        </div>
     </SettingsShell>
 </template>

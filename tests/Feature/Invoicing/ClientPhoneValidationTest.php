@@ -17,18 +17,16 @@ class ClientPhoneValidationTest extends TestCase
         $this->actingAs($user);
     }
 
-    public function test_client_store_rejects_invalid_phone(): void
+    /**
+     * @return array<string, mixed>
+     */
+    private function validClientPayload(array $overrides = []): array
     {
-        $user = User::factory()->withPersonalTeam()->create();
-        $team = $user->currentTeam;
-        $this->assertNotNull($team);
-        $this->actingTeamContext($user, $team);
-
-        $response = $this->post(route('invoicing.clients.store'), [
+        return array_replace_recursive([
             'name' => 'Phone Test Client',
-            'contact_name' => null,
-            'email' => null,
-            'phone' => '+27 000',
+            'contact_name' => 'Alex Client',
+            'email' => 'alex@example.com',
+            'phone' => null,
             'vat_number' => null,
             'registration_number' => null,
             'address' => [
@@ -36,13 +34,25 @@ class ClientPhoneValidationTest extends TestCase
                 'city' => null,
                 'province' => null,
                 'postal_code' => null,
-                'country' => null,
+                'country' => 'South Africa',
             ],
             'currency' => 'ZAR',
             'payment_terms_days' => 30,
             'notes' => null,
             'is_active' => true,
-        ]);
+        ], $overrides);
+    }
+
+    public function test_client_store_rejects_invalid_phone(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $response = $this->post(route('invoicing.clients.store'), $this->validClientPayload([
+            'phone' => '+27 000',
+        ]));
 
         $response->assertSessionHasErrors('phone');
     }
@@ -54,25 +64,10 @@ class ClientPhoneValidationTest extends TestCase
         $this->assertNotNull($team);
         $this->actingTeamContext($user, $team);
 
-        $response = $this->post(route('invoicing.clients.store'), [
+        $response = $this->post(route('invoicing.clients.store'), $this->validClientPayload([
             'name' => 'E164 Client',
-            'contact_name' => null,
-            'email' => null,
             'phone' => '+27 82 123 4567',
-            'vat_number' => null,
-            'registration_number' => null,
-            'address' => [
-                'street' => null,
-                'city' => null,
-                'province' => null,
-                'postal_code' => null,
-                'country' => null,
-            ],
-            'currency' => 'ZAR',
-            'payment_terms_days' => 30,
-            'notes' => null,
-            'is_active' => true,
-        ]);
+        ]));
 
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('clients', [
@@ -89,25 +84,10 @@ class ClientPhoneValidationTest extends TestCase
         $this->assertNotNull($team);
         $this->actingTeamContext($user, $team);
 
-        $response = $this->post(route('invoicing.clients.store'), [
+        $response = $this->post(route('invoicing.clients.store'), $this->validClientPayload([
             'name' => 'National Phone Client',
-            'contact_name' => null,
-            'email' => null,
             'phone' => '082 123 4567',
-            'vat_number' => null,
-            'registration_number' => null,
-            'address' => [
-                'street' => null,
-                'city' => null,
-                'province' => null,
-                'postal_code' => null,
-                'country' => null,
-            ],
-            'currency' => 'ZAR',
-            'payment_terms_days' => 30,
-            'notes' => null,
-            'is_active' => true,
-        ]);
+        ]));
 
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('clients', [
@@ -115,5 +95,23 @@ class ClientPhoneValidationTest extends TestCase
             'name' => 'National Phone Client',
             'phone' => '+27821234567',
         ]);
+    }
+
+    public function test_client_store_requires_contact_email_and_country(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $response = $this->post(route('invoicing.clients.store'), $this->validClientPayload([
+            'contact_name' => null,
+            'email' => null,
+            'address' => [
+                'country' => null,
+            ],
+        ]));
+
+        $response->assertSessionHasErrors(['contact_name', 'email', 'address.country']);
     }
 }

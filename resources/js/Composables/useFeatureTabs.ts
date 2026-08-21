@@ -30,6 +30,9 @@ export function useMoneyInTabs() {
             canTeam('invoices.view')
                 ? { id: 'recurring', label: 'Recurring', href: route('invoicing.recurring.index') }
                 : null,
+            canTeam('settings.business')
+                ? { id: 'note-templates', label: 'Note templates', href: route('settings.note-templates.index') }
+                : null,
         ].filter(Boolean) as AppTabItem[],
     );
 }

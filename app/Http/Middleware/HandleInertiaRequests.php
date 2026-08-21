@@ -225,8 +225,8 @@ class HandleInertiaRequests extends Middleware
                 ? ['id' => 'wealth', 'label' => 'Wealth', 'href' => route('wealth.index')]
                 : null,
             $can('settings.business') ? ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')] : null,
+            $can('settings.business') ? ['id' => 'note-templates', 'label' => 'Note Templates (Business)', 'href' => route('settings.note-templates.index')] : null,
             $can('settings.business') ? ['id' => 'features-settings', 'label' => 'Features', 'href' => route('settings.features')] : null,
-            $can('settings.business') ? ['id' => 'note-templates', 'label' => 'Note Templates', 'href' => route('settings.note-templates.index')] : null,
             $can('settings.team') ? ['id' => 'team-settings', 'label' => 'Team Members', 'href' => route('settings.team')] : null,
             ['id' => 'profile', 'label' => 'Profile Settings', 'href' => route('settings.index')],
         ]));

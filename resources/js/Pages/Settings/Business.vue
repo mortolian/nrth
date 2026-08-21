@@ -7,6 +7,8 @@ import AppButton from '@/Components/AppButton.vue';
 import AppPhoneInput from '@/Components/AppPhoneInput.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useToast } from '@/Composables/useToast';
+import { BUSINESS_PAGE_TAB_IDS, businessSettingsTabs } from '@/Composables/useBusinessSettingsTabs';
+import type { BusinessSettingsTabId } from '@/Composables/useBusinessSettingsTabs';
 import { Building2, ImagePlus, Plus, Trash2 } from 'lucide-vue-next';
 
 const toast = useToast();
@@ -69,7 +71,7 @@ const props = defineProps<{
     ai_models_by_provider: Record<string, Array<{ value: string; label: string }>>;
 }>();
 
-type BusinessTab = 'profile' | 'contact' | 'invoice' | 'estimate' | 'tax' | 'banking' | 'items' | 'payment_pages' | 'ai';
+type BusinessTab = Exclude<BusinessSettingsTabId, 'note_templates'>;
 const page = usePage();
 const currencyOptions = computed(
     () => (page.props.currencyOptions as Array<{ value: string; label: string }>) ?? [],
@@ -79,7 +81,7 @@ const timezoneSelectOptions = computed(() => [
     ...(Array.isArray(props.timezone_options) ? props.timezone_options : []),
 ]);
 
-const allowedTabs: BusinessTab[] = ['profile', 'contact', 'invoice', 'estimate', 'tax', 'banking', 'items', 'payment_pages', 'ai'];
+const allowedTabs: BusinessTab[] = BUSINESS_PAGE_TAB_IDS;
 const initialTab = new URLSearchParams(window.location.search).get('tab');
 const tab = ref<BusinessTab>(allowedTabs.includes(initialTab as BusinessTab) ? (initialTab as BusinessTab) : 'profile');
 
@@ -308,19 +310,7 @@ const clearLogo = () => {
     logoPreview.value = null;
 };
 
-const tabs = [
-    { id: 'profile' as const, label: 'Business profile' },
-    { id: 'contact' as const, label: 'Contact' },
-    { id: 'invoice' as const, label: 'Invoices' },
-    { id: 'estimate' as const, label: 'Estimates' },
-    { id: 'tax' as const, label: 'VAT' },
-    { id: 'banking' as const, label: 'Banking' },
-    { id: 'items' as const, label: 'Units' },
-    { id: 'payment_pages' as const, label: 'Online payments' },
-    { id: 'ai' as const, label: 'AI' },
-];
-
-const businessTabs = computed(() => tabs.map((t) => ({ id: t.id, label: t.label })));
+const businessTabs = computed(() => businessSettingsTabs());
 
 const aiModelOptions = computed(
     () => props.ai_models_by_provider[form.ai.provider] ?? [],

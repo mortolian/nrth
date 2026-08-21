@@ -120,8 +120,8 @@ const insertNoteTemplate = (templateId: string) => {
 
 const schema = z.object({
     name: z.string().trim().min(1, 'Company name is required'),
-    contact_name: z.string().optional(),
-    email: z.string().email('Invalid email').or(z.literal('')),
+    contact_name: z.string().trim().min(1, 'Contact name is required'),
+    email: z.string().trim().min(1, 'Email is required').email('Invalid email'),
     phone: z
         .string()
         .optional()
@@ -135,7 +135,7 @@ const schema = z.object({
         city: z.string().optional(),
         province: z.string().optional(),
         postal_code: z.string().optional(),
-        country: z.string().optional(),
+        country: z.string().trim().min(1, 'Country is required'),
     }),
     currency: z
         .string()
@@ -206,18 +206,37 @@ const submit = () => {
 
                     <div class="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Company name</label>
-                            <AppInput :model-value="values.name" @update:model-value="setFieldValue('name', $event)" />
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Company name <span class="text-rose-600">*</span>
+                            </label>
+                            <AppInput
+                                :model-value="values.name"
+                                required
+                                @update:model-value="setFieldValue('name', $event)"
+                            />
                             <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Contact name</label>
-                            <AppInput :model-value="values.contact_name" @update:model-value="setFieldValue('contact_name', $event)" />
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Contact name <span class="text-rose-600">*</span>
+                            </label>
+                            <AppInput
+                                :model-value="values.contact_name"
+                                required
+                                @update:model-value="setFieldValue('contact_name', $event)"
+                            />
                             <p v-if="fieldErrors.contact_name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.contact_name }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Email</label>
-                            <AppInput :model-value="values.email" type="email" @update:model-value="setFieldValue('email', $event)" />
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Email <span class="text-rose-600">*</span>
+                            </label>
+                            <AppInput
+                                :model-value="values.email"
+                                type="email"
+                                required
+                                @update:model-value="setFieldValue('email', $event)"
+                            />
                             <p v-if="fieldErrors.email" class="mt-1 text-xs text-rose-600">{{ fieldErrors.email }}</p>
                         </div>
                         <div>
@@ -242,7 +261,9 @@ const submit = () => {
                             <p v-if="fieldErrors.registration_number" class="mt-1 text-xs text-rose-600">{{ fieldErrors.registration_number }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Currency <span class="text-rose-600">*</span>
+                            </label>
                             <AppSelect
                                 :model-value="values.currency"
                                 :options="currencyOptions"
@@ -251,12 +272,21 @@ const submit = () => {
                             <p v-if="fieldErrors.currency" class="mt-1 text-xs text-rose-600">{{ fieldErrors.currency }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Payment terms (days)</label>
-                            <AppInput :model-value="values.payment_terms_days" type="number" @update:model-value="setFieldValue('payment_terms_days', Number($event))" />
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Payment terms (days) <span class="text-rose-600">*</span>
+                            </label>
+                            <AppInput
+                                :model-value="values.payment_terms_days"
+                                type="number"
+                                required
+                                @update:model-value="setFieldValue('payment_terms_days', Number($event))"
+                            />
                             <p v-if="fieldErrors.payment_terms_days" class="mt-1 text-xs text-rose-600">{{ fieldErrors.payment_terms_days }}</p>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Status <span class="text-rose-600">*</span>
+                            </label>
                             <AppSelect
                                 :model-value="values.is_active ? 'active' : 'inactive'"
                                 :options="[{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }]"
@@ -276,6 +306,9 @@ const submit = () => {
                         <AppInput :model-value="values.address.province" placeholder="Province" @update:model-value="setFieldValue('address.province', $event)" />
                         <AppInput :model-value="values.address.postal_code" placeholder="Postal code" @update:model-value="setFieldValue('address.postal_code', $event)" />
                         <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">
+                                Country <span class="text-rose-600">*</span>
+                            </label>
                             <AppSelect
                                 :model-value="values.address.country"
                                 :options="countryOptions"
