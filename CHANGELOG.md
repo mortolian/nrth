@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.19](https://github.com/mortolian/nrth/compare/v0.1.18...v0.1.19) (2026-08-21)
+
+
+### Bug Fixes
+
+* **invoicing:** recalculate FX from payment-date exchange rate ([4eca9b6](https://github.com/mortolian/nrth/commit/4eca9b651e14df8b62d8a365490960c5cb7dc8eb))
+
 ## [0.1.18](https://github.com/mortolian/nrth/compare/v0.1.17...v0.1.18) (2026-08-21)
 
 
