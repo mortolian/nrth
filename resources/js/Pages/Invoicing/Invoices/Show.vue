@@ -91,7 +91,7 @@ const props = defineProps<{
     invoice: InvoicePayload;
     can: {
         edit: boolean;
-        duplicate: boolean;
+        clone: boolean;
         send: boolean;
         remind: boolean;
         mark_sent: boolean;
@@ -444,8 +444,8 @@ const overflowActions = computed(() => {
     if (props.invoice.status === 'void' && props.can.unvoid) {
         actions.push({ id: 'unvoid', label: 'Restore' });
     }
-    if (props.can.duplicate) {
-        actions.push({ id: 'duplicate', label: 'Duplicate' });
+    if (props.can.clone) {
+        actions.push({ id: 'clone', label: 'Clone' });
     }
     if (props.can.delete) {
         actions.push({ id: 'delete', label: 'Delete' });
@@ -467,7 +467,7 @@ const onOverflowAction = (actionId: string) => {
         voidInvoice();
     } else if (actionId === 'unvoid') {
         unvoidInvoice();
-    } else if (actionId === 'duplicate') {
+    } else if (actionId === 'clone') {
         router.visit(route('invoicing.invoices.create', { from: props.invoice.id }));
     } else if (actionId === 'delete') {
         deleteInvoice();

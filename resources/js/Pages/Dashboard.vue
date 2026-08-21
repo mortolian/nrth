@@ -34,6 +34,10 @@ const canManageBusinessSettings = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) && perms.includes('settings.business');
 });
+const canManageInvoices = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('invoices.manage');
+});
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 const formatBudgetCents = (cents) =>
@@ -194,6 +198,7 @@ const rowActionItems = (invoice) => {
     }
     if (invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
     if (invoice.status === 'void') actions.push({ id: 'unvoid', label: 'Restore' });
+    if (canManageInvoices.value) actions.push({ id: 'clone', label: 'Clone' });
     if (invoice.can_delete) actions.push({ id: 'delete', label: 'Delete' });
     return actions;
 };
@@ -242,6 +247,8 @@ const onInvoiceAction = (invoice, actionId) => {
         router.post(route('invoicing.invoices.unvoid', invoice.id));
     } else if (actionId === 'record_payment') {
         openRecordPayment(invoice);
+    } else if (actionId === 'clone') {
+        router.visit(route('invoicing.invoices.create', { from: invoice.id }));
     } else if (actionId === 'delete') {
         if (!window.confirm(`Permanently delete invoice ${invoice.number}? This cannot be undone.`)) {
             return;

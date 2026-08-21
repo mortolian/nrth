@@ -205,6 +205,7 @@ const rowActionItems = (invoice: InvoiceRow) => {
     if (invoice.status !== 'paid' && invoice.status !== 'void') actions.push({ id: 'record_payment', label: 'Record Payment' });
     if (invoice.status === 'sent') actions.push({ id: 'void', label: 'Void' });
     if (invoice.status === 'void') actions.push({ id: 'unvoid', label: 'Restore' });
+    if (canManageInvoices.value) actions.push({ id: 'clone', label: 'Clone' });
     if (invoice.can_delete) actions.push({ id: 'delete', label: 'Delete' });
     return actions;
 };
@@ -239,6 +240,8 @@ const onAction = (invoice: InvoiceRow, actionId: string) => {
     } else if (actionId === 'record_payment') {
         selectedInvoice.value = invoice;
         paymentDrawerOpen.value = true;
+    } else if (actionId === 'clone') {
+        router.visit(route('invoicing.invoices.create', { from: invoice.id }));
     } else if (actionId === 'delete') {
         if (!window.confirm(`Permanently delete invoice ${invoice.number}? This cannot be undone.`)) {
             return;

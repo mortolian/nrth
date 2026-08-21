@@ -551,10 +551,10 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function show(Invoice $invoice): Response
+    public function show(Request $request, Invoice $invoice): Response
     {
-        $this->authorizeTeam('invoices.view');
-        abort_unless($invoice->team_id === request()->user()->current_team_id, 403);
+        $this->authorizeTeam('invoices.view', $request);
+        abort_unless($invoice->team_id === $request->user()->current_team_id, 403);
 
         $invoice->loadMissing(['team', 'client', 'lineItems', 'payments.transaction']);
 
@@ -589,6 +589,8 @@ class InvoiceController extends Controller
         $businessCurrency = Iso4217Currencies::normalize(
             (string) ($invoice->team?->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
         );
+
+        $canManage = $request->user()->canOnTeam('invoices.manage', $request->user()->currentTeam);
 
         return Inertia::render('Invoicing/Invoices/Show', [
             'issuer' => $issuer,
@@ -662,8 +664,8 @@ class InvoiceController extends Controller
                 ])->values()->all(),
             ],
             'can' => [
-                'edit' => $invoice->status !== InvoiceStatus::Void,
-                'duplicate' => true,
+                'edit' => $invoice->status !== InvoiceStatus::Void && $canManage,
+                'clone' => $canManage,
                 'send' => in_array($invoice->status, [
                     InvoiceStatus::Draft,
                     InvoiceStatus::Sent,
