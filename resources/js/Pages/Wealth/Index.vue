@@ -6,13 +6,15 @@ import { GridComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import { use } from 'echarts/core';
 import VChart from 'vue-echarts';
-import { PiggyBank } from 'lucide-vue-next';
+import { PiggyBank, ChevronDown } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import DialogModal from '@/Components/DialogModal.vue';
 import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import HelpTip from '@/Components/HelpTip.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import type { RowActionItem } from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
 import {
@@ -42,6 +44,19 @@ type Portfolio = {
     archived_at: string | null;
 };
 
+type AssetRow = {
+    id: number;
+    name: string;
+    owner_name: string;
+    asset_type_label: string;
+    institution: string | null;
+    current_value_cents: number;
+    period_movement_cents: number;
+    financial_year_movement_cents: number;
+    is_archived: boolean;
+    archived_at: string | null;
+};
+
 type Overview = {
     total_cents: number;
     accessible_cents: number;
@@ -54,18 +69,7 @@ type Overview = {
         withdrawals_cents: number;
         label: string;
     };
-    assets: Array<{
-        id: number;
-        name: string;
-        owner_name: string;
-        asset_type_label: string;
-        institution: string | null;
-        current_value_cents: number;
-        period_movement_cents: number;
-        financial_year_movement_cents: number;
-        is_archived: boolean;
-        archived_at: string | null;
-    }>;
+    assets: AssetRow[];
 };
 
 type HistoricalGrowth = {
@@ -306,6 +310,139 @@ const forceDeletePortfolio = () => {
     });
 };
 
+const assetActionTarget = ref<AssetRow | null>(null);
+const showArchiveAssetConfirm = ref(false);
+const showForceDeleteAssetConfirm = ref(false);
+const savingAsset = ref(false);
+
+const assetRowActions = (row: AssetRow): RowActionItem[] => {
+    const actions: RowActionItem[] = [{ id: 'view', label: 'View' }];
+    if (!canManage.value) {
+        return actions;
+    }
+    actions.push({ id: 'edit', label: 'Edit' });
+    if (row.is_archived) {
+        actions.push({ id: 'restore', label: 'Restore' });
+    } else {
+        actions.push({ id: 'archive', label: 'Archive' });
+    }
+    actions.push({ id: 'delete', label: 'Delete permanently' });
+    return actions;
+};
+
+const onAssetRowAction = (row: AssetRow, actionId: string) => {
+    if (actionId === 'view') {
+        router.visit(route('wealth.assets.show', row.id));
+        return;
+    }
+    if (actionId === 'edit') {
+        router.visit(route('wealth.assets.edit', row.id));
+        return;
+    }
+    if (actionId === 'restore') {
+        if (savingAsset.value) return;
+        savingAsset.value = true;
+        router.post(route('wealth.assets.restore', row.id), {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Asset restored.'),
+            onError: () => toast.error('Could not restore asset.'),
+            onFinish: () => {
+                savingAsset.value = false;
+            },
+        });
+        return;
+    }
+    if (actionId === 'archive') {
+        assetActionTarget.value = row;
+        showArchiveAssetConfirm.value = true;
+        return;
+    }
+    if (actionId === 'delete') {
+        assetActionTarget.value = row;
+        showForceDeleteAssetConfirm.value = true;
+    }
+};
+
+const archiveAsset = () => {
+    const row = assetActionTarget.value;
+    if (!row || savingAsset.value) return;
+    savingAsset.value = true;
+    router.delete(route('wealth.assets.destroy', row.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showArchiveAssetConfirm.value = false;
+            assetActionTarget.value = null;
+        },
+        onError: () => toast.error('Could not archive asset.'),
+        onFinish: () => {
+            savingAsset.value = false;
+        },
+    });
+};
+
+const forceDeleteAsset = () => {
+    const row = assetActionTarget.value;
+    if (!row || savingAsset.value) return;
+    savingAsset.value = true;
+    router.delete(route('wealth.assets.force-destroy', row.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showForceDeleteAssetConfirm.value = false;
+            assetActionTarget.value = null;
+        },
+        onError: () => toast.error('Could not delete asset.'),
+        onFinish: () => {
+            savingAsset.value = false;
+        },
+    });
+};
+
+type OverviewSections = {
+    yearEndValue: boolean;
+    portfolioValue: boolean;
+    assets: boolean;
+};
+
+const SECTION_STORAGE_KEY = 'nrth.wealth.overview.sections';
+
+const readSectionState = (): OverviewSections => {
+    try {
+        const raw = localStorage.getItem(SECTION_STORAGE_KEY);
+        if (!raw) {
+            return { yearEndValue: true, portfolioValue: true, assets: true };
+        }
+        const parsed = JSON.parse(raw) as Partial<OverviewSections>;
+        return {
+            yearEndValue: parsed.yearEndValue !== false,
+            portfolioValue: parsed.portfolioValue !== false,
+            assets: parsed.assets !== false,
+        };
+    } catch {
+        return { yearEndValue: true, portfolioValue: true, assets: true };
+    }
+};
+
+const sectionsOpen = ref<OverviewSections>(readSectionState());
+
+watch(
+    sectionsOpen,
+    (value) => {
+        try {
+            localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(value));
+        } catch {
+            // Ignore quota / private-mode failures.
+        }
+    },
+    { deep: true },
+);
+
+const toggleSection = (key: keyof OverviewSections) => {
+    sectionsOpen.value = {
+        ...sectionsOpen.value,
+        [key]: !sectionsOpen.value[key],
+    };
+};
+
 const columns: TableColumn[] = [
     { key: 'asset', label: 'Asset' },
     { key: 'owner', label: 'Owner' },
@@ -314,6 +451,7 @@ const columns: TableColumn[] = [
     { key: 'value', label: 'Current value', align: 'right' },
     { key: 'period', label: 'Period movement', align: 'right' },
     { key: 'fy', label: 'FY movement', align: 'right' },
+    { key: 'actions', label: '' },
 ];
 
 const growthColumns: TableColumn[] = [
@@ -455,64 +593,90 @@ const chartOptions = computed(() => {
         </div>
 
         <AppCard class="mt-6">
-            <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
-                <div class="flex items-center gap-1.5">
-                    <h3 class="text-base font-semibold text-slate-900">{{ historical_growth.title }}</h3>
-                    <HelpTip
-                        :text="`Market value at each financial year-end (${historical_growth.end_month_label}), with movement vs the previous year-end. The current year shows year-to-date.`"
-                        label="About year-end portfolio value"
-                    />
-                </div>
-            </div>
-            <AppTable
-                v-if="historical_growth.rows.length"
-                :columns="growthColumns"
-                :show-pagination="false"
-                dense
-                table-class="text-sm"
-                embedded
+            <button
+                type="button"
+                class="flex w-full items-start justify-between gap-3 text-left"
+                :aria-expanded="sectionsOpen.yearEndValue"
+                @click="toggleSection('yearEndValue')"
             >
-                <tr
-                    v-for="row in historical_growth.rows"
-                    :key="row.date"
-                    :class="row.is_current ? 'bg-slate-50' : ''"
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <h3 class="text-base font-semibold text-slate-900">{{ historical_growth.title }}</h3>
+                        <HelpTip
+                            :text="`Market value at each financial year-end (${historical_growth.end_month_label}), with movement vs the previous year-end. The current year shows year-to-date.`"
+                            label="About year-end portfolio value"
+                        />
+                    </div>
+                </div>
+                <ChevronDown
+                    class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 transition-transform"
+                    :class="{ '-rotate-90': !sectionsOpen.yearEndValue }"
+                />
+            </button>
+            <div v-show="sectionsOpen.yearEndValue" class="mt-3">
+                <AppTable
+                    v-if="historical_growth.rows.length"
+                    :columns="growthColumns"
+                    :show-pagination="false"
+                    dense
+                    table-class="text-sm"
+                    embedded
                 >
-                    <td class="whitespace-nowrap px-3 py-2">
-                        <span class="font-medium text-slate-900">{{ row.fy_label }}</span>
-                        <span v-if="row.is_current" class="ml-2 text-xs font-medium text-brand-700">Current</span>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">
-                        {{ row.year_end_label }}
-                        <span v-if="row.is_current" class="text-slate-500"> · YTD</span>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.date }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
-                        {{ formatCents(row.value_cents) }}
-                    </td>
-                    <td
-                        class="whitespace-nowrap px-3 py-2 text-right tabular-nums"
-                        :class="row.movement_cents == null ? 'text-slate-400' : changeClass(row.movement_cents)"
+                    <tr
+                        v-for="row in historical_growth.rows"
+                        :key="row.date"
+                        :class="row.is_current ? 'bg-slate-50' : ''"
                     >
-                        <template v-if="row.movement_cents == null">—</template>
-                        <template v-else>{{ formatSigned(row.movement_cents) }}</template>
-                    </td>
-                </tr>
-            </AppTable>
-            <p v-else class="text-sm text-slate-500">
-                Add valuations across financial years to see year-end portfolio value at each {{ historical_growth.end_month_label }} year-end.
-            </p>
+                        <td class="whitespace-nowrap px-3 py-2">
+                            <span class="font-medium text-slate-900">{{ row.fy_label }}</span>
+                            <span v-if="row.is_current" class="ml-2 text-xs font-medium text-brand-700">Current</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">
+                            {{ row.year_end_label }}
+                            <span v-if="row.is_current" class="text-slate-500"> · YTD</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.date }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
+                            {{ formatCents(row.value_cents) }}
+                        </td>
+                        <td
+                            class="whitespace-nowrap px-3 py-2 text-right tabular-nums"
+                            :class="row.movement_cents == null ? 'text-slate-400' : changeClass(row.movement_cents)"
+                        >
+                            <template v-if="row.movement_cents == null">—</template>
+                            <template v-else>{{ formatSigned(row.movement_cents) }}</template>
+                        </td>
+                    </tr>
+                </AppTable>
+                <p v-else class="text-sm text-slate-500">
+                    Add valuations across financial years to see year-end portfolio value at each {{ historical_growth.end_month_label }} year-end.
+                </p>
+            </div>
         </AppCard>
 
         <AppCard class="mt-6">
-            <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <div class="flex items-center gap-1.5">
-                    <h3 class="text-base font-semibold text-slate-900">Portfolio value</h3>
-                    <HelpTip
-                        text="Axis scaled to the range so small moves are visible. Use Indexed to compare growth from the first point in the selected period (100)."
-                        label="About portfolio value chart"
-                    />
+            <button
+                type="button"
+                class="flex w-full items-start justify-between gap-3 text-left"
+                :aria-expanded="sectionsOpen.portfolioValue"
+                @click="toggleSection('portfolioValue')"
+            >
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <h3 class="text-base font-semibold text-slate-900">Portfolio value</h3>
+                        <HelpTip
+                            text="Axis scaled to the range so small moves are visible. Use Indexed to compare growth from the first point in the selected period (100)."
+                            label="About portfolio value chart"
+                        />
+                    </div>
                 </div>
-                <div v-if="monthly_history.length" class="flex flex-wrap items-center gap-2">
+                <ChevronDown
+                    class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 transition-transform"
+                    :class="{ '-rotate-90': !sectionsOpen.portfolioValue }"
+                />
+            </button>
+            <div v-show="sectionsOpen.portfolioValue" class="mt-3">
+                <div v-if="monthly_history.length" class="mb-3 flex flex-wrap items-center gap-2">
                     <div
                         class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
                         role="group"
@@ -552,64 +716,88 @@ const chartOptions = computed(() => {
                         </button>
                     </div>
                 </div>
+                <div v-if="monthly_history.length" class="h-56 w-full md:h-72">
+                    <VChart class="h-full w-full" :option="chartOptions" autoresize />
+                </div>
+                <EmptyState
+                    v-else
+                    title="No valuation history yet"
+                    description="Add assets and monthly valuations to see portfolio growth over time."
+                    :icon="PiggyBank"
+                />
             </div>
-            <div v-if="monthly_history.length" class="h-56 w-full md:h-72">
-                <VChart class="h-full w-full" :option="chartOptions" autoresize />
-            </div>
-            <EmptyState
-                v-else
-                title="No valuation history yet"
-                description="Add assets and monthly valuations to see portfolio growth over time."
-                :icon="PiggyBank"
-            />
         </AppCard>
 
         <AppCard class="mt-6">
-            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h3 class="text-base font-semibold text-slate-900">Assets</h3>
-                <p v-if="show_archived" class="text-xs text-slate-500">Archived assets are shown with a badge and excluded from totals above.</p>
-            </div>
-            <AppTable
-                v-if="overview.assets.length"
-                :columns="columns"
-                :show-pagination="false"
-                dense
-                table-class="text-sm"
-                embedded
+            <button
+                type="button"
+                class="flex w-full items-start justify-between gap-3 text-left"
+                :aria-expanded="sectionsOpen.assets"
+                @click="toggleSection('assets')"
             >
-                <tr
-                    v-for="row in overview.assets"
-                    :key="row.id"
-                    class="cursor-pointer hover:bg-slate-50"
-                    :class="row.is_archived ? 'bg-slate-50/80' : ''"
-                    @click="router.visit(route('wealth.assets.show', row.id))"
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-slate-900">Assets</h3>
+                </div>
+                <ChevronDown
+                    class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 transition-transform"
+                    :class="{ '-rotate-90': !sectionsOpen.assets }"
+                />
+            </button>
+            <div v-show="sectionsOpen.assets" class="mt-3">
+                <p v-if="show_archived" class="mb-3 text-xs text-slate-500">
+                    Archived assets are shown with a badge and excluded from totals above.
+                </p>
+                <AppTable
+                    v-if="overview.assets.length"
+                    :columns="columns"
+                    :show-pagination="false"
+                    dense
+                    table-class="text-sm"
+                    embedded
                 >
-                    <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
-                        <span class="inline-flex items-center gap-2">
-                            {{ row.name }}
-                            <AppBadge v-if="row.is_archived" variant="neutral">Archived</AppBadge>
-                        </span>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.owner_name }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.asset_type_label }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.institution || '—' }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">{{ formatCents(row.current_value_cents) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.period_movement_cents) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.financial_year_movement_cents) }}</td>
-                </tr>
-            </AppTable>
-            <EmptyState
-                v-else
-                title="No assets yet"
-                :description="canManage ? 'Add your first investment, savings, or retirement account to this portfolio.' : 'Assets will appear here once someone with access adds them.'"
-                :icon="PiggyBank"
-            >
-                <template v-if="canManage && !portfolio.is_archived" #action>
-                    <Link :href="route('wealth.assets.create', portfolioQuery)">
-                        <AppButton variant="primary" size="sm">Add asset</AppButton>
-                    </Link>
-                </template>
-            </EmptyState>
+                    <tr
+                        v-for="row in overview.assets"
+                        :key="row.id"
+                        class="cursor-pointer hover:bg-slate-50"
+                        :class="row.is_archived ? 'bg-slate-50/80' : ''"
+                        @click="router.visit(route('wealth.assets.show', row.id))"
+                    >
+                        <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
+                            <span class="inline-flex items-center gap-2">
+                                {{ row.name }}
+                                <AppBadge v-if="row.is_archived" variant="neutral">Archived</AppBadge>
+                            </span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.owner_name }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.asset_type_label }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.institution || '—' }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">{{ formatCents(row.current_value_cents) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.period_movement_cents) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.financial_year_movement_cents) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2" @click.stop>
+                            <div class="flex justify-end">
+                                <InvoiceRowActionsMenu
+                                    :actions="assetRowActions(row)"
+                                    :aria-label="`Actions for ${row.name}`"
+                                    @select="(id) => onAssetRowAction(row, id)"
+                                />
+                            </div>
+                        </td>
+                    </tr>
+                </AppTable>
+                <EmptyState
+                    v-else
+                    title="No assets yet"
+                    :description="canManage ? 'Add your first investment, savings, or retirement account to this portfolio.' : 'Assets will appear here once someone with access adds them.'"
+                    :icon="PiggyBank"
+                >
+                    <template v-if="canManage && !portfolio.is_archived" #action>
+                        <Link :href="route('wealth.assets.create', portfolioQuery)">
+                            <AppButton variant="primary" size="sm">Add asset</AppButton>
+                        </Link>
+                    </template>
+                </EmptyState>
+            </div>
         </AppCard>
 
         <DialogModal :show="showCreateModal" max-width="lg" @close="showCreateModal = false">
@@ -717,6 +905,62 @@ const chartOptions = computed(() => {
                 <div class="flex justify-end gap-2">
                     <AppButton variant="secondary" :disabled="savingPortfolio" @click="showForceDeletePortfolio = false">Cancel</AppButton>
                     <AppButton variant="danger" :loading="savingPortfolio" :disabled="savingPortfolio" @click="forceDeletePortfolio">
+                        Delete permanently
+                    </AppButton>
+                </div>
+            </template>
+        </ConfirmationModal>
+
+        <ConfirmationModal
+            :show="showArchiveAssetConfirm"
+            @close="showArchiveAssetConfirm = false; assetActionTarget = null"
+        >
+            <template #title>
+                Archive this asset?
+            </template>
+            <template #content>
+                <p class="text-sm text-slate-600">
+                    <strong>{{ assetActionTarget?.name }}</strong> will be hidden from portfolio totals and the assets table unless you turn on Show archived. You can restore it later.
+                </p>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton
+                        variant="secondary"
+                        :disabled="savingAsset"
+                        @click="showArchiveAssetConfirm = false; assetActionTarget = null"
+                    >
+                        Cancel
+                    </AppButton>
+                    <AppButton variant="danger" :loading="savingAsset" :disabled="savingAsset" @click="archiveAsset">
+                        Archive
+                    </AppButton>
+                </div>
+            </template>
+        </ConfirmationModal>
+
+        <ConfirmationModal
+            :show="showForceDeleteAssetConfirm"
+            @close="showForceDeleteAssetConfirm = false; assetActionTarget = null"
+        >
+            <template #title>
+                Delete asset permanently?
+            </template>
+            <template #content>
+                <p class="text-sm text-slate-600">
+                    This permanently deletes <strong>{{ assetActionTarget?.name }}</strong> and all of its valuations and transactions. This cannot be undone.
+                </p>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton
+                        variant="secondary"
+                        :disabled="savingAsset"
+                        @click="showForceDeleteAssetConfirm = false; assetActionTarget = null"
+                    >
+                        Cancel
+                    </AppButton>
+                    <AppButton variant="danger" :loading="savingAsset" :disabled="savingAsset" @click="forceDeleteAsset">
                         Delete permanently
                     </AppButton>
                 </div>
