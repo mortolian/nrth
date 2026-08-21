@@ -2,6 +2,18 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.16](https://github.com/mortolian/nrth/compare/v0.1.15...v0.1.16) (2026-08-21)
+
+
+### Features
+
+* **invoicing:** add clone action to all invoice menus ([cbc9cf5](https://github.com/mortolian/nrth/commit/cbc9cf50b01f2b9bf8383b1aa7f3a3e2531bb7da))
+
+
+### Bug Fixes
+
+* include required client fields in note template test ([4d56b98](https://github.com/mortolian/nrth/commit/4d56b98ade3372409cc41e19a121edb87aa6c573))
+
 ## [0.1.15](https://github.com/mortolian/nrth/compare/v0.1.14...v0.1.15) (2026-08-21)
 
 
