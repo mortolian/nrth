@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.10](https://github.com/mortolian/nrth/compare/v0.1.9...v0.1.10) (2026-08-21)
+
+
+### Bug Fixes
+
+* **wealth:** compact chart axis labels for large balances ([b16f769](https://github.com/mortolian/nrth/commit/b16f769a6786c119a9655c28f8d547509a6c73de))
+
 ## [0.1.9](https://github.com/mortolian/nrth/compare/v0.1.8...v0.1.9) (2026-08-21)
 
 
