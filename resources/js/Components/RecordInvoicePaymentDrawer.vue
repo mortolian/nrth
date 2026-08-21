@@ -121,6 +121,10 @@ const form = ref({
 
 const spotHint = ref<{ rate: number; date: string } | null>(null);
 const spotError = ref<string | null>(null);
+/** When false, bank received tracks the payment-date spot rate. */
+const bankAmountDirty = ref(false);
+
+const centsToMajorInput = (cents: number): string => (cents / 100).toFixed(2);
 
 const parseMajorToCents = (raw: string): number => {
     const n = Number(String(raw).replace(',', '.'));
@@ -207,6 +211,7 @@ const resetForm = () => {
     };
     spotHint.value = null;
     spotError.value = null;
+    bankAmountDirty.value = false;
     localErrors.value = [];
 };
 
@@ -267,6 +272,7 @@ watch(
             }
             spotHint.value = { rate: Number(data.rate), date: String(data.date) };
             spotError.value = null;
+            applyIndicativeBankAmount();
         } catch {
             spotError.value = 'Could not load indicative rate.';
             spotHint.value = null;
@@ -285,6 +291,24 @@ const indicativeBankCents = computed(() => {
     }
     return Math.round(paymentInvoiceCents.value * spotHint.value.rate);
 });
+
+const applyIndicativeBankAmount = () => {
+    if (bankAmountDirty.value) {
+        return;
+    }
+    const cents = indicativeBankCents.value;
+    if (cents == null) {
+        return;
+    }
+    form.value.bank_amount_business = centsToMajorInput(cents);
+};
+
+watch(
+    () => [indicativeBankCents.value, bankAmountDirty.value] as const,
+    () => {
+        applyIndicativeBankAmount();
+    },
+);
 
 const close = () => emit('update:open', false);
 
@@ -455,18 +479,19 @@ const submit = () => {
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">
-                            Bank received ({{ bookCurrency }}) — optional
+                            Bank received ({{ bookCurrency }})
                         </label>
                         <AppInput
-                            v-model="form.bank_amount_business"
+                            :model-value="form.bank_amount_business"
                             type="text"
                             inputmode="decimal"
                             autocomplete="off"
-                            placeholder="Leave blank to match book value"
+                            placeholder="From payment-date rate"
+                            @update:model-value="(v) => { bankAmountDirty = true; form.bank_amount_business = v; }"
                         />
                         <p class="mt-1 text-xs text-slate-500">
-                            If the amount that cleared your bank differs from the book value, enter it here to record
-                            foreign exchange gain or loss.
+                            Defaults to the exchange rate for the payment date. Override if the amount that cleared
+                            your bank differs.
                         </p>
                     </div>
                     <div
@@ -534,7 +559,11 @@ const submit = () => {
 
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Payment date</label>
-                    <AppInput v-model="form.payment_date" type="date" />
+                    <AppInput
+                        :model-value="form.payment_date"
+                        type="date"
+                        @update:model-value="(v) => { bankAmountDirty = false; form.payment_date = v; }"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Method</label>
