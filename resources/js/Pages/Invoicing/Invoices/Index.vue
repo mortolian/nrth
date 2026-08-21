@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
@@ -260,6 +260,29 @@ const onAction = (invoice: InvoiceRow, actionId: string) => {
     }
 };
 
+const pageIds = computed(() => props.invoices.data.map((invoice) => invoice.id));
+
+const allPageSelected = computed(
+    () => pageIds.value.length > 0 && pageIds.value.every((id) => selected.value.includes(id)),
+);
+
+const somePageSelected = computed(
+    () => pageIds.value.some((id) => selected.value.includes(id)) && !allPageSelected.value,
+);
+
+const selectAllCheckbox = ref<HTMLInputElement | null>(null);
+const selectAllMobileCheckbox = ref<HTMLInputElement | null>(null);
+
+watch([allPageSelected, somePageSelected], async () => {
+    await nextTick();
+    if (selectAllCheckbox.value) {
+        selectAllCheckbox.value.indeterminate = somePageSelected.value;
+    }
+    if (selectAllMobileCheckbox.value) {
+        selectAllMobileCheckbox.value.indeterminate = somePageSelected.value;
+    }
+}, { immediate: true });
+
 const toggleSelected = (id: number, checked: boolean) => {
     if (checked) {
         if (!selected.value.includes(id)) selected.value.push(id);
@@ -268,9 +291,20 @@ const toggleSelected = (id: number, checked: boolean) => {
     selected.value = selected.value.filter((item) => item !== id);
 };
 
+const toggleSelectAllPage = (checked: boolean) => {
+    if (checked) {
+        selected.value = [...new Set([...selected.value, ...pageIds.value])];
+        return;
+    }
+    const onPage = new Set(pageIds.value);
+    selected.value = selected.value.filter((id) => !onPage.has(id));
+};
+
 const clearSelection = () => {
     selected.value = [];
 };
+
+const hasSelection = computed(() => selected.value.length > 0);
 
 const bulkMarkSent = () => {
     if (selected.value.length === 0 || bulkWorking.value || !canManageInvoices.value) {
@@ -489,29 +523,22 @@ const exportSelectedPdfZip = async () => {
 
             <AppCard>
                 <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 class="text-lg font-semibold text-slate-900">Invoice list</h3>
-                </div>
-
-                <div
-                    v-if="selected.length > 0"
-                    class="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <p class="text-sm text-slate-700">
-                        {{ selected.length }} selected
-                        <button
-                            type="button"
-                            class="ml-2 font-medium text-brand-700 underline decoration-brand-600/40 underline-offset-2 hover:text-brand-600"
-                            @click="clearSelection"
+                    <div class="flex min-w-0 items-baseline gap-2">
+                        <h3 class="text-lg font-semibold text-slate-900">Invoice list</h3>
+                        <p
+                            class="text-sm text-slate-500 tabular-nums"
+                            :class="hasSelection ? 'visible' : 'invisible'"
+                            aria-live="polite"
                         >
-                            Clear
-                        </button>
-                    </p>
+                            {{ selected.length }} selected
+                        </p>
+                    </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <AppButton
                             v-if="canManageInvoices"
                             variant="secondary"
                             size="sm"
-                            :disabled="bulkWorking"
+                            :disabled="!hasSelection || bulkWorking"
                             @click="bulkMarkSent"
                         >
                             Mark as sent
@@ -520,7 +547,7 @@ const exportSelectedPdfZip = async () => {
                             v-if="canDeleteInvoices"
                             variant="secondary"
                             size="sm"
-                            :disabled="bulkWorking"
+                            :disabled="!hasSelection || bulkWorking"
                             @click="bulkVoid"
                         >
                             Void
@@ -528,7 +555,7 @@ const exportSelectedPdfZip = async () => {
                         <AppButton
                             variant="secondary"
                             size="sm"
-                            :disabled="exportingZip || bulkWorking"
+                            :disabled="!hasSelection || exportingZip || bulkWorking"
                             @click="exportSelectedPdfZip"
                         >
                             {{ exportingZip ? 'Preparing…' : 'Export PDF zip' }}
@@ -537,19 +564,47 @@ const exportSelectedPdfZip = async () => {
                 </div>
 
                 <div class="mb-4 space-y-3 md:hidden">
-                    <button
+                    <div
+                        v-if="invoices.data.length"
+                        class="flex items-center gap-2 px-1"
+                        @click.stop
+                    >
+                        <input
+                            ref="selectAllMobileCheckbox"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-slate-300"
+                            :checked="allPageSelected"
+                            :aria-label="allPageSelected ? 'Deselect all on this page' : 'Select all on this page'"
+                            @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
+                        >
+                        <span class="text-xs text-slate-500">Select page</span>
+                    </div>
+                    <div
                         v-for="invoice in invoices.data"
                         :key="`mobile-${invoice.id}`"
-                        type="button"
-                        class="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm active:bg-slate-50"
+                        role="button"
+                        tabindex="0"
+                        class="w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm active:bg-slate-50"
                         @click="onAction(invoice, 'view')"
+                        @keydown.enter.prevent="onAction(invoice, 'view')"
                     >
                         <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0 flex-1">
-                                <p class="font-semibold text-slate-900">{{ invoice.number }}</p>
-                                <p class="text-sm text-slate-600">{{ invoice.client_name }}</p>
+                            <div class="flex min-w-0 flex-1 items-start gap-2">
+                                <div class="pt-0.5" @click.stop>
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-slate-300"
+                                        :checked="selected.includes(invoice.id)"
+                                        :aria-label="`Select invoice ${invoice.number}`"
+                                        @change="toggleSelected(invoice.id, ($event.target as HTMLInputElement).checked)"
+                                    >
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-semibold text-slate-900">{{ invoice.number }}</p>
+                                    <p class="text-sm text-slate-600">{{ invoice.client_name }}</p>
+                                </div>
                             </div>
-                            <div class="flex shrink-0 items-center gap-1.5">
+                            <div class="flex shrink-0 items-center gap-1.5" @click.stop>
                                 <AppBadge
                                     class="capitalize"
                                     :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: invoice.is_overdue })"
@@ -571,7 +626,7 @@ const exportSelectedPdfZip = async () => {
                             <span class="text-slate-500">Due</span>
                             <span :class="invoice.amount_due > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'">{{ formatRowCents(invoice.amount_due, invoice.currency) }}</span>
                         </div>
-                    </button>
+                    </div>
                     <div v-if="!invoices.data.length" class="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
                         No invoices match. Try filters or create a new invoice.
                     </div>
@@ -595,6 +650,17 @@ const exportSelectedPdfZip = async () => {
                     :last-page="invoices.last_page"
                     @page-change="navigateToPage"
                 >
+                    <template #header-select>
+                        <input
+                            ref="selectAllCheckbox"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-slate-300"
+                            :checked="allPageSelected"
+                            :disabled="invoices.data.length === 0"
+                            :aria-label="allPageSelected ? 'Deselect all on this page' : 'Select all on this page'"
+                            @change="toggleSelectAllPage(($event.target as HTMLInputElement).checked)"
+                        >
+                    </template>
                     <tr
                         v-for="invoice in invoices.data"
                         :key="invoice.id"
@@ -609,6 +675,7 @@ const exportSelectedPdfZip = async () => {
                                 type="checkbox"
                                 :checked="selected.includes(invoice.id)"
                                 class="h-4 w-4 rounded border-slate-300"
+                                :aria-label="`Select invoice ${invoice.number}`"
                                 @change="toggleSelected(invoice.id, ($event.target as HTMLInputElement).checked)"
                             >
                         </td>
