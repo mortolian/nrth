@@ -32,7 +32,11 @@ class WealthDashboardController extends Controller
             'portfolio' => $resolver->present($portfolio),
             'portfolios' => $resolver->presentList($team),
             'overview' => $overview,
-            'monthly_history' => array_slice($valuations->monthlySeries($portfolio), -12),
+            // Up to 10Y so the overview chart can filter 1M / 1Y / 2Y / 5Y / 10Y client-side.
+            'monthly_history' => $valuations->monthlySeries(
+                $portfolio,
+                now()->copy()->subYears(10)->startOfMonth(),
+            ),
             'can_manage' => TeamAccess::allows($request->user(), $team, 'wealth.manage'),
         ]);
     }

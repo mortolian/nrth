@@ -11,10 +11,23 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import DialogModal from '@/Components/DialogModal.vue';
+import HelpTip from '@/Components/HelpTip.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
+import {
+    filterByChartRange,
+    toIndexedSeries,
+    wealthIndexedAxis,
+    wealthValueAxis,
+    WEALTH_CHART_RANGES,
+    type WealthChartRange,
+} from '@/Composables/useWealthChartAxis';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
+
+type ChartMode = 'value' | 'indexed';
+const chartMode = ref<ChartMode>('value');
+const chartRange = ref<WealthChartRange>('1Y');
 
 type Portfolio = {
     id: number;
@@ -212,34 +225,48 @@ const columns: TableColumn[] = [
     { key: 'fy', label: 'FY movement', align: 'right' },
 ];
 
-const chartOptions = computed(() => ({
-    tooltip: { trigger: 'axis' },
-    grid: { left: 48, right: 16, top: 24, bottom: 32 },
-    xAxis: {
-        type: 'category',
-        data: props.monthly_history.map((p) => p.label),
-        axisLabel: { color: '#64748b', fontSize: 11 },
-    },
-    yAxis: {
-        type: 'value',
-        axisLabel: {
-            color: '#64748b',
-            fontSize: 11,
-            formatter: (v: number) => useFormatCurrency(v / 100, currency.value),
+const chartOptions = computed(() => {
+    const points = filterByChartRange(props.monthly_history, chartRange.value);
+    const valuesCents = points.map((p) => p.value_cents);
+    const indexed = chartMode.value === 'indexed';
+    const seriesData = indexed ? toIndexedSeries(valuesCents) : valuesCents;
+
+    return {
+        tooltip: {
+            trigger: 'axis',
+            formatter: (params: Array<{ dataIndex: number; marker: string; value: number }>) => {
+                const point = params[0];
+                if (!point) return '';
+                const row = points[point.dataIndex];
+                if (!row) return '';
+
+                const lines = [row.label, `${point.marker} ${formatCents(row.value_cents)}`];
+                if (indexed) {
+                    lines.push(`Indexed: ${Number(point.value).toFixed(1)} (start = 100)`);
+                }
+
+                return lines.join('<br/>');
+            },
         },
-        splitLine: { lineStyle: { color: '#e2e8f0' } },
-    },
-    series: [
-        {
-            type: 'line',
-            smooth: true,
-            data: props.monthly_history.map((p) => p.value_cents),
-            areaStyle: { opacity: 0.08 },
-            lineStyle: { width: 2, color: '#0f766e' },
-            itemStyle: { color: '#0f766e' },
+        grid: { left: 56, right: 16, top: 24, bottom: 32 },
+        xAxis: {
+            type: 'category',
+            data: points.map((p) => p.label),
+            axisLabel: { color: '#64748b', fontSize: 11 },
         },
-    ],
-}));
+        yAxis: indexed ? wealthIndexedAxis() : wealthValueAxis(currency.value),
+        series: [
+            {
+                type: 'line',
+                smooth: true,
+                data: seriesData,
+                areaStyle: { opacity: 0.08 },
+                lineStyle: { width: 2, color: '#0f766e' },
+                itemStyle: { color: '#0f766e' },
+            },
+        ],
+    };
+});
 
 const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
 </script>
@@ -316,7 +343,55 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
         </div>
 
         <AppCard class="mt-6">
-            <h3 class="mb-3 text-base font-semibold text-slate-900">Recent portfolio value</h3>
+            <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div class="flex items-center gap-1.5">
+                    <h3 class="text-base font-semibold text-slate-900">Portfolio value</h3>
+                    <HelpTip
+                        text="Axis scaled to the range so small moves are visible. Use Indexed to compare growth from the first point in the selected period (100)."
+                        label="About portfolio value chart"
+                    />
+                </div>
+                <div v-if="monthly_history.length" class="flex flex-wrap items-center gap-2">
+                    <div
+                        class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                        role="group"
+                        aria-label="Chart time range"
+                    >
+                        <button
+                            v-for="option in WEALTH_CHART_RANGES"
+                            :key="option.value"
+                            type="button"
+                            class="rounded-md px-2 py-1 text-xs font-medium tabular-nums transition"
+                            :class="chartRange === option.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            @click="chartRange = option.value"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                    <div
+                        class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                        role="group"
+                        aria-label="Chart scale"
+                    >
+                        <button
+                            type="button"
+                            class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+                            :class="chartMode === 'value' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            @click="chartMode = 'value'"
+                        >
+                            Value
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+                            :class="chartMode === 'indexed' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            @click="chartMode = 'indexed'"
+                        >
+                            Indexed
+                        </button>
+                    </div>
+                </div>
+            </div>
             <div v-if="monthly_history.length" class="h-56 w-full md:h-72">
                 <VChart class="h-full w-full" :option="chartOptions" autoresize />
             </div>

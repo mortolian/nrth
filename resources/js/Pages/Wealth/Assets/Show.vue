@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -11,12 +11,25 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import DialogModal from '@/Components/DialogModal.vue';
+import HelpTip from '@/Components/HelpTip.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import type { RowActionItem } from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
+import {
+    filterByChartRange,
+    toIndexedSeries,
+    wealthIndexedAxis,
+    wealthValueAxis,
+    WEALTH_CHART_RANGES,
+    type WealthChartRange,
+} from '@/Composables/useWealthChartAxis';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
+
+type ChartMode = 'value' | 'indexed';
+const chartMode = ref<ChartMode>('value');
+const chartRange = ref<WealthChartRange>('1Y');
 
 type Option = { value: string; label: string };
 
@@ -125,70 +138,76 @@ const interestPercent = computed(() =>
         : '—',
 );
 
-const chartOptions = computed(() => ({
-    tooltip: {
-        trigger: 'axis',
-        formatter: (params: Array<{ dataIndex: number; marker: string; seriesName: string; value: number }>) => {
-            const point = params[0];
-            if (!point) return '';
-            const row = props.detail.chart[point.dataIndex];
-            if (!row) return '';
+const chartOptions = computed(() => {
+    const points = filterByChartRange(props.detail.chart, chartRange.value);
+    const valuesCents = points.map((p) => p.value_cents);
+    const indexed = chartMode.value === 'indexed';
+    const seriesData = indexed ? toIndexedSeries(valuesCents) : valuesCents;
 
-            const lines = [
-                row.label,
-                `${point.marker} Value: ${formatCents(row.value_cents)}`,
-            ];
+    return {
+        tooltip: {
+            trigger: 'axis',
+            formatter: (params: Array<{ dataIndex: number; marker: string; seriesName: string; value: number }>) => {
+                const point = params[0];
+                if (!point) return '';
+                const row = points[point.dataIndex];
+                if (!row) return '';
 
-            if (row.change_cents != null) {
-                const percent = formatChangePercent(row.change_percent);
-                lines.push(
-                    `Change: ${formatSigned(row.change_cents)}${percent ? ` (${percent})` : ''}`,
-                );
-            }
+                const lines = [
+                    row.label,
+                    `${point.marker} Value: ${formatCents(row.value_cents)}`,
+                ];
 
-            return lines.join('<br/>');
+                if (indexed) {
+                    lines.push(`Indexed: ${Number(point.value).toFixed(1)} (start = 100)`);
+                }
+
+                if (row.change_cents != null) {
+                    const percent = formatChangePercent(row.change_percent);
+                    lines.push(
+                        `Change: ${formatSigned(row.change_cents)}${percent ? ` (${percent})` : ''}`,
+                    );
+                }
+
+                return lines.join('<br/>');
+            },
         },
-    },
-    grid: { left: 48, right: 16, top: 24, bottom: 32 },
-    xAxis: {
-        type: 'category',
-        data: props.detail.chart.map((p) => p.label),
-        axisLabel: { color: '#64748b', fontSize: 11 },
-    },
-    yAxis: {
-        type: 'value',
-        axisLabel: {
-            color: '#64748b',
-            fontSize: 11,
-            formatter: (v: number) => useFormatCurrency(v / 100, currency.value),
+        grid: { left: 56, right: 16, top: 24, bottom: 32 },
+        xAxis: {
+            type: 'category',
+            data: points.map((p) => p.label),
+            axisLabel: { color: '#64748b', fontSize: 11 },
         },
-        splitLine: { lineStyle: { color: '#e2e8f0' } },
-    },
-    series: [
-        {
-            name: 'Value',
-            type: 'line',
-            smooth: true,
-            data: props.detail.chart.map((p) => ({
-                value: p.value_cents,
-                itemStyle: {
-                    color:
-                        p.change_cents == null
-                            ? '#0f766e'
-                            : p.change_cents > 0
-                              ? '#047857'
-                              : p.change_cents < 0
-                                ? '#be123c'
-                                : '#64748b',
-                },
-            })),
-            areaStyle: { opacity: 0.08, color: '#0f766e' },
-            lineStyle: { width: 2, color: '#0f766e' },
-            symbol: 'circle',
-            symbolSize: 7,
-        },
-    ],
-}));
+        yAxis: indexed ? wealthIndexedAxis() : wealthValueAxis(currency.value),
+        series: [
+            {
+                name: 'Value',
+                type: 'line',
+                smooth: true,
+                data: seriesData.map((value, i) => {
+                    const change = points[i]?.change_cents;
+                    return {
+                        value,
+                        itemStyle: {
+                            color:
+                                change == null
+                                    ? '#0f766e'
+                                    : change > 0
+                                      ? '#047857'
+                                      : change < 0
+                                        ? '#be123c'
+                                        : '#64748b',
+                        },
+                    };
+                }),
+                areaStyle: { opacity: 0.08, color: '#0f766e' },
+                lineStyle: { width: 2, color: '#0f766e' },
+                symbol: 'circle',
+                symbolSize: 7,
+            },
+        ],
+    };
+});
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -522,6 +541,50 @@ const toggleTransactionYear = (label: string) => {
     }
     expandedTransactionYears.value = [...expandedTransactionYears.value, label];
 };
+
+type AssetShowSections = {
+    valueOverTime: boolean;
+    yearlySummary: boolean;
+};
+
+const SECTION_STORAGE_KEY = 'nrth.wealth.asset.show.sections';
+
+const readSectionState = (): AssetShowSections => {
+    try {
+        const raw = localStorage.getItem(SECTION_STORAGE_KEY);
+        if (!raw) {
+            return { valueOverTime: true, yearlySummary: true };
+        }
+        const parsed = JSON.parse(raw) as Partial<AssetShowSections>;
+        return {
+            valueOverTime: parsed.valueOverTime !== false,
+            yearlySummary: parsed.yearlySummary !== false,
+        };
+    } catch {
+        return { valueOverTime: true, yearlySummary: true };
+    }
+};
+
+const sectionsOpen = ref<AssetShowSections>(readSectionState());
+
+watch(
+    sectionsOpen,
+    (value) => {
+        try {
+            localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(value));
+        } catch {
+            // Ignore quota / private-mode failures.
+        }
+    },
+    { deep: true },
+);
+
+const toggleSection = (key: keyof AssetShowSections) => {
+    sectionsOpen.value = {
+        ...sectionsOpen.value,
+        [key]: !sectionsOpen.value[key],
+    };
+};
 </script>
 
 <template>
@@ -601,58 +664,137 @@ const toggleTransactionYear = (label: string) => {
         <p v-if="detail.asset.notes" class="mt-2 text-sm text-slate-600">{{ detail.asset.notes }}</p>
 
         <AppCard class="mt-6">
-            <h3 class="mb-3 text-base font-semibold text-slate-900">Value over time</h3>
-            <div v-if="detail.chart.length" class="h-56 w-full md:h-72">
-                <VChart class="h-full w-full" :option="chartOptions" autoresize />
+            <button
+                type="button"
+                class="flex w-full items-start justify-between gap-3 text-left"
+                :aria-expanded="sectionsOpen.valueOverTime"
+                @click="toggleSection('valueOverTime')"
+            >
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <h3 class="text-base font-semibold text-slate-900">Value over time</h3>
+                        <HelpTip
+                            text="Axis scaled to the range so small moves are visible. Use Indexed to compare growth from the first point in the selected period (100)."
+                            label="About value over time chart"
+                        />
+                    </div>
+                </div>
+                <ChevronDown
+                    class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 transition-transform"
+                    :class="{ '-rotate-90': !sectionsOpen.valueOverTime }"
+                />
+            </button>
+            <div v-show="sectionsOpen.valueOverTime" class="mt-3">
+                <div v-if="detail.chart.length" class="mb-3 flex flex-wrap items-center gap-2">
+                    <div
+                        class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                        role="group"
+                        aria-label="Chart time range"
+                    >
+                        <button
+                            v-for="option in WEALTH_CHART_RANGES"
+                            :key="option.value"
+                            type="button"
+                            class="rounded-md px-2 py-1 text-xs font-medium tabular-nums transition"
+                            :class="chartRange === option.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            @click="chartRange = option.value"
+                        >
+                            {{ option.label }}
+                        </button>
+                    </div>
+                    <div
+                        class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                        role="group"
+                        aria-label="Chart scale"
+                    >
+                        <button
+                            type="button"
+                            class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+                            :class="chartMode === 'value' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            @click="chartMode = 'value'"
+                        >
+                            Value
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-md px-2.5 py-1 text-xs font-medium transition"
+                            :class="chartMode === 'indexed' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            @click="chartMode = 'indexed'"
+                        >
+                            Indexed
+                        </button>
+                    </div>
+                </div>
+                <div v-if="detail.chart.length" class="h-56 w-full md:h-72">
+                    <VChart class="h-full w-full" :option="chartOptions" autoresize />
+                </div>
+                <p v-else class="text-sm text-slate-500">Add valuations to plot history.</p>
             </div>
-            <p v-else class="text-sm text-slate-500">Add valuations to plot history.</p>
         </AppCard>
 
         <AppCard class="mt-6">
-            <h3 class="mb-1 text-base font-semibold text-slate-900">Yearly summary</h3>
-            <p class="mb-3 text-sm text-slate-500">
-                One row per financial year. Opening uses the previous FY’s last valuation when present;
-                otherwise the first valuation in that year. Movement is closing − opening − contributions + withdrawals for that year only.
-            </p>
-            <AppTable
-                v-if="detail.yearly_summaries.length"
-                :columns="yearColumns"
-                :show-pagination="false"
-                dense
-                table-class="text-sm"
-                embedded
+            <button
+                type="button"
+                class="flex w-full items-start justify-between gap-3 text-left"
+                :aria-expanded="sectionsOpen.yearlySummary"
+                @click="toggleSection('yearlySummary')"
             >
-                <tr v-for="row in detail.yearly_summaries" :key="row.starts_on">
-                    <td class="whitespace-nowrap px-3 py-2">
-                        <span class="font-medium text-slate-900">{{ row.label }}</span>
-                        <span v-if="row.is_current" class="ml-2 text-xs font-medium text-brand-700">Current</span>
-                        <div class="text-xs text-slate-500">
-                            {{ row.starts_on }} → {{ row.is_current ? row.as_of : row.ends_on }}
-                        </div>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.opening_cents) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.closing_cents) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.contributions_cents) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.withdrawals_cents) }}</td>
-                    <td
-                        class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium"
-                        :class="changeClass(row.investment_movement_cents)"
-                    >
-                        {{ formatSigned(row.investment_movement_cents) }}
-                    </td>
-                </tr>
-            </AppTable>
-            <p v-else class="text-sm text-slate-500">Add valuations or transactions to build yearly summaries.</p>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <h3 class="text-base font-semibold text-slate-900">Yearly summary</h3>
+                        <HelpTip
+                            text="One row per financial year. Opening uses the previous FY’s last valuation when present; otherwise the first valuation in that year. Movement is closing − opening − contributions + withdrawals for that year only."
+                            label="About yearly summary"
+                        />
+                    </div>
+                </div>
+                <ChevronDown
+                    class="mt-0.5 h-5 w-5 shrink-0 text-slate-500 transition-transform"
+                    :class="{ '-rotate-90': !sectionsOpen.yearlySummary }"
+                />
+            </button>
+            <div v-show="sectionsOpen.yearlySummary" class="mt-3">
+                <AppTable
+                    v-if="detail.yearly_summaries.length"
+                    :columns="yearColumns"
+                    :show-pagination="false"
+                    dense
+                    table-class="text-sm"
+                    embedded
+                >
+                    <tr v-for="row in detail.yearly_summaries" :key="row.starts_on">
+                        <td class="whitespace-nowrap px-3 py-2">
+                            <span class="font-medium text-slate-900">{{ row.label }}</span>
+                            <span v-if="row.is_current" class="ml-2 text-xs font-medium text-brand-700">Current</span>
+                            <div class="text-xs text-slate-500">
+                                {{ row.starts_on }} → {{ row.is_current ? row.as_of : row.ends_on }}
+                            </div>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.opening_cents) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.closing_cents) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.contributions_cents) }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.withdrawals_cents) }}</td>
+                        <td
+                            class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium"
+                            :class="changeClass(row.investment_movement_cents)"
+                        >
+                            {{ formatSigned(row.investment_movement_cents) }}
+                        </td>
+                    </tr>
+                </AppTable>
+                <p v-else class="text-sm text-slate-500">Add valuations or transactions to build yearly summaries.</p>
+            </div>
         </AppCard>
 
         <div class="mt-6 grid gap-6 xl:grid-cols-2">
             <AppCard>
                 <div class="mb-3 flex items-center justify-between gap-3">
-                    <div>
+                    <div class="flex items-center gap-1.5">
                         <h3 class="text-base font-semibold text-slate-900">Valuations</h3>
-                        <p class="text-xs text-slate-500">
-                            Grouped by financial year. Change is vs the previous valuation in the same year.
-                        </p>
+                        <HelpTip
+                            text="Grouped by financial year. Change is vs the previous valuation in the same year."
+                            label="About valuations"
+                        />
                     </div>
                     <AppButton
                         v-if="can_manage"
@@ -742,9 +884,12 @@ const toggleTransactionYear = (label: string) => {
 
             <AppCard>
                 <div class="mb-3 flex items-center justify-between gap-3">
-                    <div>
+                    <div class="flex items-center gap-1.5">
                         <h3 class="text-base font-semibold text-slate-900">Transactions</h3>
-                        <p class="text-xs text-slate-500">Grouped by financial year. Older years stay collapsed.</p>
+                        <HelpTip
+                            text="Grouped by financial year. Older years stay collapsed."
+                            label="About transactions"
+                        />
                     </div>
                     <AppButton
                         v-if="can_manage"

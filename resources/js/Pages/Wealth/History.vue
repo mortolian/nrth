@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import { LineChart, BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
@@ -10,6 +10,13 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
+import HelpTip from '@/Components/HelpTip.vue';
+import {
+    filterByChartRange,
+    wealthValueAxis,
+    WEALTH_CHART_RANGES,
+    type WealthChartRange,
+} from '@/Composables/useWealthChartAxis';
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent]);
 
@@ -21,26 +28,27 @@ const props = defineProps<{
 
 const currency = computed(() => props.portfolio.base_currency || 'ZAR');
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, currency.value);
+const chartRange = ref<WealthChartRange>('1Y');
 
-const monthlyChart = computed(() => ({
-    tooltip: { trigger: 'axis' },
-    grid: { left: 56, right: 16, top: 24, bottom: 40 },
-    xAxis: { type: 'category', data: props.monthly.map((p) => p.label), axisLabel: { rotate: 45, fontSize: 10 } },
-    yAxis: {
-        type: 'value',
-        axisLabel: { formatter: (v: number) => useFormatCurrency(v / 100, currency.value), fontSize: 11 },
-    },
-    series: [{ type: 'line', smooth: true, data: props.monthly.map((p) => p.value_cents), lineStyle: { color: '#0f766e' }, itemStyle: { color: '#0f766e' } }],
-}));
+const monthlyPoints = computed(() => filterByChartRange(props.monthly, chartRange.value));
+
+const monthlyChart = computed(() => {
+    const points = monthlyPoints.value;
+
+    return {
+        tooltip: { trigger: 'axis' },
+        grid: { left: 56, right: 16, top: 24, bottom: 40 },
+        xAxis: { type: 'category', data: points.map((p) => p.label), axisLabel: { rotate: 45, fontSize: 10 } },
+        yAxis: wealthValueAxis(currency.value),
+        series: [{ type: 'line', smooth: true, data: points.map((p) => p.value_cents), lineStyle: { color: '#0f766e' }, itemStyle: { color: '#0f766e' } }],
+    };
+});
 
 const annualChart = computed(() => ({
     tooltip: { trigger: 'axis' },
     grid: { left: 56, right: 16, top: 24, bottom: 32 },
     xAxis: { type: 'category', data: props.annual.map((p) => p.label) },
-    yAxis: {
-        type: 'value',
-        axisLabel: { formatter: (v: number) => useFormatCurrency(v / 100, currency.value), fontSize: 11 },
-    },
+    yAxis: wealthValueAxis(currency.value),
     series: [{ type: 'bar', data: props.annual.map((p) => p.value_cents), itemStyle: { color: '#0f766e' } }],
 }));
 
@@ -71,7 +79,32 @@ const columns: TableColumn[] = [
         </PageHeader>
 
         <AppCard class="mt-6">
-            <h3 class="mb-3 text-base font-semibold text-slate-900">Monthly</h3>
+            <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div class="flex items-center gap-1.5">
+                    <h3 class="text-base font-semibold text-slate-900">Monthly</h3>
+                    <HelpTip
+                        text="Axis scaled to the value range. Pick a window to zoom the chart; the table below stays complete."
+                        label="About monthly history chart"
+                    />
+                </div>
+                <div
+                    v-if="monthly.length"
+                    class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                    role="group"
+                    aria-label="Chart time range"
+                >
+                    <button
+                        v-for="option in WEALTH_CHART_RANGES"
+                        :key="option.value"
+                        type="button"
+                        class="rounded-md px-2 py-1 text-xs font-medium tabular-nums transition"
+                        :class="chartRange === option.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                        @click="chartRange = option.value"
+                    >
+                        {{ option.label }}
+                    </button>
+                </div>
+            </div>
             <div v-if="monthly.length" class="h-64 w-full md:h-80">
                 <VChart class="h-full w-full" :option="monthlyChart" autoresize />
             </div>
@@ -86,7 +119,13 @@ const columns: TableColumn[] = [
         </AppCard>
 
         <AppCard class="mt-6">
-            <h3 class="mb-3 text-base font-semibold text-slate-900">Annual (financial year end)</h3>
+            <div class="mb-3 flex items-center gap-1.5">
+                <h3 class="text-base font-semibold text-slate-900">Annual (financial year end)</h3>
+                <HelpTip
+                    text="Axis scaled to the value range so year-to-year differences are easier to see."
+                    label="About annual history chart"
+                />
+            </div>
             <div v-if="annual.length" class="h-56 w-full md:h-72">
                 <VChart class="h-full w-full" :option="annualChart" autoresize />
             </div>
