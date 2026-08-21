@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.17](https://github.com/mortolian/nrth/compare/v0.1.16...v0.1.17) (2026-08-21)
+
+
+### Features
+
+* **invoicing:** add bulk actions and configurable FX accounts ([feb4d26](https://github.com/mortolian/nrth/commit/feb4d262b7c4bc81d96071dfa6e33cafd65d084c))
+
 ## [0.1.16](https://github.com/mortolian/nrth/compare/v0.1.15...v0.1.16) (2026-08-21)
 
 
