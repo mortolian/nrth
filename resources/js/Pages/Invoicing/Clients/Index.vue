@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useMoneyInTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 const moneyInTabs = useMoneyInTabs();
+const page = usePage();
+const canTeam = (permission: string) => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes(permission);
+};
+const canManage = computed(() => canTeam('clients.manage'));
 
 type ClientRow = {
     id: number;
@@ -25,23 +32,61 @@ const props = defineProps<{
     };
     filters: {
         search: string | null;
-        status: 'all' | 'active' | 'inactive';
-        view: 'grid' | 'table';
+        status: 'active' | 'inactive';
     };
 }>();
 
 const filters = ref({
     search: props.filters.search ?? '',
-    status: props.filters.status ?? 'all',
-    view: props.filters.view ?? 'grid',
+    status: props.filters.status ?? 'active',
 });
 
-const applyFilters = (page = 1) => {
-    router.get(route('invoicing.clients.index'), { ...filters.value, page }, { preserveState: true, preserveScroll: true, replace: true });
+const businessCurrency = computed(() => {
+    const fromPage = page.props.business_currency;
+    return typeof fromPage === 'string' && fromPage.trim() !== '' ? fromPage : 'ZAR';
+});
+
+const applyFilters = (pageNum = 1) => {
+    router.get(
+        route('invoicing.clients.index'),
+        {
+            search: filters.value.search || undefined,
+            status: filters.value.status,
+            page: pageNum,
+        },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+};
+
+const clearFilters = () => {
+    filters.value = { search: '', status: 'active' };
+    applyFilters();
 };
 
 const goToClient = (id: number) => router.visit(route('invoicing.clients.show', id));
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+
+const formatCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, businessCurrency.value);
+
+const rowActions = (client: ClientRow) => {
+    const actions = [{ id: 'view', label: 'View' }];
+    if (canManage.value) {
+        actions.push({ id: 'edit', label: 'Edit' });
+    }
+    return actions;
+};
+
+const onAction = (client: ClientRow, actionId: string) => {
+    if (actionId === 'view') {
+        goToClient(client.id);
+        return;
+    }
+    if (actionId === 'edit') {
+        router.visit(route('invoicing.clients.edit', client.id));
+    }
+};
+
+const hasRows = computed(() => props.clients.data.length > 0);
 </script>
 
 <template>
@@ -50,90 +95,125 @@ const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 
         section="clients"
         :tabs="moneyInTabs"
         document-title="Clients"
+        subtitle="People and companies you invoice"
     >
         <template #actions>
-            <AppButton variant="primary" @click="router.visit(route('invoicing.clients.create'))">New Client</AppButton>
+            <AppButton
+                v-if="canManage"
+                variant="primary"
+                @click="router.visit(route('invoicing.clients.create'))"
+            >
+                New client
+            </AppButton>
         </template>
 
-        <AppCard class="mt-5">
-            <div class="grid gap-3 md:grid-cols-4">
-                <div class="md:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Search</label>
-                    <AppInput v-model="filters.search" placeholder="Search name or email..." />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
-                    <AppSelect
-                        :model-value="filters.status"
-                        :options="[
-                            { label: 'All', value: 'all' },
-                            { label: 'Active', value: 'active' },
-                            { label: 'Inactive', value: 'inactive' },
-                        ]"
-                        @update:model-value="filters.status = $event as 'all' | 'active' | 'inactive'"
-                    />
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">View</label>
-                    <div class="flex gap-2">
-                        <AppButton :variant="filters.view === 'grid' ? 'primary' : 'secondary'" size="sm" @click="filters.view = 'grid'">Grid</AppButton>
-                        <AppButton :variant="filters.view === 'table' ? 'primary' : 'secondary'" size="sm" @click="filters.view = 'table'">Table</AppButton>
+        <div class="space-y-6">
+            <AppCard>
+                <div class="grid gap-3 md:grid-cols-3">
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Search</label>
+                        <AppInput
+                            v-model="filters.search"
+                            placeholder="Search name or email…"
+                            @keydown.enter="applyFilters()"
+                        />
                     </div>
-                </div>
-            </div>
-            <div class="mt-3 flex gap-2">
-                <AppButton variant="secondary" @click="applyFilters()">Apply</AppButton>
-                <AppButton variant="ghost" @click="filters = { search: '', status: 'all', view: 'grid' }; applyFilters()">Clear</AppButton>
-            </div>
-        </AppCard>
-
-        <div v-if="filters.view === 'grid'" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <AppCard
-                v-for="client in clients.data"
-                :key="client.id"
-                class="cursor-pointer hover:border-brand-300"
-                @click="goToClient(client.id)"
-            >
-                <div class="flex items-start justify-between">
                     <div>
-                        <h3 class="text-base font-semibold text-slate-900">{{ client.name }}</h3>
-                        <p class="text-sm text-slate-500">{{ client.email || 'No email' }}</p>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                        <AppSelect
+                            :model-value="filters.status"
+                            :options="[
+                                { label: 'Active', value: 'active' },
+                                { label: 'Inactive', value: 'inactive' },
+                            ]"
+                            @update:model-value="filters.status = $event as 'active' | 'inactive'"
+                        />
                     </div>
-                    <AppBadge :variant="client.status === 'active' ? 'success' : 'neutral'">{{ client.status }}</AppBadge>
                 </div>
-                <div class="mt-3 space-y-1 text-sm">
-                    <p><span class="text-slate-500">Outstanding:</span> <span class="font-medium">{{ formatCents(client.outstanding_balance_cents) }}</span></p>
-                    <p><span class="text-slate-500">Last invoice:</span> {{ client.last_invoice_date || '-' }}</p>
+                <div class="mt-3 flex gap-2">
+                    <AppButton size="sm" variant="secondary" @click="applyFilters()">Apply</AppButton>
+                    <AppButton size="sm" variant="ghost" @click="clearFilters">Clear</AppButton>
                 </div>
             </AppCard>
-        </div>
 
-        <AppCard v-else class="mt-5">
-            <AppTable
-                :columns="[
-                    { key: 'name', label: 'Name' },
-                    { key: 'email', label: 'Email' },
-                    { key: 'outstanding', label: 'Outstanding' },
-                    { key: 'last_invoice', label: 'Last invoice' },
-                    { key: 'status', label: 'Status' },
-                ]"
-                :page="clients.current_page"
-                :last-page="clients.last_page"
-                @page-change="applyFilters"
-            >
-                <tr
-                    v-for="client in clients.data"
-                    :key="client.id"
-                    class="cursor-pointer hover:bg-slate-50"
-                    @click="goToClient(client.id)"
+            <AppCard class="overflow-hidden p-0">
+                <AppTable
+                    embedded
+                    dense
+                    table-class="text-sm"
+                    :columns="[
+                        { key: 'name', label: 'Client' },
+                        { key: 'email', label: 'Email' },
+                        { key: 'outstanding', label: 'Outstanding', align: 'right' },
+                        { key: 'last_invoice', label: 'Last invoice' },
+                        { key: 'status', label: 'Status' },
+                        { key: 'actions', label: '' },
+                    ]"
+                    :page="clients.current_page"
+                    :last-page="clients.last_page"
+                    @page-change="applyFilters"
                 >
-                    <td class="px-4 py-3 font-medium text-slate-900">{{ client.name }}</td>
-                    <td class="px-4 py-3 text-slate-600">{{ client.email || '-' }}</td>
-                    <td class="px-4 py-3">{{ formatCents(client.outstanding_balance_cents) }}</td>
-                    <td class="px-4 py-3">{{ client.last_invoice_date || '-' }}</td>
-                    <td class="px-4 py-3"><AppBadge :variant="client.status === 'active' ? 'success' : 'neutral'">{{ client.status }}</AppBadge></td>
-                </tr>
-            </AppTable>
-        </AppCard>
+                    <tr v-if="!hasRows">
+                        <td colspan="6" class="px-4 py-10">
+                            <EmptyState
+                                title="No clients yet"
+                                :description="
+                                    filters.status === 'inactive'
+                                        ? 'No inactive clients match these filters.'
+                                        : 'Add a client to start creating invoices and estimates.'
+                                "
+                            >
+                                <template v-if="canManage && filters.status === 'active'" #action>
+                                    <AppButton
+                                        variant="primary"
+                                        @click="router.visit(route('invoicing.clients.create'))"
+                                    >
+                                        New client
+                                    </AppButton>
+                                </template>
+                            </EmptyState>
+                        </td>
+                    </tr>
+                    <tr
+                        v-for="client in clients.data"
+                        :key="client.id"
+                        class="cursor-pointer border-b border-slate-100 hover:bg-slate-50"
+                        @click="goToClient(client.id)"
+                    >
+                        <td class="px-3 py-2">
+                            <div class="font-medium text-slate-900">{{ client.name }}</div>
+                            <div
+                                v-if="client.contact_name"
+                                class="mt-0.5 max-w-md truncate text-xs text-slate-500"
+                            >
+                                {{ client.contact_name }}
+                            </div>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">
+                            {{ client.email || '—' }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
+                            {{ formatCents(client.outstanding_balance_cents) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">
+                            <DateDisplay v-if="client.last_invoice_date" :value="client.last_invoice_date" />
+                            <span v-else>—</span>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2">
+                            <AppBadge :variant="client.status === 'active' ? 'success' : 'neutral'">
+                                {{ client.status === 'active' ? 'Active' : 'Inactive' }}
+                            </AppBadge>
+                        </td>
+                        <td class="px-3 py-2 text-right" @click.stop>
+                            <InvoiceRowActionsMenu
+                                :actions="rowActions(client)"
+                                :aria-label="`Actions for ${client.name}`"
+                                @select="(id) => onAction(client, id)"
+                            />
+                        </td>
+                    </tr>
+                </AppTable>
+            </AppCard>
+        </div>
     </FeatureShell>
 </template>

@@ -26,7 +26,7 @@ class ClientController extends Controller
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());
         $status = (string) $request->string('status')->toString();
-        $view = (string) $request->string('view')->toString() ?: 'grid';
+        $status = in_array($status, ['active', 'inactive'], true) ? $status : 'active';
 
         $query = Client::queryWithoutTeamScope()->where('team_id', $teamId);
 
@@ -37,11 +37,7 @@ class ClientController extends Controller
             });
         }
 
-        if ($status === 'active') {
-            $query->where('is_active', true);
-        } elseif ($status === 'inactive') {
-            $query->where('is_active', false);
-        }
+        $query->where('is_active', $status === 'active');
 
         $clients = $query
             ->with(['invoices' => fn ($q) => $q->latest('issue_date')])
@@ -78,8 +74,7 @@ class ClientController extends Controller
             'clients' => $clients,
             'filters' => [
                 'search' => $search ?: null,
-                'status' => $status ?: 'all',
-                'view' => in_array($view, ['grid', 'table'], true) ? $view : 'grid',
+                'status' => $status,
             ],
         ]);
     }
@@ -240,7 +235,7 @@ class ClientController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:50', (new Phone)->international()],
+            'phone' => ['nullable', 'string', 'max:50', (new Phone)->country('ZA')->international()],
             'vat_number' => ['nullable', 'regex:/^4\d{9}$/'],
             'registration_number' => ['nullable', 'string', 'max:100'],
             'address' => ['nullable', 'array'],
@@ -257,7 +252,7 @@ class ClientController extends Controller
         ]);
 
         if (! empty($validated['phone'])) {
-            $validated['phone'] = (new PhoneNumber((string) $validated['phone']))->formatE164();
+            $validated['phone'] = (new PhoneNumber((string) $validated['phone'], ['ZA']))->formatE164();
         } else {
             $validated['phone'] = null;
         }

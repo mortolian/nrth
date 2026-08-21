@@ -4,10 +4,11 @@ import { router, usePage } from '@inertiajs/vue3';
 import { useForm } from 'vee-validate';
 import { z } from 'zod';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import AppPhoneInput from '@/Components/AppPhoneInput.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
 import { useFieldErrors } from '@/Composables/useFieldErrors';
 import { useToast } from '@/Composables/useToast';
+import { isValidOptionalPhone } from '@/lib/phoneMeta';
+import countries from '@/data/countries.json';
 
 type NoteTemplateOption = { id: number; name: string; body: string; target: 'notes' | 'footer' };
 
@@ -81,6 +82,22 @@ const setFieldValue = (path: string, value: unknown) => {
  */
 const formValues = computed<Record<string, any>>(() => ((values as any)?.value ?? values) as Record<string, any>);
 
+const countryOptions = computed(() => {
+    const preferred = ['South Africa'];
+    const names = countries as string[];
+    const current = String(formValues.value?.address?.country ?? '').trim();
+    const preferredSet = new Set(preferred);
+    const ordered = [
+        ...preferred.filter((name) => names.includes(name)),
+        ...names.filter((name) => !preferredSet.has(name)),
+    ];
+    if (current && !ordered.includes(current)) {
+        ordered.unshift(current);
+    }
+
+    return ordered.map((name) => ({ label: name, value: name }));
+});
+
 const noteTemplates = computed(() =>
     props.note_templates.filter((template) => template.target === 'notes'),
 );
@@ -105,7 +122,12 @@ const schema = z.object({
     name: z.string().trim().min(1, 'Company name is required'),
     contact_name: z.string().optional(),
     email: z.string().email('Invalid email').or(z.literal('')),
-    phone: z.string().optional(),
+    phone: z
+        .string()
+        .optional()
+        .refine((value) => isValidOptionalPhone(value), {
+            message: 'Enter a valid phone number (e.g. 082 123 4567 or +27 82 123 4567)',
+        }),
     vat_number: z.string().regex(/^$|^4\d{9}$/, 'SA VAT must be 10 digits starting with 4'),
     registration_number: z.string().optional(),
     address: z.object({
@@ -200,7 +222,13 @@ const submit = () => {
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500">Phone</label>
-                            <AppPhoneInput :model-value="values.phone" @update:model-value="setFieldValue('phone', $event ?? '')" />
+                            <AppInput
+                                :model-value="values.phone"
+                                type="tel"
+                                autocomplete="tel"
+                                placeholder="082 123 4567 or +27 82 123 4567"
+                                @update:model-value="setFieldValue('phone', $event)"
+                            />
                             <p v-if="fieldErrors.phone" class="mt-1 text-xs text-rose-600">{{ fieldErrors.phone }}</p>
                         </div>
                         <div>
@@ -247,7 +275,17 @@ const submit = () => {
                         <AppInput :model-value="values.address.city" placeholder="City" @update:model-value="setFieldValue('address.city', $event)" />
                         <AppInput :model-value="values.address.province" placeholder="Province" @update:model-value="setFieldValue('address.province', $event)" />
                         <AppInput :model-value="values.address.postal_code" placeholder="Postal code" @update:model-value="setFieldValue('address.postal_code', $event)" />
-                        <AppInput :model-value="values.address.country" placeholder="Country" @update:model-value="setFieldValue('address.country', $event)" />
+                        <div>
+                            <AppSelect
+                                :model-value="values.address.country"
+                                :options="countryOptions"
+                                placeholder="Country"
+                                @update:model-value="setFieldValue('address.country', $event)"
+                            />
+                            <p v-if="fieldErrors['address.country']" class="mt-1 text-xs text-rose-600">
+                                {{ fieldErrors['address.country'] }}
+                            </p>
+                        </div>
                     </div>
                 </section>
 

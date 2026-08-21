@@ -81,4 +81,39 @@ class ClientPhoneValidationTest extends TestCase
             'phone' => '+27821234567',
         ]);
     }
+
+    public function test_client_store_accepts_sa_national_phone_and_normalizes_to_e164(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $response = $this->post(route('invoicing.clients.store'), [
+            'name' => 'National Phone Client',
+            'contact_name' => null,
+            'email' => null,
+            'phone' => '082 123 4567',
+            'vat_number' => null,
+            'registration_number' => null,
+            'address' => [
+                'street' => null,
+                'city' => null,
+                'province' => null,
+                'postal_code' => null,
+                'country' => null,
+            ],
+            'currency' => 'ZAR',
+            'payment_terms_days' => 30,
+            'notes' => null,
+            'is_active' => true,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('clients', [
+            'team_id' => $team->id,
+            'name' => 'National Phone Client',
+            'phone' => '+27821234567',
+        ]);
+    }
 }

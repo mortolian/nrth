@@ -120,3 +120,25 @@ export function buildE164(iso: string, nationalInput: string): string {
 
     return `+${dial}${nat}`;
 }
+
+/**
+ * Optional phone: empty OK; otherwise international E.164 or SA national (0XXXXXXXXX).
+ * Server still validates with libphonenumber.
+ */
+export function isValidOptionalPhone(value: string | null | undefined): boolean {
+    const trimmed = (value ?? '').trim();
+    if (!trimmed) {
+        return true;
+    }
+    const compact = trimmed.replace(/[\s().-]/g, '');
+    if (/^\+[1-9]\d{6,14}$/.test(compact)) {
+        return true;
+    }
+    // South African national numbers (leading trunk 0 + 9 digits).
+    if (/^0\d{9}$/.test(compact)) {
+        return true;
+    }
+
+    return false;
+}
+

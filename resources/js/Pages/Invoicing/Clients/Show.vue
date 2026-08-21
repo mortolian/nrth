@@ -202,9 +202,14 @@ const goHistoryPage = (page: number) => {
                 </div>
             </AppCard>
 
-            <AppCard>
-                <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 class="text-base font-semibold text-slate-900">Invoice history</h3>
+            <AppCard class="overflow-hidden p-0">
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Invoice history</h3>
+                        <p v-if="invoice_history.last_page > 1" class="mt-1 text-xs text-slate-500">
+                            Page {{ invoice_history.current_page }} of {{ invoice_history.last_page }} · 25 per page
+                        </p>
+                    </div>
                     <Link
                         :href="viewAllInvoicesUrl"
                         class="shrink-0 text-sm font-medium text-brand-700 hover:text-brand-600 hover:underline"
@@ -212,11 +217,8 @@ const goHistoryPage = (page: number) => {
                         View in invoice list
                     </Link>
                 </div>
-                <p v-if="invoice_history.last_page > 1" class="mb-4 text-xs text-slate-500">
-                    Page {{ invoice_history.current_page }} of {{ invoice_history.last_page }} · 25 per page
-                </p>
 
-                <div class="mb-4 space-y-3 md:hidden">
+                <div class="space-y-3 px-5 py-4 md:hidden">
                     <button
                         v-for="invoice in invoice_history.data"
                         :key="`m-${invoice.id}`"
@@ -263,15 +265,17 @@ const goHistoryPage = (page: number) => {
 
                 <div class="hidden md:block">
                     <AppTable
-                        table-class="min-w-[720px]"
+                        embedded
+                        dense
+                        table-class="w-full text-sm"
                         :show-pagination="invoice_history.last_page > 1"
                         :columns="[
-                            { key: 'number', label: 'Invoice #', widthClass: 'whitespace-nowrap' },
-                            { key: 'issue_date', label: 'Issued', widthClass: 'whitespace-nowrap' },
-                            { key: 'due_date', label: 'Due', widthClass: 'whitespace-nowrap' },
-                            { key: 'total', label: 'Total', widthClass: 'whitespace-nowrap text-right tabular-nums' },
-                            { key: 'amount_due', label: 'Outstanding', widthClass: 'whitespace-nowrap text-right tabular-nums' },
-                            { key: 'status', label: 'Status', widthClass: 'whitespace-nowrap' },
+                            { key: 'number', label: 'Invoice #' },
+                            { key: 'issue_date', label: 'Issued' },
+                            { key: 'due_date', label: 'Due' },
+                            { key: 'total', label: 'Total', align: 'right' },
+                            { key: 'amount_due', label: 'Outstanding', align: 'right' },
+                            { key: 'status', label: 'Status' },
                         ]"
                         :page="invoice_history.current_page"
                         :last-page="invoice_history.last_page"
@@ -280,32 +284,32 @@ const goHistoryPage = (page: number) => {
                         <tr
                             v-for="invoice in invoice_history.data"
                             :key="invoice.id"
-                            class="cursor-pointer text-sm text-slate-700 hover:bg-slate-50"
+                            class="cursor-pointer border-b border-slate-100 text-sm text-slate-700 hover:bg-slate-50"
                             @click="router.visit(route('invoicing.invoices.show', invoice.id))"
                         >
-                            <td class="whitespace-nowrap px-3 py-3 align-middle">
+                            <td class="whitespace-nowrap px-3 py-2 align-middle">
                                 <span class="font-medium text-brand-700">{{ invoice.number }}</span>
                             </td>
-                            <td class="whitespace-nowrap px-3 py-3 align-middle text-slate-700">
+                            <td class="whitespace-nowrap px-3 py-2 align-middle text-slate-700">
                                 <DateDisplay :value="invoice.issue_date" />
                             </td>
-                            <td class="whitespace-nowrap px-3 py-3 align-middle text-slate-700">
+                            <td class="whitespace-nowrap px-3 py-2 align-middle text-slate-700">
                                 <div class="flex flex-nowrap items-center gap-1.5">
                                     <DateDisplay :value="invoice.due_date" />
                                     <AppBadge v-if="invoice.is_overdue" variant="danger">{{ invoice.days_overdue }}d</AppBadge>
                                 </div>
                             </td>
-                            <td class="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums text-slate-700">
+                            <td class="whitespace-nowrap px-3 py-2 text-right align-middle tabular-nums text-slate-700">
                                 {{ formatInvoiceCents(invoice.total_cents, invoice.currency) }}
                             </td>
-                            <td class="whitespace-nowrap px-3 py-3 text-right align-middle tabular-nums">
+                            <td class="whitespace-nowrap px-3 py-2 text-right align-middle tabular-nums">
                                 <span
                                     :class="invoice.amount_due_cents > 0 ? 'font-semibold text-slate-900' : 'text-slate-500'"
                                 >
                                     {{ formatInvoiceCents(invoice.amount_due_cents, invoice.currency) }}
                                 </span>
                             </td>
-                            <td class="whitespace-nowrap px-3 py-3 align-middle">
+                            <td class="whitespace-nowrap px-3 py-2 align-middle">
                                 <AppBadge
                                     class="capitalize"
                                     :variant="invoiceStatusBadgeVariant(invoice.status, { isOverdue: invoice.is_overdue })"
@@ -315,7 +319,7 @@ const goHistoryPage = (page: number) => {
                             </td>
                         </tr>
                         <tr v-if="!invoice_history.data.length">
-                            <td colspan="6" class="px-4 py-5">
+                            <td colspan="6" class="px-4 py-10">
                                 <EmptyState title="No invoices yet" description="Create the first invoice for this client.">
                                     <template #action>
                                         <AppButton variant="primary" @click="router.visit(route('invoicing.invoices.create'))">
