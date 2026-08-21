@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.8](https://github.com/mortolian/nrth/compare/v0.1.7...v0.1.8) (2026-08-21)
+
+
+### Bug Fixes
+
+* **wealth:** scope FY movement to prior-year opening only ([6654e51](https://github.com/mortolian/nrth/commit/6654e512390456a239810585b77764a193e6514b))
+
 ## [0.1.7](https://github.com/mortolian/nrth/compare/v0.1.6...v0.1.7) (2026-08-21)
 
 
