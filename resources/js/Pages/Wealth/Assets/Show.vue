@@ -44,6 +44,8 @@ const props = defineProps<{
             label: string;
             starts_on: string;
             ends_on: string;
+            opening_as_of: string | null;
+            used_synthetic_opening: boolean;
         };
         valuations: Array<{
             id: number;
@@ -83,6 +85,8 @@ const props = defineProps<{
             contributions_cents: number;
             withdrawals_cents: number;
             investment_movement_cents: number;
+            opening_as_of: string | null;
+            used_synthetic_opening: boolean;
         }>;
     };
     transaction_types: Option[];
@@ -554,6 +558,10 @@ const toggleTransactionYear = (label: string) => {
                     Opening · FY {{ detail.financial_year.label }}
                 </p>
                 <p class="mt-2 text-xl font-semibold tabular-nums">{{ formatCents(detail.financial_year.opening_cents) }}</p>
+                <p v-if="detail.financial_year.opening_as_of" class="mt-1 text-xs text-slate-500">
+                    As of {{ detail.financial_year.opening_as_of }}
+                    <span v-if="detail.financial_year.used_synthetic_opening"> · first valuation this FY</span>
+                </p>
             </AppCard>
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -603,7 +611,8 @@ const toggleTransactionYear = (label: string) => {
         <AppCard class="mt-6">
             <h3 class="mb-1 text-base font-semibold text-slate-900">Yearly summary</h3>
             <p class="mb-3 text-sm text-slate-500">
-                Grouped by portfolio financial year. Movement is closing − opening − contributions + withdrawals.
+                One row per financial year. Opening uses the previous FY’s last valuation when present;
+                otherwise the first valuation in that year. Movement is closing − opening − contributions + withdrawals for that year only.
             </p>
             <AppTable
                 v-if="detail.yearly_summaries.length"
@@ -641,7 +650,9 @@ const toggleTransactionYear = (label: string) => {
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <div>
                         <h3 class="text-base font-semibold text-slate-900">Valuations</h3>
-                        <p class="text-xs text-slate-500">Grouped by financial year. Older years stay collapsed.</p>
+                        <p class="text-xs text-slate-500">
+                            Grouped by financial year. Change is vs the previous valuation in the same year.
+                        </p>
                     </div>
                     <AppButton
                         v-if="can_manage"

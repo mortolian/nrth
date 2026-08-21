@@ -35,6 +35,7 @@ final class PortfolioPerformanceService
         $asOf = ($asOf ?? now())->copy()->startOfDay();
         $currency = $portfolio->base_currency;
         $assets = $portfolio->assets()->where('is_active', true)->orderBy('name')->get();
+        $assets->each->setRelation('portfolio', $portfolio);
 
         $total = 0;
         $accessible = 0;
@@ -146,34 +147,44 @@ final class PortfolioPerformanceService
 
         $chartPoints = [];
         $valuationChangeById = [];
-        foreach ($allValuations as $index => $valuation) {
+        $previousCentsInYear = [];
+        $previousGlobalCents = null;
+
+        foreach ($allValuations as $valuation) {
+            [$rowStart, $rowEnd] = WealthFinancialYear::windowContaining($valuation->valued_on, $startMonth);
+            $yearLabel = WealthFinancialYear::labelForWindow($rowStart, $rowEnd);
             $valueCents = (int) $valuation->value_cents;
-            $previousCents = $index > 0 ? (int) $allValuations[$index - 1]->value_cents : null;
-            $changeCents = $previousCents === null ? null : $valueCents - $previousCents;
-            $changePercent = $this->changePercent($changeCents, $previousCents);
 
+            // Table change is scoped to the financial year so sparse yearly snapshots
+            // are not compared to the prior year's last point as if they were monthly moves.
+            $previousInYearCents = $previousCentsInYear[$yearLabel] ?? null;
+            $yearChangeCents = $previousInYearCents === null ? null : $valueCents - $previousInYearCents;
             $valuationChangeById[$valuation->id] = [
-                'change_cents' => $changeCents,
-                'change_percent' => $changePercent,
+                'change_cents' => $yearChangeCents,
+                'change_percent' => $this->changePercent($yearChangeCents, $previousInYearCents),
+                'year_label' => $yearLabel,
             ];
+            $previousCentsInYear[$yearLabel] = $valueCents;
 
+            $globalChangeCents = $previousGlobalCents === null ? null : $valueCents - $previousGlobalCents;
             $chartPoints[] = [
                 'date' => $valuation->valued_on->toDateString(),
                 'label' => $valuation->valued_on->format('d M Y'),
                 'value_cents' => $valueCents,
-                'change_cents' => $changeCents,
-                'change_percent' => $changePercent,
+                'change_cents' => $globalChangeCents,
+                'change_percent' => $this->changePercent($globalChangeCents, $previousGlobalCents),
             ];
+            $previousGlobalCents = $valueCents;
         }
 
         $valuationRows = $allValuations
             ->sortByDesc(fn ($valuation) => $valuation->valued_on->timestamp.'-'.$valuation->id)
             ->values()
-            ->map(function ($valuation) use ($startMonth, $valuationChangeById) {
-                [$rowStart, $rowEnd] = WealthFinancialYear::windowContaining($valuation->valued_on, $startMonth);
+            ->map(function ($valuation) use ($valuationChangeById) {
                 $change = $valuationChangeById[$valuation->id] ?? [
                     'change_cents' => null,
                     'change_percent' => null,
+                    'year_label' => '',
                 ];
 
                 return [
@@ -182,7 +193,7 @@ final class PortfolioPerformanceService
                     'value_cents' => (int) $valuation->value_cents,
                     'change_cents' => $change['change_cents'],
                     'change_percent' => $change['change_percent'],
-                    'year_label' => WealthFinancialYear::labelForWindow($rowStart, $rowEnd),
+                    'year_label' => $change['year_label'],
                     'currency' => $valuation->currency,
                     'notes' => $valuation->notes,
                     'source' => $valuation->source->value,
@@ -256,7 +267,9 @@ final class PortfolioPerformanceService
      *     closing_cents: int,
      *     contributions_cents: int,
      *     withdrawals_cents: int,
-     *     investment_movement_cents: int
+     *     investment_movement_cents: int,
+     *     opening_as_of: string|null,
+     *     used_synthetic_opening: bool
      * }>
      */
     private function yearlySummaries(WealthAsset $asset, CarbonInterface $asOf): array
@@ -296,6 +309,8 @@ final class PortfolioPerformanceService
                 'contributions_cents' => $movement['contributions_cents'],
                 'withdrawals_cents' => $movement['withdrawals_cents'],
                 'investment_movement_cents' => $movement['investment_movement_cents'],
+                'opening_as_of' => $movement['opening_as_of'],
+                'used_synthetic_opening' => $movement['used_synthetic_opening'],
             ];
 
             $fyStart = $fyStart->copy()->addYear();

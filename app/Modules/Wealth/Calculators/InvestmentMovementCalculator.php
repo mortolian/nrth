@@ -6,6 +6,7 @@ use App\Modules\Wealth\Enums\WealthTransactionType;
 use App\Modules\Wealth\Models\WealthAsset;
 use App\Modules\Wealth\Models\WealthAssetTransaction;
 use App\Modules\Wealth\Models\WealthAssetValuation;
+use App\Modules\Wealth\Services\WealthFinancialYear;
 use Brick\Money\Money;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -13,26 +14,49 @@ use Illuminate\Support\Collection;
 final class InvestmentMovementCalculator
 {
     /**
+     * Investment movement for a single asset over [periodStart, periodEnd].
+     *
+     * Opening is the last valuation dated in the previous financial year (on or before
+     * the day before periodStart). Ancient carry-forward across missing years is not
+     * used — otherwise a sparse history dumps multi-year gains into the current FY.
+     *
+     * When there is no prior-FY valuation, opening is the first valuation inside the
+     * period (synthetic open), and only flows on/after that date are included.
+     *
      * @return array{
      *     opening_cents: int,
      *     closing_cents: int,
      *     contributions_cents: int,
      *     withdrawals_cents: int,
      *     investment_movement_cents: int,
-     *     currency: string
+     *     currency: string,
+     *     opening_as_of: string|null,
+     *     used_synthetic_opening: bool
      * }
      */
     public function forAsset(WealthAsset $asset, CarbonInterface $periodStart, CarbonInterface $periodEnd): array
     {
         $currency = $asset->currency;
-        $openingDate = $periodStart->copy()->subDay();
+        $openingDate = $periodStart->copy()->subDay()->startOfDay();
+        $startMonth = (int) ($asset->portfolio?->financial_year_start_month
+            ?? $asset->portfolio()->value('financial_year_start_month')
+            ?? 3);
 
-        $opening = $asset->valueCentsAsOf($openingDate);
-        $closing = $asset->valueCentsAsOf($periodEnd);
+        [$previousFyStart] = WealthFinancialYear::windowContaining($openingDate, $startMonth);
 
-        // Mid-year starts have no valuation before the period. Use the first in-period
-        // valuation as the opening book value so that starting balance is not treated as growth.
-        if ($opening === 0) {
+        $prior = $asset->valuationAsOf($openingDate);
+        $priorInPreviousFy = $prior !== null
+            && $prior->valued_on->greaterThanOrEqualTo($previousFyStart->copy()->startOfDay())
+            && $prior->valued_on->lessThanOrEqualTo($openingDate);
+
+        $usedSyntheticOpening = false;
+        $openingAsOf = null;
+        $flowStart = $periodStart->copy()->startOfDay();
+
+        if ($priorInPreviousFy) {
+            $opening = (int) $prior->value_cents;
+            $openingAsOf = $prior->valued_on->toDateString();
+        } else {
             $firstInPeriod = WealthAssetValuation::query()
                 ->where('asset_id', $asset->id)
                 ->whereDate('valued_on', '>=', $periodStart->toDateString())
@@ -43,10 +67,16 @@ final class InvestmentMovementCalculator
 
             if ($firstInPeriod !== null) {
                 $opening = (int) $firstInPeriod->value_cents;
+                $openingAsOf = $firstInPeriod->valued_on->toDateString();
+                $flowStart = $firstInPeriod->valued_on->copy()->startOfDay();
+                $usedSyntheticOpening = true;
+            } else {
+                $opening = 0;
             }
         }
 
-        $flows = $this->periodFlows($asset, $periodStart, $periodEnd);
+        $closing = $asset->valueCentsAsOf($periodEnd);
+        $flows = $this->periodFlows($asset, $flowStart, $periodEnd);
 
         $investmentMovement = $closing - $opening - $flows['contributions_cents'] + $flows['withdrawals_cents'];
 
@@ -57,6 +87,8 @@ final class InvestmentMovementCalculator
             'withdrawals_cents' => $flows['withdrawals_cents'],
             'investment_movement_cents' => $investmentMovement,
             'currency' => $currency,
+            'opening_as_of' => $openingAsOf,
+            'used_synthetic_opening' => $usedSyntheticOpening,
         ];
     }
 

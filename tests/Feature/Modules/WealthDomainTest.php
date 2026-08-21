@@ -284,19 +284,29 @@ class WealthDomainTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Wealth/Assets/Show')
+                ->has('detail.valuations', 3)
+                ->where('detail.valuations.0.valued_on', '2027-03-31')
+                ->where('detail.valuations.0.change_cents', null)
+                ->where('detail.valuations.1.valued_on', '2026-02-28')
+                ->where('detail.valuations.1.change_cents', null)
+                ->where('detail.valuations.2.valued_on', '2025-02-28')
+                ->where('detail.valuations.2.change_cents', null)
+                ->where('detail.chart.1.change_cents', 1_500_000)
                 ->has('detail.yearly_summaries', 4)
                 ->where('detail.yearly_summaries.0.label', '2027/28')
                 ->where('detail.yearly_summaries.0.is_current', true)
-                ->where('detail.yearly_summaries.0.opening_cents', 11_500_000)
+                ->where('detail.yearly_summaries.0.opening_cents', 12_200_000)
                 ->where('detail.yearly_summaries.0.closing_cents', 12_200_000)
                 ->where('detail.yearly_summaries.0.contributions_cents', 0)
-                ->where('detail.yearly_summaries.0.investment_movement_cents', 700_000)
+                ->where('detail.yearly_summaries.0.investment_movement_cents', 0)
+                ->where('detail.yearly_summaries.0.used_synthetic_opening', true)
                 ->where('detail.yearly_summaries.1.label', '2026/27')
                 ->where('detail.yearly_summaries.1.is_current', false)
                 ->where('detail.yearly_summaries.1.opening_cents', 11_500_000)
                 ->where('detail.yearly_summaries.1.closing_cents', 11_500_000)
                 ->where('detail.yearly_summaries.1.contributions_cents', 500_000)
                 ->where('detail.yearly_summaries.1.investment_movement_cents', -500_000)
+                ->where('detail.yearly_summaries.1.used_synthetic_opening', false)
                 ->where('detail.yearly_summaries.2.label', '2025/26')
                 ->where('detail.yearly_summaries.2.opening_cents', 10_000_000)
                 ->where('detail.yearly_summaries.2.closing_cents', 11_500_000)
@@ -305,7 +315,8 @@ class WealthDomainTest extends TestCase
                 ->where('detail.yearly_summaries.3.label', '2024/25')
                 ->where('detail.yearly_summaries.3.opening_cents', 10_000_000)
                 ->where('detail.yearly_summaries.3.closing_cents', 10_000_000)
-                ->where('detail.yearly_summaries.3.investment_movement_cents', 0));
+                ->where('detail.yearly_summaries.3.investment_movement_cents', 0)
+                ->where('detail.yearly_summaries.3.used_synthetic_opening', true));
 
         Carbon::setTestNow();
     }
