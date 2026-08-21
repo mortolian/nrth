@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.18](https://github.com/mortolian/nrth/compare/v0.1.17...v0.1.18) (2026-08-21)
+
+
+### Bug Fixes
+
+* **invoicing:** use header select-all for invoice bulk actions ([14a3d8a](https://github.com/mortolian/nrth/commit/14a3d8a6366e69be6d46914018e0b6fcb7e40e60))
+
 ## [0.1.17](https://github.com/mortolian/nrth/compare/v0.1.16...v0.1.17) (2026-08-21)
 
 
