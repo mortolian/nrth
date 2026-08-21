@@ -121,7 +121,7 @@ const form = ref({
 
 const spotHint = ref<{ rate: number; date: string } | null>(null);
 const spotError = ref<string | null>(null);
-/** When false, bank received tracks the payment-date spot rate. */
+/** When true, user edited bank received — do not overwrite from spot rate. */
 const bankAmountDirty = ref(false);
 
 const centsToMajorInput = (cents: number): string => (cents / 100).toFixed(2);
@@ -272,7 +272,8 @@ watch(
             }
             spotHint.value = { rate: Number(data.rate), date: String(data.date) };
             spotError.value = null;
-            applyIndicativeBankAmount();
+            // Seed only while empty so changing payment date does not overwrite bank received.
+            seedBankAmountIfEmpty();
         } catch {
             spotError.value = 'Could not load indicative rate.';
             spotHint.value = null;
@@ -292,8 +293,11 @@ const indicativeBankCents = computed(() => {
     return Math.round(paymentInvoiceCents.value * spotHint.value.rate);
 });
 
-const applyIndicativeBankAmount = () => {
+const seedBankAmountIfEmpty = () => {
     if (bankAmountDirty.value) {
+        return;
+    }
+    if (form.value.bank_amount_business.trim() !== '') {
         return;
     }
     const cents = indicativeBankCents.value;
@@ -303,10 +307,24 @@ const applyIndicativeBankAmount = () => {
     form.value.bank_amount_business = centsToMajorInput(cents);
 };
 
+/** When payment amount changes and the user has not edited bank received, refresh from current rate. */
 watch(
-    () => [indicativeBankCents.value, bankAmountDirty.value] as const,
-    () => {
-        applyIndicativeBankAmount();
+    () => paymentInvoiceCents.value,
+    (cents, previous) => {
+        if (bankAmountDirty.value) {
+            return;
+        }
+        if (previous === undefined) {
+            return;
+        }
+        if (cents === previous) {
+            return;
+        }
+        const indicative = indicativeBankCents.value;
+        if (indicative == null) {
+            return;
+        }
+        form.value.bank_amount_business = centsToMajorInput(indicative);
     },
 );
 
@@ -490,8 +508,8 @@ const submit = () => {
                             @update:model-value="(v) => { bankAmountDirty = true; form.bank_amount_business = v; }"
                         />
                         <p class="mt-1 text-xs text-slate-500">
-                            Defaults to the exchange rate for the payment date. Override if the amount that cleared
-                            your bank differs.
+                            Seeded once from the payment-date rate when empty. Changing the date updates the indicative
+                            rate only — edit this field if the amount that cleared your bank differs.
                         </p>
                     </div>
                     <div
@@ -559,11 +577,7 @@ const submit = () => {
 
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Payment date</label>
-                    <AppInput
-                        :model-value="form.payment_date"
-                        type="date"
-                        @update:model-value="(v) => { bankAmountDirty = false; form.payment_date = v; }"
-                    />
+                    <AppInput v-model="form.payment_date" type="date" />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Method</label>
