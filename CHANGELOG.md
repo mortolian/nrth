@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.15](https://github.com/mortolian/nrth/compare/v0.1.14...v0.1.15) (2026-08-21)
+
+
+### Features
+
+* tighten client required fields and relocate note templates ([b8e049d](https://github.com/mortolian/nrth/commit/b8e049d577031ea884b02f772910ea8ae961341f))
+
 ## [0.1.14](https://github.com/mortolian/nrth/compare/v0.1.13...v0.1.14) (2026-08-21)
 
 
