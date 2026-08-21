@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.13](https://github.com/mortolian/nrth/compare/v0.1.12...v0.1.13) (2026-08-21)
+
+
+### Features
+
+* **wealth:** add asset row actions and collapsible overview sections ([433e1a2](https://github.com/mortolian/nrth/commit/433e1a25506dee6fac3ad86bfa953bf3915b73a4))
+
 ## [0.1.12](https://github.com/mortolian/nrth/compare/v0.1.11...v0.1.12) (2026-08-21)
 
 
