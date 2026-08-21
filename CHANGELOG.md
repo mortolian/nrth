@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.9](https://github.com/mortolian/nrth/compare/v0.1.8...v0.1.9) (2026-08-21)
+
+
+### Features
+
+* **wealth:** improve charts with scaled axes, ranges, and collapsible sections ([35d59f6](https://github.com/mortolian/nrth/commit/35d59f6848e743fb529254a6e99a90d6add916c3))
+
 ## [0.1.8](https://github.com/mortolian/nrth/compare/v0.1.7...v0.1.8) (2026-08-21)
 
 
