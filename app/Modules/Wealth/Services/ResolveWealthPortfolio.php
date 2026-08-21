@@ -17,18 +17,23 @@ final class ResolveWealthPortfolio
     /**
      * @return Collection<int, WealthPortfolio>
      */
-    public function listForTeam(Team $team): Collection
+    public function listForTeam(Team $team, bool $includeArchived = false): Collection
     {
         $this->ensureDefault->forTeam($team);
 
-        return WealthPortfolio::query()
+        $query = WealthPortfolio::query()
             ->where('team_id', $team->id)
             ->orderByDesc('is_default')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($includeArchived) {
+            $query->withTrashed();
+        }
+
+        return $query->get();
     }
 
-    public function resolve(Team $team, ?int $requestedId = null): WealthPortfolio
+    public function resolve(Team $team, ?int $requestedId = null, bool $allowArchived = false): WealthPortfolio
     {
         $this->ensureDefault->forTeam($team);
 
@@ -38,13 +43,20 @@ final class ResolveWealthPortfolio
             ?? (Session::has($sessionKey) ? (int) Session::get($sessionKey) : null);
 
         if ($candidateId !== null && $candidateId > 0) {
-            $portfolio = WealthPortfolio::query()
+            $query = WealthPortfolio::query()
                 ->where('team_id', $team->id)
-                ->whereKey($candidateId)
-                ->first();
+                ->whereKey($candidateId);
+
+            if ($allowArchived) {
+                $query->withTrashed();
+            }
+
+            $portfolio = $query->first();
 
             if ($portfolio !== null) {
-                Session::put($sessionKey, $portfolio->id);
+                if (! $portfolio->trashed()) {
+                    Session::put($sessionKey, $portfolio->id);
+                }
 
                 return $portfolio;
             }
@@ -71,7 +83,7 @@ final class ResolveWealthPortfolio
     }
 
     /**
-     * @return array{id: int, name: string, base_currency: string, financial_year_start_month: int, is_default: bool, notes: string|null}
+     * @return array{id: int, name: string, base_currency: string, financial_year_start_month: int, is_default: bool, notes: string|null, is_archived: bool, archived_at: string|null}
      */
     public function present(WealthPortfolio $portfolio): array
     {
@@ -82,15 +94,17 @@ final class ResolveWealthPortfolio
             'financial_year_start_month' => (int) $portfolio->financial_year_start_month,
             'is_default' => (bool) $portfolio->is_default,
             'notes' => $portfolio->notes,
+            'is_archived' => $portfolio->trashed(),
+            'archived_at' => $portfolio->deleted_at?->toDateString(),
         ];
     }
 
     /**
-     * @return list<array{id: int, name: string, base_currency: string, financial_year_start_month: int, is_default: bool, notes: string|null}>
+     * @return list<array{id: int, name: string, base_currency: string, financial_year_start_month: int, is_default: bool, notes: string|null, is_archived: bool, archived_at: string|null}>
      */
-    public function presentList(Team $team): array
+    public function presentList(Team $team, bool $includeArchived = false): array
     {
-        return $this->listForTeam($team)
+        return $this->listForTeam($team, $includeArchived)
             ->map(fn (WealthPortfolio $p) => $this->present($p))
             ->values()
             ->all();

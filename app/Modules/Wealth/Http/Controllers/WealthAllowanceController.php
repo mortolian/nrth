@@ -29,7 +29,6 @@ class WealthAllowanceController extends Controller
 
         $assets = WealthAsset::query()
             ->where('portfolio_id', $portfolio->id)
-            ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'owner_name']);
 

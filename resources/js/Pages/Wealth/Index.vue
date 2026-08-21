@@ -11,6 +11,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import DialogModal from '@/Components/DialogModal.vue';
+import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import HelpTip from '@/Components/HelpTip.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
@@ -37,6 +38,8 @@ type Portfolio = {
     financial_year_start_month: number;
     is_default: boolean;
     notes: string | null;
+    is_archived: boolean;
+    archived_at: string | null;
 };
 
 type Overview = {
@@ -60,6 +63,21 @@ type Overview = {
         current_value_cents: number;
         period_movement_cents: number;
         financial_year_movement_cents: number;
+        is_archived: boolean;
+        archived_at: string | null;
+    }>;
+};
+
+type HistoricalGrowth = {
+    title: string;
+    end_month_label: string;
+    rows: Array<{
+        fy_label: string;
+        year_end_label: string;
+        date: string;
+        value_cents: number;
+        movement_cents: number | null;
+        is_current: boolean;
     }>;
 };
 
@@ -68,6 +86,8 @@ const props = defineProps<{
     portfolios: Portfolio[];
     overview: Overview;
     monthly_history: Array<{ label: string; date: string; value_cents: number }>;
+    historical_growth: HistoricalGrowth;
+    show_archived: boolean;
     can_manage: boolean;
 }>();
 
@@ -85,9 +105,19 @@ const formatSigned = (cents: number) => {
     return formatted;
 };
 
+const changeClass = (cents: number) => {
+    const n = Number(cents) || 0;
+    if (n > 0) return 'text-emerald-700';
+    if (n < 0) return 'text-rose-700';
+    return 'text-slate-900';
+};
+
 const portfolioOptions = computed(() =>
     props.portfolios.map((p) => ({
-        label: p.is_default ? `${p.name} (default)` : p.name,
+        label: [
+            p.is_default ? `${p.name} (default)` : p.name,
+            p.is_archived ? '· archived' : null,
+        ].filter(Boolean).join(' '),
         value: String(p.id),
     })),
 );
@@ -102,8 +132,37 @@ watch(
 
 const switchPortfolio = (value: string) => {
     if (value === String(props.portfolio.id)) return;
-    router.get(route('wealth.index', { portfolio: value }), {}, { preserveState: false });
+    router.get(
+        route('wealth.index', {
+            portfolio: value,
+            ...(props.show_archived ? { show_archived: 1 } : {}),
+        }),
+        {},
+        { preserveState: false },
+    );
 };
+
+const toggleShowArchived = () => {
+    router.get(
+        route('wealth.index', {
+            portfolio: props.portfolio.id,
+            ...(props.show_archived ? {} : { show_archived: 1 }),
+        }),
+        {},
+        { preserveState: false, preserveScroll: true },
+    );
+};
+
+const portfolioQuery = computed(() => ({
+    portfolio: props.portfolio.id,
+    ...(props.show_archived ? { show_archived: 1 } : {}),
+}));
+
+const activePortfolioCount = computed(
+    () => props.portfolios.filter((p) => !p.is_archived).length,
+);
+
+const showForceDeletePortfolio = ref(false);
 
 const showCreateModal = ref(false);
 const showEditModal = ref(false);
@@ -203,13 +262,44 @@ const updatePortfolio = () => {
 };
 
 const archivePortfolio = () => {
-    if (savingPortfolio.value || props.portfolios.length <= 1) return;
+    if (savingPortfolio.value || activePortfolioCount.value <= 1 || props.portfolio.is_archived) return;
     savingPortfolio.value = true;
     router.delete(route('wealth.portfolios.destroy', props.portfolio.id), {
         onSuccess: () => {
             showEditModal.value = false;
         },
         onError: () => toast.error('Could not archive portfolio.'),
+        onFinish: () => {
+            savingPortfolio.value = false;
+        },
+    });
+};
+
+const restorePortfolio = () => {
+    if (savingPortfolio.value || !props.portfolio.is_archived) return;
+    savingPortfolio.value = true;
+    router.post(route('wealth.portfolios.restore', props.portfolio.id), {}, {
+        onSuccess: () => {
+            showEditModal.value = false;
+            toast.success('Portfolio restored.');
+        },
+        onError: () => toast.error('Could not restore portfolio.'),
+        onFinish: () => {
+            savingPortfolio.value = false;
+        },
+    });
+};
+
+const forceDeletePortfolio = () => {
+    if (savingPortfolio.value) return;
+    if (!props.portfolio.is_archived && activePortfolioCount.value <= 1) return;
+    savingPortfolio.value = true;
+    router.delete(route('wealth.portfolios.force-destroy', props.portfolio.id), {
+        onSuccess: () => {
+            showEditModal.value = false;
+            showForceDeletePortfolio.value = false;
+        },
+        onError: () => toast.error('Could not delete portfolio.'),
         onFinish: () => {
             savingPortfolio.value = false;
         },
@@ -224,6 +314,14 @@ const columns: TableColumn[] = [
     { key: 'value', label: 'Current value', align: 'right' },
     { key: 'period', label: 'Period movement', align: 'right' },
     { key: 'fy', label: 'FY movement', align: 'right' },
+];
+
+const growthColumns: TableColumn[] = [
+    { key: 'fy', label: 'Financial year' },
+    { key: 'year_end', label: 'Year-end' },
+    { key: 'as_of', label: 'As of' },
+    { key: 'value', label: 'Market value', align: 'right' },
+    { key: 'movement', label: 'Movement', align: 'right' },
 ];
 
 const chartOptions = computed(() => {
@@ -268,8 +366,6 @@ const chartOptions = computed(() => {
         ],
     };
 });
-
-const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
 </script>
 
 <template>
@@ -279,7 +375,7 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
     >
         <PageHeader
             title="Wealth"
-            :subtitle="`Viewing ${portfolio.name} · ${portfolio.base_currency}`"
+            :subtitle="`Viewing ${portfolio.name} · ${portfolio.base_currency}${portfolio.is_archived ? ' · archived' : ''}`"
         >
             <template #actions>
                 <div class="flex flex-wrap items-center gap-2">
@@ -291,6 +387,14 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
                             @update:model-value="switchPortfolio"
                         />
                     </div>
+                    <AppButton
+                        variant="secondary"
+                        size="sm"
+                        :class="show_archived ? 'ring-1 ring-slate-300' : ''"
+                        @click="toggleShowArchived"
+                    >
+                        {{ show_archived ? 'Hide archived' : 'Show archived' }}
+                    </AppButton>
                     <AppButton
                         v-if="canManage"
                         variant="secondary"
@@ -313,7 +417,7 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
                     <Link :href="route('wealth.allowances.index', portfolioQuery)">
                         <AppButton variant="secondary" size="sm">Allowances</AppButton>
                     </Link>
-                    <Link v-if="canManage" :href="route('wealth.assets.create', portfolioQuery)">
+                    <Link v-if="canManage && !portfolio.is_archived" :href="route('wealth.assets.create', portfolioQuery)">
                         <AppButton variant="primary" size="sm">Add asset</AppButton>
                     </Link>
                 </div>
@@ -335,13 +439,72 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
             </AppCard>
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Change this month</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatSigned(overview.month.investment_movement_cents) }}</p>
+                <p
+                    class="mt-2 text-xl font-semibold tabular-nums"
+                    :class="changeClass(overview.month.investment_movement_cents)"
+                >
+                    {{ formatSigned(overview.month.investment_movement_cents) }}
+                </p>
             </AppCard>
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Change FY {{ overview.financial_year.label }}</p>
-                <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatSigned(overview.financial_year.investment_movement_cents) }}</p>
+                <p
+                    class="mt-2 text-xl font-semibold tabular-nums"
+                    :class="changeClass(overview.financial_year.investment_movement_cents)"
+                >
+                    {{ formatSigned(overview.financial_year.investment_movement_cents) }}
+                </p>
             </AppCard>
         </div>
+
+        <AppCard class="mt-6">
+            <div class="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <div class="flex items-center gap-1.5">
+                    <h3 class="text-base font-semibold text-slate-900">{{ historical_growth.title }}</h3>
+                    <HelpTip
+                        :text="`Market value at each financial year-end (${historical_growth.end_month_label}), with movement vs the previous year-end. The current year shows year-to-date.`"
+                        label="About year-end portfolio value"
+                    />
+                </div>
+            </div>
+            <AppTable
+                v-if="historical_growth.rows.length"
+                :columns="growthColumns"
+                :show-pagination="false"
+                dense
+                table-class="text-sm"
+                embedded
+            >
+                <tr
+                    v-for="row in historical_growth.rows"
+                    :key="row.date"
+                    :class="row.is_current ? 'bg-slate-50' : ''"
+                >
+                    <td class="whitespace-nowrap px-3 py-2">
+                        <span class="font-medium text-slate-900">{{ row.fy_label }}</span>
+                        <span v-if="row.is_current" class="ml-2 text-xs font-medium text-brand-700">Current</span>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">
+                        {{ row.year_end_label }}
+                        <span v-if="row.is_current" class="text-slate-500"> · YTD</span>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.date }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
+                        {{ formatCents(row.value_cents) }}
+                    </td>
+                    <td
+                        class="whitespace-nowrap px-3 py-2 text-right tabular-nums"
+                        :class="row.movement_cents == null ? 'text-slate-400' : changeClass(row.movement_cents)"
+                    >
+                        <template v-if="row.movement_cents == null">—</template>
+                        <template v-else>{{ formatSigned(row.movement_cents) }}</template>
+                    </td>
+                </tr>
+            </AppTable>
+            <p v-else class="text-sm text-slate-500">
+                Add valuations across financial years to see year-end portfolio value at each {{ historical_growth.end_month_label }} year-end.
+            </p>
+        </AppCard>
 
         <AppCard class="mt-6">
             <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -405,7 +568,10 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
         </AppCard>
 
         <AppCard class="mt-6">
-            <h3 class="mb-3 text-base font-semibold text-slate-900">Assets</h3>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 class="text-base font-semibold text-slate-900">Assets</h3>
+                <p v-if="show_archived" class="text-xs text-slate-500">Archived assets are shown with a badge and excluded from totals above.</p>
+            </div>
             <AppTable
                 v-if="overview.assets.length"
                 :columns="columns"
@@ -418,9 +584,15 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
                     v-for="row in overview.assets"
                     :key="row.id"
                     class="cursor-pointer hover:bg-slate-50"
+                    :class="row.is_archived ? 'bg-slate-50/80' : ''"
                     @click="router.visit(route('wealth.assets.show', row.id))"
                 >
-                    <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">{{ row.name }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
+                        <span class="inline-flex items-center gap-2">
+                            {{ row.name }}
+                            <AppBadge v-if="row.is_archived" variant="neutral">Archived</AppBadge>
+                        </span>
+                    </td>
                     <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.owner_name }}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.asset_type_label }}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.institution || '—' }}</td>
@@ -435,7 +607,7 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
                 :description="canManage ? 'Add your first investment, savings, or retirement account to this portfolio.' : 'Assets will appear here once someone with access adds them.'"
                 :icon="PiggyBank"
             >
-                <template v-if="canManage" #action>
+                <template v-if="canManage && !portfolio.is_archived" #action>
                     <Link :href="route('wealth.assets.create', portfolioQuery)">
                         <AppButton variant="primary" size="sm">Add asset</AppButton>
                     </Link>
@@ -492,29 +664,66 @@ const portfolioQuery = computed(() => ({ portfolio: props.portfolio.id }));
                         >
                         Default portfolio for this business
                     </label>
-                    <p v-if="portfolios.length > 1" class="text-xs text-slate-500">
-                        Archiving removes this portfolio from the switcher. Assets remain in the database but are not shown until restored in a later release.
+                    <p class="text-xs text-slate-500">
+                        Archive hides this portfolio from the switcher (unless Show archived is on). Delete permanently removes the portfolio and all of its assets.
                     </p>
                 </div>
             </template>
             <template #footer>
                 <div class="flex w-full flex-wrap items-center justify-between gap-2">
-                    <AppButton
-                        v-if="portfolios.length > 1"
-                        variant="danger"
-                        :disabled="savingPortfolio"
-                        @click="archivePortfolio"
-                    >
-                        Archive portfolio
-                    </AppButton>
+                    <div class="flex flex-wrap gap-2">
+                        <AppButton
+                            v-if="!portfolio.is_archived && activePortfolioCount > 1"
+                            variant="danger"
+                            :disabled="savingPortfolio"
+                            @click="archivePortfolio"
+                        >
+                            Archive
+                        </AppButton>
+                        <AppButton
+                            v-if="portfolio.is_archived"
+                            variant="secondary"
+                            :disabled="savingPortfolio"
+                            @click="restorePortfolio"
+                        >
+                            Restore
+                        </AppButton>
+                        <AppButton
+                            v-if="portfolio.is_archived || activePortfolioCount > 1"
+                            variant="danger"
+                            :disabled="savingPortfolio"
+                            @click="showForceDeletePortfolio = true"
+                        >
+                            Delete permanently
+                        </AppButton>
+                    </div>
                     <div class="ml-auto flex gap-2">
                         <AppButton variant="secondary" :disabled="savingPortfolio" @click="showEditModal = false">Cancel</AppButton>
-                        <AppButton variant="primary" :loading="savingPortfolio" :disabled="savingPortfolio" @click="updatePortfolio">
+                        <AppButton variant="primary" :loading="savingPortfolio" :disabled="savingPortfolio || portfolio.is_archived" @click="updatePortfolio">
                             Save
                         </AppButton>
                     </div>
                 </div>
             </template>
         </DialogModal>
+
+        <ConfirmationModal :show="showForceDeletePortfolio" @close="showForceDeletePortfolio = false">
+            <template #title>
+                Delete portfolio permanently?
+            </template>
+            <template #content>
+                <p class="text-sm text-slate-600">
+                    This permanently deletes <strong>{{ portfolio.name }}</strong> and all of its assets, valuations, and transactions. This cannot be undone.
+                </p>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton variant="secondary" :disabled="savingPortfolio" @click="showForceDeletePortfolio = false">Cancel</AppButton>
+                    <AppButton variant="danger" :loading="savingPortfolio" :disabled="savingPortfolio" @click="forceDeletePortfolio">
+                        Delete permanently
+                    </AppButton>
+                </div>
+            </template>
+        </ConfirmationModal>
     </AppLayout>
 </template>

@@ -58,6 +58,235 @@ class WealthDomainTest extends TestCase
                 ->where('overview.total_cents', 4_800_000));
     }
 
+    public function test_owner_can_edit_opening_valuation_from_asset_form(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $team->setModuleEnabled(ModuleCatalog::WEALTH, true);
+
+        $this->actingAs($owner)
+            ->post(route('wealth.assets.store'), [
+                'name' => 'TFSA',
+                'owner_name' => 'Alex',
+                'asset_type' => WealthAssetType::TaxFreeSavings->value,
+                'institution' => 'EasyEquities',
+                'liquidity' => WealthLiquidity::Accessible->value,
+                'opening_value_cents' => 4_600_000,
+                'opening_valued_on' => '2026-03-01',
+            ])
+            ->assertRedirect();
+
+        $asset = WealthAsset::query()->where('name', 'TFSA')->firstOrFail();
+        $openingId = $asset->valuations()->orderBy('valued_on')->orderBy('id')->value('id');
+
+        $this->actingAs($owner)
+            ->get(route('wealth.assets.edit', $asset))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Wealth/Assets/Form')
+                ->where('asset.opening_valuation.value_cents', 4_600_000)
+                ->where('asset.opening_valuation.valued_on', '2026-03-01'));
+
+        $this->actingAs($owner)
+            ->put(route('wealth.assets.update', $asset), [
+                'name' => 'TFSA',
+                'owner_name' => 'Alex',
+                'asset_type' => WealthAssetType::TaxFreeSavings->value,
+                'institution' => 'EasyEquities',
+                'liquidity' => WealthLiquidity::Accessible->value,
+                'is_active' => true,
+                'opening_value_cents' => 5_000_000,
+                'opening_valued_on' => '2026-03-15',
+            ])
+            ->assertRedirect(route('wealth.assets.show', $asset));
+
+        $opening = $asset->valuations()->findOrFail($openingId);
+        $this->assertSame(5_000_000, (int) $opening->value_cents);
+        $this->assertSame('2026-03-15', $opening->valued_on->toDateString());
+        $this->assertSame(1, $asset->valuations()->count());
+    }
+
+    public function test_overview_includes_historical_growth_by_financial_year_end(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-01'));
+
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $team->setModuleEnabled(ModuleCatalog::WEALTH, true);
+
+        $portfolio = WealthPortfolio::query()->create([
+            'team_id' => $team->id,
+            'name' => 'Household',
+            'base_currency' => 'ZAR',
+            'financial_year_start_month' => 3,
+            'is_default' => true,
+        ]);
+
+        $asset = WealthAsset::query()->create([
+            'team_id' => $team->id,
+            'portfolio_id' => $portfolio->id,
+            'name' => 'TFSA',
+            'owner_name' => 'Alex',
+            'asset_type' => WealthAssetType::TaxFreeSavings,
+            'institution' => 'EasyEquities',
+            'currency' => 'ZAR',
+            'liquidity' => WealthLiquidity::Accessible,
+            'is_active' => true,
+        ]);
+
+        $asset->valuations()->create([
+            'team_id' => $team->id,
+            'valued_on' => '2025-02-28',
+            'value_cents' => 10_000_000,
+            'currency' => 'ZAR',
+            'source' => 'manual',
+        ]);
+        $asset->valuations()->create([
+            'team_id' => $team->id,
+            'valued_on' => '2026-02-28',
+            'value_cents' => 11_000_000,
+            'currency' => 'ZAR',
+            'source' => 'manual',
+        ]);
+        $asset->valuations()->create([
+            'team_id' => $team->id,
+            'valued_on' => '2026-08-01',
+            'value_cents' => 11_500_000,
+            'currency' => 'ZAR',
+            'source' => 'manual',
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('wealth.index', ['portfolio' => $portfolio->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Wealth/Index')
+                ->where('historical_growth.title', 'Year-end portfolio value · March to February')
+                ->has('historical_growth.rows', 3)
+                ->where('historical_growth.rows.0.fy_label', '2026/27')
+                ->where('historical_growth.rows.0.year_end_label', 'August 2026')
+                ->where('historical_growth.rows.0.date', '2026-08-01')
+                ->where('historical_growth.rows.0.value_cents', 11_500_000)
+                ->where('historical_growth.rows.0.movement_cents', 500_000)
+                ->where('historical_growth.rows.0.is_current', true)
+                ->where('historical_growth.rows.1.fy_label', '2025/26')
+                ->where('historical_growth.rows.1.year_end_label', 'February 2026')
+                ->where('historical_growth.rows.1.value_cents', 11_000_000)
+                ->where('historical_growth.rows.1.movement_cents', 1_000_000)
+                ->where('historical_growth.rows.2.fy_label', '2024/25')
+                ->where('historical_growth.rows.2.year_end_label', 'February 2025')
+                ->where('historical_growth.rows.2.value_cents', 10_000_000)
+                ->where('historical_growth.rows.2.movement_cents', null));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_asset_archive_hides_from_overview_until_show_archived(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $team->setModuleEnabled(ModuleCatalog::WEALTH, true);
+
+        $portfolio = WealthPortfolio::query()->create([
+            'team_id' => $team->id,
+            'name' => 'Household',
+            'base_currency' => 'ZAR',
+            'financial_year_start_month' => 3,
+            'is_default' => true,
+        ]);
+
+        $asset = WealthAsset::query()->create([
+            'team_id' => $team->id,
+            'portfolio_id' => $portfolio->id,
+            'name' => 'TFSA',
+            'owner_name' => 'Alex',
+            'asset_type' => WealthAssetType::TaxFreeSavings,
+            'currency' => 'ZAR',
+            'liquidity' => WealthLiquidity::Accessible,
+            'is_active' => true,
+        ]);
+        $asset->valuations()->create([
+            'team_id' => $team->id,
+            'valued_on' => '2026-03-01',
+            'value_cents' => 1_000_000,
+            'currency' => 'ZAR',
+            'source' => 'manual',
+        ]);
+
+        $this->actingAs($owner)
+            ->delete(route('wealth.assets.destroy', $asset))
+            ->assertRedirect();
+
+        $this->assertSoftDeleted('wealth_assets', ['id' => $asset->id]);
+
+        $this->actingAs($owner)
+            ->get(route('wealth.index', ['portfolio' => $portfolio->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('overview.total_cents', 0)
+                ->where('overview.assets', []));
+
+        $this->actingAs($owner)
+            ->get(route('wealth.index', ['portfolio' => $portfolio->id, 'show_archived' => 1]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('show_archived', true)
+                ->where('overview.total_cents', 0)
+                ->has('overview.assets', 1)
+                ->where('overview.assets.0.is_archived', true)
+                ->where('overview.assets.0.name', 'TFSA'));
+
+        $this->actingAs($owner)
+            ->post(route('wealth.assets.restore', $asset))
+            ->assertRedirect();
+
+        $this->assertNull($asset->fresh()->deleted_at);
+
+        $this->actingAs($owner)
+            ->get(route('wealth.index', ['portfolio' => $portfolio->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('overview.total_cents', 1_000_000)
+                ->has('overview.assets', 1)
+                ->where('overview.assets.0.is_archived', false));
+    }
+
+    public function test_portfolio_force_delete_removes_assets(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $team->setModuleEnabled(ModuleCatalog::WEALTH, true);
+
+        $this->actingAs($owner)->get(route('wealth.index'))->assertOk();
+        $keep = WealthPortfolio::query()->where('team_id', $team->id)->firstOrFail();
+
+        $remove = WealthPortfolio::query()->create([
+            'team_id' => $team->id,
+            'name' => 'Remove',
+            'base_currency' => 'ZAR',
+            'financial_year_start_month' => 3,
+            'is_default' => false,
+        ]);
+        $asset = WealthAsset::query()->create([
+            'team_id' => $team->id,
+            'portfolio_id' => $remove->id,
+            'name' => 'Gone',
+            'owner_name' => 'Alex',
+            'asset_type' => WealthAssetType::Cash,
+            'currency' => 'ZAR',
+            'liquidity' => WealthLiquidity::Accessible,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($owner)
+            ->delete(route('wealth.portfolios.force-destroy', $remove))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('wealth_portfolios', ['id' => $remove->id]);
+        $this->assertDatabaseMissing('wealth_assets', ['id' => $asset->id]);
+        $this->assertDatabaseHas('wealth_portfolios', ['id' => $keep->id]);
+    }
+
     public function test_disabled_module_still_retains_data_rows(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();

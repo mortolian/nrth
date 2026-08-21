@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,7 +61,7 @@ class WealthAssetController extends Controller
             'liquidity' => $validated['liquidity'],
             'interest_rate_bps' => $validated['interest_rate_bps'] ?? null,
             'notes' => $validated['notes'] ?? null,
-            'is_active' => $validated['is_active'] ?? true,
+            'is_active' => true,
         ]);
 
         if (isset($validated['opening_value_cents']) && $validated['opening_value_cents'] !== null) {
@@ -105,6 +106,12 @@ class WealthAssetController extends Controller
         abort_unless($team !== null, 403);
         $portfolio = $asset->portfolio ?? $resolver->resolve($team);
 
+        $earliestValuation = $asset->valuations()
+            ->reorder()
+            ->orderBy('valued_on')
+            ->orderBy('id')
+            ->first();
+
         return Inertia::render('Wealth/Assets/Form', [
             'asset' => [
                 'id' => $asset->id,
@@ -115,7 +122,13 @@ class WealthAssetController extends Controller
                 'liquidity' => $asset->liquidity->value,
                 'interest_rate_bps' => $asset->interest_rate_bps,
                 'notes' => $asset->notes,
-                'is_active' => $asset->is_active,
+                'is_archived' => $asset->trashed(),
+                'archived_at' => $asset->deleted_at?->toDateString(),
+                'opening_valuation' => $earliestValuation === null ? null : [
+                    'id' => $earliestValuation->id,
+                    'valued_on' => $earliestValuation->valued_on->toDateString(),
+                    'value_cents' => (int) $earliestValuation->value_cents,
+                ],
             ],
             'portfolio' => $resolver->present($portfolio),
             'portfolios' => $resolver->presentList($team),
@@ -124,8 +137,11 @@ class WealthAssetController extends Controller
         ]);
     }
 
-    public function update(Request $request, WealthAsset $asset): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        WealthAsset $asset,
+        AssetValuationService $valuations,
+    ): RedirectResponse {
         $this->authorizeTeam('wealth.manage', $request);
         $this->assertTeamAsset($request, $asset);
         $portfolio = $asset->portfolio;
@@ -141,8 +157,16 @@ class WealthAssetController extends Controller
             'liquidity' => $validated['liquidity'],
             'interest_rate_bps' => $validated['interest_rate_bps'] ?? null,
             'notes' => $validated['notes'] ?? null,
-            'is_active' => $validated['is_active'] ?? true,
         ])->save();
+
+        if (array_key_exists('opening_value_cents', $validated) && $validated['opening_value_cents'] !== null) {
+            $this->syncOpeningValuation(
+                $asset,
+                $valuations,
+                (int) $validated['opening_value_cents'],
+                Carbon::parse($validated['opening_valued_on'] ?? now()->toDateString()),
+            );
+        }
 
         return redirect()
             ->route('wealth.assets.show', $asset)
@@ -153,12 +177,40 @@ class WealthAssetController extends Controller
     {
         $this->authorizeTeam('wealth.manage', $request);
         $this->assertTeamAsset($request, $asset);
+        abort_if($asset->trashed(), 404);
+
         $portfolioId = $asset->portfolio_id;
         $asset->delete();
 
         return redirect()
             ->route('wealth.index', ['portfolio' => $portfolioId])
             ->with('success', __('Asset archived.'));
+    }
+
+    public function restore(Request $request, WealthAsset $asset): RedirectResponse
+    {
+        $this->authorizeTeam('wealth.manage', $request);
+        $this->assertTeamAsset($request, $asset);
+        abort_unless($asset->trashed(), 404);
+
+        $asset->restore();
+
+        return redirect()
+            ->route('wealth.assets.show', $asset)
+            ->with('success', __('Asset restored.'));
+    }
+
+    public function forceDestroy(Request $request, WealthAsset $asset): RedirectResponse
+    {
+        $this->authorizeTeam('wealth.manage', $request);
+        $this->assertTeamAsset($request, $asset);
+
+        $portfolioId = $asset->portfolio_id;
+        $asset->forceDelete();
+
+        return redirect()
+            ->route('wealth.index', ['portfolio' => $portfolioId])
+            ->with('success', __('Asset deleted permanently.'));
     }
 
     /**
@@ -174,16 +226,50 @@ class WealthAssetController extends Controller
             'liquidity' => ['required', Rule::enum(WealthLiquidity::class)],
             'interest_rate_bps' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'notes' => ['nullable', 'string'],
-            'is_active' => ['sometimes', 'boolean'],
+            'opening_value_cents' => ['nullable', 'integer', 'min:0'],
+            'opening_valued_on' => ['nullable', 'date'],
         ];
 
         if (! $forUpdate) {
-            $rules['opening_value_cents'] = ['nullable', 'integer', 'min:0'];
-            $rules['opening_valued_on'] = ['nullable', 'date'];
             $rules['portfolio_id'] = ['nullable', 'integer'];
         }
 
         return $request->validate($rules);
+    }
+
+    private function syncOpeningValuation(
+        WealthAsset $asset,
+        AssetValuationService $valuations,
+        int $valueCents,
+        Carbon $valuedOn,
+    ): void {
+        $earliest = $asset->valuations()
+            ->reorder()
+            ->orderBy('valued_on')
+            ->orderBy('id')
+            ->first();
+
+        if ($earliest === null) {
+            $valuations->record($asset, $valuedOn, $valueCents);
+
+            return;
+        }
+
+        $newDate = $valuedOn->toDateString();
+        if ($earliest->valued_on->toDateString() !== $newDate) {
+            $conflict = $asset->valuations()
+                ->whereDate('valued_on', $newDate)
+                ->whereKeyNot($earliest->id)
+                ->exists();
+
+            if ($conflict) {
+                throw ValidationException::withMessages([
+                    'opening_valued_on' => __('Another valuation already exists on that date. Choose a different opening date, or edit that valuation on the asset page.'),
+                ]);
+            }
+        }
+
+        $valuations->update($earliest, $valuedOn, $valueCents, $earliest->notes);
     }
 
     private function assertTeamAsset(Request $request, WealthAsset $asset): void

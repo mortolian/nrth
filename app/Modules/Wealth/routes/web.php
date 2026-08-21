@@ -13,16 +13,20 @@ Route::get('/', WealthDashboardController::class)->name('index');
 Route::get('/history', WealthHistoryController::class)->name('history');
 
 Route::post('/portfolios', [WealthPortfolioController::class, 'store'])->name('portfolios.store');
-Route::put('/portfolios/{portfolio}', [WealthPortfolioController::class, 'update'])->name('portfolios.update');
-Route::post('/portfolios/{portfolio}/select', [WealthPortfolioController::class, 'select'])->name('portfolios.select');
+Route::put('/portfolios/{portfolio}', [WealthPortfolioController::class, 'update'])->withTrashed()->name('portfolios.update');
+Route::post('/portfolios/{portfolio}/select', [WealthPortfolioController::class, 'select'])->withTrashed()->name('portfolios.select');
 Route::delete('/portfolios/{portfolio}', [WealthPortfolioController::class, 'destroy'])->name('portfolios.destroy');
+Route::post('/portfolios/{portfolio}/restore', [WealthPortfolioController::class, 'restore'])->withTrashed()->name('portfolios.restore');
+Route::delete('/portfolios/{portfolio}/force', [WealthPortfolioController::class, 'forceDestroy'])->withTrashed()->name('portfolios.force-destroy');
 
 Route::get('/assets/create', [WealthAssetController::class, 'create'])->name('assets.create');
 Route::post('/assets', [WealthAssetController::class, 'store'])->name('assets.store');
-Route::get('/assets/{asset}', [WealthAssetController::class, 'show'])->name('assets.show');
-Route::get('/assets/{asset}/edit', [WealthAssetController::class, 'edit'])->name('assets.edit');
-Route::put('/assets/{asset}', [WealthAssetController::class, 'update'])->name('assets.update');
+Route::get('/assets/{asset}', [WealthAssetController::class, 'show'])->withTrashed()->name('assets.show');
+Route::get('/assets/{asset}/edit', [WealthAssetController::class, 'edit'])->withTrashed()->name('assets.edit');
+Route::put('/assets/{asset}', [WealthAssetController::class, 'update'])->withTrashed()->name('assets.update');
 Route::delete('/assets/{asset}', [WealthAssetController::class, 'destroy'])->name('assets.destroy');
+Route::post('/assets/{asset}/restore', [WealthAssetController::class, 'restore'])->withTrashed()->name('assets.restore');
+Route::delete('/assets/{asset}/force', [WealthAssetController::class, 'forceDestroy'])->withTrashed()->name('assets.force-destroy');
 
 Route::post('/assets/{asset}/valuations', [WealthValuationController::class, 'store'])->name('assets.valuations.store');
 Route::put('/assets/{asset}/valuations/{valuation}', [WealthValuationController::class, 'update'])->name('assets.valuations.update');

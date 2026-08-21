@@ -30,12 +30,17 @@ final class PortfolioPerformanceService
      *     assets: list<array<string, mixed>>
      * }
      */
-    public function overview(WealthPortfolio $portfolio, ?CarbonInterface $asOf = null): array
+    public function overview(WealthPortfolio $portfolio, ?CarbonInterface $asOf = null, bool $includeArchived = false): array
     {
         $asOf = ($asOf ?? now())->copy()->startOfDay();
         $currency = $portfolio->base_currency;
-        $assets = $portfolio->assets()->where('is_active', true)->orderBy('name')->get();
-        $assets->each->setRelation('portfolio', $portfolio);
+        $activeAssets = $portfolio->assets()->orderBy('name')->get();
+        $activeAssets->each->setRelation('portfolio', $portfolio);
+
+        $listAssets = $includeArchived
+            ? $portfolio->assets()->withTrashed()->orderBy('name')->get()
+            : $activeAssets;
+        $listAssets->each->setRelation('portfolio', $portfolio);
 
         $total = 0;
         $accessible = 0;
@@ -47,11 +52,10 @@ final class PortfolioPerformanceService
         [$fyStart, $fyEnd] = WealthFinancialYear::windowContaining($asOf, (int) $portfolio->financial_year_start_month);
         $fyPeriodEnd = $asOf->lt($fyEnd) ? $asOf : $fyEnd;
 
-        $monthMovement = $this->movement->forAssets($assets, $monthStart, $asOf, $currency);
-        $fyMovement = $this->movement->forAssets($assets, $fyStart, $fyPeriodEnd, $currency);
+        $monthMovement = $this->movement->forAssets($activeAssets, $monthStart, $asOf, $currency);
+        $fyMovement = $this->movement->forAssets($activeAssets, $fyStart, $fyPeriodEnd, $currency);
 
-        $assetRows = [];
-        foreach ($assets as $asset) {
+        foreach ($activeAssets as $asset) {
             if ($asset->currency !== $currency) {
                 continue;
             }
@@ -71,6 +75,13 @@ final class PortfolioPerformanceService
             $byType[$typeKey] = ($byType[$typeKey] ?? 0) + $value;
             $owner = $asset->owner_name;
             $byOwner[$owner] = ($byOwner[$owner] ?? 0) + $value;
+        }
+
+        $assetRows = [];
+        foreach ($listAssets as $asset) {
+            if ($asset->currency !== $currency) {
+                continue;
+            }
 
             $period = $this->movement->forAsset($asset, $monthStart, $asOf);
             $fy = $this->movement->forAsset($asset, $fyStart, $fyPeriodEnd);
@@ -82,13 +93,15 @@ final class PortfolioPerformanceService
                 'asset_type' => $asset->asset_type->value,
                 'asset_type_label' => $asset->asset_type->label(),
                 'institution' => $asset->institution,
-                'liquidity' => $liquidity->value,
-                'liquidity_label' => $liquidity->label(),
+                'liquidity' => $asset->liquidity->value,
+                'liquidity_label' => $asset->liquidity->label(),
                 'currency' => $asset->currency,
-                'current_value_cents' => $value,
+                'current_value_cents' => $asset->valueCentsAsOf($asOf),
                 'period_movement_cents' => $period['investment_movement_cents'],
                 'financial_year_movement_cents' => $fy['investment_movement_cents'],
                 'interest_rate_bps' => $asset->interest_rate_bps,
+                'is_archived' => $asset->trashed(),
+                'archived_at' => $asset->deleted_at?->toDateString(),
             ];
         }
 
@@ -238,6 +251,8 @@ final class PortfolioPerformanceService
                 'interest_rate_bps' => $asset->interest_rate_bps,
                 'notes' => $asset->notes,
                 'is_active' => $asset->is_active,
+                'is_archived' => $asset->trashed(),
+                'archived_at' => $asset->deleted_at?->toDateString(),
                 'portfolio_id' => $asset->portfolio_id,
             ],
             'current_value_cents' => $asset->valueCentsAsOf($asOf),

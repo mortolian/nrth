@@ -11,6 +11,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import AppTable from '@/Components/AppTable.vue';
 import type { TableColumn } from '@/Components/AppTable.vue';
 import DialogModal from '@/Components/DialogModal.vue';
+import ConfirmationModal from '@/Components/ConfirmationModal.vue';
 import HelpTip from '@/Components/HelpTip.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import type { RowActionItem } from '@/Components/InvoiceRowActionsMenu.vue';
@@ -46,7 +47,8 @@ const props = defineProps<{
             liquidity_label: string;
             interest_rate_bps: number | null;
             notes: string | null;
-            is_active: boolean;
+            is_archived: boolean;
+            archived_at: string | null;
         };
         current_value_cents: number;
         financial_year: {
@@ -109,6 +111,9 @@ const props = defineProps<{
 
 const toast = useToast();
 const currency = computed(() => props.detail.asset.currency || 'ZAR');
+const showArchiveConfirm = ref(false);
+const showForceDeleteConfirm = ref(false);
+const archiving = ref(false);
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, currency.value);
 const formatSigned = (cents: number) => {
     const n = Number(cents) || 0;
@@ -586,6 +591,46 @@ const toggleSection = (key: keyof AssetShowSections) => {
         [key]: !sectionsOpen.value[key],
     };
 };
+
+const archiveAsset = () => {
+    if (archiving.value || props.detail.asset.is_archived) return;
+    archiving.value = true;
+    router.delete(route('wealth.assets.destroy', props.detail.asset.id), {
+        onSuccess: () => {
+            showArchiveConfirm.value = false;
+        },
+        onError: () => toast.error('Could not archive asset.'),
+        onFinish: () => {
+            archiving.value = false;
+        },
+    });
+};
+
+const restoreAsset = () => {
+    if (archiving.value || !props.detail.asset.is_archived) return;
+    archiving.value = true;
+    router.post(route('wealth.assets.restore', props.detail.asset.id), {}, {
+        onSuccess: () => toast.success('Asset restored.'),
+        onError: () => toast.error('Could not restore asset.'),
+        onFinish: () => {
+            archiving.value = false;
+        },
+    });
+};
+
+const forceDeleteAsset = () => {
+    if (archiving.value) return;
+    archiving.value = true;
+    router.delete(route('wealth.assets.force-destroy', props.detail.asset.id), {
+        onSuccess: () => {
+            showForceDeleteConfirm.value = false;
+        },
+        onError: () => toast.error('Could not delete asset.'),
+        onFinish: () => {
+            archiving.value = false;
+        },
+    });
+};
 </script>
 
 <template>
@@ -601,13 +646,39 @@ const toggleSection = (key: keyof AssetShowSections) => {
             :subtitle="`${detail.asset.owner_name} · ${detail.asset.asset_type_label}${detail.asset.institution ? ` · ${detail.asset.institution}` : ''}`"
         >
             <template #actions>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <AppBadge v-if="detail.asset.is_archived" variant="neutral">Archived</AppBadge>
                     <Link :href="route('wealth.index')">
                         <AppButton variant="secondary" size="sm">Back to Wealth</AppButton>
                     </Link>
                     <Link v-if="can_manage" :href="route('wealth.assets.edit', detail.asset.id)">
                         <AppButton variant="secondary" size="sm">Edit</AppButton>
                     </Link>
+                    <AppButton
+                        v-if="can_manage && !detail.asset.is_archived"
+                        variant="secondary"
+                        size="sm"
+                        @click="showArchiveConfirm = true"
+                    >
+                        Archive
+                    </AppButton>
+                    <AppButton
+                        v-if="can_manage && detail.asset.is_archived"
+                        variant="secondary"
+                        size="sm"
+                        :disabled="archiving"
+                        @click="restoreAsset"
+                    >
+                        Restore
+                    </AppButton>
+                    <AppButton
+                        v-if="can_manage"
+                        variant="danger"
+                        size="sm"
+                        @click="showForceDeleteConfirm = true"
+                    >
+                        Delete
+                    </AppButton>
                 </div>
             </template>
         </PageHeader>
@@ -1102,5 +1173,43 @@ const toggleSection = (key: keyof AssetShowSections) => {
                 </AppButton>
             </template>
         </DialogModal>
+
+        <ConfirmationModal :show="showArchiveConfirm" @close="showArchiveConfirm = false">
+            <template #title>
+                Archive this asset?
+            </template>
+            <template #content>
+                <p class="text-sm text-slate-600">
+                    <strong>{{ detail.asset.name }}</strong> will be hidden from portfolio totals and the assets table unless you turn on Show archived. You can restore it later.
+                </p>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton variant="secondary" :disabled="archiving" @click="showArchiveConfirm = false">Cancel</AppButton>
+                    <AppButton variant="danger" :loading="archiving" :disabled="archiving" @click="archiveAsset">
+                        Archive
+                    </AppButton>
+                </div>
+            </template>
+        </ConfirmationModal>
+
+        <ConfirmationModal :show="showForceDeleteConfirm" @close="showForceDeleteConfirm = false">
+            <template #title>
+                Delete asset permanently?
+            </template>
+            <template #content>
+                <p class="text-sm text-slate-600">
+                    This permanently deletes <strong>{{ detail.asset.name }}</strong> and all of its valuations and transactions. This cannot be undone.
+                </p>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton variant="secondary" :disabled="archiving" @click="showForceDeleteConfirm = false">Cancel</AppButton>
+                    <AppButton variant="danger" :loading="archiving" :disabled="archiving" @click="forceDeleteAsset">
+                        Delete permanently
+                    </AppButton>
+                </div>
+            </template>
+        </ConfirmationModal>
     </AppLayout>
 </template>

@@ -160,6 +160,52 @@ class InvestmentMovementCalculatorTest extends TestCase
         $this->assertSame('2026-02-28', $end2->toDateString());
     }
 
+    public function test_trailing_year_allows_carry_forward_opening(): void
+    {
+        $asset = $this->makeAsset();
+
+        // Ancient snapshot still opens the YoY window (unlike FY movement).
+        $this->valuation($asset, '2024-08-01', 10_000_000);
+        $this->transaction($asset, WealthTransactionType::Contribution, '2026-01-15', 500_000);
+        $this->valuation($asset, '2026-08-01', 11_200_000);
+
+        $result = (new InvestmentMovementCalculator)->forAssetsTrailingYear(
+            collect([$asset->fresh(['portfolio'])]),
+            Carbon::parse('2026-08-01'),
+            'ZAR',
+        );
+
+        $this->assertSame('2025-08-01', $result['starts_on']);
+        $this->assertSame('2026-08-01', $result['ends_on']);
+        $this->assertSame(10_000_000, $result['opening_cents']);
+        $this->assertSame(11_200_000, $result['closing_cents']);
+        $this->assertSame(500_000, $result['contributions_cents']);
+        // 11.2m − 10m − 0.5m = 0.7m growth
+        $this->assertSame(700_000, $result['investment_movement_cents']);
+        $this->assertSame(7.0, $result['change_percent']);
+        $this->assertFalse($result['used_synthetic_opening']);
+    }
+
+    public function test_trailing_year_synthetic_open_when_no_prior_valuation(): void
+    {
+        $asset = $this->makeAsset();
+
+        $this->valuation($asset, '2026-03-01', 8_000_000);
+        $this->valuation($asset, '2026-08-01', 8_400_000);
+
+        $result = (new InvestmentMovementCalculator)->forAssetsTrailingYear(
+            collect([$asset->fresh(['portfolio'])]),
+            Carbon::parse('2026-08-01'),
+            'ZAR',
+        );
+
+        $this->assertTrue($result['used_synthetic_opening']);
+        $this->assertSame(8_000_000, $result['opening_cents']);
+        $this->assertSame(8_400_000, $result['closing_cents']);
+        $this->assertSame(400_000, $result['investment_movement_cents']);
+        $this->assertSame(5.0, $result['change_percent']);
+    }
+
     private function makeAsset(): WealthAsset
     {
         $owner = User::factory()->withPersonalTeam()->create();

@@ -15,7 +15,7 @@ final class PortfolioValuationService
      */
     public function valueAsOf(WealthPortfolio $portfolio, CarbonInterface $asOf, ?Collection $assets = null): int
     {
-        $assets ??= $portfolio->assets()->where('is_active', true)->get();
+        $assets ??= $portfolio->assets()->get();
 
         $total = 0;
         foreach ($assets as $asset) {
@@ -35,7 +35,7 @@ final class PortfolioValuationService
      */
     public function monthlySeries(WealthPortfolio $portfolio, ?CarbonInterface $from = null, ?CarbonInterface $to = null): array
     {
-        $assets = $portfolio->assets()->where('is_active', true)->get();
+        $assets = $portfolio->assets()->get();
         $to = ($to ?? now())->copy()->startOfDay();
         $from = $from?->copy()->startOfDay();
 
@@ -80,7 +80,7 @@ final class PortfolioValuationService
      */
     public function annualSeries(WealthPortfolio $portfolio, ?CarbonInterface $to = null): array
     {
-        $assets = $portfolio->assets()->where('is_active', true)->get();
+        $assets = $portfolio->assets()->get();
         $to = ($to ?? now())->copy()->startOfDay();
         $startMonth = (int) $portfolio->financial_year_start_month;
 
@@ -115,5 +115,58 @@ final class PortfolioValuationService
         }
 
         return $series;
+    }
+
+    /**
+     * FY-end portfolio values newest-first, with market-value movement vs the prior FY end.
+     *
+     * @return array{
+     *     title: string,
+     *     end_month_label: string,
+     *     rows: list<array{
+     *         fy_label: string,
+     *         year_end_label: string,
+     *         date: string,
+     *         value_cents: int,
+     *         movement_cents: int|null,
+     *         is_current: bool
+     *     }>
+     * }
+     */
+    public function historicalGrowth(WealthPortfolio $portfolio, ?CarbonInterface $to = null): array
+    {
+        $to = ($to ?? now())->copy()->startOfDay();
+        $startMonth = max(1, min(12, (int) $portfolio->financial_year_start_month));
+        $endMonth = $startMonth === 1 ? 12 : $startMonth - 1;
+        $startLabel = Carbon::create(null, $startMonth, 1)->format('F');
+        $endLabel = Carbon::create(null, $endMonth, 1)->format('F');
+
+        $annual = $this->annualSeries($portfolio, $to);
+        $rows = [];
+        $previousCents = null;
+
+        foreach ($annual as $point) {
+            $asOf = Carbon::parse($point['date'])->startOfDay();
+            [, $fyEnd] = WealthFinancialYear::windowContaining($asOf, $startMonth);
+            $isIncompleteCurrent = $asOf->lt($fyEnd);
+
+            $rows[] = [
+                'fy_label' => $point['label'],
+                'year_end_label' => $asOf->format('F Y'),
+                'date' => $point['date'],
+                'value_cents' => $point['value_cents'],
+                'movement_cents' => $previousCents === null
+                    ? null
+                    : $point['value_cents'] - $previousCents,
+                'is_current' => $isIncompleteCurrent,
+            ];
+            $previousCents = $point['value_cents'];
+        }
+
+        return [
+            'title' => "Year-end portfolio value · {$startLabel} to {$endLabel}",
+            'end_month_label' => $endLabel,
+            'rows' => array_reverse($rows),
+        ];
     }
 }

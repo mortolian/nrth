@@ -101,10 +101,11 @@ class WealthPortfolioController extends Controller
         $team = $request->user()->currentTeam;
         abort_unless($team !== null, 403);
         abort_unless((int) $portfolio->team_id === (int) $team->id, 404);
+        abort_if($portfolio->trashed(), 404);
 
         $count = WealthPortfolio::query()->where('team_id', $team->id)->count();
         if ($count <= 1) {
-            return back()->with('error', __('You need at least one portfolio.'));
+            return back()->with('error', __('You need at least one active portfolio.'));
         }
 
         $wasDefault = (bool) $portfolio->is_default;
@@ -122,5 +123,50 @@ class WealthPortfolioController extends Controller
         return redirect()
             ->route('wealth.index', ['portfolio' => $current->id])
             ->with('success', __('Portfolio archived.'));
+    }
+
+    public function restore(Request $request, WealthPortfolio $portfolio, ResolveWealthPortfolio $resolver): RedirectResponse
+    {
+        $this->authorizeTeam('wealth.manage', $request);
+        $team = $request->user()->currentTeam;
+        abort_unless($team !== null, 403);
+        abort_unless((int) $portfolio->team_id === (int) $team->id, 404);
+        abort_unless($portfolio->trashed(), 404);
+
+        $portfolio->restore();
+        $resolver->remember($team, $portfolio);
+
+        return redirect()
+            ->route('wealth.index', ['portfolio' => $portfolio->id, 'show_archived' => 1])
+            ->with('success', __('Portfolio restored.'));
+    }
+
+    public function forceDestroy(Request $request, WealthPortfolio $portfolio, ResolveWealthPortfolio $resolver): RedirectResponse
+    {
+        $this->authorizeTeam('wealth.manage', $request);
+        $team = $request->user()->currentTeam;
+        abort_unless($team !== null, 403);
+        abort_unless((int) $portfolio->team_id === (int) $team->id, 404);
+
+        $activeCount = WealthPortfolio::query()->where('team_id', $team->id)->count();
+        if (! $portfolio->trashed() && $activeCount <= 1) {
+            return back()->with('error', __('You need at least one active portfolio.'));
+        }
+
+        $wasDefault = (bool) $portfolio->is_default && ! $portfolio->trashed();
+        $portfolio->forceDelete();
+
+        if ($wasDefault) {
+            $next = WealthPortfolio::query()->where('team_id', $team->id)->orderBy('name')->first();
+            if ($next !== null) {
+                $next->forceFill(['is_default' => true])->save();
+            }
+        }
+
+        $current = $resolver->resolve($team);
+
+        return redirect()
+            ->route('wealth.index', ['portfolio' => $current->id])
+            ->with('success', __('Portfolio deleted permanently.'));
     }
 }

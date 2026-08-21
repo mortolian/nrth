@@ -28,7 +28,13 @@ const props = defineProps<{
         liquidity: string;
         interest_rate_bps: number | null;
         notes: string | null;
-        is_active: boolean;
+        is_archived?: boolean;
+        archived_at?: string | null;
+        opening_valuation: null | {
+            id: number;
+            valued_on: string;
+            value_cents: number;
+        };
     };
     portfolio: { id: number; base_currency: string };
     asset_types: Option[];
@@ -50,9 +56,11 @@ const form = ref({
         ? String(props.asset.interest_rate_bps / 100)
         : '',
     notes: props.asset?.notes ?? '',
-    is_active: props.asset?.is_active ?? true,
-    opening_value: '',
-    opening_valued_on: new Date().toISOString().slice(0, 10),
+    opening_value: props.asset?.opening_valuation != null
+        ? String(props.asset.opening_valuation.value_cents / 100)
+        : '',
+    opening_valued_on: props.asset?.opening_valuation?.valued_on
+        ?? new Date().toISOString().slice(0, 10),
 });
 
 const setField = <K extends keyof typeof form.value>(key: K, value: (typeof form.value)[K]) => {
@@ -98,7 +106,6 @@ const schema = z.object({
         z.number().min(0, 'Interest rate cannot be negative').max(1000, 'Interest rate looks too high').nullable(),
     ),
     notes: z.string().optional(),
-    is_active: z.boolean(),
     opening_value: z.preprocess(
         (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
         z.number().min(0, 'Opening value cannot be negative').nullable(),
@@ -137,11 +144,10 @@ const submit = () => {
         liquidity: parsed.data.liquidity,
         interest_rate_bps: interest,
         notes: parsed.data.notes?.trim() ? parsed.data.notes.trim() : null,
-        is_active: parsed.data.is_active,
         portfolio_id: props.portfolio.id,
     };
 
-    if (!isEdit.value && parsed.data.opening_value != null) {
+    if (parsed.data.opening_value != null) {
         payload.opening_value_cents = Math.round(parsed.data.opening_value * 100);
         payload.opening_valued_on = parsed.data.opening_valued_on || new Date().toISOString().slice(0, 10);
     }
@@ -187,7 +193,7 @@ const submit = () => {
             :title="isEdit ? 'Edit asset' : 'Add asset'"
             :subtitle="
                 isEdit
-                    ? 'Update how this holding is classified. Valuations and cash flows stay on the asset page.'
+                    ? 'Update how this holding is classified, and adjust the opening valuation if needed.'
                     : 'Describe the holding once — valuations and contributions are tracked separately over time.'
             "
         />
@@ -322,7 +328,6 @@ const submit = () => {
                     </section>
 
                     <section
-                        v-if="!isEdit"
                         class="space-y-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 md:p-5"
                     >
                         <div class="flex items-start gap-3">
@@ -332,7 +337,13 @@ const submit = () => {
                             <div>
                                 <h3 class="text-sm font-semibold text-slate-900">Opening valuation</h3>
                                 <p class="mt-1 text-sm text-slate-500">
-                                    Optional starting balance. You can add or update valuations any time from the asset page.
+                                    <template v-if="isEdit">
+                                        Earliest balance snapshot for this asset. Changing the date replaces that opening
+                                        row; later valuations on the asset page are unchanged.
+                                    </template>
+                                    <template v-else>
+                                        Optional starting balance. You can add or update valuations any time from the asset page.
+                                    </template>
                                 </p>
                             </div>
                         </div>
@@ -370,34 +381,18 @@ const submit = () => {
 
                     <section class="space-y-4">
                         <div>
-                            <h3 class="text-sm font-semibold text-slate-900">Notes &amp; status</h3>
+                            <h3 class="text-sm font-semibold text-slate-900">Notes</h3>
                             <p class="mt-1 text-sm text-slate-500">Anything that helps you recognise this holding later.</p>
                         </div>
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div v-if="isEdit">
-                                <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
-                                <AppSelect
-                                    :model-value="form.is_active ? 'active' : 'inactive'"
-                                    :options="[
-                                        { label: 'Active', value: 'active' },
-                                        { label: 'Inactive', value: 'inactive' },
-                                    ]"
-                                    @update:model-value="setField('is_active', $event === 'active')"
-                                />
-                                <p class="mt-1 text-xs text-slate-500">
-                                    Inactive assets stay on record but are excluded from portfolio totals.
-                                </p>
-                            </div>
-                            <div :class="isEdit ? 'md:col-span-1' : 'md:col-span-2'">
-                                <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
-                                <textarea
-                                    :value="form.notes"
-                                    rows="4"
-                                    class="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                    placeholder="Account number hints, strategy notes, or reminders — not shown on the overview table."
-                                    @input="setField('notes', ($event.target as HTMLTextAreaElement).value)"
-                                />
-                            </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Notes</label>
+                            <textarea
+                                :value="form.notes"
+                                rows="4"
+                                class="min-h-28 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                placeholder="Account number hints, strategy notes, or reminders — not shown on the overview table."
+                                @input="setField('notes', ($event.target as HTMLTextAreaElement).value)"
+                            />
                         </div>
                     </section>
                 </div>

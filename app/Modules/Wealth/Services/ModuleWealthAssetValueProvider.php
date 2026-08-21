@@ -13,7 +13,6 @@ final class ModuleWealthAssetValueProvider implements WealthAssetValueProvider
     {
         $assets = WealthAsset::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->where('is_active', true)
             ->orderBy('name')
             ->get();
 
