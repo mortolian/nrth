@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.20](https://github.com/mortolian/nrth/compare/v0.1.19...v0.1.20) (2026-08-21)
+
+
+### Bug Fixes
+
+* **invoicing:** keep bank received stable when payment date changes ([6ca47a0](https://github.com/mortolian/nrth/commit/6ca47a08241b66763c25eaaedc34e2cf32b1c744))
+
 ## [0.1.19](https://github.com/mortolian/nrth/compare/v0.1.18...v0.1.19) (2026-08-21)
 
 
