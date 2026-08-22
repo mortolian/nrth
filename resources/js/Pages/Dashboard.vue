@@ -21,6 +21,15 @@ const toast = useToast();
 const props = defineProps({
     kpis: { type: Object, default: () => ({}) },
     revenue_chart: { type: Array, default: () => [] },
+    revenue_chart_meta: {
+        type: Object,
+        default: () => ({
+            period_label: '',
+            financial_year_label: '',
+            financial_year_start: '',
+            financial_year_end: '',
+        }),
+    },
     outstanding_invoices: { type: Object, default: () => ({ data: [], current_page: 1, last_page: 1 }) },
     recent_transactions: { type: Array, default: () => [] },
     budget_progress: { type: Array, default: () => [] },
@@ -44,6 +53,25 @@ const canManageInvoices = computed(() => {
 });
 
 const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
+const formatChartCents = (cents) => formatCents(cents);
+const formatChartAxis = (cents) => {
+    const major = (Number(cents) || 0) / 100;
+    return new Intl.NumberFormat('en-ZA', {
+        style: 'currency',
+        currency: bookCurrency.value,
+        notation: major >= 10_000 ? 'compact' : 'standard',
+        maximumFractionDigits: major >= 10_000 ? 1 : 0,
+    }).format(major);
+};
+const chartSubtitle = computed(() => {
+    const meta = props.revenue_chart_meta ?? {};
+    const period = typeof meta.period_label === 'string' ? meta.period_label.trim() : '';
+    const fy = typeof meta.financial_year_label === 'string' ? meta.financial_year_label.trim() : '';
+    if (period && fy) {
+        return `${period} · FY ${fy}`;
+    }
+    return period || (fy ? `FY ${fy}` : '');
+});
 const formatBudgetCents = (cents) =>
     useFormatCurrency((Number(cents) || 0) / 100, props.budget_progress_currency || 'ZAR');
 const formatRowCents = (cents, currency) =>
@@ -109,7 +137,21 @@ const kpiRows = computed(() => {
 });
 
 const chartOptions = computed(() => ({
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+        trigger: 'axis',
+        formatter: (params) => {
+            if (!Array.isArray(params) || params.length === 0) {
+                return '';
+            }
+            const header = params[0]?.axisValue ?? '';
+            const lines = params.map((point) => {
+                const value = formatChartCents(point.data);
+                return `${point.marker} ${point.seriesName}: ${value}`;
+            });
+
+            return [header, ...lines].join('<br/>');
+        },
+    },
     legend: { data: ['Revenue', 'Expenses'] },
     grid: { left: 16, right: 16, top: 36, bottom: 24, containLabel: true },
     xAxis: {
@@ -124,7 +166,7 @@ const chartOptions = computed(() => ({
         splitLine: { lineStyle: { color: '#f1f5f9' } },
         axisLabel: {
             color: '#64748b',
-            formatter: (value) => `R ${(Number(value) / 100).toLocaleString('en-ZA')}`,
+            formatter: (value) => formatChartAxis(value),
         },
     },
     series: [
@@ -310,7 +352,10 @@ const onInvoiceAction = (invoice, actionId) => {
 
             <div class="grid gap-6 xl:grid-cols-3">
                 <AppCard class="xl:col-span-2">
-                    <h3 class="mb-3 text-base font-semibold text-slate-900 sm:mb-4 sm:text-lg">Revenue vs Expenses</h3>
+                    <div class="mb-3 sm:mb-4">
+                        <h3 class="text-base font-semibold text-slate-900 sm:text-lg">Revenue vs Expenses</h3>
+                        <p v-if="chartSubtitle" class="mt-1 text-sm text-slate-500">{{ chartSubtitle }}</p>
+                    </div>
                     <div
                         v-if="isChartLoading"
                         class="flex h-56 items-center justify-center rounded-md border-2 border-dashed border-slate-200 bg-slate-50 px-4 text-center md:h-80"
