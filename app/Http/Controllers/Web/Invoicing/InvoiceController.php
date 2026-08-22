@@ -738,6 +738,9 @@ class InvoiceController extends Controller
                         return [
                             'id' => $payment->id,
                             'amount_cents' => (int) $payment->getRawOriginal('amount_cents'),
+                            'bank_amount_business_cents' => $payment->getRawOriginal('bank_amount_business_cents') !== null
+                                ? (int) $payment->getRawOriginal('bank_amount_business_cents')
+                                : null,
                             'payment_date' => optional($payment->payment_date)->toDateString(),
                             'method' => $payment->method->value,
                             'reference' => $payment->reference,

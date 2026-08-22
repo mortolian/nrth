@@ -68,6 +68,7 @@ type InvoicePayload = {
     payments: Array<{
         id: number;
         amount_cents: number;
+        bank_amount_business_cents: number | null;
         payment_date: string | null;
         method: string;
         reference: string | null;
@@ -160,6 +161,16 @@ const onlinePaymentProviders = computed(() =>
 );
 const formatCents = (cents: number) =>
     useFormatCurrency((Number(cents) || 0) / 100, invoiceCurrency.value);
+const isForeignCurrencyInvoice = computed(
+    () =>
+        Boolean(props.invoice.currency)
+        && Boolean(props.business_currency)
+        && props.invoice.currency !== props.business_currency,
+);
+const formatBusinessCents = (cents: number) =>
+    useFormatCurrency((Number(cents) || 0) / 100, props.business_currency);
+const paymentBankAmountCents = (payment: InvoicePayload['payments'][number]) =>
+    payment.bank_amount_business_cents;
 
 const documentTitle = computed(() => (props.charges_vat ? 'Tax invoice' : 'Invoice'));
 
@@ -697,6 +708,12 @@ const onOverflowAction = (actionId: string) => {
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
                                     <p class="font-medium text-slate-900">{{ formatCents(payment.amount_cents) }}</p>
+                                    <p
+                                        v-if="isForeignCurrencyInvoice && paymentBankAmountCents(payment) != null"
+                                        class="text-xs text-slate-600"
+                                    >
+                                        Received {{ formatBusinessCents(paymentBankAmountCents(payment)!) }} in bank
+                                    </p>
                                     <p class="text-xs text-slate-500">{{ payment.payment_date }} • {{ payment.method.toUpperCase() }}</p>
                                 </div>
                                 <AppButton
