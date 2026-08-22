@@ -436,7 +436,7 @@ All notable changes to nrth are documented here. Format follows [Keep a Changelo
 
 ## [0.1.0] - 2026-06-28
 
-Initial public alpha. nrth is open-source accounting and finance software for contractors and small businesses, with a South Africa focus (VAT, invoicing, ledger, bank imports). **Not production-ready** — data models and features are still changing.
+Initial public release. nrth is open-source accounting and finance software for contractors and small businesses, with a South Africa focus (VAT, invoicing, ledger, bank imports). **Not production-ready** — data models and features are still changing.
 
 ### Invoicing & estimates
 
@@ -492,7 +492,7 @@ Initial public alpha. nrth is open-source accounting and finance software for co
 - MIT license, contributing guide, code of conduct, and security policy.
 - GitHub issue/PR templates, CI test workflow (PHP 8.3–8.5), and documentation hub (`docs/INSTALL.md`, `docs/SELF_HOST.md`, `docs/DEVELOPMENT.md`).
 
-### Known limitations (alpha)
+### Known limitations
 
 - No semver stability guarantee — expect breaking migrations and API changes on `master`.
 - Not audited accounting or tax advice — evaluate carefully before relying on outputs.

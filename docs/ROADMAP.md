@@ -75,7 +75,7 @@ To set expectations during beta:
 
 - **`master`** — active development; still the default `./scripts/update` target.
 - **Tags (`v0.x.y`)** — created automatically when you merge a Release Please PR; see [docs/RELEASE.md](RELEASE.md). Self-hosters who want a known release should use `./scripts/update --ref v0.x.y` ([docs/UPGRADE.md](UPGRADE.md)).
-- **Schema** — from 2026-08-18, new migrations are additive (no drop/rename in `up()`). Older alpha tags may have included breaking migrations.
+- **Schema** — from 2026-08-18, new migrations are additive (no drop/rename in `up()`). Tags before that policy may have included breaking migrations.
 - **1.0** — not planned until data models, install/upgrade story, and core workflows are stable enough for production-minded self-hosters.
 
 ---

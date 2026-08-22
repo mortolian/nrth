@@ -86,7 +86,7 @@ Do not “roll back” by deleting migration files or running `migrate:fresh` on
 
 New migrations on existing tables are **additive**: new tables, columns, and indexes. `up()` must not `dropColumn`, `renameColumn`, or drop tables.
 
-Older alpha tags may still have included breaking migrations. From this cutoff forward, a normal `./scripts/update` between tags should not destroy existing money, banking, or team data.
+Tags before the 2026-08-18 additive schema policy may still have included breaking migrations. From this cutoff forward, a normal `./scripts/update` between tags should not destroy existing money, banking, or team data.
 
 If a future change cannot be additive, it must use an expand/contract pair and be called out as breaking in the release notes.
 
