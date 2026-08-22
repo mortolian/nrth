@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.22](https://github.com/mortolian/nrth/compare/v0.1.21...v0.1.22) (2026-08-22)
+
+
+### Features
+
+* **invoicing:** include bank amount for foreign currency payments in invoice details ([0293ca4](https://github.com/mortolian/nrth/commit/0293ca456e23d5067223279ce1792132992360c8))
+
 ## [0.1.21](https://github.com/mortolian/nrth/compare/v0.1.20...v0.1.21) (2026-08-22)
 
 
