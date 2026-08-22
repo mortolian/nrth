@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Domain\Instance\Services\InstanceOperatorService;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\TeamAccess\TeamAccess;
@@ -24,7 +25,7 @@ class TeamPolicy
      */
     public function view(User $user, Team $team): bool
     {
-        return $user->belongsToTeam($team);
+        return $user->belongsToTeam($team) || $this->isInstanceOperator($user);
     }
 
     /**
@@ -40,7 +41,7 @@ class TeamPolicy
      */
     public function update(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $user->ownsTeam($team) || $this->isInstanceOperator($user);
     }
 
     /**
@@ -78,6 +79,12 @@ class TeamPolicy
     private function canManageTeamAccess(User $user, Team $team): bool
     {
         return $user->ownsTeam($team)
-            || TeamAccess::allows($user, $team, 'settings.team');
+            || TeamAccess::allows($user, $team, 'settings.team')
+            || $this->isInstanceOperator($user);
+    }
+
+    private function isInstanceOperator(User $user): bool
+    {
+        return app(InstanceOperatorService::class)->userCanManageInstance($user);
     }
 }

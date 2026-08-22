@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import { useAccountingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
@@ -29,7 +29,13 @@ const props = defineProps<{
     period: { from: string; to: string };
 }>();
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const page = usePage<{ business_currency?: string }>();
+const bookCurrency = computed(() =>
+    typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
+        ? page.props.business_currency
+        : 'ZAR',
+);
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 
 const period = ref({ from: props.period.from, to: props.period.to });
 

@@ -20,7 +20,7 @@ class SessionIdleTimeoutTest extends TestCase
         $this->actingAs($user);
 
         $this->put(
-            route('settings.team.session-idle-timeout'),
+            route('settings.team.session-idle-timeout', $team),
             ['session_idle_timeout_minutes' => 30]
         )->assertRedirect();
 
@@ -38,7 +38,7 @@ class SessionIdleTimeoutTest extends TestCase
         $this->actingAs($user);
 
         $this->put(
-            route('settings.team.session-idle-timeout'),
+            route('settings.team.session-idle-timeout', $team),
             ['session_idle_timeout_minutes' => 121]
         )->assertSessionHasErrors('session_idle_timeout_minutes');
 
@@ -154,7 +154,7 @@ class SessionIdleTimeoutTest extends TestCase
         $this->actingAs($member);
 
         $this->put(
-            route('settings.team.session-idle-timeout'),
+            route('settings.team.session-idle-timeout', $team),
             ['session_idle_timeout_minutes' => 30]
         )->assertForbidden();
     }

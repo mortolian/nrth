@@ -105,6 +105,28 @@ Contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
+## Foreign-currency ledger repair
+
+Releases that post invoice accruals in **book currency** (team `invoice_default_currency`) may leave older foreign-currency invoices with AR/revenue lines still in invoice currency (e.g. EUR cents labelled as Rand on statements). After upgrading:
+
+1. Backup first (`./scripts/backup`).
+2. Dry-run for the affected team:
+
+```bash
+php artisan invoicing:repair-foreign-ledger --team=YOUR_TEAM_ID
+```
+
+3. Review the table. Invoices missing an FX snapshot are skipped — open and save those invoices so a rate is stored, then re-run.
+4. Apply:
+
+```bash
+php artisan invoicing:repair-foreign-ledger --team=YOUR_TEAM_ID --apply
+```
+
+The command voids mismatched accrual/payment journals and rebuilds them from the invoice snapshot and payment rows. Invoice paid totals and payment rows are kept.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -114,3 +136,4 @@ Contributors: see [CONTRIBUTING.md](../CONTRIBUTING.md).
 | UI looks old | Re-run `./scripts/update` so assets rebuild and `public/hot` is removed |
 | Need to undo the schema | Restore the pre-upgrade backup; do not hand-edit `migrations` |
 | `HEAD does not match origin/master` | You are on a tag (`--ref`). That check is skipped for `--ref`. To return to master, run `./scripts/update` without `--ref`. |
+| Statement shows foreign amounts as Rand 1:1 | Run `invoicing:repair-foreign-ledger` (see above) after upgrading to book-currency accruals. |

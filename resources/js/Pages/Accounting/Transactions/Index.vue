@@ -52,7 +52,7 @@ const props = defineProps<{
     }>;
 }>();
 
-const page = usePage<{ errors?: Record<string, string | string[] | undefined> }>();
+const page = usePage<{ errors?: Record<string, string | string[] | undefined>; business_currency?: string }>();
 
 const transactionDeleteError = computed(() => {
     const err = page.props.errors?.transaction;
@@ -73,7 +73,12 @@ const filters = ref({
     search: props.filters.search ?? '',
 });
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const bookCurrency = computed(() =>
+    typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
+        ? page.props.business_currency
+        : 'ZAR',
+);
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 
 const applyFilters = (page = 1) => {
     router.get(route('accounting.transactions.index'), {

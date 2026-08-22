@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import EmptyState from '@/Components/EmptyState.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import MarkdownEditor from '@/Components/MarkdownEditor.vue';
@@ -20,7 +20,12 @@ type Template = {
 
 const props = defineProps<{ templates: Template[] }>();
 
-const businessTabs = businessSettingsTabs({ linkAll: true });
+const page = usePage();
+
+const businessTabs = businessSettingsTabs({
+    linkAll: true,
+    teamPermissions: (page.props.team_permissions as string[] | undefined) ?? [],
+});
 
 const blankForm = () => ({
     name: '',

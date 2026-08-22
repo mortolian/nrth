@@ -24,7 +24,7 @@ class VoidInvoiceAction
         }
 
         return DB::transaction(function () use ($invoice, $reason): Invoice {
-            $invoice->loadMissing('payments');
+            $invoice->loadMissing(['payments', 'accrualTransaction']);
 
             foreach ($invoice->payments as $payment) {
                 $transaction = $payment->transaction;
@@ -35,6 +35,14 @@ class VoidInvoiceAction
                         'Invoice '.$invoice->number.' voided: '.$reason
                     );
                 }
+            }
+
+            $accrual = $invoice->accrualTransaction;
+            if ($accrual !== null && $accrual->status === TransactionStatus::Posted) {
+                $this->voidTransactionAction->execute(
+                    $accrual,
+                    'Invoice '.$invoice->number.' voided: '.$reason
+                );
             }
 
             $invoice->status = InvoiceStatus::Void;

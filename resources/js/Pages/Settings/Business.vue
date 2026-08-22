@@ -342,7 +342,9 @@ const clearLogo = () => {
     logoPreview.value = null;
 };
 
-const businessTabs = computed(() => businessSettingsTabs());
+const businessTabs = computed(() => businessSettingsTabs({
+    teamPermissions: (page.props.team_permissions as string[] | undefined) ?? [],
+}));
 
 const aiModelOptions = computed(
     () => props.ai_models_by_provider[form.ai.provider] ?? [],

@@ -44,32 +44,36 @@ class PostInvoiceAccrualAction
                 ->where('code', '2100')
                 ->first();
             $defaultIncome = $this->resolveDefaultIncomeAccount($invoice);
-            $totalCents = (int) $invoice->getRawOriginal('total_cents');
+            $totalInvoiceCents = (int) $invoice->getRawOriginal('total_cents');
 
-            $incomeBuckets = [];
-            $vatTotal = 0;
-            $exclusiveTotal = 0;
+            $incomeBucketsInvoice = [];
+            $vatTotalInvoice = 0;
 
             if ($invoice->lineItems->isEmpty()) {
-                $vatTotal = (int) $invoice->getRawOriginal('vat_amount_cents');
-                $exclusiveTotal = max(0, $totalCents - $vatTotal);
-                $incomeBuckets[$defaultIncome->id] = $exclusiveTotal;
+                $vatTotalInvoice = (int) $invoice->getRawOriginal('vat_amount_cents');
+                $exclusiveTotal = max(0, $totalInvoiceCents - $vatTotalInvoice);
+                $incomeBucketsInvoice[$defaultIncome->id] = $exclusiveTotal;
             } else {
                 foreach ($invoice->lineItems as $line) {
                     /** @var InvoiceLineItem $line */
                     $exclusive = max(0, (int) $line->getRawOriginal('total_cents') - (int) $line->getRawOriginal('vat_amount_cents'));
-                    $exclusiveTotal += $exclusive;
-                    $vatTotal += (int) $line->getRawOriginal('vat_amount_cents');
+                    $vatTotalInvoice += (int) $line->getRawOriginal('vat_amount_cents');
                     $accountId = $line->income_account_id ?? $invoice->income_account_id ?? $defaultIncome->id;
-                    $incomeBuckets[$accountId] = ($incomeBuckets[$accountId] ?? 0) + $exclusive;
+                    $incomeBucketsInvoice[$accountId] = ($incomeBucketsInvoice[$accountId] ?? 0) + $exclusive;
                 }
             }
 
-            if ($totalCents <= 0) {
+            if ($totalInvoiceCents <= 0) {
                 return null;
             }
 
-            $currency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
+            [$bookCurrency, $totalBookCents, $incomeBucketsBook, $vatTotalBook] = $this->amountsInBookCurrency(
+                $invoice,
+                $team,
+                $totalInvoiceCents,
+                $incomeBucketsInvoice,
+                $vatTotalInvoice,
+            );
 
             $transaction = Transaction::query()->create([
                 'team_id' => $invoice->team_id,
@@ -84,12 +88,12 @@ class PostInvoiceAccrualAction
                 'transaction_id' => $transaction->id,
                 'account_id' => $receivable->id,
                 'type' => EntryType::Debit,
-                'amount_cents' => $totalCents,
-                'currency' => $currency,
+                'amount_cents' => $totalBookCents,
+                'currency' => $bookCurrency,
                 'description' => 'Accounts receivable for '.$invoice->number,
             ]);
 
-            foreach ($incomeBuckets as $accountId => $amount) {
+            foreach ($incomeBucketsBook as $accountId => $amount) {
                 if ($amount <= 0) {
                     continue;
                 }
@@ -98,18 +102,18 @@ class PostInvoiceAccrualAction
                     'account_id' => $accountId,
                     'type' => EntryType::Credit,
                     'amount_cents' => $amount,
-                    'currency' => $currency,
+                    'currency' => $bookCurrency,
                     'description' => 'Revenue for '.$invoice->number,
                 ]);
             }
 
-            if ($vatTotal > 0 && $vatOutput !== null) {
+            if ($vatTotalBook > 0 && $vatOutput !== null) {
                 JournalEntry::query()->create([
                     'transaction_id' => $transaction->id,
                     'account_id' => $vatOutput->id,
                     'type' => EntryType::Credit,
-                    'amount_cents' => $vatTotal,
-                    'currency' => $currency,
+                    'amount_cents' => $vatTotalBook,
+                    'currency' => $bookCurrency,
                     'description' => 'VAT output for '.$invoice->number,
                 ]);
             }
@@ -119,6 +123,62 @@ class PostInvoiceAccrualAction
 
             return $posted;
         });
+    }
+
+    /**
+     * @param  array<int, int>  $incomeBucketsInvoice
+     * @return array{0: string, 1: int, 2: array<int, int>, 3: int}
+     */
+    private function amountsInBookCurrency(
+        Invoice $invoice,
+        Team $team,
+        int $totalInvoiceCents,
+        array $incomeBucketsInvoice,
+        int $vatTotalInvoice,
+    ): array {
+        $invoiceCurrency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
+        $bookCurrency = Iso4217Currencies::normalize((string) (
+            $invoice->business_currency_code
+            ?? $team->mergedBusinessSettings()['invoice_default_currency']
+            ?? 'ZAR'
+        ));
+
+        if ($invoiceCurrency === $bookCurrency) {
+            return [$bookCurrency, $totalInvoiceCents, $incomeBucketsInvoice, $vatTotalInvoice];
+        }
+
+        $totalBookCents = $invoice->getRawOriginal('total_business_currency_cents');
+        $rate = $invoice->fx_rate_invoice_to_business;
+
+        if ($totalBookCents === null || $rate === null || (float) $rate <= 0) {
+            throw ValidationException::withMessages([
+                'currency' => __('This invoice is in :invoice but the business books use :book. Save the invoice again so an exchange rate can be stored, then mark it sent.', [
+                    'invoice' => $invoiceCurrency,
+                    'book' => $bookCurrency,
+                ]),
+            ]);
+        }
+
+        $totalBookCents = (int) $totalBookCents;
+        $toBook = static fn (int $invoiceCents): int => (int) round(($invoiceCents * $totalBookCents) / max(1, $totalInvoiceCents));
+
+        $incomeBucketsBook = [];
+        foreach ($incomeBucketsInvoice as $accountId => $amount) {
+            $incomeBucketsBook[$accountId] = $toBook((int) $amount);
+        }
+        $vatTotalBook = $toBook($vatTotalInvoice);
+
+        $creditsSum = array_sum($incomeBucketsBook) + $vatTotalBook;
+        $diff = $totalBookCents - $creditsSum;
+        if ($diff !== 0 && $incomeBucketsBook !== []) {
+            $largestAccountId = array_keys($incomeBucketsBook, max($incomeBucketsBook), true)[0];
+            $incomeBucketsBook[$largestAccountId] += $diff;
+        } elseif ($diff !== 0) {
+            // No income lines — push rounding onto VAT if present, else leave unbalanced (should not happen).
+            $vatTotalBook += $diff;
+        }
+
+        return [$bookCurrency, $totalBookCents, $incomeBucketsBook, $vatTotalBook];
     }
 
     private function resolveDefaultIncomeAccount(Invoice $invoice): Account

@@ -135,6 +135,14 @@ class Invoice extends Model implements HasMedia
         return $this->belongsTo(Transaction::class);
     }
 
+    /**
+     * @return BelongsTo<Transaction, $this>
+     */
+    public function accrualTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'accrual_transaction_id');
+    }
+
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('invoice-pdfs')->useDisk(MediaDisks::private())->singleFile();

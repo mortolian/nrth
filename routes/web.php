@@ -30,6 +30,7 @@ use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
 use App\Http\Controllers\Web\Settings\FeaturesSettingsController;
 use App\Http\Controllers\Web\Settings\InstanceSettingsController;
+use App\Http\Controllers\Web\Settings\InstanceTeamsController;
 use App\Http\Controllers\Web\Settings\NoteTemplateController;
 use App\Http\Controllers\Web\Settings\TeamInvitationController;
 use App\Http\Controllers\Web\Settings\TeamRoleController;
@@ -86,14 +87,16 @@ Route::middleware([
     Route::get('/settings/company', fn () => redirect()->route('settings.business'));
     Route::post('/settings/company', [BusinessSettingsController::class, 'update']);
     Route::get('/settings/team', [TeamSettingsController::class, 'edit'])->name('settings.team');
-    Route::put('/settings/team/session-idle-timeout', [TeamSettingsController::class, 'updateSessionIdleTimeout'])
+    Route::put('/settings/team/{team}/session-idle-timeout', [TeamSettingsController::class, 'updateSessionIdleTimeout'])
         ->name('settings.team.session-idle-timeout');
-    Route::post('/settings/team/roles', [TeamRoleController::class, 'store'])->name('settings.team.roles.store');
-    Route::put('/settings/team/roles/{teamRole}', [TeamRoleController::class, 'update'])->name('settings.team.roles.update');
-    Route::delete('/settings/team/roles/{teamRole}', [TeamRoleController::class, 'destroy'])->name('settings.team.roles.destroy');
+    Route::post('/settings/team/{team}/roles', [TeamRoleController::class, 'store'])->name('settings.team.roles.store');
+    Route::put('/settings/team/{team}/roles/{teamRole}', [TeamRoleController::class, 'update'])->name('settings.team.roles.update');
+    Route::delete('/settings/team/{team}/roles/{teamRole}', [TeamRoleController::class, 'destroy'])->name('settings.team.roles.destroy');
     Route::post('/team-invitations/{invitation}/resend', [TeamInvitationController::class, 'resend'])
         ->name('team-invitations.resend');
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
+    Route::get('/settings/instance/teams', [InstanceTeamsController::class, 'index'])->name('settings.instance.teams');
+    Route::get('/settings/instance/teams/{team}', [InstanceTeamsController::class, 'show'])->name('settings.instance.teams.show');
     Route::get('/settings/instance/timezone', [InstanceSettingsController::class, 'timezone'])->name('settings.instance.timezone');
     Route::put('/settings/instance/timezone', [InstanceSettingsController::class, 'updateTimezone'])
         ->name('settings.instance.timezone.update');

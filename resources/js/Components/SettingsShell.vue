@@ -6,7 +6,7 @@ import AppTabs from '@/Components/AppTabs.vue';
 import type { AppTabItem } from '@/Components/AppTabs.vue';
 
 const props = defineProps<{
-    section: 'profile' | 'business' | 'team' | 'instance' | 'features' | 'backups';
+    section: 'profile' | 'business' | 'instance' | 'features' | 'backups';
     title?: string;
     subtitle?: string;
 }>();
@@ -28,10 +28,6 @@ const sections = computed((): AppTabItem[] => {
     if (canTeam('settings.business')) {
         tabs.push({ id: 'business', label: 'Business', href: route('settings.business') });
         tabs.push({ id: 'features', label: 'Features', href: route('settings.features') });
-    }
-
-    if (canTeam('settings.team')) {
-        tabs.push({ id: 'team', label: 'Team members', href: route('settings.team') });
     }
 
     if (canAccessBackupsExports.value) {
@@ -64,13 +60,11 @@ const headerSubtitle = computed(() => {
         case 'profile':
             return undefined;
         case 'business':
-            return 'Profile, invoicing, tax, banking, and online payments for the current business.';
+            return 'Profile, invoicing, tax, banking, team access, and online payments for the current business.';
         case 'features':
             return 'Optional modules for this business. Disabling hides them without deleting data.';
         case 'backups':
             return 'Tax data takeouts for your team, and whole-server backups for operators.';
-        case 'team':
-            return 'People who can access the currently selected business.';
         case 'instance':
             return 'Install-wide settings for operators — separate from each business.';
         default:

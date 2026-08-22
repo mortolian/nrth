@@ -49,6 +49,44 @@ class InstanceSettingsTest extends TestCase
                 ->has('operators_summary'));
     }
 
+    public function test_operator_can_list_and_manage_all_teams(): void
+    {
+        $operator = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $otherOwner = User::factory()->withPersonalTeam()->create();
+        $otherTeam = $otherOwner->currentTeam;
+
+        $this->actingAs($operator)
+            ->get(route('settings.instance.teams'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Settings/Instance/Teams/Index')
+                ->has('teams', 2));
+
+        $this->actingAs($operator)
+            ->get(route('settings.instance.teams.show', $otherTeam))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Settings/Team')
+                ->where('settings_context', 'instance')
+                ->where('team.id', $otherTeam->id)
+                ->where('permissions.canManageRoles', true)
+                ->where('permissions.canAddTeamMembers', true));
+    }
+
+    public function test_non_operator_cannot_access_instance_teams(): void
+    {
+        User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => false,
+        ]);
+        $user->forceFill(['is_instance_operator' => false])->save();
+        $this->actingAs($user);
+
+        $this->get(route('settings.instance.teams'))->assertForbidden();
+    }
+
     public function test_operator_can_update_instance_timezone(): void
     {
         $user = User::factory()->withPersonalTeam()->create([

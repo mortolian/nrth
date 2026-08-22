@@ -35,7 +35,7 @@ Resolution order for a member: belong to team → if owner, all permissions → 
 
 Owner-only product areas that stay outside (or beside) the matrix: tax takeout, instance backups (`manageInstanceBackups`). Instance settings (outbound SMTP, operators) use the same operator gate under **Settings → Instance**. Renaming or deleting a business stays Jetstream `TeamPolicy` (owner). Inviting members, changing roles, and custom role CRUD use `settings.team` (owner by default; grantable on a custom role). Business settings pages use `settings.business` the same way.
 
-**Settings navigation:** Profile is always available. Business, Features, and Team members tabs appear only when the signed-in user has `settings.business` / `settings.team` respectively — viewers and accountants should not see those links (and get 403 if they hit the URLs directly). **Settings → Features** toggles optional modules (`team_modules`); Features uses `settings.business`. **Settings → Business** includes an optional per-business timezone (falls back to the instance default). **Settings → Instance → Timezone** (operators) sets that install-wide default. **Settings → Backups & exports** is shown to team owners (data takeouts) and instance operators (server backups); it is not in the main sidebar.
+**Settings navigation:** Profile is always available. **Settings → Business** covers profile, invoicing, tax, banking, and **Team members** (when the user has `settings.business` / `settings.team`). Features uses `settings.business`. **Settings → Instance → Teams** (instance operators only) lists every business on the install and opens member/role management for any of them. **Settings → Backups & exports** is shown to team owners (data takeouts) and instance operators (server backups); it is not in the main sidebar.
 
 ## Leaving a business
 
@@ -43,7 +43,7 @@ Non-owners who were invited into a business can leave it at any time:
 
 1. **Settings → Profile** — “Leave business” (available without `settings.team`).
 2. **Business switcher** (sidebar) — “Leave {business}” when the current business is not owned by the user.
-3. **Team members** (owners / `settings.team`) — each non-owner row still has “Leave team” for themselves.
+3. **Team members** (owners / `settings.team`) — under **Settings → Business → Team members**; each non-owner row still has “Leave team” for themselves.
 
 Leaving uses Jetstream `DELETE /teams/{team}/members/{user}` (self). Owners cannot leave a business they created. After leave, the member is switched to another owned/member business when one exists; otherwise they are sent to create a business.
 

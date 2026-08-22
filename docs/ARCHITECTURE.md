@@ -116,7 +116,11 @@ Ledger, invoices, expenses, and recon allocations store **integer cents**. Eloqu
 
 Bank **import** rows keep decimal amount columns for statement fidelity. Do not mix those with ledger cents except at an explicit conversion (`BankingMoney` helpers).
 
-Default book currency is ZAR; invoices may snapshot a business-currency total for FX.
+Default book currency comes from the team’s `invoice_default_currency` (typically ZAR). The **general ledger is single-currency**: invoice accruals and payment journals post in that book currency. Customer-facing invoices may use a different currency; on create/update the app stores an FX snapshot (`fx_rate_invoice_to_business`, `total_business_currency_cents`). Foreign invoices cannot be marked sent (or paid) without that snapshot. Realised FX gain/loss is booked when the bank amount in book currency differs from the snapshot clearing amount.
+
+If an older install posted foreign accruals in invoice currency, rebuild with:
+
+`php artisan invoicing:repair-foreign-ledger --team=ID` (dry-run) then `--apply`. See [UPGRADE.md](UPGRADE.md).
 
 ## Team scoping
 

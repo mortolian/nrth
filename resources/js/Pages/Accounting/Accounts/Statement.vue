@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
@@ -48,7 +48,13 @@ const period = ref({
 
 const selected = ref<number[]>([]);
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const page = usePage<{ business_currency?: string }>();
+const bookCurrency = computed(() =>
+    typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
+        ? page.props.business_currency
+        : 'ZAR',
+);
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 
 const parentCrumb = computed(() =>
     props.source === 'ledger'
@@ -195,7 +201,10 @@ const exportSelectedCsv = () => {
 
         <AppCard class="mt-5">
             <div class="mb-3 flex items-center justify-between gap-3">
-                <h3 class="text-lg font-semibold text-slate-900">Statement entries</h3>
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-900">Statement entries</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Amounts are in your business currency ({{ bookCurrency }}).</p>
+                </div>
                 <AppButton
                     variant="secondary"
                     size="sm"

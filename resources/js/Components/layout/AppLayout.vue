@@ -226,9 +226,11 @@ function isNavItemActive(item: MenuItem): boolean {
     return isActivePath(item.href);
 }
 
-/** Team settings use `Settings/Team` for both `/settings/team` and `/teams/{id}`. */
+/** Team members live under Business; instance operators use Instance → Teams. */
 const isTeamSettingsPath = computed(
-    () => isActivePath(route('settings.team')) || /^\/teams\/\d+$/.test(currentPath.value),
+    () => isActivePath(route('settings.team'))
+        || /^\/settings\/instance\/teams\/\d+$/.test(currentPath.value)
+        || /^\/teams\/\d+$/.test(currentPath.value),
 );
 
 const isSettingsSectionActive = computed(

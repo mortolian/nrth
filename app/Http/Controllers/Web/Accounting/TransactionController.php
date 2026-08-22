@@ -11,6 +11,7 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Payment;
 use App\Http\Controllers\Controller;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -174,8 +175,11 @@ class TransactionController extends Controller
             ->get();
 
         $filename = 'transactions-'.now()->format('Y-m-d-His').'.csv';
+        $bookCurrency = Iso4217Currencies::normalize(
+            (string) ($request->user()->currentTeam?->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
+        );
 
-        return response()->streamDownload(function () use ($transactions): void {
+        return response()->streamDownload(function () use ($transactions, $bookCurrency): void {
             $handle = fopen('php://output', 'w');
             if ($handle === false) {
                 return;
@@ -191,7 +195,7 @@ class TransactionController extends Controller
                 'Supplier',
                 'Description',
                 'Accounts affected',
-                'Amount (ZAR)',
+                'Amount ('.$bookCurrency.')',
                 'Status',
             ]);
 

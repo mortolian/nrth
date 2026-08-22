@@ -72,6 +72,12 @@ const appVersion = computed(() => {
                     <p class="mt-1 text-xs text-slate-600">{{ mail_summary }}</p>
                 </AppCard>
             </Link>
+            <Link :href="route('settings.instance.teams')" class="block">
+                <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
+                    <h3 class="text-sm font-semibold text-slate-900">Teams</h3>
+                    <p class="mt-1 text-xs text-slate-600">All businesses, members, and roles on this install</p>
+                </AppCard>
+            </Link>
             <Link :href="route('settings.instance.operators')" class="block">
                 <AppCard class="h-full cursor-pointer transition hover:border-slate-300 hover:bg-slate-50">
                     <h3 class="text-sm font-semibold text-slate-900">Operators</h3>

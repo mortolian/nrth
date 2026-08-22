@@ -31,8 +31,13 @@ const state = ref({
     to: props.period.to,
 });
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
-const page = usePage<{ vat_enabled?: boolean }>();
+const page = usePage<{ vat_enabled?: boolean; business_currency?: string }>();
+const bookCurrency = computed(() =>
+    typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
+        ? page.props.business_currency
+        : 'ZAR',
+);
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
 
 const comparisonMap = computed(() => ({

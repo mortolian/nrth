@@ -30,6 +30,10 @@ const props = defineProps({
 });
 
 const page = usePage();
+const bookCurrency = computed(() => {
+    const code = page.props.business_currency;
+    return typeof code === 'string' && code.trim() !== '' ? code : 'ZAR';
+});
 const canManageBusinessSettings = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) && perms.includes('settings.business');
@@ -39,7 +43,7 @@ const canManageInvoices = computed(() => {
     return Array.isArray(perms) && perms.includes('invoices.manage');
 });
 
-const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const formatCents = (cents) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 const formatBudgetCents = (cents) =>
     useFormatCurrency((Number(cents) || 0) / 100, props.budget_progress_currency || 'ZAR');
 const formatRowCents = (cents, currency) =>

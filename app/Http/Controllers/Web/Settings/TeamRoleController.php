@@ -8,22 +8,20 @@ use App\Models\TeamRole;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use App\Support\TeamAccess\PermissionCatalog;
 use App\Support\TeamAccess\RolePresets;
+use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class TeamRoleController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, Team $team): RedirectResponse
     {
-        $user = $request->user();
-        $team = $user->currentTeam;
-
-        abort_unless($team !== null && $user->belongsToTeam($team), 403);
-        $this->authorizeTeam('settings.team', $request, $team);
+        $this->authorizeTeamRoles($request, $team);
         EnsureTeamSystemRoles::ensureFor($team);
 
         $validated = $request->validate([
@@ -47,13 +45,10 @@ class TeamRoleController extends Controller
         return back()->with('success', __('Role created.'));
     }
 
-    public function update(Request $request, TeamRole $teamRole): RedirectResponse
+    public function update(Request $request, Team $team, TeamRole $teamRole): RedirectResponse
     {
-        $user = $request->user();
-        $team = $user->currentTeam;
-
-        abort_unless($team !== null && $teamRole->team_id === $team->id, 403);
-        $this->authorizeTeam('settings.team', $request, $team);
+        abort_unless($teamRole->team_id === $team->id, 404);
+        $this->authorizeTeamRoles($request, $team);
 
         if ($teamRole->is_system) {
             throw ValidationException::withMessages([
@@ -77,13 +72,10 @@ class TeamRoleController extends Controller
         return back()->with('success', __('Role updated.'));
     }
 
-    public function destroy(Request $request, TeamRole $teamRole): RedirectResponse
+    public function destroy(Request $request, Team $team, TeamRole $teamRole): RedirectResponse
     {
-        $user = $request->user();
-        $team = $user->currentTeam;
-
-        abort_unless($team !== null && $teamRole->team_id === $team->id, 403);
-        $this->authorizeTeam('settings.team', $request, $team);
+        abort_unless($teamRole->team_id === $team->id, 404);
+        $this->authorizeTeamRoles($request, $team);
 
         if ($teamRole->is_system) {
             throw ValidationException::withMessages([
@@ -109,6 +101,23 @@ class TeamRoleController extends Controller
         $teamRole->delete();
 
         return back()->with('success', __('Role deleted.'));
+    }
+
+    private function authorizeTeamRoles(Request $request, Team $team): void
+    {
+        $user = $request->user();
+        $isOperator = Gate::allows('manageInstanceBackups');
+
+        abort_unless($user !== null && ($user->belongsToTeam($team) || $isOperator), 403);
+
+        if ($isOperator) {
+            Gate::authorize('addTeamMember', $team);
+
+            return;
+        }
+
+        abort_unless(TeamAccess::allows($user, $team, 'settings.team'), 403);
+        abort_unless($team->id === $user->currentTeam?->id, 403);
     }
 
     private function uniqueKey(Team $team, string $base): string

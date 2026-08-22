@@ -8,6 +8,7 @@ use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
 use App\Models\Team;
+use App\Support\Iso4217Currencies;
 use Brick\Money\Money;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -25,7 +26,7 @@ class LedgerService
     public function getBalance(Account $account, ?Carbon $asOf = null): Money
     {
         $asOf = $asOf ?? Carbon::now();
-        $currency = $this->defaultCurrencyForAccount($account);
+        $currency = $this->bookCurrencyForTeamId((int) $account->team_id);
 
         $debitSum = (int) JournalEntry::query()
             ->where('account_id', $account->id)
@@ -68,7 +69,7 @@ class LedgerService
      */
     public function getAccountStatement(Account $account, Carbon $from, Carbon $to): Collection
     {
-        $currency = $this->defaultCurrencyForAccount($account);
+        $currency = $this->bookCurrencyForTeamId((int) $account->team_id);
         $runningMinor = $this->getBalance($account, $from->copy()->subDay())->getMinorAmount()->toInt();
 
         $lines = JournalEntry::query()
@@ -134,7 +135,7 @@ class LedgerService
      */
     public function trialBalance(Team $team, Carbon $asOf): Collection
     {
-        $currency = 'ZAR';
+        $currency = $this->bookCurrencyForTeam($team);
 
         return Account::queryWithoutTeamScope()
             ->where('team_id', $team->id)
@@ -170,12 +171,17 @@ class LedgerService
             });
     }
 
-    private function defaultCurrencyForAccount(Account $account): string
+    public function bookCurrencyForTeam(Team $team): string
     {
-        $code = JournalEntry::query()
-            ->where('account_id', $account->id)
-            ->value('currency');
+        return Iso4217Currencies::normalize(
+            (string) ($team->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
+        );
+    }
 
-        return $code ?: 'ZAR';
+    private function bookCurrencyForTeamId(int $teamId): string
+    {
+        $team = Team::query()->find($teamId);
+
+        return $team !== null ? $this->bookCurrencyForTeam($team) : 'ZAR';
     }
 }

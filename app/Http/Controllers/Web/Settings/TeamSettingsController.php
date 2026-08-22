@@ -11,7 +11,11 @@ use App\Support\TeamAccess\RolePresets;
 use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -26,16 +30,12 @@ class TeamSettingsController extends Controller
 
         abort_unless($team !== null && $user->belongsToTeam($team), 403);
 
-        return $this->show($request, $team);
+        return $this->show($request, $team, 'business');
     }
 
-    public function updateSessionIdleTimeout(Request $request): RedirectResponse
+    public function updateSessionIdleTimeout(Request $request, Team $team): RedirectResponse
     {
-        $this->authorizeTeam('settings.team', $request);
-        $user = $request->user();
-        $team = $user->currentTeam;
-
-        abort_unless($team !== null && $user->belongsToTeam($team), 403);
+        $this->authorizeTeamManagement($request, $team);
 
         $max = (int) config('session.lifetime');
         $validated = $request->validate([
@@ -50,14 +50,22 @@ class TeamSettingsController extends Controller
         return back()->with('success', __('Session idle timeout saved.'));
     }
 
-    public function show(Request $request, Team $team): Response
+    public function show(Request $request, Team $team, string $context = 'business'): Response
     {
         $user = $request->user();
+        $isOperator = Gate::allows('manageInstanceBackups');
 
-        abort_unless($user->belongsToTeam($team), 403);
-        abort_unless(TeamAccess::allows($user, $team, 'settings.team'), 403);
+        abort_unless($user->belongsToTeam($team) || $isOperator, 403);
+        abort_unless(
+            $isOperator || TeamAccess::allows($user, $team, 'settings.team'),
+            403
+        );
 
         Gate::authorize('view', $team);
+
+        if ($context === 'business' && ! $isOperator) {
+            abort_unless($team->id === $user->currentTeam?->id, 403);
+        }
 
         EnsureTeamSystemRoles::ensureFor($team);
 
@@ -127,6 +135,7 @@ class TeamSettingsController extends Controller
         })->values()->all();
 
         return Inertia::render('Settings/Team', [
+            'settings_context' => $context,
             'team_settings_entry' => $request->routeIs('teams.show') ? 'direct' : 'settings',
             'team' => [
                 'id' => $team->id,
@@ -148,7 +157,7 @@ class TeamSettingsController extends Controller
                 'canRemoveTeamMembers' => Gate::check('removeTeamMember', $team),
                 'canUpdateTeam' => Gate::check('update', $team),
                 'canUpdateTeamMembers' => Gate::check('updateTeamMember', $team),
-                'canManageRoles' => TeamAccess::allows($user, $team, 'settings.team'),
+                'canManageRoles' => Gate::check('addTeamMember', $team),
             ],
             'session_idle_timeout_minutes' => (int) ($settings['session_idle_timeout_minutes'] ?? 0),
             'session_lifetime_minutes' => (int) config('session.lifetime'),
@@ -187,5 +196,22 @@ class TeamSettingsController extends Controller
                 ))),
             ],
         ]);
+    }
+
+    private function authorizeTeamManagement(Request $request, Team $team): void
+    {
+        $user = $request->user();
+        $isOperator = Gate::allows('manageInstanceBackups');
+
+        abort_unless($user !== null && ($user->belongsToTeam($team) || $isOperator), 403);
+
+        if ($isOperator) {
+            Gate::authorize('view', $team);
+
+            return;
+        }
+
+        abort_unless(TeamAccess::allows($user, $team, 'settings.team'), 403);
+        abort_unless($team->id === $user->currentTeam?->id, 403);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web\Accounting;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Http\Controllers\Controller;
+use App\Support\Iso4217Currencies;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
@@ -136,8 +137,11 @@ class AccountStatementController extends Controller
 
         $safeCode = preg_replace('/[^A-Za-z0-9_-]+/', '-', $account->code) ?: 'account';
         $filename = 'account-statement-'.$safeCode.'-'.now()->format('Y-m-d-His').'.csv';
+        $bookCurrency = Iso4217Currencies::normalize(
+            (string) ($request->user()->currentTeam?->mergedBusinessSettings()['invoice_default_currency'] ?? 'ZAR')
+        );
 
-        return response()->streamDownload(function () use ($entries): void {
+        return response()->streamDownload(function () use ($entries, $bookCurrency): void {
             $handle = fopen('php://output', 'w');
             if ($handle === false) {
                 return;
@@ -150,8 +154,8 @@ class AccountStatementController extends Controller
                 'Date',
                 'Reference',
                 'Description',
-                'Debit (ZAR)',
-                'Credit (ZAR)',
+                'Debit ('.$bookCurrency.')',
+                'Credit ('.$bookCurrency.')',
             ]);
 
             foreach ($entries as $entry) {

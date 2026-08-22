@@ -50,7 +50,13 @@ class RecordPaymentAction
             (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
             (new EnsureDefaultBankingAccount)->execute($team);
 
-            if ($this->shouldPostInBusinessFunctionalCurrency($invoice)) {
+            if ($this->isForeignCurrencyInvoice($invoice)) {
+                if (! $this->hasBusinessCurrencySnapshot($invoice)) {
+                    throw ValidationException::withMessages([
+                        'currency' => __('This invoice is in a foreign currency but has no book-currency exchange rate. Open and save the invoice so a rate can be stored, then record the payment again.'),
+                    ]);
+                }
+
                 if ($dto->bankAmountBusinessCents !== null && $dto->bankAmountBusinessCents < 0) {
                     throw ValidationException::withMessages([
                         'bank_amount_business_cents' => __('Bank amount cannot be negative.'),
@@ -76,7 +82,60 @@ class RecordPaymentAction
         });
     }
 
-    private function shouldPostInBusinessFunctionalCurrency(Invoice $invoice): bool
+    /**
+     * Rebuild the ledger transaction for an existing payment without changing invoice paid totals.
+     */
+    public function rebuildJournal(Payment $payment, RecordPaymentDTO $dto): Payment
+    {
+        return DB::transaction(function () use ($payment, $dto): Payment {
+            $payment = Payment::queryWithoutTeamScope()
+                ->where('team_id', $dto->teamId)
+                ->lockForUpdate()
+                ->findOrFail($payment->id);
+
+            $invoice = Invoice::queryWithoutTeamScope()
+                ->where('team_id', $dto->teamId)
+                ->with('team')
+                ->findOrFail($dto->invoiceId);
+
+            if (in_array($invoice->status, [InvoiceStatus::Void, InvoiceStatus::Draft], true)) {
+                throw ValidationException::withMessages([
+                    'invoice_id' => __('Cannot rebuild payment journals for a draft or void invoice.'),
+                ]);
+            }
+
+            $team = $invoice->team ?? Team::query()->findOrFail($dto->teamId);
+            (new DefaultChartOfAccountsSeeder)->ensureForTeam($team);
+            (new EnsureDefaultBankingAccount)->execute($team);
+
+            if ($this->isForeignCurrencyInvoice($invoice)) {
+                if (! $this->hasBusinessCurrencySnapshot($invoice)) {
+                    throw ValidationException::withMessages([
+                        'currency' => __('This invoice is in a foreign currency but has no book-currency exchange rate.'),
+                    ]);
+                }
+
+                $transactionId = $this->postFunctionalCurrencyJournal($dto, $invoice);
+            } else {
+                $transactionId = $this->postInvoiceCurrencyJournal($dto, $invoice);
+            }
+
+            $payment->forceFill([
+                'transaction_id' => $transactionId,
+                'banking_account_id' => $dto->bankingAccountId,
+                'bank_amount_business_cents' => $this->isForeignCurrencyInvoice($invoice)
+                    ? ($dto->bankAmountBusinessCents ?? (int) round(
+                        ($dto->amountCents * (int) $invoice->getRawOriginal('total_business_currency_cents'))
+                        / max(1, (int) $invoice->getRawOriginal('total_cents'))
+                    ))
+                    : null,
+            ])->save();
+
+            return $payment->refresh();
+        });
+    }
+
+    private function isForeignCurrencyInvoice(Invoice $invoice): bool
     {
         $invoiceCurrency = Iso4217Currencies::normalize((string) ($invoice->currency ?? 'ZAR'));
         $bookCurrency = Iso4217Currencies::normalize((string) (
@@ -84,16 +143,26 @@ class RecordPaymentAction
             ?? $invoice->team?->mergedBusinessSettings()['invoice_default_currency']
             ?? 'ZAR'
         ));
-        if ($invoiceCurrency === $bookCurrency) {
-            return false;
-        }
 
+        return $invoiceCurrency !== $bookCurrency;
+    }
+
+    private function hasBusinessCurrencySnapshot(Invoice $invoice): bool
+    {
         $rawTotalBusiness = $invoice->getRawOriginal('total_business_currency_cents');
+        $rate = $invoice->fx_rate_invoice_to_business;
 
-        return $rawTotalBusiness !== null;
+        return $rawTotalBusiness !== null && $rate !== null && (float) $rate > 0;
     }
 
     private function executeInvoiceCurrencyPayment(RecordPaymentDTO $dto, Invoice $invoice): Payment
+    {
+        $transactionId = $this->postInvoiceCurrencyJournal($dto, $invoice);
+
+        return $this->finalizePayment($dto, $invoice, $transactionId, null);
+    }
+
+    private function postInvoiceCurrencyJournal(RecordPaymentDTO $dto, Invoice $invoice): int
     {
         $bankAccount = $this->resolveDepositGlAccount($dto);
         $receivableAccount = $this->getRequiredAccount($dto->teamId, '1100', 'Accounts Receivable');
@@ -135,7 +204,7 @@ class RecordPaymentAction
 
             $this->postTransactionAction->execute($transaction->fresh());
 
-            return $this->finalizePayment($dto, $invoice, $transaction->id, null);
+            return (int) $transaction->id;
         }
 
         $vatPart = $this->calculateVatPart($invoice, $amountCents);
@@ -180,10 +249,23 @@ class RecordPaymentAction
 
         $this->postTransactionAction->execute($transaction->fresh());
 
-        return $this->finalizePayment($dto, $invoice, $transaction->id, null);
+        return (int) $transaction->id;
     }
 
     private function executeFunctionalCurrencyPayment(RecordPaymentDTO $dto, Invoice $invoice): Payment
+    {
+        $paymentInvoiceCents = $dto->amountCents;
+        $totalInvoiceCents = max(1, (int) $invoice->getRawOriginal('total_cents'));
+        $totalBusinessCents = (int) $invoice->getRawOriginal('total_business_currency_cents');
+        $bookClearingBusiness = (int) round(($paymentInvoiceCents * $totalBusinessCents) / $totalInvoiceCents);
+        $bankBusiness = $dto->bankAmountBusinessCents ?? $bookClearingBusiness;
+
+        $transactionId = $this->postFunctionalCurrencyJournal($dto, $invoice);
+
+        return $this->finalizePayment($dto, $invoice, $transactionId, $bankBusiness);
+    }
+
+    private function postFunctionalCurrencyJournal(RecordPaymentDTO $dto, Invoice $invoice): int
     {
         $bookCurrency = Iso4217Currencies::normalize((string) (
             $invoice->business_currency_code
@@ -307,7 +389,7 @@ class RecordPaymentAction
 
         $this->postTransactionAction->execute($transaction->fresh());
 
-        return $this->finalizePayment($dto, $invoice, $transaction->id, $bankBusiness);
+        return (int) $transaction->id;
     }
 
     private function resolveDepositGlAccount(RecordPaymentDTO $dto): Account

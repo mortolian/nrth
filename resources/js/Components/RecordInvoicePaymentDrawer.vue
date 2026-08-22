@@ -454,8 +454,9 @@ const submit = () => {
                 >
                     <p class="font-medium text-sky-950">Foreign currency invoice</p>
                     <p class="mt-1 text-sky-900">
-                        Payment amount is in <strong>{{ invoice.currency }}</strong>. The bank deposit is tracked in
-                        <strong>{{ bookCurrency }}</strong> for your books.
+                        The amount on the invoice is in <strong>{{ invoice.currency }}</strong>.
+                        What actually landed in your bank is in <strong>{{ bookCurrency }}</strong>.
+                        Your books use {{ bookCurrency }} — any difference is foreign exchange gain or loss.
                     </p>
                     <p v-if="spotHint" class="mt-1 text-sky-800">
                         Indicative rate ({{ spotHint.date }}): 1 {{ invoice.currency }} ≈
@@ -467,7 +468,7 @@ const submit = () => {
 
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">
-                        Amount ({{ invoice.currency }})
+                        Amount on invoice ({{ invoice.currency }})
                     </label>
                     <AppInput
                         :model-value="form.amount"
@@ -490,26 +491,30 @@ const submit = () => {
                             Book value of this payment ({{ bookCurrency }}):
                             <strong>{{ formatCo(bookClearingBusinessCents) }}</strong>
                         </p>
+                        <p class="mt-1 text-slate-600">
+                            This is the invoice amount converted at the rate stored when the invoice was created.
+                            Accounts receivable is cleared by this amount.
+                        </p>
                         <p v-if="indicativeBankCents != null" class="mt-1 text-slate-600">
-                            Indicative bank deposit at above rate:
+                            Suggested bank amount at today’s indicative rate:
                             <strong>{{ formatCo(indicativeBankCents) }}</strong>
                         </p>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">
-                            Bank received ({{ bookCurrency }})
+                            Amount in bank ({{ bookCurrency }})
                         </label>
                         <AppInput
                             :model-value="form.bank_amount_business"
                             type="text"
                             inputmode="decimal"
                             autocomplete="off"
-                            placeholder="From payment-date rate"
+                            placeholder="What hit your bank account"
                             @update:model-value="(v) => { bankAmountDirty = true; form.bank_amount_business = v; }"
                         />
                         <p class="mt-1 text-xs text-slate-500">
-                            Seeded once from the payment-date rate when empty. Changing the date updates the indicative
-                            rate only — edit this field if the amount that cleared your bank differs.
+                            Enter what actually cleared your bank. If this differs from book value, the difference is
+                            recorded as foreign exchange gain or loss.
                         </p>
                     </div>
                     <div
@@ -522,16 +527,17 @@ const submit = () => {
                         ]"
                     >
                         <template v-if="fxDifferenceCents > 0">
-                            <p class="font-medium">Foreign exchange gain</p>
+                            <p class="font-medium">You received more than book value</p>
                             <p class="mt-0.5">
-                                {{ formatCo(fxDifferenceCents) }} will be posted to the income account selected below.
+                                {{ formatCo(fxDifferenceCents) }} will be recorded as foreign exchange gain
+                                (extra income).
                             </p>
                         </template>
                         <template v-else>
-                            <p class="font-medium">Foreign exchange loss</p>
+                            <p class="font-medium">You received less than book value</p>
                             <p class="mt-0.5">
-                                {{ formatCo(Math.abs(fxDifferenceCents)) }} below book value — confirm expense posting
-                                below.
+                                {{ formatCo(Math.abs(fxDifferenceCents)) }} short — confirm below to record this as
+                                a foreign exchange loss (expense).
                             </p>
                         </template>
                     </div>
@@ -557,8 +563,8 @@ const submit = () => {
                             class="mt-0.5 h-4 w-4 rounded border-slate-300"
                         >
                         <span>
-                            Record foreign exchange loss to expenses. Required when the bank amount is below book
-                            value.
+                            Yes — record the shortfall as a foreign exchange loss (expense). Required when the bank
+                            amount is below book value.
                         </span>
                     </label>
                     <div

@@ -32,12 +32,17 @@ const props = defineProps<{
     can_manage: boolean;
 }>();
 
-const page = usePage();
+const page = usePage<{ business_currency?: string }>();
 const pageErrors = computed(() => page.props.errors as Record<string, string> | undefined);
 
 const isTrulyEmpty = computed(() => props.account_count === 0);
 
-const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
+const bookCurrency = computed(() =>
+    typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
+        ? page.props.business_currency
+        : 'ZAR',
+);
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 
 const typeLabels: Record<string, string> = {
     asset: 'Assets',

@@ -10,10 +10,11 @@ export type BusinessSettingsTabId =
     | 'items'
     | 'payment_pages'
     | 'ai'
-    | 'note_templates';
+    | 'note_templates'
+    | 'team_members';
 
-/** In-page Business settings tabs (excludes Note templates, which is its own page). */
-export const BUSINESS_PAGE_TAB_IDS: Exclude<BusinessSettingsTabId, 'note_templates'>[] = [
+/** In-page Business settings tabs (excludes Note templates and Team members — separate pages). */
+export const BUSINESS_PAGE_TAB_IDS: Exclude<BusinessSettingsTabId, 'note_templates' | 'team_members'>[] = [
     'profile',
     'contact',
     'invoice',
@@ -25,7 +26,7 @@ export const BUSINESS_PAGE_TAB_IDS: Exclude<BusinessSettingsTabId, 'note_templat
     'ai',
 ];
 
-const TAB_DEFS: Array<{ id: BusinessSettingsTabId; label: string }> = [
+const TAB_DEFS: Array<{ id: BusinessSettingsTabId; label: string; permission?: 'settings.team' }> = [
     { id: 'profile', label: 'Business profile' },
     { id: 'contact', label: 'Contact' },
     { id: 'invoice', label: 'Invoices' },
@@ -36,20 +37,39 @@ const TAB_DEFS: Array<{ id: BusinessSettingsTabId; label: string }> = [
     { id: 'items', label: 'Units' },
     { id: 'payment_pages', label: 'Online payments' },
     { id: 'ai', label: 'AI' },
+    { id: 'team_members', label: 'Team members', permission: 'settings.team' },
 ];
 
 /**
  * Business settings sub-tabs.
- * Note templates is always a link. Pass `linkAll` on the note-templates page so
+ * Note templates and Team members are always links. Pass `linkAll` on those pages so
  * the other tabs navigate back into Settings → Business.
  */
-export function businessSettingsTabs(options: { linkAll?: boolean } = {}): AppTabItem[] {
-    return TAB_DEFS.map((tab) => {
+export function businessSettingsTabs(
+    options: { linkAll?: boolean; teamPermissions?: string[] } = {},
+): AppTabItem[] {
+    const perms = options.teamPermissions ?? [];
+
+    return TAB_DEFS.filter((tab) => {
+        if (tab.permission === undefined) {
+            return true;
+        }
+
+        return perms.includes(tab.permission);
+    }).map((tab) => {
         if (tab.id === 'note_templates') {
             return {
                 id: tab.id,
                 label: tab.label,
                 href: route('settings.note-templates.index'),
+            };
+        }
+
+        if (tab.id === 'team_members') {
+            return {
+                id: tab.id,
+                label: tab.label,
+                href: route('settings.team'),
             };
         }
 

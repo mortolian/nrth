@@ -171,7 +171,7 @@ class TeamPermissionsTest extends TestCase
         EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
 
         $this->actingAs($owner)
-            ->post(route('settings.team.roles.store'), [
+            ->post(route('settings.team.roles.store', $owner->currentTeam), [
                 'name' => 'Bookkeeper',
                 'description' => 'Expenses only',
                 'permissions' => ['expenses.view', 'expenses.manage'],
