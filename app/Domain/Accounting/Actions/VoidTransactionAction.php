@@ -28,7 +28,8 @@ class VoidTransactionAction
                 'status' => TransactionStatus::Draft,
                 'reference' => 'VOID-'.$transaction->getKey(),
                 'description' => 'Reversal of transaction #'.$transaction->getKey().': '.$reason,
-                'transaction_date' => Carbon::now()->toDateString(),
+                'transaction_date' => $transaction->transaction_date?->toDateString()
+                    ?? Carbon::now()->toDateString(),
                 'created_by' => $transaction->created_by,
             ]);
 

@@ -508,7 +508,7 @@ class ReportsController extends Controller
             ->whereHas('transaction', fn ($q) => $q
                 ->withoutGlobalScopes()
                 ->where('team_id', $teamId)
-                ->where('status', TransactionStatus::Posted)
+                ->forPeriodReporting()
                 ->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()]))
             ->sum('amount_cents');
 
@@ -518,7 +518,7 @@ class ReportsController extends Controller
             ->whereHas('transaction', fn ($q) => $q
                 ->withoutGlobalScopes()
                 ->where('team_id', $teamId)
-                ->where('status', TransactionStatus::Posted)
+                ->forPeriodReporting()
                 ->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()]))
             ->sum('amount_cents');
 

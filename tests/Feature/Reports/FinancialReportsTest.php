@@ -120,6 +120,32 @@ class FinancialReportsTest extends TestCase
                 ->where('report.totals.net_profit', 0));
     }
 
+    public function test_profit_loss_counts_replacement_accrual_not_void_reversal_debits(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->actingAsOwner($user, $team);
+
+        $ar = Account::factory()->for($team)->asset()->create(['code' => '1100', 'name' => 'Accounts Receivable']);
+        $income = Account::factory()->for($team)->income()->create(['code' => '4000', 'name' => 'Services']);
+
+        $legacy = $this->postPair($team, $user, '2026-08-17', $ar, $income, 524_700);
+        app(VoidTransactionAction::class)->execute($legacy->fresh(['journalEntries']), 'Repair foreign invoice ledger');
+        $this->postPair($team, $user, '2026-08-17', $ar, $income, 9_824_745);
+
+        $this->actingAs($user)
+            ->get(route('reports.profit-loss', [
+                'preset' => 'custom',
+                'from' => '2026-08-01',
+                'to' => '2026-08-31',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('report.totals.income', 9_824_745)
+                ->where('report.totals.expenses', 0)
+                ->where('report.totals.net_profit', 9_824_745));
+    }
+
     public function test_trial_balance_debits_equal_credits(): void
     {
         [$user] = $this->seedKnownBooks();

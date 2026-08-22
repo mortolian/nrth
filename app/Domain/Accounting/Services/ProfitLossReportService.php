@@ -4,7 +4,6 @@ namespace App\Domain\Accounting\Services;
 
 use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\EntryType;
-use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\JournalEntry;
 use Carbon\Carbon;
 
@@ -19,7 +18,7 @@ final class ProfitLossReportService
             ->whereHas('transaction', fn ($q) => $q
                 ->withoutGlobalScopes()
                 ->where('team_id', $teamId)
-                ->where('status', TransactionStatus::Posted->value)
+                ->forPeriodReporting()
                 ->whereBetween('transaction_date', [$from->toDateString(), $to->toDateString()]))
             ->whereHas('account', fn ($q) => $q
                 ->withoutGlobalScopes()

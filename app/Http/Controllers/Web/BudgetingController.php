@@ -627,7 +627,7 @@ class BudgetingController extends Controller
             ->whereHas('transaction', fn ($q) => $q
                 ->withoutGlobalScopes()
                 ->where('team_id', $teamId)
-                ->where('status', TransactionStatus::Posted->value)
+                ->forPeriodReporting()
                 ->whereBetween('transaction_date', [$from, $to]))
             ->whereHas('account', fn ($q) => $q
                 ->withoutGlobalScopes()
@@ -646,7 +646,7 @@ class BudgetingController extends Controller
             ->whereHas('transaction', fn ($q) => $q
                 ->withoutGlobalScopes()
                 ->where('team_id', $teamId)
-                ->where('status', TransactionStatus::Posted->value)
+                ->forPeriodReporting()
                 ->whereBetween('transaction_date', [$from, $to]))
             ->whereHas('account', fn ($q) => $q
                 ->withoutGlobalScopes()

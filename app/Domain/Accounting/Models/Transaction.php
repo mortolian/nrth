@@ -10,6 +10,7 @@ use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\MediaDisks;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -159,5 +160,28 @@ class Transaction extends Model implements HasMedia
         }
 
         return null;
+    }
+
+    public function isVoidReversal(): bool
+    {
+        return str_starts_with((string) $this->reference, 'VOID-');
+    }
+
+    /**
+     * Posted transactions that count toward dashboard / P&L period totals.
+     * Void reversals (VOID-*) are excluded: the voided original is already omitted,
+     * so counting the reversal would incorrectly reduce income or expenses.
+     *
+     * @param  Builder<Transaction>  $query
+     * @return Builder<Transaction>
+     */
+    public function scopeForPeriodReporting(Builder $query): Builder
+    {
+        return $query
+            ->where('status', TransactionStatus::Posted)
+            ->where(function (Builder $inner): void {
+                $inner->whereNull('reference')
+                    ->orWhere('reference', 'not like', 'VOID-%');
+            });
     }
 }
