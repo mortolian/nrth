@@ -48,6 +48,8 @@ class DraftInvoiceExclusionsTest extends TestCase
                 ->has('outstanding_invoices.data', 1)
                 ->where('outstanding_invoices.data.0.number', 'INV-SENT-1')
                 ->where('outstanding_invoices.data.0.amount', 25000)
+                ->has('revenue_chart_meta.period_label')
+                ->has('revenue_chart_meta.financial_year_label')
             );
     }
 

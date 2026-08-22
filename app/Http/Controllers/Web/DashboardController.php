@@ -12,6 +12,7 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\Services\VATService;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Support\FinancialYear;
 use App\Support\Iso4217Currencies;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -89,6 +90,7 @@ class DashboardController extends Controller
             ],
             'vat_enabled' => $vatEnabled,
             'revenue_chart' => $this->revenueChart($team),
+            'revenue_chart_meta' => $this->revenueChartMeta($team, $now),
             'outstanding_invoices' => $outstandingInvoices,
             'recent_transactions' => $this->recentTransactions($team),
             'budget_progress' => $budgetProgressAligned
@@ -154,6 +156,31 @@ class DashboardController extends Controller
         }
 
         return $rows;
+    }
+
+    /**
+     * @return array{
+     *     period_label: string,
+     *     financial_year_label: string,
+     *     financial_year_start: string,
+     *     financial_year_end: string
+     * }
+     */
+    private function revenueChartMeta(Team $team, Carbon $now): array
+    {
+        $endMonth = (int) ($team->mergedBusinessSettings()['financial_year_end_month'] ?? 2);
+        $startMonth = FinancialYear::startMonthFromEndMonth($endMonth);
+        [$fyStart, $fyEnd] = FinancialYear::windowContaining($now, $startMonth);
+
+        $chartStart = $now->copy()->startOfMonth()->subMonths(5);
+        $chartEnd = $now->copy()->endOfMonth();
+
+        return [
+            'period_label' => $chartStart->format('M Y').' – '.$chartEnd->format('M Y'),
+            'financial_year_label' => FinancialYear::labelForWindow($fyStart, $fyEnd),
+            'financial_year_start' => $fyStart->toDateString(),
+            'financial_year_end' => $fyEnd->toDateString(),
+        ];
     }
 
     /**
