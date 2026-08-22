@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.24](https://github.com/mortolian/nrth/compare/v0.1.23...v0.1.24) (2026-08-22)
+
+
+### Features
+
+* **dashboard:** format revenue chart currency and show FY period ([77ed43e](https://github.com/mortolian/nrth/commit/77ed43ec6c217a95186066944ac72e9db6267954))
+
 ## [0.1.23](https://github.com/mortolian/nrth/compare/v0.1.22...v0.1.23) (2026-08-22)
 
 
