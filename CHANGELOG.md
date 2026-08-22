@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.21](https://github.com/mortolian/nrth/compare/v0.1.20...v0.1.21) (2026-08-22)
+
+
+### Bug Fixes
+
+* **invoicing:** post foreign-currency ledger in book currency ([3660d13](https://github.com/mortolian/nrth/commit/3660d13a38772119e9e0f003204de493d5eead79))
+
 ## [0.1.20](https://github.com/mortolian/nrth/compare/v0.1.19...v0.1.20) (2026-08-21)
 
 
