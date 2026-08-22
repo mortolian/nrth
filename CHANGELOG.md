@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.23](https://github.com/mortolian/nrth/compare/v0.1.22...v0.1.23) (2026-08-22)
+
+
+### Bug Fixes
+
+* **accounting:** exclude void reversals from period revenue totals ([ee81ab7](https://github.com/mortolian/nrth/commit/ee81ab7ce43525ae5181cec4e88df97c2563cbdd))
+
 ## [0.1.22](https://github.com/mortolian/nrth/compare/v0.1.21...v0.1.22) (2026-08-22)
 
 
