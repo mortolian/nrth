@@ -13,7 +13,8 @@ const props = defineProps<{
     budget: null | {
         id: number;
         name: string;
-        period_type: 'monthly' | 'quarterly' | 'annual' | 'custom';
+        has_period: boolean;
+        period_type: 'monthly' | 'quarterly' | 'annual' | 'custom' | null;
         start_date: string | null;
         end_date: string | null;
         currency: string;
@@ -34,6 +35,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 const form = reactive({
     name: props.budget?.name ?? '',
+    has_period: props.budget?.has_period ?? false,
     period_type: (props.budget?.period_type ?? 'monthly') as 'monthly' | 'quarterly' | 'annual' | 'custom',
     start_date: props.budget?.start_date ?? today,
     end_date: props.budget?.end_date ?? today,
@@ -62,27 +64,52 @@ const applyPeriodType = () => {
     }
 };
 
-if (!props.isEditing) {
-    applyPeriodType();
-}
-
 watch(
-    () => form.period_type,
-    () => {
-        if (form.period_type !== 'custom') {
+    () => form.has_period,
+    (enabled) => {
+        if (enabled && form.period_type !== 'custom') {
             applyPeriodType();
         }
     },
 );
 
-const schema = z.object({
-    name: z.string().trim().min(1, 'Budget name is required'),
-    period_type: z.enum(['monthly', 'quarterly', 'annual', 'custom']),
-    start_date: z.string().min(1, 'Start date is required'),
-    end_date: z.string().min(1, 'End date is required'),
-    currency: z.string().length(3, 'Currency is required'),
-    set_active: z.boolean(),
-});
+watch(
+    () => form.period_type,
+    () => {
+        if (form.has_period && form.period_type !== 'custom') {
+            applyPeriodType();
+        }
+    },
+);
+
+const schema = z
+    .object({
+        name: z.string().trim().min(1, 'Budget name is required'),
+        has_period: z.boolean(),
+        period_type: z.enum(['monthly', 'quarterly', 'annual', 'custom']),
+        start_date: z.string(),
+        end_date: z.string(),
+        currency: z.string().length(3, 'Currency is required'),
+        set_active: z.boolean(),
+    })
+    .superRefine((data, ctx) => {
+        if (!data.has_period) {
+            return;
+        }
+        if (!data.start_date) {
+            ctx.addIssue({ code: 'custom', message: 'Start date is required', path: ['start_date'] });
+        }
+        if (!data.end_date) {
+            ctx.addIssue({ code: 'custom', message: 'End date is required', path: ['end_date'] });
+        }
+        if (data.start_date && data.end_date && data.end_date < data.start_date) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'End date must be on or after the start date.',
+                path: ['end_date'],
+            });
+        }
+    });
 
 const submit = () => {
     if (saving.value) return;
@@ -93,18 +120,14 @@ const submit = () => {
         return;
     }
 
-    if (parsed.data.end_date < parsed.data.start_date) {
-        setFromServer({ end_date: 'End date must be on or after the start date.' });
-        return;
-    }
-
     clear();
 
     const payload = {
         name: parsed.data.name,
-        period_type: parsed.data.period_type,
-        start_date: parsed.data.start_date,
-        end_date: parsed.data.end_date,
+        has_period: parsed.data.has_period,
+        period_type: parsed.data.has_period ? parsed.data.period_type : null,
+        start_date: parsed.data.has_period ? parsed.data.start_date : null,
+        end_date: parsed.data.has_period ? parsed.data.end_date : null,
         currency: parsed.data.currency,
         set_active: parsed.data.set_active,
     };
@@ -159,8 +182,8 @@ const cancel = () => {
             :title="isEditing ? 'Edit budget details' : 'Create budget'"
             :subtitle="
                 isEditing
-                    ? 'Update the budget period and currency. Categories and line items are managed on the budget page.'
-                    : 'Start with the basics. You will add categories and known expenses on the next screen.'
+                    ? 'Update the budget name, currency, and optional period. Categories and line items are managed on the budget page.'
+                    : 'Create an ongoing plan, or enable a fixed period if this budget should only cover a date range.'
             "
         />
 
@@ -175,29 +198,12 @@ const cancel = () => {
                         </label>
                         <AppInput
                             v-model="form.name"
-                            placeholder="2026 Operating budget"
+                            placeholder="Operating budget"
                             @update:model-value="clearField('name')"
                         />
                         <p v-if="fieldErrors.name" class="mt-1 text-xs text-rose-600">{{ fieldErrors.name }}</p>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Period type</label>
-                        <AppSelect
-                            :model-value="form.period_type"
-                            :options="[
-                                { label: 'Monthly', value: 'monthly' },
-                                { label: 'Quarterly', value: 'quarterly' },
-                                { label: 'Annual', value: 'annual' },
-                                { label: 'Custom', value: 'custom' },
-                            ]"
-                            @update:model-value="
-                                form.period_type = $event as 'monthly' | 'quarterly' | 'annual' | 'custom';
-                                clearField('period_type');
-                                if (form.period_type !== 'custom') applyPeriodType();
-                            "
-                        />
-                    </div>
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-medium text-slate-500">Budget currency</label>
                         <AppSelect
                             :model-value="form.currency"
@@ -209,28 +215,68 @@ const cancel = () => {
                         />
                         <p v-if="fieldErrors.currency" class="mt-1 text-xs text-rose-600">{{ fieldErrors.currency }}</p>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">Start date</label>
-                        <AppInput
-                            v-model="form.start_date"
-                            type="date"
-                            @change="
-                                clearField('start_date');
-                                if (form.period_type !== 'custom') applyPeriodType();
-                            "
-                        />
-                        <p v-if="fieldErrors.start_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.start_date }}</p>
+
+                    <div class="md:col-span-2 flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-3">
+                        <input
+                            id="budget-has-period"
+                            v-model="form.has_period"
+                            type="checkbox"
+                            class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        >
+                        <div>
+                            <label for="budget-has-period" class="text-sm font-medium text-slate-800">
+                                Limit this budget to a period
+                            </label>
+                            <p class="mt-0.5 text-xs text-slate-500">
+                                Leave unchecked for an ongoing plan. Enable to set a period type and start/end dates.
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">End date</label>
-                        <AppInput
-                            v-model="form.end_date"
-                            type="date"
-                            :disabled="form.period_type !== 'custom'"
-                            @update:model-value="clearField('end_date')"
-                        />
-                        <p v-if="fieldErrors.end_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.end_date }}</p>
-                    </div>
+
+                    <template v-if="form.has_period">
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Period type</label>
+                            <AppSelect
+                                :model-value="form.period_type"
+                                :options="[
+                                    { label: 'Monthly', value: 'monthly' },
+                                    { label: 'Quarterly', value: 'quarterly' },
+                                    { label: 'Annual', value: 'annual' },
+                                    { label: 'Custom', value: 'custom' },
+                                ]"
+                                @update:model-value="
+                                    form.period_type = $event as 'monthly' | 'quarterly' | 'annual' | 'custom';
+                                    clearField('period_type');
+                                    if (form.period_type !== 'custom') applyPeriodType();
+                                "
+                            />
+                            <p v-if="fieldErrors.period_type" class="mt-1 text-xs text-rose-600">{{ fieldErrors.period_type }}</p>
+                        </div>
+                        <div class="hidden md:block" />
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Start date</label>
+                            <AppInput
+                                v-model="form.start_date"
+                                type="date"
+                                @change="
+                                    clearField('start_date');
+                                    if (form.period_type !== 'custom') applyPeriodType();
+                                "
+                            />
+                            <p v-if="fieldErrors.start_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.start_date }}</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">End date</label>
+                            <AppInput
+                                v-model="form.end_date"
+                                type="date"
+                                :disabled="form.period_type !== 'custom'"
+                                @update:model-value="clearField('end_date')"
+                            />
+                            <p v-if="fieldErrors.end_date" class="mt-1 text-xs text-rose-600">{{ fieldErrors.end_date }}</p>
+                        </div>
+                    </template>
+
                     <div class="md:col-span-2 flex items-center gap-2 pt-2">
                         <input
                             id="budget-set-active"

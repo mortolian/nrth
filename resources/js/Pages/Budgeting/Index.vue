@@ -101,7 +101,7 @@ const formatCents = (cents, currency = 'ZAR') =>
     >
         <PageHeader
             title="Budgets"
-            subtitle="Plan envelopes by category and track spend against the period."
+            subtitle="Plan ongoing expenses by category. Optionally limit a budget to a period and track spend against linked accounts."
         >
             <template v-if="canManageBudgets" #actions>
                 <AppButton variant="primary" @click="router.visit(route('budgeting.create'))">
@@ -115,7 +115,7 @@ const formatCents = (cents, currency = 'ZAR') =>
             class="mt-5"
             title="No budgets yet"
             :description="canManageBudgets
-                ? 'Set spending limits by category and track how actuals compare to plan over the year.'
+                ? 'Create a budget, add categories, and plan the expenses you need to cover.'
                 : 'Budgets for this business will appear here once someone with access creates one.'"
             :icon="FolderKanban"
         >
@@ -131,9 +131,9 @@ const formatCents = (cents, currency = 'ZAR') =>
                 :columns="[
                     { key: 'name', label: 'Name' },
                     { key: 'period', label: 'Period' },
-                    { key: 'allocated', label: 'Total allocated' },
-                    { key: 'spent', label: 'Total spent' },
-                    { key: 'used', label: '% used' },
+                    { key: 'planned', label: 'Planned', align: 'right' },
+                    { key: 'spent', label: 'Spent', align: 'right' },
+                    { key: 'used', label: '% of plan' },
                     { key: 'status', label: 'Status' },
                     { key: 'actions', label: '' },
                 ]"
@@ -149,9 +149,17 @@ const formatCents = (cents, currency = 'ZAR') =>
                 >
                     <td class="px-4 py-3 font-medium text-slate-900">{{ budget.name }}</td>
                     <td class="px-4 py-3">{{ budget.period }}</td>
-                    <td class="px-4 py-3 tabular-nums">{{ formatCents(budget.total_allocated, budget.currency) }}</td>
-                    <td class="px-4 py-3 tabular-nums">{{ formatCents(budget.total_spent, budget.currency) }}</td>
-                    <td class="px-4 py-3">{{ budget.percentage_used }}%</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{{ formatCents(budget.total_planned, budget.currency) }}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">
+                        <template v-if="budget.has_tracking">
+                            {{ formatCents(budget.total_spent, budget.currency) }}
+                        </template>
+                        <span v-else class="text-slate-400">—</span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <template v-if="budget.has_tracking">{{ budget.percentage_used }}%</template>
+                        <span v-else class="text-slate-400">—</span>
+                    </td>
                     <td class="px-4 py-3">
                         <AppBadge :variant="budget.status === 'active' ? 'success' : 'neutral'">{{ budget.status }}</AppBadge>
                     </td>

@@ -5,6 +5,7 @@ namespace App\Domain\Budgeting\Enums;
 enum BudgetItemCadence: string
 {
     case Monthly = 'monthly';
+    case Annually = 'annually';
     case OncePerPeriod = 'once_per_period';
 
     /**

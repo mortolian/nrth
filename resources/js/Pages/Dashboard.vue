@@ -487,7 +487,7 @@ const onInvoiceAction = (invoice, actionId) => {
                 </AppCard>
 
                 <AppCard>
-                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Budget Progress (Current Month)</h3>
+                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Budget vs plan (this month)</h3>
                     <div v-if="isLoading" class="space-y-3">
                         <div v-for="n in 4" :key="`budget-skeleton-${n}`" class="h-8 animate-pulse rounded bg-slate-100" />
                     </div>
@@ -496,7 +496,7 @@ const onInvoiceAction = (invoice, actionId) => {
                             <div class="mb-1 flex items-center justify-between text-sm">
                                 <span class="font-medium text-slate-700">{{ item.category }}</span>
                                 <span class="text-slate-500">
-                                    {{ formatBudgetCents(item.spent) }} / {{ formatBudgetCents(item.allocated) }}
+                                    {{ formatBudgetCents(item.spent) }} / {{ formatBudgetCents(item.planned) }}
                                 </span>
                             </div>
                             <div class="h-2 rounded-full bg-slate-100">
@@ -510,7 +510,7 @@ const onInvoiceAction = (invoice, actionId) => {
                             </div>
                         </div>
                         <p v-if="!budget_progress.length" class="text-sm text-slate-500">
-                            No active budget for this month, or the current month is outside your budget dates. Create or activate a budget under Planning → Budgets.
+                            No tracked categories for this month. Link expense accounts on an active budget under Planning → Budgets to see progress against plan.
                         </p>
                     </div>
                 </AppCard>

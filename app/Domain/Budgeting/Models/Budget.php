@@ -36,6 +36,11 @@ class Budget extends Model
         ];
     }
 
+    public function hasPeriod(): bool
+    {
+        return $this->start_date !== null && $this->end_date !== null;
+    }
+
     /**
      * @return BelongsTo<Team, $this>
      */

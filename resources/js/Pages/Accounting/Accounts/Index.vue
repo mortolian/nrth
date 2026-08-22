@@ -133,12 +133,12 @@ const openAccount = (account: AccountRow) => {
     }
 };
 
-const typeBadgeClass: Record<string, string> = {
-    asset: 'bg-blue-100 text-blue-700',
-    liability: 'bg-rose-100 text-rose-700',
-    equity: 'bg-purple-100 text-purple-700',
-    income: 'bg-brand-100 text-brand-700',
-    expense: 'bg-amber-100 text-amber-700',
+const typeHeaderClass: Record<string, string> = {
+    asset: 'border-blue-100 bg-blue-50 text-blue-900',
+    liability: 'border-rose-100 bg-rose-50 text-rose-900',
+    equity: 'border-purple-100 bg-purple-50 text-purple-900',
+    income: 'border-brand-100 bg-brand-50 text-brand-900',
+    expense: 'border-amber-100 bg-amber-50 text-amber-900',
 };
 
 /** Shared across type-group tables so Code / Parent / Balance line up vertically. */
@@ -224,18 +224,20 @@ const accountColumns = [
         </div>
 
         <div v-for="group in filteredGroups" :key="group.type" class="mt-5">
-            <div class="mb-2 flex items-center gap-2">
-                <span
-                    class="rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide"
-                    :class="typeBadgeClass[group.type] ?? 'bg-slate-100 text-slate-600'"
+            <AppCard class="overflow-hidden p-0">
+                <div
+                    class="flex items-center justify-between gap-3 border-b px-5 py-3"
+                    :class="typeHeaderClass[group.type] ?? 'border-slate-200 bg-slate-50 text-slate-900'"
                 >
-                    {{ typeLabels[group.type] ?? group.type }}
-                </span>
-                <span class="text-xs text-slate-400">{{ group.accounts.length }} accounts</span>
-            </div>
+                    <h3 class="text-sm font-semibold">
+                        {{ typeLabels[group.type] ?? group.type }}
+                    </h3>
+                    <span class="text-xs opacity-70">{{ group.accounts.length }} accounts</span>
+                </div>
 
-            <AppCard>
                 <AppTable
+                    embedded
+                    dense
                     table-class="text-sm table-fixed"
                     :show-pagination="false"
                     :columns="accountColumns"

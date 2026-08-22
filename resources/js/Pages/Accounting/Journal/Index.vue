@@ -71,12 +71,12 @@ const typeLabels: Record<string, string> = {
     expense: 'Expenses',
 };
 
-const typeBadgeClass: Record<string, string> = {
-    asset: 'bg-blue-100 text-blue-700',
-    liability: 'bg-rose-100 text-rose-700',
-    equity: 'bg-purple-100 text-purple-700',
-    income: 'bg-brand-100 text-brand-700',
-    expense: 'bg-amber-100 text-amber-700',
+const typeHeaderClass: Record<string, string> = {
+    asset: 'border-blue-100 bg-blue-50 text-blue-900',
+    liability: 'border-rose-100 bg-rose-50 text-rose-900',
+    equity: 'border-purple-100 bg-purple-50 text-purple-900',
+    income: 'border-brand-100 bg-brand-50 text-brand-900',
+    expense: 'border-amber-100 bg-amber-50 text-amber-900',
 };
 
 const groupTotals = computed(() =>
@@ -138,63 +138,67 @@ const navigateTo = (url: string) =>
         </div>
 
         <div v-for="group in groups" :key="group.type" class="mt-5">
-            <div class="mb-2 flex items-center gap-2">
-                <span
-                    class="rounded-md px-2.5 py-1 text-xs font-semibold uppercase tracking-wide"
-                    :class="typeBadgeClass[group.type] ?? 'bg-slate-100 text-slate-600'"
+            <AppCard class="overflow-hidden p-0">
+                <div
+                    class="flex items-center justify-between gap-3 border-b px-5 py-3"
+                    :class="typeHeaderClass[group.type] ?? 'border-slate-200 bg-slate-50 text-slate-900'"
                 >
-                    {{ typeLabels[group.type] ?? group.type }}
-                </span>
-            </div>
+                    <h3 class="text-sm font-semibold">
+                        {{ typeLabels[group.type] ?? group.type }}
+                    </h3>
+                    <span class="text-xs opacity-70">{{ group.accounts.length }} accounts</span>
+                </div>
 
-            <AppCard>
                 <AppTable
+                    embedded
+                    dense
+                    table-class="text-sm"
+                    :show-pagination="false"
                     :columns="[
                         { key: 'code', label: 'Code' },
                         { key: 'name', label: 'Account' },
-                        { key: 'opening', label: 'Opening' },
-                        { key: 'debits', label: 'Debits (period)' },
-                        { key: 'credits', label: 'Credits (period)' },
-                        { key: 'closing', label: 'Closing' },
-                        { key: 'actions', label: '' },
+                        { key: 'opening', label: 'Opening', align: 'right' },
+                        { key: 'debits', label: 'Debits (period)', align: 'right' },
+                        { key: 'credits', label: 'Credits (period)', align: 'right' },
+                        { key: 'closing', label: 'Closing', align: 'right' },
+                        { key: 'actions', label: '', align: 'right' },
                     ]"
                 >
                     <tr v-for="account in group.accounts" :key="account.id" class="hover:bg-slate-50">
-                        <td class="px-4 py-3 font-mono text-sm text-slate-600">{{ account.code }}</td>
-                        <td class="px-4 py-3 font-medium text-slate-800">{{ account.name }}</td>
-                        <td class="px-4 py-3 tabular-nums text-sm text-slate-600">
+                        <td class="whitespace-nowrap px-3 py-2 font-mono text-slate-600">{{ account.code }}</td>
+                        <td class="px-3 py-2 font-medium text-slate-800">{{ account.name }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-600">
                             {{ formatCents(Math.abs(account.opening_balance_cents)) }}
                         </td>
-                        <td class="px-4 py-3 tabular-nums text-sm text-slate-700">
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">
                             <span v-if="account.period_debits_cents > 0">{{ formatCents(account.period_debits_cents) }}</span>
                             <span v-else class="text-slate-300">—</span>
                         </td>
-                        <td class="px-4 py-3 tabular-nums text-sm text-slate-700">
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">
                             <span v-if="account.period_credits_cents > 0">{{ formatCents(account.period_credits_cents) }}</span>
                             <span v-else class="text-slate-300">—</span>
                         </td>
-                        <td class="px-4 py-3 tabular-nums text-sm font-semibold">
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-semibold">
                             <span :class="account.closing_balance_cents < 0 ? 'text-rose-600' : 'text-brand-700'">
                                 {{ formatCents(Math.abs(account.closing_balance_cents)) }}
-                                <span v-if="account.closing_balance_cents < 0" class="text-xs font-normal ml-1 text-rose-400">abnormal</span>
+                                <span v-if="account.closing_balance_cents < 0" class="ml-1 text-xs font-normal text-rose-400">abnormal</span>
                             </span>
                         </td>
-                        <td class="px-4 py-3 text-right">
+                        <td class="px-3 py-2 text-right">
                             <AppButton size="sm" variant="ghost" @click="navigateTo(account.statement_url)">
                                 View entries
                             </AppButton>
                         </td>
                     </tr>
 
-                    <!-- Group total row -->
                     <tr class="border-t border-slate-200 bg-slate-50">
-                        <td colspan="5" class="px-4 py-2 text-xs font-semibold uppercase text-slate-500">
+                        <td colspan="5" class="px-3 py-2 text-xs font-semibold uppercase text-slate-500">
                             {{ typeLabels[group.type] ?? group.type }} total
                         </td>
-                        <td class="px-4 py-2 tabular-nums text-sm font-bold text-slate-800">
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-sm font-bold text-slate-800">
                             {{ formatCents(Math.abs(group.accounts.reduce((s, a) => s + a.closing_balance_cents, 0))) }}
                         </td>
-                        <td />
+                        <td class="px-3 py-2" />
                     </tr>
                 </AppTable>
             </AppCard>

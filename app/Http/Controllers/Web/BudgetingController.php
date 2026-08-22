@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Web;
 
 use App\Domain\Accounting\Enums\AccountType;
 use App\Domain\Accounting\Enums\EntryType;
-use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Budgeting\Enums\BudgetItemCadence;
@@ -47,8 +46,9 @@ class BudgetingController extends Controller
 
         $budgetRows = Budget::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->with(['categories'])
+            ->with(['categories.items', 'categories.account'])
             ->orderByDesc('start_date')
+            ->orderByDesc('id')
             ->get();
 
         $trashedBudgets = [];
@@ -63,7 +63,7 @@ class BudgetingController extends Controller
                 return [
                     'id' => $budget->id,
                     'name' => $budget->name,
-                    'period' => $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y'),
+                    'period' => $this->budgetPeriodLabel($budget),
                     'currency' => $budget->currency,
                     'deleted_at' => $budget->deleted_at?->toIso8601String(),
                 ];
@@ -72,18 +72,27 @@ class BudgetingController extends Controller
 
         $active = $budgetRows->firstWhere('is_active', true);
 
-        $budgets = $budgetRows->map(function (Budget $budget) use ($businessCurrency): array {
-            $allocated = (int) $budget->categories->sum('envelope_cents');
-            $spent = $this->spentForPeriod((int) $budget->team_id, $budget->start_date->toDateString(), $budget->end_date->toDateString());
+        $budgets = $budgetRows->map(function (Budget $budget) use ($teamId, $businessCurrency): array {
+            $categories = $this->budgetCategoryBreakdown($budget, $teamId);
+            $periodPlanned = (int) collect($categories)->sum('period_planned_cents');
+            $hasTracking = collect($categories)->contains(fn (array $cat): bool => (bool) $cat['has_account']);
+            $trackedSpent = (int) collect($categories)->sum('spent_cents');
+            $trackedPlanned = (int) collect($categories)
+                ->filter(fn (array $cat): bool => (bool) $cat['has_account'])
+                ->sum('period_planned_cents');
 
             return [
                 'id' => $budget->id,
                 'name' => $budget->name,
-                'period' => $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y'),
+                'period' => $this->budgetPeriodLabel($budget),
+                'has_period' => $budget->hasPeriod(),
                 'currency' => $budget->currency,
-                'total_allocated' => $allocated,
-                'total_spent' => $spent,
-                'percentage_used' => $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0,
+                'total_planned' => $periodPlanned,
+                'has_tracking' => $hasTracking,
+                'total_spent' => $hasTracking ? $trackedSpent : 0,
+                'percentage_used' => ($hasTracking && $trackedPlanned > 0)
+                    ? (int) round(($trackedSpent / $trackedPlanned) * 100)
+                    : 0,
                 'status' => $budget->is_active ? 'active' : 'closed',
                 'business_spend_aligned' => strcasecmp((string) $budget->currency, $businessCurrency) === 0,
             ];
@@ -91,23 +100,30 @@ class BudgetingController extends Controller
 
         $activeBudgetPayload = null;
         if ($active !== null) {
-            $active->loadMissing(['categories.items', 'categories.account']);
             $categories = $this->budgetCategoryBreakdown($active, $teamId);
-            $allocated = (int) collect($categories)->sum('envelope_cents');
-            $periodSpentBusiness = strcasecmp((string) $active->currency, $businessCurrency) === 0
-                ? $this->spentForPeriod($teamId, $active->start_date->toDateString(), $active->end_date->toDateString())
-                : null;
-            $spentTotal = $periodSpentBusiness !== null ? (int) $periodSpentBusiness : (int) collect($categories)->sum('spent_cents');
+            $periodPlanned = (int) collect($categories)->sum('period_planned_cents');
+            $monthlyPlanned = (int) collect($categories)->sum('monthly_planned_cents');
+            $hasTracking = collect($categories)->contains(fn (array $cat): bool => (bool) $cat['has_account']);
+            $trackedSpent = (int) collect($categories)->sum('spent_cents');
+            $trackedPlanned = (int) collect($categories)
+                ->filter(fn (array $cat): bool => (bool) $cat['has_account'])
+                ->sum('period_planned_cents');
+
             $activeBudgetPayload = [
                 'id' => $active->id,
                 'name' => $active->name,
-                'period' => $active->start_date->format('M Y').' - '.$active->end_date->format('M Y'),
+                'period' => $this->budgetPeriodLabel($active),
+                'has_period' => $active->hasPeriod(),
                 'currency' => $active->currency,
                 'is_active' => (bool) $active->is_active,
-                'total_allocated' => $allocated,
-                'total_spent' => $spentTotal,
-                'business_spend_aligned' => $periodSpentBusiness !== null,
-                'percentage_used' => $allocated > 0 ? (int) round(($spentTotal / $allocated) * 100) : 0,
+                'total_planned' => $periodPlanned,
+                'total_monthly_planned' => $monthlyPlanned,
+                'has_tracking' => $hasTracking,
+                'total_spent' => $hasTracking ? $trackedSpent : 0,
+                'business_spend_aligned' => strcasecmp((string) $active->currency, $businessCurrency) === 0,
+                'percentage_used' => ($hasTracking && $trackedPlanned > 0)
+                    ? (int) round(($trackedSpent / $trackedPlanned) * 100)
+                    : 0,
                 'categories' => $categories,
             ];
         }
@@ -144,12 +160,13 @@ class BudgetingController extends Controller
         );
 
         $categories = $this->budgetCategoryBreakdown($budget, $teamId);
-        $allocated = (int) collect($categories)->sum('envelope_cents');
         $periodPlanned = (int) collect($categories)->sum('period_planned_cents');
-        $aligned = strcasecmp((string) $budget->currency, $businessCurrency) === 0;
-        $spent = $aligned
-            ? $this->spentForPeriod($teamId, $budget->start_date->toDateString(), $budget->end_date->toDateString())
-            : (int) collect($categories)->sum('spent_cents');
+        $monthlyPlanned = (int) collect($categories)->sum('monthly_planned_cents');
+        $hasTracking = collect($categories)->contains(fn (array $cat): bool => (bool) $cat['has_account']);
+        $trackedSpent = (int) collect($categories)->sum('spent_cents');
+        $trackedPlanned = (int) collect($categories)
+            ->filter(fn (array $cat): bool => (bool) $cat['has_account'])
+            ->sum('period_planned_cents');
 
         $canImport = $budget->categories->isEmpty() && $this->previousBudgetForImport($teamId, $budget->id) !== null;
 
@@ -158,17 +175,21 @@ class BudgetingController extends Controller
                 'id' => $budget->id,
                 'name' => $budget->name,
                 'period_type' => $budget->period_type,
-                'period' => $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y'),
+                'period' => $this->budgetPeriodLabel($budget),
+                'has_period' => $budget->hasPeriod(),
                 'start_date' => $budget->start_date?->toDateString(),
                 'end_date' => $budget->end_date?->toDateString(),
                 'currency' => $budget->currency,
                 'is_active' => (bool) $budget->is_active,
-                'months_in_period' => $this->monthsInBudgetPeriod($budget->start_date, $budget->end_date),
-                'total_allocated' => $allocated,
+                'months_in_period' => $this->monthsInBudgetPeriodFor($budget),
                 'total_planned' => $periodPlanned,
-                'total_spent' => $spent,
-                'percentage_used' => $allocated > 0 ? (int) round(($spent / $allocated) * 100) : 0,
-                'business_spend_aligned' => $aligned,
+                'total_monthly_planned' => $monthlyPlanned,
+                'has_tracking' => $hasTracking,
+                'total_spent' => $hasTracking ? $trackedSpent : 0,
+                'percentage_used' => ($hasTracking && $trackedPlanned > 0)
+                    ? (int) round(($trackedSpent / $trackedPlanned) * 100)
+                    : 0,
+                'business_spend_aligned' => strcasecmp((string) $budget->currency, $businessCurrency) === 0,
                 'categories' => $categories,
             ],
             'expense_accounts' => $this->expenseAccounts($teamId),
@@ -281,7 +302,6 @@ class BudgetingController extends Controller
             foreach ($previous->categories as $ci => $cat) {
                 $newCat = $budget->categories()->create([
                     'name' => $cat->name,
-                    'envelope_cents' => (int) $cat->envelope_cents,
                     'account_id' => $cat->account_id,
                     'sort_order' => $ci,
                 ]);
@@ -324,7 +344,6 @@ class BudgetingController extends Controller
         $nextSort = (int) $budget->categories()->max('sort_order') + 1;
         $budget->categories()->create([
             'name' => $payload['name'],
-            'envelope_cents' => (int) $payload['envelope_cents'],
             'account_id' => $payload['account_id'] ?? null,
             'sort_order' => $nextSort,
         ]);
@@ -341,7 +360,6 @@ class BudgetingController extends Controller
 
         $category->update([
             'name' => $payload['name'],
-            'envelope_cents' => (int) $payload['envelope_cents'],
             'account_id' => $payload['account_id'] ?? null,
         ]);
 
@@ -396,13 +414,14 @@ class BudgetingController extends Controller
     }
 
     /**
-     * @return array{id: int, name: string, period_type: string, start_date: string|null, end_date: string|null, currency: string, is_active: bool}
+     * @return array{id: int, name: string, has_period: bool, period_type: string|null, start_date: string|null, end_date: string|null, currency: string, is_active: bool}
      */
     private function budgetHeaderPayload(Budget $budget): array
     {
         return [
             'id' => $budget->id,
             'name' => $budget->name,
+            'has_period' => $budget->hasPeriod(),
             'period_type' => $budget->period_type,
             'start_date' => $budget->start_date?->toDateString(),
             'end_date' => $budget->end_date?->toDateString(),
@@ -412,31 +431,112 @@ class BudgetingController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{name: string, period_type: string|null, start_date: string|null, end_date: string|null, currency: string, set_active: bool}
      */
     private function validateBudgetHeader(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'period_type' => ['required', Rule::in(['monthly', 'quarterly', 'annual', 'custom'])],
-            'start_date' => ['required', 'date'],
-            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'has_period' => ['nullable', 'boolean'],
+            'period_type' => ['nullable', 'string', Rule::in(['monthly', 'quarterly', 'annual', 'custom'])],
+            'start_date' => ['nullable', 'date'],
+            'end_date' => ['nullable', 'date'],
             'currency' => ['required', 'string', 'size:3', Rule::in(Iso4217Currencies::allowedCodes())],
             'set_active' => ['nullable', 'boolean'],
         ]);
+
+        $hasPeriod = (bool) ($validated['has_period'] ?? false);
+
+        if ($hasPeriod) {
+            if (empty($validated['period_type'])) {
+                throw ValidationException::withMessages([
+                    'period_type' => 'Choose a period type.',
+                ]);
+            }
+            if (empty($validated['start_date'])) {
+                throw ValidationException::withMessages([
+                    'start_date' => 'Start date is required when a budget period is enabled.',
+                ]);
+            }
+            if (empty($validated['end_date'])) {
+                throw ValidationException::withMessages([
+                    'end_date' => 'End date is required when a budget period is enabled.',
+                ]);
+            }
+            if ($validated['end_date'] < $validated['start_date']) {
+                throw ValidationException::withMessages([
+                    'end_date' => 'End date must be on or after the start date.',
+                ]);
+            }
+
+            return [
+                'name' => $validated['name'],
+                'period_type' => $validated['period_type'],
+                'start_date' => $validated['start_date'],
+                'end_date' => $validated['end_date'],
+                'currency' => $validated['currency'],
+                'set_active' => (bool) ($validated['set_active'] ?? false),
+            ];
+        }
+
+        return [
+            'name' => $validated['name'],
+            'period_type' => null,
+            'start_date' => null,
+            'end_date' => null,
+            'currency' => $validated['currency'],
+            'set_active' => (bool) ($validated['set_active'] ?? false),
+        ];
+    }
+
+    private function budgetPeriodLabel(Budget $budget): string
+    {
+        if (! $budget->hasPeriod()) {
+            return 'Ongoing Budget';
+        }
+
+        return $budget->start_date->format('M Y').' - '.$budget->end_date->format('M Y');
+    }
+
+    private function monthsInBudgetPeriodFor(Budget $budget): int
+    {
+        if (! $budget->hasPeriod()) {
+            return 1;
+        }
+
+        return $this->monthsInBudgetPeriod($budget->start_date, $budget->end_date);
     }
 
     /**
-     * @return array{name: string, envelope_cents: int, account_id: int|null}
+     * @return array{0: string, 1: string}
+     */
+    private function trackingWindowFor(Budget $budget): array
+    {
+        if ($budget->hasPeriod()) {
+            return [
+                $budget->start_date->toDateString(),
+                $budget->end_date->toDateString(),
+            ];
+        }
+
+        $now = now();
+
+        return [
+            $now->copy()->startOfMonth()->toDateString(),
+            $now->copy()->endOfMonth()->toDateString(),
+        ];
+    }
+
+    /**
+     * @return array{name: string, account_id: int|null}
      */
     private function validateCategoryPayload(Request $request): array
     {
         $teamId = (int) $request->user()->current_team_id;
 
-        /** @var array{name: string, envelope_cents: int, account_id: int|null} $data */
+        /** @var array{name: string, account_id: int|null} $data */
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'envelope_cents' => ['required', 'integer', 'min:0'],
             'account_id' => ['nullable', 'integer', Rule::exists('accounts', 'id')->where('team_id', $teamId)],
         ]);
 
@@ -562,12 +662,9 @@ class BudgetingController extends Controller
      */
     private function budgetCategoryBreakdown(Budget $budget, int $teamId): array
     {
-        $monthsInPeriod = $this->monthsInBudgetPeriod($budget->start_date, $budget->end_date);
-        $spentByAccount = $this->spentByExpenseAccount(
-            $teamId,
-            $budget->start_date->toDateString(),
-            $budget->end_date->toDateString()
-        );
+        $monthsInPeriod = $this->monthsInBudgetPeriodFor($budget);
+        [$from, $to] = $this->trackingWindowFor($budget);
+        $spentByAccount = $this->spentByExpenseAccount($teamId, $from, $to);
 
         return $budget->categories->map(function (BudgetCategory $cat) use ($spentByAccount, $monthsInPeriod): array {
             $monthlyPlanned = (int) $cat->items->sum(
@@ -576,28 +673,27 @@ class BudgetingController extends Controller
             $periodPlanned = (int) $cat->items->sum(
                 fn (BudgetItem $item): int => $item->periodTotalBudgetCents($monthsInPeriod)
             );
-            $envelope = (int) $cat->envelope_cents;
-            $spent = $cat->account_id !== null
+            $hasAccount = $cat->account_id !== null;
+            $spent = $hasAccount
                 ? (int) ($spentByAccount[$cat->account_id] ?? 0)
                 : 0;
-            $percent = $envelope > 0 ? (int) round(($spent / $envelope) * 100) : ($spent > 0 ? 100 : 0);
-            $plannedVsEnvelope = $envelope > 0 ? (int) round(($periodPlanned / $envelope) * 100) : 0;
+            $percent = $hasAccount && $periodPlanned > 0
+                ? (int) round(($spent / $periodPlanned) * 100)
+                : ($hasAccount && $spent > 0 ? 100 : 0);
 
             return [
                 'id' => $cat->id,
                 'name' => $cat->name,
-                'envelope_cents' => $envelope,
                 'account_id' => $cat->account_id,
                 'account_name' => $cat->account !== null
                     ? trim($cat->account->code.' - '.$cat->account->name)
                     : null,
                 'period_planned_cents' => $periodPlanned,
                 'monthly_planned_cents' => $monthlyPlanned,
-                'planned_fill_percent' => min(100, $plannedVsEnvelope),
                 'spent_cents' => $spent,
-                'has_account' => $cat->account_id !== null,
+                'has_account' => $hasAccount,
                 'percentage' => $percent,
-                'remaining_cents' => max(0, $envelope - $spent),
+                'remaining_cents' => $hasAccount ? max(0, $periodPlanned - $spent) : 0,
                 'items' => $cat->items->map(fn (BudgetItem $item) => [
                     'id' => $item->id,
                     'label' => $item->label,
@@ -637,21 +733,5 @@ class BudgetingController extends Controller
             ->groupBy('account_id')
             ->map(fn ($rows): int => (int) $rows->sum(fn (JournalEntry $entry) => (int) $entry->getRawOriginal('amount_cents')))
             ->toArray();
-    }
-
-    private function spentForPeriod(int $teamId, string $from, string $to): int
-    {
-        return (int) JournalEntry::query()
-            ->where('type', EntryType::Debit)
-            ->whereHas('transaction', fn ($q) => $q
-                ->withoutGlobalScopes()
-                ->where('team_id', $teamId)
-                ->forPeriodReporting()
-                ->whereBetween('transaction_date', [$from, $to]))
-            ->whereHas('account', fn ($q) => $q
-                ->withoutGlobalScopes()
-                ->where('team_id', $teamId)
-                ->where('type', AccountType::Expense->value))
-            ->sum('amount_cents');
     }
 }

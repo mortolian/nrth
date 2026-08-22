@@ -4,6 +4,10 @@ This file is for **any** coding agent (Cursor, Copilot, Codex, Claude Code, etc.
 
 Also follow [CONTRIBUTING.md](CONTRIBUTING.md), [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), and conventional commits in [docs/RELEASE.md](docs/RELEASE.md).
 
+## Clean code (no residue)
+
+When changing or removing behaviour, **finish the cleanup in the same change**. Do not leave unused DB columns, ignored fields, dead helpers, or soft-deprecations “for later” — that becomes technical debt. Drop schema with a migration, delete call sites/tests/copy, and rename misleading APIs. Only keep transitional shims when a documented upgrade or external contract requires them.
+
 ## Documentation (required when behavior or setup changes)
 
 Docs are part of the product surface for self-hosters and contributors. When you change user-visible behavior, install/setup, configuration, auth/roles, or release process, **update the matching docs in the same change** (or the same PR). Do not leave README/`docs/` describing the old flow.

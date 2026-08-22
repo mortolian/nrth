@@ -7,7 +7,6 @@ import { useToast } from '@/Composables/useToast';
 type CategoryInput = {
     id: number;
     name: string;
-    envelope_cents: number;
     account_id: number | null;
 } | null;
 
@@ -29,60 +28,13 @@ const errors = reactive<Record<string, string>>({});
 
 const form = reactive({
     name: '',
-    envelope_major: '',
     account_id: '' as string,
 });
-
-/** Match Brick default fraction digits used elsewhere in budgeting. */
-function minorDigits(code: string): number {
-    const c = code.toUpperCase();
-    if (c === 'JPY' || c === 'KRW' || c === 'VND' || c === 'CLP' || c === 'UGX') return 0;
-    if (c === 'BHD' || c === 'IQD' || c === 'JOD' || c === 'KWD' || c === 'LYD' || c === 'OMR' || c === 'TND') return 3;
-    return 2;
-}
-
-function centsToMajorStr(cents: number, ccy: string): string {
-    const d = minorDigits(ccy);
-    return ((Number(cents) || 0) / 10 ** d).toFixed(d);
-}
-
-function normalizeMajorAmountForParse(raw: string): string {
-    let s = raw.trim().replace(/\s/g, '');
-    if (s === '' || s === '-') return s;
-    const hasComma = s.includes(',');
-    const hasDot = s.includes('.');
-    if (hasComma && hasDot) {
-        const lastComma = s.lastIndexOf(',');
-        const lastDot = s.lastIndexOf('.');
-        if (lastDot > lastComma) {
-            s = s.replace(/,/g, '');
-        } else {
-            s = s.replace(/\./g, '').replace(',', '.');
-        }
-    } else if (hasComma && !hasDot) {
-        const parts = s.split(',');
-        if (parts.length === 2 && parts[1].length <= 3) {
-            s = `${parts[0].replace(/\./g, '')}.${parts[1]}`;
-        } else {
-            s = s.replace(/,/g, '');
-        }
-    }
-    return s.replace(/[^0-9.-]/g, '');
-}
-
-function majorStrToCents(raw: string, ccy: string): number | null {
-    const normalized = normalizeMajorAmountForParse(raw);
-    if (normalized === '' || normalized === '-') return null;
-    const n = Number(normalized);
-    if (!Number.isFinite(n) || n < 0) return null;
-    const d = minorDigits(ccy);
-    return Math.round(n * 10 ** d);
-}
 
 const isEditing = computed(() => props.category != null);
 
 const accountOptions = computed(() => [
-    { label: 'No linked account', value: '' },
+    { label: 'Do not track spending', value: '' },
     ...props.expenseAccounts.map((a) => ({ label: a.name, value: String(a.id) })),
 ]);
 
@@ -93,11 +45,9 @@ watch(
         Object.keys(errors).forEach((k) => delete errors[k]);
         if (props.category) {
             form.name = props.category.name;
-            form.envelope_major = centsToMajorStr(props.category.envelope_cents, props.budgetCurrency);
             form.account_id = props.category.account_id != null ? String(props.category.account_id) : '';
         } else {
             form.name = '';
-            form.envelope_major = '';
             form.account_id = '';
         }
     },
@@ -118,15 +68,8 @@ const submit = () => {
         return;
     }
 
-    const envelopeCents = majorStrToCents(form.envelope_major === '' ? '0' : form.envelope_major, props.budgetCurrency);
-    if (envelopeCents === null) {
-        errors.envelope_cents = 'Enter a valid envelope amount.';
-        return;
-    }
-
     const payload = {
         name,
-        envelope_cents: envelopeCents,
         account_id: form.account_id === '' ? null : Number(form.account_id),
     };
 
@@ -178,21 +121,17 @@ const submit = () => {
                     <p v-if="errors.name" class="mt-1 text-xs text-rose-600">{{ errors.name }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">
-                        Envelope ({{ budgetCurrency }})
-                    </label>
-                    <AppInput v-model="form.envelope_major" placeholder="0.00" inputmode="decimal" />
-                    <p class="mt-1 text-xs text-slate-500">Period spending cap in budget currency.</p>
-                    <p v-if="errors.envelope_cents" class="mt-1 text-xs text-rose-600">{{ errors.envelope_cents }}</p>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Linked expense account</label>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Track spending</label>
                     <AppSelect
                         :model-value="form.account_id"
                         :options="accountOptions"
                         @update:model-value="form.account_id = $event"
                     />
-                    <p class="mt-1 text-xs text-slate-500">Optional — used to track linked ledger spend against this category.</p>
+                    <p class="mt-1 text-xs text-slate-500">
+                        Optional — link an expense account to compare ledger spend with this category’s planned line
+                        items for the budget period ({{ budgetCurrency }}).
+                    </p>
+                    <p v-if="errors.account_id" class="mt-1 text-xs text-rose-600">{{ errors.account_id }}</p>
                 </div>
             </div>
         </template>

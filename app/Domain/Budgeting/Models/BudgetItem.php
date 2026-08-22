@@ -46,18 +46,19 @@ class BudgetItem extends Model
     }
 
     /**
-     * Amount in budget currency attributed to one calendar month (once-offs are spread over the period).
+     * Amount in budget currency attributed to one calendar month.
+     * Once-offs and annual amounts are spread over the relevant span.
      */
     public function monthlyEquivalentBudgetCents(int $monthsInPeriod): int
     {
         $amount = (int) $this->monthly_budget_currency_cents;
         $months = max(1, $monthsInPeriod);
 
-        if ($this->cadenceEnum() === BudgetItemCadence::OncePerPeriod) {
-            return (int) round($amount / $months);
-        }
-
-        return $amount;
+        return match ($this->cadenceEnum()) {
+            BudgetItemCadence::OncePerPeriod => (int) round($amount / $months),
+            BudgetItemCadence::Annually => (int) round($amount / 12),
+            BudgetItemCadence::Monthly => $amount,
+        };
     }
 
     /**
@@ -68,11 +69,11 @@ class BudgetItem extends Model
         $amount = (int) $this->monthly_budget_currency_cents;
         $months = max(1, $monthsInPeriod);
 
-        if ($this->cadenceEnum() === BudgetItemCadence::OncePerPeriod) {
-            return $amount;
-        }
-
-        return $amount * $months;
+        return match ($this->cadenceEnum()) {
+            BudgetItemCadence::OncePerPeriod => $amount,
+            BudgetItemCadence::Annually => (int) round($amount * ($months / 12)),
+            BudgetItemCadence::Monthly => $amount * $months,
+        };
     }
 
     /**
@@ -82,10 +83,10 @@ class BudgetItem extends Model
     {
         $months = max(1, $monthsInPeriod);
 
-        if ($this->cadenceEnum() === BudgetItemCadence::OncePerPeriod) {
-            return (int) round(((int) $this->monthly_budget_currency_cents) * (12 / $months));
-        }
-
-        return (int) $this->monthly_budget_currency_cents * 12;
+        return match ($this->cadenceEnum()) {
+            BudgetItemCadence::OncePerPeriod => (int) round(((int) $this->monthly_budget_currency_cents) * (12 / $months)),
+            BudgetItemCadence::Annually => (int) $this->monthly_budget_currency_cents,
+            BudgetItemCadence::Monthly => (int) $this->monthly_budget_currency_cents * 12,
+        };
     }
 }

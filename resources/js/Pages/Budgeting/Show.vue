@@ -14,7 +14,7 @@ import { useToast } from '@/Composables/useToast';
 type BudgetItemRow = {
     id: number;
     label: string;
-    cadence: 'monthly' | 'once_per_period';
+    cadence: 'monthly' | 'annually' | 'once_per_period';
     notes: string | null;
     monthly_amount_cents: number;
     currency: string;
@@ -28,12 +28,10 @@ type BudgetItemRow = {
 type BudgetCategoryRow = {
     id: number;
     name: string;
-    envelope_cents: number;
     account_id: number | null;
     account_name: string | null;
     period_planned_cents: number;
     monthly_planned_cents: number;
-    planned_fill_percent: number;
     spent_cents: number;
     has_account: boolean;
     percentage: number;
@@ -45,15 +43,17 @@ const props = defineProps<{
     budget: {
         id: number;
         name: string;
-        period_type: string;
+        period_type: string | null;
         period: string;
+        has_period: boolean;
         start_date: string | null;
         end_date: string | null;
         currency: string;
         is_active: boolean;
         months_in_period: number;
-        total_allocated: number;
         total_planned: number;
+        total_monthly_planned: number;
+        has_tracking: boolean;
         total_spent: number;
         percentage_used: number;
         business_spend_aligned: boolean;
@@ -228,21 +228,24 @@ const itemActions = [
             </template>
         </PageHeader>
 
-        <div class="mt-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Allocated</p>
-                <p class="mt-1 text-xl font-semibold tabular-nums text-slate-900">
-                    {{ formatCents(budget.total_allocated, budget.currency) }}
-                </p>
-            </AppCard>
-            <AppCard>
+        <div
+            class="mt-2 grid gap-4 sm:grid-cols-2"
+            :class="budget.has_tracking ? (budget.has_period ? 'xl:grid-cols-4' : 'xl:grid-cols-3') : budget.has_period ? 'xl:grid-cols-2' : 'xl:grid-cols-1'"
+        >
+            <AppCard v-if="budget.has_period">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Planned (period)</p>
                 <p class="mt-1 text-xl font-semibold tabular-nums text-slate-900">
                     {{ formatCents(budget.total_planned, budget.currency) }}
                 </p>
             </AppCard>
             <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Spent</p>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Monthly planned</p>
+                <p class="mt-1 text-xl font-semibold tabular-nums text-slate-900">
+                    {{ formatCents(budget.total_monthly_planned, budget.currency) }}
+                </p>
+            </AppCard>
+            <AppCard v-if="budget.has_tracking">
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Spent (tracked)</p>
                 <p class="mt-1 text-xl font-semibold tabular-nums text-slate-900">
                     {{ formatCents(budget.total_spent, budget.currency) }}
                 </p>
@@ -250,8 +253,8 @@ const itemActions = [
                     Linked categories only (budget {{ budget.currency }} ≠ books {{ business_currency }}).
                 </p>
             </AppCard>
-            <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Used</p>
+            <AppCard v-if="budget.has_tracking">
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Used vs plan</p>
                 <p class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ budget.percentage_used }}%</p>
                 <div class="mt-3 h-2 w-full rounded-full bg-slate-100">
                     <div
@@ -267,7 +270,12 @@ const itemActions = [
             <div>
                 <h2 class="text-lg font-semibold text-slate-900">Categories</h2>
                 <p class="mt-0.5 text-sm text-slate-500">
-                    Envelopes and planned expenses for this plan ({{ budget.months_in_period }} month(s)).
+                    <template v-if="budget.has_period">
+                        Planned expenses for this period ({{ budget.months_in_period }} month(s)).
+                    </template>
+                    <template v-else>
+                        Ongoing monthly plan. Tracked spend uses the current calendar month.
+                    </template>
                 </p>
             </div>
             <AppButton v-if="canManage" variant="primary" @click="openAddCategory">
@@ -282,7 +290,7 @@ const itemActions = [
             title="No categories yet"
             :description="
                 canManage
-                    ? 'Add a category to set an envelope, or copy the structure from your previous budget.'
+                    ? 'Add categories, then add the expenses you need to plan for — or copy the structure from your previous budget.'
                     : 'Categories will appear here once someone with access builds this plan.'
             "
             :icon="FolderKanban"
@@ -308,15 +316,9 @@ const itemActions = [
                     <div class="min-w-0">
                         <h3 class="text-base font-semibold text-slate-900">{{ cat.name }}</h3>
                         <p class="mt-0.5 text-sm text-slate-500">
-                            Envelope {{ formatCents(cat.envelope_cents, budget.currency) }}
-                            <span v-if="cat.account_name"> · {{ cat.account_name }}</span>
-                            <span v-else> · No linked account</span>
-                        </p>
-                        <p
-                            v-if="cat.planned_fill_percent > 100"
-                            class="mt-1 text-xs text-rose-600"
-                        >
-                            Planned period total is over the envelope.
+                            Planned {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                            <span v-if="cat.account_name"> · Tracking {{ cat.account_name }}</span>
+                            <span v-else> · Not tracking spend</span>
                         </p>
                     </div>
                     <div v-if="canManage" class="flex items-center gap-2">
@@ -374,8 +376,22 @@ const itemActions = [
                             </p>
                         </td>
                         <td class="whitespace-nowrap px-3 py-2">
-                            <AppBadge :variant="item.cadence === 'once_per_period' ? 'warning' : 'neutral'">
-                                {{ item.cadence === 'once_per_period' ? 'Once' : 'Monthly' }}
+                            <AppBadge
+                                :variant="
+                                    item.cadence === 'once_per_period'
+                                        ? 'warning'
+                                        : item.cadence === 'annually'
+                                          ? 'info'
+                                          : 'neutral'
+                                "
+                            >
+                                {{
+                                    item.cadence === 'once_per_period'
+                                        ? 'Once'
+                                        : item.cadence === 'annually'
+                                          ? 'Annually'
+                                          : 'Monthly'
+                                }}
                             </AppBadge>
                         </td>
                         <td class="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{{ item.currency }}</td>
@@ -411,20 +427,34 @@ const itemActions = [
 
                 <div
                     v-if="cat.has_account"
-                    class="mt-3 flex flex-wrap gap-4 text-sm text-slate-600"
+                    class="mt-3 space-y-2"
                 >
-                    <span>
-                        Linked spend:
-                        <span class="font-medium tabular-nums text-slate-900">
-                            {{ formatCents(cat.spent_cents, budget.currency) }}
+                    <div class="flex flex-wrap gap-4 text-sm text-slate-600">
+                        <span>
+                            Spent vs plan:
+                            <span class="font-medium tabular-nums text-slate-900">
+                                {{ formatCents(cat.spent_cents, budget.currency) }}
+                            </span>
+                            /
+                            <span class="font-medium tabular-nums text-slate-900">
+                                {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                            </span>
                         </span>
-                    </span>
-                    <span>
-                        Remaining:
-                        <span class="font-medium tabular-nums text-slate-900">
-                            {{ formatCents(cat.remaining_cents, budget.currency) }}
+                        <span>
+                            Remaining:
+                            <span class="font-medium tabular-nums text-slate-900">
+                                {{ formatCents(cat.remaining_cents, budget.currency) }}
+                            </span>
                         </span>
-                    </span>
+                        <span class="tabular-nums">{{ cat.percentage }}%</span>
+                    </div>
+                    <div class="h-2 w-full rounded-full bg-slate-100">
+                        <div
+                            :class="progressColor(cat.percentage)"
+                            class="h-2 rounded-full"
+                            :style="{ width: `${Math.min(100, cat.percentage)}%` }"
+                        />
+                    </div>
                 </div>
             </AppCard>
         </div>

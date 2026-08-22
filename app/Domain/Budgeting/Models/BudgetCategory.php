@@ -12,7 +12,6 @@ class BudgetCategory extends Model
     protected $fillable = [
         'budget_id',
         'name',
-        'envelope_cents',
         'account_id',
         'sort_order',
     ];

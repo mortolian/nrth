@@ -4,7 +4,7 @@ import { router, usePage } from '@inertiajs/vue3';
 import DialogModal from '@/Components/DialogModal.vue';
 import { useToast } from '@/Composables/useToast';
 
-type ItemCadence = 'monthly' | 'once_per_period';
+type ItemCadence = 'monthly' | 'annually' | 'once_per_period';
 
 type ItemInput = {
     id: number;
@@ -50,6 +50,7 @@ const currencyOptions = computed(
 
 const cadenceOptions = [
     { label: 'Monthly', value: 'monthly' },
+    { label: 'Annually', value: 'annually' },
     { label: 'Once per period', value: 'once_per_period' },
 ];
 
@@ -57,10 +58,15 @@ const isEditing = computed(() => props.item != null);
 const currenciesDiffer = computed(
     () => form.currency.toUpperCase() !== props.budgetCurrency.toUpperCase(),
 );
-const isOncePerPeriod = computed(() => form.cadence === 'once_per_period');
-const amountLabel = computed(() =>
-    isOncePerPeriod.value ? 'Amount (once in this period)' : 'Monthly amount',
-);
+const amountLabel = computed(() => {
+    if (form.cadence === 'once_per_period') {
+        return 'Amount (once in this period)';
+    }
+    if (form.cadence === 'annually') {
+        return 'Annual amount';
+    }
+    return 'Monthly amount';
+});
 
 function minorDigits(code: string): number {
     const c = code.toUpperCase();
@@ -157,7 +163,10 @@ watch(
         fxError.value = '';
         if (props.item) {
             form.label = props.item.label;
-            form.cadence = props.item.cadence === 'once_per_period' ? 'once_per_period' : 'monthly';
+            form.cadence =
+                props.item.cadence === 'once_per_period' || props.item.cadence === 'annually'
+                    ? props.item.cadence
+                    : 'monthly';
             form.notes = props.item.notes ?? '';
             form.currency = props.item.currency || props.budgetCurrency;
             form.monthly_major = centsToMajorStr(props.item.monthly_amount_cents, form.currency);
@@ -208,9 +217,8 @@ const submit = () => {
 
     const amountCents = majorStrToCents(form.monthly_major === '' ? '0' : form.monthly_major, form.currency);
     if (amountCents === null) {
-        errors.monthly_amount_cents = isOncePerPeriod.value
-            ? 'Enter a valid amount.'
-            : 'Enter a valid monthly amount.';
+        errors.monthly_amount_cents =
+            form.cadence === 'monthly' ? 'Enter a valid monthly amount.' : 'Enter a valid amount.';
         return;
     }
 
@@ -291,8 +299,11 @@ const submit = () => {
                         @update:model-value="form.cadence = $event as ItemCadence"
                     />
                     <p class="mt-1 text-xs text-slate-500">
-                        <template v-if="isOncePerPeriod">
-                            Counted once for the whole budget period (e.g. an annual subscription).
+                        <template v-if="form.cadence === 'once_per_period'">
+                            Counted once for the whole budget period.
+                        </template>
+                        <template v-else-if="form.cadence === 'annually'">
+                            Enter the yearly amount; monthly and period totals are derived from it.
                         </template>
                         <template v-else>
                             Recurs every month; period total multiplies by months in the budget.

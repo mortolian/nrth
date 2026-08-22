@@ -24,7 +24,7 @@ final class ModuleCatalog
             ],
             self::PLANNING => [
                 'label' => 'Planning',
-                'description' => 'Category budgets, envelopes, and variance tracking.',
+                'description' => 'Plan expenses by category and optionally track spend against the ledger.',
                 'default_enabled' => false,
                 'experimental' => false,
             ],

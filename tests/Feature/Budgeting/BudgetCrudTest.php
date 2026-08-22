@@ -33,13 +33,14 @@ class BudgetCrudTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function headerPayload(bool $setActive = true, string $name = 'FY Plan'): array
+    private function headerPayload(bool $setActive = true, string $name = 'FY Plan', bool $hasPeriod = true): array
     {
         return [
             'name' => $name,
-            'period_type' => 'annual',
-            'start_date' => '2026-01-01',
-            'end_date' => '2026-12-31',
+            'has_period' => $hasPeriod,
+            'period_type' => $hasPeriod ? 'annual' : null,
+            'start_date' => $hasPeriod ? '2026-01-01' : null,
+            'end_date' => $hasPeriod ? '2026-12-31' : null,
             'currency' => 'ZAR',
             'set_active' => $setActive,
         ];
@@ -73,6 +74,11 @@ class BudgetCrudTest extends TestCase
                 ->component('Budgeting/Show')
                 ->where('budget.name', 'FY Plan')
                 ->where('budget.currency', 'ZAR')
+                ->where('budget.has_period', true)
+                ->where('budget.total_planned', 0)
+                ->where('budget.total_monthly_planned', 0)
+                ->where('budget.has_tracking', false)
+                ->missing('budget.total_allocated')
                 ->has('expense_accounts')
                 ->has('can_import_structure'));
     }
@@ -87,14 +93,12 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.categories.store', $budget), [
             'name' => 'Ops',
-            'envelope_cents' => 120_000,
             'account_id' => null,
         ])->assertRedirect();
 
         $cat = BudgetCategory::query()->where('budget_id', $budget->id)->first();
         $this->assertNotNull($cat);
         $this->assertSame('Ops', $cat->name);
-        $this->assertSame(120_000, (int) $cat->envelope_cents);
 
         $this->post(route('budgeting.items.store', [$budget, $cat]), [
             'label' => 'Software',
@@ -114,13 +118,11 @@ class BudgetCrudTest extends TestCase
 
         $this->put(route('budgeting.categories.update', [$budget, $cat]), [
             'name' => 'Operations',
-            'envelope_cents' => 150_000,
             'account_id' => null,
         ])->assertRedirect();
 
         $cat->refresh();
         $this->assertSame('Operations', $cat->name);
-        $this->assertSame(150_000, (int) $cat->envelope_cents);
 
         $this->put(route('budgeting.items.update', [$budget, $cat, $item]), [
             'label' => 'SaaS',
@@ -153,7 +155,6 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.categories.store', $budget), [
             'name' => 'Intl',
-            'envelope_cents' => 1_000_000,
             'account_id' => null,
         ]);
 
@@ -185,7 +186,6 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.categories.store', $budget), [
             'name' => 'Ops',
-            'envelope_cents' => 120_000,
             'account_id' => null,
         ]);
         $cat = BudgetCategory::query()->where('budget_id', $budget->id)->first();
@@ -194,6 +194,7 @@ class BudgetCrudTest extends TestCase
 
         $this->put(route('budgeting.update', $budget), [
             'name' => 'Updated',
+            'has_period' => true,
             'period_type' => 'annual',
             'start_date' => '2026-01-01',
             'end_date' => '2026-12-31',
@@ -241,6 +242,7 @@ class BudgetCrudTest extends TestCase
 
         $this->put(route('budgeting.update', $second), [
             'name' => 'Draft budget',
+            'has_period' => true,
             'period_type' => 'annual',
             'start_date' => '2026-01-01',
             'end_date' => '2026-12-31',
@@ -294,7 +296,6 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.categories.store', $previous), [
             'name' => 'Ops',
-            'envelope_cents' => 50_000,
             'account_id' => null,
         ]);
         $prevCat = BudgetCategory::query()->where('budget_id', $previous->id)->first();
@@ -310,6 +311,7 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.store'), [
             'name' => 'Current',
+            'has_period' => true,
             'period_type' => 'annual',
             'start_date' => '2027-01-01',
             'end_date' => '2027-12-31',
@@ -343,7 +345,6 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.categories.store', $budget), [
             'name' => 'Software',
-            'envelope_cents' => 200_000,
             'account_id' => null,
         ]);
         $cat = BudgetCategory::query()->where('budget_id', $budget->id)->first();
@@ -369,11 +370,14 @@ class BudgetCrudTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Budgeting/Show')
+                ->where('budget.total_planned', 120_000)
+                ->where('budget.has_tracking', false)
                 ->where('budget.categories.0.items.0.cadence', 'once_per_period')
                 ->where('budget.categories.0.items.0.period_total_budget_cents', 120_000)
                 ->where('budget.categories.0.items.0.monthly_budget_currency_cents', 10_000)
                 ->where('budget.categories.0.period_planned_cents', 120_000)
-                ->where('budget.categories.0.items.0.notes', 'Renews in March'));
+                ->where('budget.categories.0.items.0.notes', 'Renews in March')
+                ->missing('budget.categories.0.envelope_cents'));
     }
 
     public function test_import_structure_rejected_when_categories_exist(): void
@@ -383,6 +387,7 @@ class BudgetCrudTest extends TestCase
         $this->post(route('budgeting.store'), $this->headerPayload(false, 'Previous'));
         $this->post(route('budgeting.store'), [
             'name' => 'Current',
+            'has_period' => true,
             'period_type' => 'annual',
             'start_date' => '2027-01-01',
             'end_date' => '2027-12-31',
@@ -394,7 +399,6 @@ class BudgetCrudTest extends TestCase
 
         $this->post(route('budgeting.categories.store', $current), [
             'name' => 'Existing',
-            'envelope_cents' => 1,
             'account_id' => null,
         ]);
 
@@ -432,6 +436,47 @@ class BudgetCrudTest extends TestCase
         $this->assertNull(Budget::queryWithoutTeamScope()->withTrashed()->find($budgetId));
     }
 
+    public function test_annual_item_spreads_over_months(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->headerPayload(true));
+        $budget = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->first();
+        $this->assertNotNull($budget);
+
+        $this->post(route('budgeting.categories.store', $budget), [
+            'name' => 'Licenses',
+            'account_id' => null,
+        ]);
+        $cat = BudgetCategory::query()->where('budget_id', $budget->id)->first();
+        $this->assertNotNull($cat);
+
+        $this->post(route('budgeting.items.store', [$budget, $cat]), [
+            'label' => 'Hosting',
+            'cadence' => 'annually',
+            'notes' => null,
+            'monthly_amount_cents' => 120_000,
+            'currency' => 'ZAR',
+            'fx_budget_per_line_major' => null,
+        ])->assertRedirect();
+
+        $item = BudgetItem::query()->where('budget_category_id', $cat->id)->first();
+        $this->assertNotNull($item);
+        $this->assertSame('annually', $item->cadenceEnum()->value);
+        $this->assertSame(10_000, $item->monthlyEquivalentBudgetCents(12));
+        $this->assertSame(120_000, $item->periodTotalBudgetCents(12));
+        $this->assertSame(30_000, $item->periodTotalBudgetCents(3));
+        $this->assertSame(120_000, $item->annualizedBudgetCents(12));
+
+        $this->get(route('budgeting.show', $budget))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Budgeting/Show')
+                ->where('budget.categories.0.items.0.cadence', 'annually')
+                ->where('budget.categories.0.items.0.monthly_budget_currency_cents', 10_000)
+                ->where('budget.categories.0.items.0.period_total_budget_cents', 120_000));
+    }
+
     public function test_viewer_can_show_but_not_manage_nested_writes(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();
@@ -454,8 +499,37 @@ class BudgetCrudTest extends TestCase
         $this->get(route('budgeting.create'))->assertForbidden();
         $this->post(route('budgeting.categories.store', $budget), [
             'name' => 'Nope',
-            'envelope_cents' => 1,
             'account_id' => null,
         ])->assertForbidden();
+    }
+
+    public function test_store_ongoing_budget_without_period(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->headerPayload(true, 'Standing plan', false))
+            ->assertRedirect();
+
+        $budget = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->first();
+        $this->assertNotNull($budget);
+        $this->assertNull($budget->period_type);
+        $this->assertNull($budget->start_date);
+        $this->assertNull($budget->end_date);
+        $this->assertFalse($budget->hasPeriod());
+
+        $this->get(route('budgeting.show', $budget))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Budgeting/Show')
+                ->where('budget.has_period', false)
+                ->where('budget.period', 'Ongoing Budget')
+                ->where('budget.months_in_period', 1));
+
+        $this->get(route('budgeting.edit', $budget))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Budgeting/Form')
+                ->where('budget.has_period', false)
+                ->where('budget.start_date', null));
     }
 }

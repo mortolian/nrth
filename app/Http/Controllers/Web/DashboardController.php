@@ -8,6 +8,7 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Budgeting\Models\Budget;
 use App\Domain\Budgeting\Models\BudgetCategory;
+use App\Domain\Budgeting\Models\BudgetItem;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Tax\Services\VATService;
 use App\Http\Controllers\Controller;
@@ -97,7 +98,7 @@ class DashboardController extends Controller
                 ? collect($this->budgetProgress($team, $monthStart, $monthEnd, $activeBudget))
                     ->map(fn (array $item) => [
                         'category' => $item['category'],
-                        'allocated' => $item['allocated_cents'],
+                        'planned' => $item['planned_cents'],
                         'spent' => $item['spent_cents'],
                         'percentage' => $item['progress_percent'],
                     ])
@@ -279,26 +280,27 @@ class DashboardController extends Controller
             return [];
         }
 
-        $monthsInPeriod = $this->budgetMonthsInPeriod($activeBudget->start_date, $activeBudget->end_date);
+        $monthsInPeriod = $activeBudget->hasPeriod()
+            ? $this->budgetMonthsInPeriod($activeBudget->start_date, $activeBudget->end_date)
+            : 1;
         $spentByAccount = $this->spentByExpenseAccountIds($team->id, $from->toDateString(), $to->toDateString());
 
         return $activeBudget->categories
+            ->filter(fn (BudgetCategory $cat): bool => $cat->account_id !== null)
             ->map(function (BudgetCategory $cat) use ($spentByAccount, $factor, $monthsInPeriod): array {
-                $monthlyEnvelope = $monthsInPeriod > 0
-                    ? (int) round($cat->envelope_cents / $monthsInPeriod)
-                    : 0;
-                $allocated = (int) round($monthlyEnvelope * $factor);
-                $spent = $cat->account_id !== null
-                    ? (int) ($spentByAccount[$cat->account_id] ?? 0)
-                    : 0;
-                $progressPercent = $allocated > 0
-                    ? min(100, (int) round(($spent / $allocated) * 100))
+                $monthlyPlanned = (int) $cat->items->sum(
+                    fn (BudgetItem $item): int => $item->monthlyEquivalentBudgetCents($monthsInPeriod)
+                );
+                $planned = (int) round($monthlyPlanned * $factor);
+                $spent = (int) ($spentByAccount[$cat->account_id] ?? 0);
+                $progressPercent = $planned > 0
+                    ? min(100, (int) round(($spent / $planned) * 100))
                     : ($spent > 0 ? 100 : 0);
 
                 return [
                     'category' => $cat->name,
                     'spent_cents' => $spent,
-                    'allocated_cents' => $allocated,
+                    'planned_cents' => $planned,
                     'progress_percent' => $progressPercent,
                 ];
             })
@@ -316,6 +318,10 @@ class DashboardController extends Controller
 
     private function budgetMonthProrationFactor(Budget $budget, Carbon $monthStart): float
     {
+        if (! $budget->hasPeriod()) {
+            return 1.0;
+        }
+
         $mStart = $monthStart->copy()->startOfMonth();
         $mEnd = $monthStart->copy()->endOfMonth();
 

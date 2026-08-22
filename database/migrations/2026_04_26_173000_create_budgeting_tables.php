@@ -12,9 +12,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->string('name');
-            $table->string('period_type', 20);
-            $table->date('start_date');
-            $table->date('end_date');
+            $table->string('period_type', 20)->nullable();
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
             $table->string('currency', 3)->default('ZAR');
             $table->boolean('is_active')->default(false);
             $table->timestamps();
