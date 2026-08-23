@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.25](https://github.com/mortolian/nrth/compare/v0.1.24...v0.1.25) (2026-08-22)
+
+
+### Features
+
+* **budgeting:** plan-first budgets with optional period and annual cadence ([5b83f31](https://github.com/mortolian/nrth/commit/5b83f31aaf4b93d4bf072e2b9062765c8c109d7f))
+
 ## [0.1.24](https://github.com/mortolian/nrth/compare/v0.1.23...v0.1.24) (2026-08-22)
 
 
