@@ -628,12 +628,12 @@ const onOverflowAction = (actionId: string) => {
             </section>
 
             <aside class="space-y-4">
-                <AppCard>
-                    <div class="flex items-center justify-between">
+                <AppCard class="overflow-hidden p-0">
+                    <div class="flex items-center justify-between gap-3 border-b border-canvas-200 bg-canvas-100 px-5 py-3">
                         <h3 class="text-base font-semibold text-slate-900">Status</h3>
                         <AppBadge class="capitalize" :variant="statusBadgeVariant">{{ statusLabel }}</AppBadge>
                     </div>
-                    <div class="mt-4 space-y-2">
+                    <div class="space-y-2 px-5 py-4">
                         <div v-for="step in timeline" :key="step.label" class="flex items-start gap-2 text-sm">
                             <CircleDot :class="step.done ? 'text-brand-500' : 'text-slate-300'" class="mt-0.5 h-4 w-4" />
                             <div>
@@ -644,66 +644,74 @@ const onOverflowAction = (actionId: string) => {
                     </div>
                 </AppCard>
 
-                <AppCard>
-                    <h3 class="text-base font-semibold text-slate-900">Client details</h3>
-                    <p class="mt-2 text-sm text-slate-700">{{ invoice.client.name || 'Unknown client' }}</p>
-                    <p class="text-sm text-slate-600">{{ invoice.client.email || '-' }}</p>
-                    <p class="text-sm text-slate-600">{{ invoice.client.phone || '-' }}</p>
-                </AppCard>
-
-                <AppCard v-if="showPublicPayCard">
-                    <div class="flex items-start gap-2">
-                        <QrCode class="mt-0.5 h-5 w-5 shrink-0 text-slate-600" aria-hidden="true" />
-                        <div class="min-w-0 flex-1">
-                            <h3 class="text-base font-semibold text-slate-900">Customer pay link</h3>
-                            <p class="mt-1 text-xs text-slate-500">
-                                QR for in-person or print. Opens a page with this invoice, PDF download, and online payment
-                                (when configured).
-                            </p>
-                        </div>
+                <AppCard class="overflow-hidden p-0">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">Client details</h3>
                     </div>
-                    <div v-if="!public_pay_url && can_manage_public_pay_link" class="mt-4">
-                        <AppButton variant="secondary" type="button" @click="createPublicPayLink">Create pay link &amp; QR</AppButton>
-                    </div>
-                    <div v-else-if="public_pay_url" class="mt-4 space-y-3">
-                        <div class="flex justify-center rounded-md border border-slate-200 bg-white p-3">
-                            <img
-                                v-if="public_pay_qr_url"
-                                :src="public_pay_qr_url"
-                                alt="QR code linking to customer pay page"
-                                class="h-44 w-44"
-                                width="220"
-                                height="220"
-                            >
-                        </div>
-                        <p class="break-all font-mono text-xs text-slate-700">{{ public_pay_url }}</p>
-                        <div class="flex flex-wrap gap-2">
-                            <AppButton size="sm" variant="secondary" type="button" @click="copyPublicPayUrl">Copy link</AppButton>
-                            <AppButton size="sm" variant="secondary" type="button" @click="openPublicPayPage">Open</AppButton>
-                            <AppButton
-                                v-if="can_manage_public_pay_link"
-                                size="sm"
-                                variant="ghost"
-                                class="text-amber-900 hover:bg-amber-50"
-                                type="button"
-                                @click="regeneratePublicPayLink"
-                            >
-                                New link
-                            </AppButton>
-                        </div>
+                    <div class="space-y-0.5 px-5 py-4">
+                        <p class="text-sm text-slate-700">{{ invoice.client.name || 'Unknown client' }}</p>
+                        <p class="text-sm text-slate-600">{{ invoice.client.email || '-' }}</p>
+                        <p class="text-sm text-slate-600">{{ invoice.client.phone || '-' }}</p>
                     </div>
                 </AppCard>
 
-                <AppCard>
-                    <div class="flex items-center justify-between">
+                <AppCard v-if="showPublicPayCard" class="overflow-hidden p-0">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <div class="flex items-start gap-2">
+                            <QrCode class="mt-0.5 h-5 w-5 shrink-0 text-slate-600" aria-hidden="true" />
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-base font-semibold text-slate-900">Customer pay link</h3>
+                                <p class="mt-0.5 text-xs text-slate-500">
+                                    QR for in-person or print. Opens a page with this invoice, PDF download, and online payment
+                                    (when configured).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-5 py-4">
+                        <div v-if="!public_pay_url && can_manage_public_pay_link">
+                            <AppButton variant="secondary" type="button" @click="createPublicPayLink">Create pay link &amp; QR</AppButton>
+                        </div>
+                        <div v-else-if="public_pay_url" class="space-y-3">
+                            <div class="flex justify-center rounded-md border border-slate-200 bg-white p-3">
+                                <img
+                                    v-if="public_pay_qr_url"
+                                    :src="public_pay_qr_url"
+                                    alt="QR code linking to customer pay page"
+                                    class="h-44 w-44"
+                                    width="220"
+                                    height="220"
+                                >
+                            </div>
+                            <p class="break-all font-mono text-xs text-slate-700">{{ public_pay_url }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                <AppButton size="sm" variant="secondary" type="button" @click="copyPublicPayUrl">Copy link</AppButton>
+                                <AppButton size="sm" variant="secondary" type="button" @click="openPublicPayPage">Open</AppButton>
+                                <AppButton
+                                    v-if="can_manage_public_pay_link"
+                                    size="sm"
+                                    variant="ghost"
+                                    class="text-amber-900 hover:bg-amber-50"
+                                    type="button"
+                                    @click="regeneratePublicPayLink"
+                                >
+                                    New link
+                                </AppButton>
+                            </div>
+                        </div>
+                    </div>
+                </AppCard>
+
+                <AppCard class="overflow-hidden p-0">
+                    <div class="flex items-center justify-between gap-3 border-b border-canvas-200 bg-canvas-100 px-5 py-3">
                         <h3 class="text-base font-semibold text-slate-900">Payment history</h3>
                         <AppButton v-if="can.record_payment" size="sm" variant="secondary" @click="openRecordPayment">Record Payment</AppButton>
                     </div>
-                    <div v-if="invoice.payments.length" class="mt-3 space-y-2">
+                    <div v-if="invoice.payments.length" class="divide-y divide-slate-100">
                         <div
                             v-for="payment in invoice.payments"
                             :key="payment.id"
-                            class="rounded-md border border-slate-200 p-2 text-sm"
+                            class="px-5 py-3 text-sm"
                         >
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
@@ -745,26 +753,34 @@ const onOverflowAction = (actionId: string) => {
                             </div>
                         </div>
                     </div>
-                    <p v-else class="mt-3 text-sm text-slate-500">No payments recorded yet.</p>
+                    <p v-else class="px-5 py-4 text-sm text-slate-500">No payments recorded yet.</p>
                 </AppCard>
 
-                <AppCard>
-                    <h3 class="text-base font-semibold text-slate-900">Activity log</h3>
-                    <div v-if="invoice.activity_log.length" class="mt-3 space-y-2">
-                        <div v-for="entry in visibleActivityLog" :key="entry.id" class="rounded-md border border-slate-200 p-2 text-sm">
-                            <p class="text-slate-800">{{ entry.description }}</p>
-                            <p class="text-xs text-slate-500">{{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '-' }}</p>
+                <AppCard class="overflow-hidden p-0">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">Activity log</h3>
+                    </div>
+                    <div v-if="invoice.activity_log.length">
+                        <div class="divide-y divide-slate-100">
+                            <div
+                                v-for="entry in visibleActivityLog"
+                                :key="entry.id"
+                                class="px-5 py-3 text-sm"
+                            >
+                                <p class="text-slate-800">{{ entry.description }}</p>
+                                <p class="text-xs text-slate-500">{{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '-' }}</p>
+                            </div>
                         </div>
                         <button
                             v-if="hiddenActivityCount > 0"
                             type="button"
-                            class="w-full rounded-md px-2 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                            class="w-full border-t border-slate-100 px-5 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
                             @click="activityLogExpanded = !activityLogExpanded"
                         >
                             {{ activityLogExpanded ? 'Show less' : `Show ${hiddenActivityCount} more` }}
                         </button>
                     </div>
-                    <p v-else class="mt-3 text-sm text-slate-500">No activity logged yet.</p>
+                    <p v-else class="px-5 py-4 text-sm text-slate-500">No activity logged yet.</p>
                 </AppCard>
 
             </aside>

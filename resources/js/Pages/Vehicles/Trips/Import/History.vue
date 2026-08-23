@@ -114,7 +114,6 @@ const undoImport = (row: ImportRow) => {
         section="import-history"
         :tabs="travelTabs"
         document-title="Trip import history"
-        subtitle="Undo Smart AI imports that created the wrong trips"
     >
         <template #actions>
             <AppButton variant="secondary" @click="router.visit(route('vehicles.trips.index'))">
@@ -130,7 +129,7 @@ const undoImport = (row: ImportRow) => {
         </template>
 
         <AppCard>
-            <form class="mb-4 max-w-sm" @submit.prevent="applyFilters()">
+            <form class="mb-4" @submit.prevent="applyFilters()">
                 <label class="mb-1 block text-xs font-medium text-slate-500">Vehicle</label>
                 <AppSelect
                     :model-value="filters.vehicle_id"

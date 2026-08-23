@@ -268,7 +268,6 @@ const emptyColspan = computed(() => tableColumns.value.length);
         section="trips"
         :tabs="travelTabs"
         document-title="Trip log"
-        subtitle="Business and private travel log book"
     >
         <template #actions>
             <AppButton

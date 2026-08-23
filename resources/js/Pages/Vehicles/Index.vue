@@ -80,7 +80,6 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
         section="vehicles"
         :tabs="travelTabs"
         document-title="Vehicles"
-        subtitle="Vehicles used for business travel"
     >
         <template #actions>
             <AppButton variant="primary" @click="router.visit(route('vehicles.create'))">
@@ -121,8 +120,10 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
             </div>
         </AppCard>
 
-        <AppCard class="mt-5">
+        <AppCard class="mt-5 overflow-hidden p-0">
             <AppTable
+                embedded
+                dense
                 table-class="text-sm"
                 :columns="[
                     { key: 'name', label: 'Vehicle' },
