@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.27](https://github.com/mortolian/nrth/compare/v0.1.26...v0.1.27) (2026-08-23)
+
+
+### Bug Fixes
+
+* tighten card chrome and remove nested table borders ([bf8fec6](https://github.com/mortolian/nrth/commit/bf8fec622a3619bcc31aab81fb0ad1700d58f77a))
+
 ## [0.1.26](https://github.com/mortolian/nrth/compare/v0.1.25...v0.1.26) (2026-08-23)
 
 
