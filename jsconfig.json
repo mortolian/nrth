@@ -1,10 +1,9 @@
 {
     "compilerOptions": {
-        "baseUrl": ".",
         "paths": {
-            "@/stores/*": ["resources/js/Stores/*"],
-            "@/composables/*": ["resources/js/Composables/*"],
-            "@/*": ["resources/js/*"]
+            "@/stores/*": ["./resources/js/Stores/*"],
+            "@/composables/*": ["./resources/js/Composables/*"],
+            "@/*": ["./resources/js/*"]
         },
         "jsx": "preserve",
         "module": "ESNext",
