@@ -2,6 +2,20 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.26](https://github.com/mortolian/nrth/compare/v0.1.25...v0.1.26) (2026-08-23)
+
+
+### Features
+
+* **budgeting:** add category and item reordering functionality ([c8a1d95](https://github.com/mortolian/nrth/commit/c8a1d95cfc10036822cb98bd59095da28e2d63f6))
+* **budgeting:** add footer slot to AppTable and enhance item display in Budgeting page ([bfad314](https://github.com/mortolian/nrth/commit/bfad3149aa32d14b23477296f438fe4506605afa))
+* **page-header:** enhance PageHeader component to include status slot for dynamic status display ([3748e01](https://github.com/mortolian/nrth/commit/3748e01133e63b037d536eac01b9a4cecc889f92))
+
+
+### Bug Fixes
+
+* **config:** update paths in jsconfig.json and tsconfig.json to use relative paths ([56983bf](https://github.com/mortolian/nrth/commit/56983bf27424a60526c86e19332fdb2c57653bb0))
+
 ## [0.1.25](https://github.com/mortolian/nrth/compare/v0.1.24...v0.1.25) (2026-08-22)
 
 
