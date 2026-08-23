@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ArrowUpDown } from 'lucide-vue-next';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +28,10 @@ const props = withDefaults(defineProps<{
     dense?: boolean;
     /** Called with the data `<tbody>` when the slot body is mounted (or `null` when unmounted). For row Sortable. */
     tbodyRefFn?: (el: HTMLTableSectionElement | null) => void;
+    /** Controlled sort column key (keeps header state in sync with server filters). */
+    sortKey?: string | null;
+    /** Controlled sort direction. */
+    sortDirection?: 'asc' | 'desc';
 }>(), {
     columns: () => [],
     page: 1,
@@ -38,6 +42,8 @@ const props = withDefaults(defineProps<{
     showPagination: true,
     embedded: false,
     dense: false,
+    sortKey: null,
+    sortDirection: 'asc',
 });
 
 function setDataTbodyRef(el: unknown) {
@@ -50,8 +56,18 @@ const emit = defineEmits<{
     (e: 'page-change', page: number): void;
 }>();
 
-const sortBy = ref<string | null>(null);
-const sortDirection = ref<'asc' | 'desc'>('asc');
+const sortBy = ref<string | null>(props.sortKey ?? null);
+const sortDirection = ref<'asc' | 'desc'>(props.sortDirection ?? 'asc');
+
+watch(
+    () => [props.sortKey, props.sortDirection] as const,
+    ([key, direction]) => {
+        sortBy.value = key ?? null;
+        if (direction === 'asc' || direction === 'desc') {
+            sortDirection.value = direction;
+        }
+    },
+);
 
 const normalizedColumns = computed<TableColumn[]>(() => {
     if (!props.columns?.length) return [];

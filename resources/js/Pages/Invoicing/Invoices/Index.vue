@@ -44,6 +44,9 @@ const props = defineProps<{
         overdue_count: number;
         overdue_total: number;
         overdue_totals_by_currency: Array<{ currency: string; total_cents: number }>;
+        fy_paid_total: number;
+        fy_paid_currency: string;
+        fy_label: string | null;
     };
     filters: {
         status: string;
@@ -53,6 +56,8 @@ const props = defineProps<{
         client_id: number | null;
         min_amount: number | null;
         max_amount: number | null;
+        sort: string;
+        direction: 'asc' | 'desc';
     };
     filter_client: { id: number; name: string } | null;
 }>();
@@ -93,11 +98,15 @@ const localFilters = ref({
     client_id: props.filters.client_id != null ? String(props.filters.client_id) : '',
     min_amount: props.filters.min_amount?.toString() ?? '',
     max_amount: props.filters.max_amount?.toString() ?? '',
+    sort: props.filters.sort ?? 'issue',
+    direction: (props.filters.direction ?? 'desc') as 'asc' | 'desc',
 });
 
 const buildInvoiceIndexQuery = (extra: Record<string, string | number> = {}) => {
     const q: Record<string, string | number> = {
         status: localFilters.value.status,
+        sort: localFilters.value.sort || 'issue',
+        direction: localFilters.value.direction || 'desc',
         ...extra,
     };
     if (localFilters.value.from) q.from = localFilters.value.from;
@@ -148,6 +157,72 @@ const overdueTotalsHint = computed(() => {
     return 'Amount past due';
 });
 
+const fyPaidTotalsValue = computed(() =>
+    formatRowCents(
+        props.summary.fy_paid_total ?? 0,
+        props.summary.fy_paid_currency || businessCurrency.value,
+    ),
+);
+
+const fyPaidTotalsHint = computed(() => {
+    const label = props.summary.fy_label;
+    if (label) {
+        return `FY ${label}`;
+    }
+
+    return 'This financial year';
+});
+
+const summaryStats = computed(() => [
+    {
+        id: 'draft',
+        title: 'Draft',
+        value: String(props.summary.draft_count),
+        hint: 'Awaiting send',
+        trend: 'neutral' as const,
+        filter: 'draft' as string | null,
+    },
+    {
+        id: 'sent',
+        title: 'Sent',
+        value: String(props.summary.sent_count),
+        hint: 'Awaiting payment',
+        trend: 'neutral' as const,
+        filter: 'sent' as string | null,
+    },
+    {
+        id: 'overdue',
+        title: 'Overdue',
+        value: String(props.summary.overdue_count),
+        hint: 'Invoices past due',
+        trend: 'down' as const,
+        filter: 'overdue' as string | null,
+    },
+    {
+        id: 'overdue-totals',
+        title: 'Overdue totals',
+        value: overdueTotalsValue.value,
+        hint: overdueTotalsHint.value,
+        trend: 'down' as const,
+        filter: 'overdue' as string | null,
+    },
+    {
+        id: 'paid-income',
+        title: 'Paid income',
+        value: fyPaidTotalsValue.value,
+        hint: fyPaidTotalsHint.value,
+        trend: 'up' as const,
+        filter: null as string | null,
+    },
+]);
+
+const onSummaryStatClick = (filter: string | null) => {
+    if (!filter) {
+        return;
+    }
+    applyStatFilter(filter);
+};
+
 const applyFilters = () => {
     router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery(), {
         preserveState: true,
@@ -165,6 +240,8 @@ const clearFilters = () => {
         client_id: '',
         min_amount: '',
         max_amount: '',
+        sort: 'issue',
+        direction: 'desc',
     };
     applyFilters();
 };
@@ -182,6 +259,16 @@ const applyStatFilter = (status: string) => {
 
 const navigateToPage = (page: number) => {
     router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery({ page }), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+};
+
+const onSort = (payload: { key: string; direction: 'asc' | 'desc' }) => {
+    localFilters.value.sort = payload.key;
+    localFilters.value.direction = payload.direction;
+    router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery({ page: 1 }), {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -420,40 +507,50 @@ const exportSelectedPdfZip = async () => {
         </div>
 
         <div class="space-y-6">
-            <div class="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
-                <button
-                    type="button"
-                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-                    @click="applyStatFilter('draft')"
-                >
-                    <StatCard title="Draft" :value="String(summary.draft_count)" hint="Awaiting send" trend="neutral" />
-                </button>
-                <button
-                    type="button"
-                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-                    @click="applyStatFilter('sent')"
-                >
-                    <StatCard title="Sent" :value="String(summary.sent_count)" hint="Awaiting payment" trend="neutral" />
-                </button>
-                <button
-                    type="button"
-                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-                    @click="applyStatFilter('overdue')"
-                >
-                    <StatCard title="Overdue" :value="String(summary.overdue_count)" hint="Invoices past due" trend="down" />
-                </button>
-                <button
-                    type="button"
-                    class="block w-full rounded-xl text-left transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-                    @click="applyStatFilter('overdue')"
+            <!-- Mobile: one compact horizontal strip so the list stays above the fold -->
+            <div class="-mx-4 overflow-x-auto px-4 md:hidden [scrollbar-width:thin]">
+                <div class="flex w-max gap-2 pb-1">
+                    <component
+                        :is="stat.filter ? 'button' : 'div'"
+                        v-for="stat in summaryStats"
+                        :key="`m-${stat.id}`"
+                        :type="stat.filter ? 'button' : undefined"
+                        class="w-[8.75rem] shrink-0 rounded-xl text-left"
+                        :class="stat.filter
+                            ? 'transition active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2'
+                            : ''"
+                        @click="onSummaryStatClick(stat.filter)"
+                    >
+                        <StatCard
+                            compact
+                            :title="stat.title"
+                            :value="stat.value"
+                            :trend="stat.trend"
+                        />
+                    </component>
+                </div>
+            </div>
+
+            <!-- Desktop / tablet: equal-height card grid -->
+            <div class="hidden items-stretch gap-4 md:grid md:grid-cols-3 xl:grid-cols-5">
+                <component
+                    :is="stat.filter ? 'button' : 'div'"
+                    v-for="stat in summaryStats"
+                    :key="stat.id"
+                    :type="stat.filter ? 'button' : undefined"
+                    class="h-full w-full rounded-xl text-left"
+                    :class="stat.filter
+                        ? 'transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2'
+                        : ''"
+                    @click="onSummaryStatClick(stat.filter)"
                 >
                     <StatCard
-                        title="Overdue totals"
-                        :value="overdueTotalsValue"
-                        :hint="overdueTotalsHint"
-                        trend="down"
+                        :title="stat.title"
+                        :value="stat.value"
+                        :hint="stat.hint"
+                        :trend="stat.trend"
                     />
-                </button>
+                </component>
             </div>
 
             <AppCard>
@@ -650,7 +747,10 @@ const exportSelectedPdfZip = async () => {
                     ]"
                     :page="invoices.current_page"
                     :last-page="invoices.last_page"
+                    :sort-key="localFilters.sort"
+                    :sort-direction="localFilters.direction"
                     @page-change="navigateToPage"
+                    @sort="onSort"
                 >
                     <template #header-select>
                         <input
