@@ -143,6 +143,9 @@ const prevPage = () => {
                 <tbody v-else :ref="setDataTbodyRef" class="divide-y divide-slate-100">
                     <slot />
                 </tbody>
+                <tfoot v-if="$slots.footer">
+                    <slot name="footer" />
+                </tfoot>
             </table>
         </div>
         <div

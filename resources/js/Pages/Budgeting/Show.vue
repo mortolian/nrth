@@ -406,6 +406,14 @@ const initItemSortables = () => {
             draggable: '.budget-line-item',
             filter: '.budget-line-fixed',
             emptyInsertThreshold: 24,
+            onMove(evt) {
+                const related = evt.related as HTMLElement | undefined;
+                // Keep drops above the empty-state placeholder (never after it).
+                if (related?.classList.contains('budget-line-fixed') && evt.willInsertAfter) {
+                    return -1;
+                }
+                return true;
+            },
             onEnd(evt) {
                 const itemId = Number((evt.item as HTMLElement).dataset.itemId);
                 const fromId = Number((evt.from as HTMLElement).dataset.categoryId);
@@ -604,41 +612,50 @@ onBeforeUnmount(() => {
                 class="budget-category-card"
                 :data-category-id="cat.id"
             >
-                <AppCard>
-                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                        <div class="flex min-w-0 items-start gap-2">
+                <AppCard class="overflow-hidden p-0">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                        <div class="flex min-w-0 items-center gap-2">
                             <span
                                 v-if="canManage"
-                                class="budget-category-drag-handle mt-0.5 inline-flex h-8 w-6 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                class="budget-category-drag-handle inline-flex h-8 w-6 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded text-slate-400 hover:bg-white hover:text-slate-600 active:cursor-grabbing"
                                 role="button"
                                 tabindex="0"
                                 :aria-label="`Drag to reorder ${cat.name}`"
                             >
                                 <GripVertical class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </span>
-                            <div class="min-w-0">
-                                <h3 class="text-base font-semibold text-slate-900">{{ cat.name }}</h3>
-                                <p class="mt-0.5 text-sm text-slate-500">
-                                    Planned {{ formatCents(cat.period_planned_cents, budget.currency) }}
-                                    <span v-if="cat.account_name"> · Tracking {{ cat.account_name }}</span>
-                                    <span v-else> · Not tracking spend</span>
-                                </p>
-                            </div>
+                            <h3 class="truncate text-sm font-semibold text-slate-900">{{ cat.name }}</h3>
+                            <AppBadge :variant="cat.has_account ? 'success' : 'neutral'">
+                                {{ cat.has_account ? 'Tracking' : 'Not tracking' }}
+                            </AppBadge>
+                            <span class="hidden text-xs text-slate-500 sm:inline">
+                                {{ (cat.items ?? []).length }}
+                                {{ (cat.items ?? []).length === 1 ? 'line' : 'lines' }}
+                            </span>
+                            <span
+                                v-if="cat.account_name"
+                                class="hidden truncate text-xs text-slate-500 lg:inline"
+                                :title="cat.account_name"
+                            >
+                                · {{ cat.account_name }}
+                            </span>
                         </div>
-                        <div v-if="canManage" class="flex items-center gap-2">
-                            <AppButton size="sm" variant="secondary" @click="openAddItem(cat)">
-                                Add line
-                            </AppButton>
-                            <InvoiceRowActionsMenu
-                                :actions="categoryActions"
-                                :aria-label="`Actions for ${cat.name}`"
-                                @select="onCategoryAction(cat, $event)"
-                            />
+                        <div class="flex shrink-0 items-center gap-2">
+                            <template v-if="canManage">
+                                <AppButton size="sm" variant="secondary" @click="openAddItem(cat)">
+                                    <Plus class="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                                    Add line
+                                </AppButton>
+                                <InvoiceRowActionsMenu
+                                    :actions="categoryActions"
+                                    :aria-label="`Actions for ${cat.name}`"
+                                    @select="onCategoryAction(cat, $event)"
+                                />
+                            </template>
                         </div>
                     </div>
 
                     <AppTable
-                        class="mt-3"
                         embedded
                         dense
                         table-class="text-sm table-fixed"
@@ -724,21 +741,23 @@ onBeforeUnmount(() => {
                                 />
                             </td>
                         </tr>
-                        <tr class="budget-line-fixed border-t border-slate-200 bg-slate-50/80 font-medium text-slate-900">
-                            <td class="px-3 py-2" :colspan="canManage ? 5 : 4">Category total</td>
-                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                                {{ formatCents(cat.monthly_planned_cents, budget.currency) }}
-                            </td>
-                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                                {{ formatCents(cat.period_planned_cents, budget.currency) }}
-                            </td>
-                            <td class="px-3 py-2" />
-                        </tr>
+                        <template #footer>
+                            <tr class="border-t border-slate-200 bg-slate-50/80 font-medium text-slate-900">
+                                <td class="px-3 py-2" :colspan="canManage ? 5 : 4">Category total</td>
+                                <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                    {{ formatCents(cat.monthly_planned_cents, budget.currency) }}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                    {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                                </td>
+                                <td class="px-3 py-2" />
+                            </tr>
+                        </template>
                     </AppTable>
 
                     <div
                         v-if="cat.has_account"
-                        class="mt-3 space-y-2"
+                        class="space-y-2 border-t border-slate-100 px-4 py-3 sm:px-5"
                     >
                         <div class="flex flex-wrap gap-4 text-sm text-slate-600">
                             <span>
