@@ -8,6 +8,7 @@ import BudgetItemModal from '@/Components/BudgetItemModal.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import PageHeader from '@/Components/PageHeader.vue';
+import type { TableColumn } from '@/Components/AppTable.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { useToast } from '@/Composables/useToast';
 
@@ -194,6 +195,32 @@ const itemActions = [
     { id: 'edit', label: 'Edit line' },
     { id: 'delete', label: 'Delete line' },
 ];
+
+/** Shared across category tables so Expense / Cadence / money columns line up vertically. */
+const budgetLineColumns = computed<TableColumn[]>(() => [
+    { key: 'label', label: 'Expense', widthClass: 'w-[28%]' },
+    { key: 'cadence', label: 'Cadence', widthClass: 'w-[12%] whitespace-nowrap' },
+    { key: 'ccy', label: 'Currency', widthClass: 'w-[8%] whitespace-nowrap' },
+    {
+        key: 'amount_line',
+        label: 'Amount (line)',
+        align: 'right',
+        widthClass: 'w-[14%] whitespace-nowrap text-right tabular-nums',
+    },
+    {
+        key: 'monthly_budget',
+        label: `Monthly (${props.budget.currency})`,
+        align: 'right',
+        widthClass: 'w-[16%] whitespace-nowrap text-right tabular-nums',
+    },
+    {
+        key: 'period',
+        label: 'Period total',
+        align: 'right',
+        widthClass: 'w-[14%] whitespace-nowrap text-right tabular-nums',
+    },
+    { key: 'actions', label: '', widthClass: 'w-[8%] whitespace-nowrap text-right', align: 'right' },
+]);
 </script>
 
 <template>
@@ -206,25 +233,25 @@ const itemActions = [
         ]"
     >
         <PageHeader :title="budget.name" :subtitle="budget.period">
-            <template #actions>
+            <template #status>
                 <AppBadge v-if="budget.is_active" variant="success">Active</AppBadge>
                 <AppBadge v-else variant="neutral">Inactive</AppBadge>
-                <template v-if="canManage">
-                    <AppButton variant="secondary" @click="router.visit(route('budgeting.edit', budget.id))">
-                        Edit details
-                    </AppButton>
-                    <AppButton
-                        v-if="can_import_structure"
-                        variant="ghost"
-                        :disabled="importProcessing"
-                        @click="importStructure"
-                    >
-                        Copy structure
-                    </AppButton>
-                    <AppButton variant="ghost" class="text-rose-600 hover:text-rose-700" @click="deleteBudgetOpen = true">
-                        Delete
-                    </AppButton>
-                </template>
+            </template>
+            <template v-if="canManage" #actions>
+                <AppButton variant="secondary" @click="router.visit(route('budgeting.edit', budget.id))">
+                    Edit details
+                </AppButton>
+                <AppButton
+                    v-if="can_import_structure"
+                    variant="secondary"
+                    :disabled="importProcessing"
+                    @click="importStructure"
+                >
+                    Copy structure
+                </AppButton>
+                <AppButton variant="danger" @click="deleteBudgetOpen = true">
+                    Delete
+                </AppButton>
             </template>
         </PageHeader>
 
@@ -337,16 +364,8 @@ const itemActions = [
                     class="mt-3"
                     embedded
                     dense
-                    table-class="text-sm"
-                    :columns="[
-                        { key: 'label', label: 'Expense' },
-                        { key: 'cadence', label: 'Cadence' },
-                        { key: 'ccy', label: 'Currency' },
-                        { key: 'amount_line', label: 'Amount (line)', align: 'right' },
-                        { key: 'monthly_budget', label: `Monthly (${budget.currency})`, align: 'right' },
-                        { key: 'period', label: 'Period total', align: 'right' },
-                        { key: 'actions', label: '', widthClass: 'w-12', align: 'right' },
-                    ]"
+                    table-class="text-sm table-fixed"
+                    :columns="budgetLineColumns"
                     :page="1"
                     :last-page="1"
                     :show-pagination="false"
@@ -369,9 +388,9 @@ const itemActions = [
                         :key="item.id"
                         class="align-middle"
                     >
-                        <td class="px-3 py-2 text-slate-900">
-                            <div>{{ item.label }}</div>
-                            <p v-if="item.notes" class="mt-0.5 max-w-xs text-xs font-normal text-slate-500">
+                        <td class="min-w-0 px-3 py-2 text-slate-900">
+                            <div class="truncate" :title="item.label">{{ item.label }}</div>
+                            <p v-if="item.notes" class="mt-0.5 truncate text-xs font-normal text-slate-500" :title="item.notes">
                                 {{ item.notes }}
                             </p>
                         </td>
