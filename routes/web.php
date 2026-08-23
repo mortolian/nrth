@@ -198,9 +198,11 @@ Route::middleware([
         Route::delete('/budgeting/trash/{id}', [BudgetingController::class, 'forceDestroy'])->whereNumber('id')->name('budgeting.force-destroy');
         Route::post('/budgeting/{budget}/import-structure', [BudgetingController::class, 'importStructure'])->name('budgeting.import-structure');
         Route::post('/budgeting/{budget}/categories', [BudgetingController::class, 'storeCategory'])->name('budgeting.categories.store');
+        Route::put('/budgeting/{budget}/categories/reorder', [BudgetingController::class, 'reorderCategories'])->name('budgeting.categories.reorder');
         Route::put('/budgeting/{budget}/categories/{category}', [BudgetingController::class, 'updateCategory'])->name('budgeting.categories.update');
         Route::delete('/budgeting/{budget}/categories/{category}', [BudgetingController::class, 'destroyCategory'])->name('budgeting.categories.destroy');
         Route::post('/budgeting/{budget}/categories/{category}/items', [BudgetingController::class, 'storeItem'])->name('budgeting.items.store');
+        Route::put('/budgeting/{budget}/items/reorder', [BudgetingController::class, 'reorderItems'])->name('budgeting.items.reorder');
         Route::put('/budgeting/{budget}/categories/{category}/items/{item}', [BudgetingController::class, 'updateItem'])->name('budgeting.items.update');
         Route::delete('/budgeting/{budget}/categories/{category}/items/{item}', [BudgetingController::class, 'destroyItem'])->name('budgeting.items.destroy');
     });

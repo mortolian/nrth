@@ -501,6 +501,145 @@ class BudgetCrudTest extends TestCase
             'name' => 'Nope',
             'account_id' => null,
         ])->assertForbidden();
+        $this->put(route('budgeting.categories.reorder', $budget), [
+            'ordered_ids' => [1],
+        ])->assertForbidden();
+        $this->put(route('budgeting.items.reorder', $budget), [
+            'groups' => [['category_id' => 1, 'ordered_ids' => []]],
+        ])->assertForbidden();
+    }
+
+    public function test_reorder_categories_updates_sort_order(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->headerPayload(true))->assertRedirect();
+        $budget = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->first();
+        $this->assertNotNull($budget);
+
+        $this->post(route('budgeting.categories.store', $budget), ['name' => 'Alpha', 'account_id' => null]);
+        $this->post(route('budgeting.categories.store', $budget), ['name' => 'Beta', 'account_id' => null]);
+        $this->post(route('budgeting.categories.store', $budget), ['name' => 'Gamma', 'account_id' => null]);
+
+        $cats = BudgetCategory::query()->where('budget_id', $budget->id)->orderBy('sort_order')->get();
+        $this->assertSame(['Alpha', 'Beta', 'Gamma'], $cats->pluck('name')->all());
+
+        $reordered = [$cats[2]->id, $cats[0]->id, $cats[1]->id];
+        $this->put(route('budgeting.categories.reorder', $budget), [
+            'ordered_ids' => $reordered,
+        ])->assertRedirect();
+
+        $names = BudgetCategory::query()
+            ->where('budget_id', $budget->id)
+            ->orderBy('sort_order')
+            ->pluck('name')
+            ->all();
+        $this->assertSame(['Gamma', 'Alpha', 'Beta'], $names);
+    }
+
+    public function test_reorder_items_within_and_across_categories(): void
+    {
+        [, $team] = $this->userAndTeam();
+
+        $this->post(route('budgeting.store'), $this->headerPayload(true))->assertRedirect();
+        $budget = Budget::queryWithoutTeamScope()->where('team_id', $team->id)->first();
+        $this->assertNotNull($budget);
+
+        $this->post(route('budgeting.categories.store', $budget), ['name' => 'Housing', 'account_id' => null]);
+        $this->post(route('budgeting.categories.store', $budget), ['name' => 'Food', 'account_id' => null]);
+
+        $housing = BudgetCategory::query()->where('budget_id', $budget->id)->where('name', 'Housing')->first();
+        $food = BudgetCategory::query()->where('budget_id', $budget->id)->where('name', 'Food')->first();
+        $this->assertNotNull($housing);
+        $this->assertNotNull($food);
+
+        foreach (['Rent', 'Water', 'Electricity'] as $label) {
+            $this->post(route('budgeting.items.store', [$budget, $housing]), [
+                'label' => $label,
+                'cadence' => 'monthly',
+                'notes' => null,
+                'monthly_amount_cents' => 10_000,
+                'currency' => 'ZAR',
+                'fx_budget_per_line_major' => null,
+            ])->assertRedirect();
+        }
+        $this->post(route('budgeting.items.store', [$budget, $food]), [
+            'label' => 'Groceries',
+            'cadence' => 'monthly',
+            'notes' => null,
+            'monthly_amount_cents' => 5_000,
+            'currency' => 'ZAR',
+            'fx_budget_per_line_major' => null,
+        ])->assertRedirect();
+
+        $housingItems = BudgetItem::query()->where('budget_category_id', $housing->id)->orderBy('sort_order')->get();
+        $foodItems = BudgetItem::query()->where('budget_category_id', $food->id)->orderBy('sort_order')->get();
+        $this->assertCount(3, $housingItems);
+        $this->assertCount(1, $foodItems);
+
+        // Reorder within Housing: Electricity, Rent, Water
+        $this->put(route('budgeting.items.reorder', $budget), [
+            'groups' => [[
+                'category_id' => $housing->id,
+                'ordered_ids' => [$housingItems[2]->id, $housingItems[0]->id, $housingItems[1]->id],
+            ]],
+        ])->assertRedirect();
+
+        $this->assertSame(
+            ['Electricity', 'Rent', 'Water'],
+            BudgetItem::query()->where('budget_category_id', $housing->id)->orderBy('sort_order')->pluck('label')->all()
+        );
+
+        // Move Water from Housing to Food (append)
+        $water = BudgetItem::query()->where('budget_category_id', $housing->id)->where('label', 'Water')->first();
+        $this->assertNotNull($water);
+        $remainingHousing = BudgetItem::query()
+            ->where('budget_category_id', $housing->id)
+            ->where('id', '!=', $water->id)
+            ->orderBy('sort_order')
+            ->pluck('id')
+            ->all();
+        $foodOrdered = array_merge(
+            BudgetItem::query()->where('budget_category_id', $food->id)->orderBy('sort_order')->pluck('id')->all(),
+            [$water->id]
+        );
+
+        $this->put(route('budgeting.items.reorder', $budget), [
+            'groups' => [
+                ['category_id' => $housing->id, 'ordered_ids' => $remainingHousing],
+                ['category_id' => $food->id, 'ordered_ids' => $foodOrdered],
+            ],
+        ])->assertRedirect();
+
+        $this->assertSame(
+            ['Electricity', 'Rent'],
+            BudgetItem::query()->where('budget_category_id', $housing->id)->orderBy('sort_order')->pluck('label')->all()
+        );
+        $this->assertSame(
+            ['Groceries', 'Water'],
+            BudgetItem::query()->where('budget_category_id', $food->id)->orderBy('sort_order')->pluck('label')->all()
+        );
+        $this->assertSame((int) $food->id, (int) $water->fresh()->budget_category_id);
+
+        // Move the last Housing item out so Housing's ordered_ids is empty (must still succeed).
+        $lastHousing = BudgetItem::query()->where('budget_category_id', $housing->id)->orderBy('sort_order')->get();
+        $this->assertNotEmpty($lastHousing);
+        $foodAfter = BudgetItem::query()->where('budget_category_id', $food->id)->orderBy('sort_order')->pluck('id')->all();
+        $this->put(route('budgeting.items.reorder', $budget), [
+            'groups' => [
+                ['category_id' => $housing->id, 'ordered_ids' => []],
+                [
+                    'category_id' => $food->id,
+                    'ordered_ids' => array_merge($foodAfter, $lastHousing->pluck('id')->all()),
+                ],
+            ],
+        ])->assertRedirect();
+
+        $this->assertSame(0, BudgetItem::query()->where('budget_category_id', $housing->id)->count());
+        $this->assertSame(
+            ['Groceries', 'Water', 'Electricity', 'Rent'],
+            BudgetItem::query()->where('budget_category_id', $food->id)->orderBy('sort_order')->pluck('label')->all()
+        );
     }
 
     public function test_store_ongoing_budget_without_period(): void

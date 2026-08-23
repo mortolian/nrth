@@ -413,6 +413,110 @@ class BudgetingController extends Controller
         return back()->with('success', __('Line item deleted.'));
     }
 
+    public function reorderCategories(Request $request, Budget $budget): RedirectResponse
+    {
+        $this->authorizeTeam('budgets.manage', $request);
+        $this->assertBudgetOwnsTeam($request, $budget);
+
+        $payload = $request->validate([
+            'ordered_ids' => ['required', 'array', 'min:1'],
+            'ordered_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $orderedIds = array_map('intval', $payload['ordered_ids']);
+        $existingIds = $budget->categories()->pluck('id')->map(fn ($id): int => (int) $id)->sort()->values()->all();
+        $incomingSorted = collect($orderedIds)->sort()->values()->all();
+
+        if ($existingIds !== $incomingSorted) {
+            throw ValidationException::withMessages([
+                'ordered_ids' => __('Category list must include every category on this budget exactly once.'),
+            ]);
+        }
+
+        DB::transaction(function () use ($budget, $orderedIds): void {
+            foreach ($orderedIds as $index => $categoryId) {
+                BudgetCategory::query()
+                    ->where('budget_id', $budget->id)
+                    ->where('id', $categoryId)
+                    ->update(['sort_order' => $index]);
+            }
+        });
+
+        return back();
+    }
+
+    public function reorderItems(Request $request, Budget $budget): RedirectResponse
+    {
+        $this->authorizeTeam('budgets.manage', $request);
+        $this->assertBudgetOwnsTeam($request, $budget);
+
+        $payload = $request->validate([
+            'groups' => ['required', 'array', 'min:1'],
+            'groups.*.category_id' => ['required', 'integer', 'distinct'],
+            // `present` (not `required`): empty ordered_ids is valid when the last line leaves a category.
+            'groups.*.ordered_ids' => ['present', 'array'],
+            'groups.*.ordered_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        /** @var array<int, array{category_id: int, ordered_ids: array<int, int>}> $groups */
+        $groups = collect($payload['groups'])
+            ->map(fn (array $group): array => [
+                'category_id' => (int) $group['category_id'],
+                'ordered_ids' => array_map('intval', $group['ordered_ids']),
+            ])
+            ->values()
+            ->all();
+
+        $categoryIds = array_column($groups, 'category_id');
+        $ownedCategoryCount = $budget->categories()
+            ->whereIn('id', $categoryIds)
+            ->count();
+
+        if ($ownedCategoryCount !== count($categoryIds)) {
+            throw ValidationException::withMessages([
+                'groups' => __('One or more categories do not belong to this budget.'),
+            ]);
+        }
+
+        $itemIds = collect($groups)->flatMap(fn (array $group) => $group['ordered_ids'])->values();
+        if ($itemIds->count() !== $itemIds->unique()->count()) {
+            throw ValidationException::withMessages([
+                'groups' => __('Each line item may appear in only one category.'),
+            ]);
+        }
+
+        $budgetItemIds = BudgetItem::query()
+            ->whereIn('budget_category_id', $budget->categories()->select('id'))
+            ->whereIn('id', $itemIds->all())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->sort()
+            ->values()
+            ->all();
+
+        $incomingItemIds = $itemIds->sort()->values()->all();
+        if ($budgetItemIds !== $incomingItemIds) {
+            throw ValidationException::withMessages([
+                'groups' => __('One or more line items do not belong to this budget.'),
+            ]);
+        }
+
+        DB::transaction(function () use ($groups): void {
+            foreach ($groups as $group) {
+                foreach ($group['ordered_ids'] as $index => $itemId) {
+                    BudgetItem::query()
+                        ->where('id', $itemId)
+                        ->update([
+                            'budget_category_id' => $group['category_id'],
+                            'sort_order' => $index,
+                        ]);
+                }
+            }
+        });
+
+        return back();
+    }
+
     /**
      * @return array{id: int, name: string, has_period: bool, period_type: string|null, start_date: string|null, end_date: string|null, currency: string, is_active: bool}
      */

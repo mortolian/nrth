@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
-import { FolderKanban, Plus } from 'lucide-vue-next';
+import { FolderKanban, GripVertical, Plus } from 'lucide-vue-next';
+import Sortable from 'sortablejs';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import BudgetCategoryModal from '@/Components/BudgetCategoryModal.vue';
 import BudgetItemModal from '@/Components/BudgetItemModal.vue';
@@ -78,6 +79,23 @@ const progressColor = (percentage: number) => {
     return 'bg-brand-500';
 };
 
+const cloneCategories = (rows: BudgetCategoryRow[]): BudgetCategoryRow[] =>
+    rows.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) => ({ ...item })),
+    }));
+
+const categories = ref<BudgetCategoryRow[]>(cloneCategories(props.budget.categories ?? []));
+
+watch(
+    () => props.budget.categories,
+    (rows) => {
+        categories.value = cloneCategories(rows ?? []);
+        nextTick(() => initSortables());
+    },
+    { deep: true },
+);
+
 const categoryModalOpen = ref(false);
 const categoryEditing = ref<BudgetCategoryRow | null>(null);
 
@@ -91,6 +109,12 @@ const pendingDeleteCategory = ref<BudgetCategoryRow | null>(null);
 const pendingDeleteItem = ref<{ category: BudgetCategoryRow; item: BudgetItemRow } | null>(null);
 const deleteProcessing = ref(false);
 const importProcessing = ref(false);
+const reorderSaving = ref(false);
+
+const categoriesListRef = ref<HTMLElement | null>(null);
+const itemTbodyByCategory = new Map<number, HTMLTableSectionElement>();
+let categorySortable: ReturnType<typeof Sortable.create> | null = null;
+const itemSortables = new Map<number, ReturnType<typeof Sortable.create>>();
 
 const openAddCategory = () => {
     categoryEditing.value = null;
@@ -196,31 +220,266 @@ const itemActions = [
     { id: 'delete', label: 'Delete line' },
 ];
 
+const lineColspan = computed(() => (canManage.value ? 8 : 7));
+
 /** Shared across category tables so Expense / Cadence / money columns line up vertically. */
-const budgetLineColumns = computed<TableColumn[]>(() => [
-    { key: 'label', label: 'Expense', widthClass: 'w-[28%]' },
-    { key: 'cadence', label: 'Cadence', widthClass: 'w-[12%] whitespace-nowrap' },
-    { key: 'ccy', label: 'Currency', widthClass: 'w-[8%] whitespace-nowrap' },
-    {
-        key: 'amount_line',
-        label: 'Amount (line)',
-        align: 'right',
-        widthClass: 'w-[14%] whitespace-nowrap text-right tabular-nums',
-    },
-    {
-        key: 'monthly_budget',
-        label: `Monthly (${props.budget.currency})`,
-        align: 'right',
-        widthClass: 'w-[16%] whitespace-nowrap text-right tabular-nums',
-    },
-    {
-        key: 'period',
-        label: 'Period total',
-        align: 'right',
-        widthClass: 'w-[14%] whitespace-nowrap text-right tabular-nums',
-    },
-    { key: 'actions', label: '', widthClass: 'w-[8%] whitespace-nowrap text-right', align: 'right' },
-]);
+const budgetLineColumns = computed<TableColumn[]>(() => {
+    const columns: TableColumn[] = [];
+    if (canManage.value) {
+        columns.push({ key: 'drag', label: '', widthClass: 'w-[3%]' });
+    }
+    columns.push(
+        { key: 'label', label: 'Expense', widthClass: canManage.value ? 'w-[25%]' : 'w-[28%]' },
+        { key: 'cadence', label: 'Cadence', widthClass: 'w-[12%] whitespace-nowrap' },
+        { key: 'ccy', label: 'Currency', widthClass: 'w-[8%] whitespace-nowrap' },
+        {
+            key: 'amount_line',
+            label: 'Amount (line)',
+            align: 'right',
+            widthClass: 'w-[14%] whitespace-nowrap text-right tabular-nums',
+        },
+        {
+            key: 'monthly_budget',
+            label: `Monthly (${props.budget.currency})`,
+            align: 'right',
+            widthClass: 'w-[16%] whitespace-nowrap text-right tabular-nums',
+        },
+        {
+            key: 'period',
+            label: 'Period total',
+            align: 'right',
+            widthClass: 'w-[14%] whitespace-nowrap text-right tabular-nums',
+        },
+        { key: 'actions', label: '', widthClass: 'w-[8%] whitespace-nowrap text-right', align: 'right' },
+    );
+    return columns;
+});
+
+const recomputeCategoryTotals = (cat: BudgetCategoryRow) => {
+    cat.monthly_planned_cents = cat.items.reduce((sum, item) => sum + item.monthly_budget_currency_cents, 0);
+    cat.period_planned_cents = cat.items.reduce((sum, item) => sum + item.period_total_budget_cents, 0);
+    if (cat.has_account) {
+        cat.remaining_cents = Math.max(0, cat.period_planned_cents - cat.spent_cents);
+        cat.percentage =
+            cat.period_planned_cents > 0
+                ? Math.round((cat.spent_cents / cat.period_planned_cents) * 100)
+                : cat.spent_cents > 0
+                  ? 100
+                  : 0;
+    }
+};
+
+const itemIdsFromTbody = (tbody: HTMLTableSectionElement): number[] =>
+    [...tbody.querySelectorAll<HTMLElement>('.budget-line-item')]
+        .map((el) => Number(el.dataset.itemId))
+        .filter((id) => Number.isFinite(id) && id > 0);
+
+const applyItemOrderFromDom = (categoryIds: number[]) => {
+    const itemById = new Map<number, BudgetItemRow>();
+    for (const cat of categories.value) {
+        for (const item of cat.items) {
+            itemById.set(item.id, item);
+        }
+    }
+
+    for (const categoryId of categoryIds) {
+        const cat = categories.value.find((row) => row.id === categoryId);
+        const tbody = itemTbodyByCategory.get(categoryId);
+        if (!cat || !tbody) continue;
+        cat.items = itemIdsFromTbody(tbody)
+            .map((id) => itemById.get(id))
+            .filter((item): item is BudgetItemRow => item !== undefined);
+        recomputeCategoryTotals(cat);
+    }
+};
+
+const persistCategoryOrder = () => {
+    if (!canManage.value || reorderSaving.value) return;
+    const orderedIds = categories.value.map((cat) => cat.id);
+    reorderSaving.value = true;
+    router.put(
+        route('budgeting.categories.reorder', props.budget.id),
+        { ordered_ids: orderedIds },
+        {
+            preserveScroll: true,
+            onError: () => {
+                toast.error('Could not reorder categories.');
+                categories.value = cloneCategories(props.budget.categories ?? []);
+                nextTick(() => initSortables());
+            },
+            onFinish: () => {
+                reorderSaving.value = false;
+            },
+        },
+    );
+};
+
+const persistItemGroups = (categoryIds: number[]) => {
+    if (!canManage.value || reorderSaving.value) return;
+    const uniqueIds = [...new Set(categoryIds)];
+    const groups = uniqueIds.map((categoryId) => {
+        const cat = categories.value.find((row) => row.id === categoryId);
+        return {
+            category_id: categoryId,
+            ordered_ids: (cat?.items ?? []).map((item) => item.id),
+        };
+    });
+
+    reorderSaving.value = true;
+    router.put(
+        route('budgeting.items.reorder', props.budget.id),
+        { groups },
+        {
+            preserveScroll: true,
+            onError: (errors) => {
+                const message = errors.groups ?? Object.values(errors)[0];
+                toast.error(
+                    typeof message === 'string' && message.trim() !== ''
+                        ? message
+                        : 'Could not reorder line items.',
+                );
+                categories.value = cloneCategories(props.budget.categories ?? []);
+                nextTick(() => initSortables());
+            },
+            onFinish: () => {
+                reorderSaving.value = false;
+            },
+        },
+    );
+};
+
+const destroyItemSortables = () => {
+    for (const sortable of itemSortables.values()) {
+        sortable.destroy();
+    }
+    itemSortables.clear();
+};
+
+const setItemTbodyRef = (categoryId: number, el: HTMLTableSectionElement | null) => {
+    if (el) {
+        itemTbodyByCategory.set(categoryId, el);
+        el.dataset.categoryId = String(categoryId);
+    } else {
+        itemTbodyByCategory.delete(categoryId);
+        const existing = itemSortables.get(categoryId);
+        existing?.destroy();
+        itemSortables.delete(categoryId);
+    }
+};
+
+const initCategorySortable = () => {
+    categorySortable?.destroy();
+    categorySortable = null;
+    const el = categoriesListRef.value;
+    if (!el || !canManage.value || categories.value.length < 2) {
+        return;
+    }
+    categorySortable = Sortable.create(el, {
+        animation: 150,
+        handle: '.budget-category-drag-handle',
+        draggable: '.budget-category-card',
+        onEnd(evt) {
+            const { oldIndex, newIndex } = evt;
+            if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) {
+                return;
+            }
+            const next = [...categories.value];
+            const [moved] = next.splice(oldIndex, 1);
+            next.splice(newIndex, 0, moved);
+            categories.value = next;
+            persistCategoryOrder();
+        },
+    });
+};
+
+const initItemSortables = () => {
+    destroyItemSortables();
+    if (!canManage.value) return;
+
+    for (const cat of categories.value) {
+        const tbody = itemTbodyByCategory.get(cat.id);
+        if (!tbody) continue;
+        const sortable = Sortable.create(tbody, {
+            animation: 150,
+            group: 'budget-items',
+            handle: '.budget-item-drag-handle',
+            draggable: '.budget-line-item',
+            filter: '.budget-line-fixed',
+            emptyInsertThreshold: 24,
+            onEnd(evt) {
+                const itemId = Number((evt.item as HTMLElement).dataset.itemId);
+                const fromId = Number((evt.from as HTMLElement).dataset.categoryId);
+                const toId = Number((evt.to as HTMLElement).dataset.categoryId);
+                if (!itemId || !fromId || !toId) {
+                    categories.value = cloneCategories(props.budget.categories ?? []);
+                    nextTick(() => initSortables());
+                    return;
+                }
+
+                const fromCat = categories.value.find((row) => row.id === fromId);
+                const toCat = categories.value.find((row) => row.id === toId);
+                if (!fromCat || !toCat) {
+                    categories.value = cloneCategories(props.budget.categories ?? []);
+                    nextTick(() => initSortables());
+                    return;
+                }
+
+                const oldIndex = evt.oldDraggableIndex ?? evt.oldIndex;
+                const newIndex = evt.newDraggableIndex ?? evt.newIndex;
+                if (oldIndex === undefined || newIndex === undefined) {
+                    return;
+                }
+
+                if (fromId === toId) {
+                    if (oldIndex === newIndex) return;
+                    const nextItems = [...fromCat.items];
+                    const [moved] = nextItems.splice(oldIndex, 1);
+                    if (!moved) return;
+                    nextItems.splice(newIndex, 0, moved);
+                    fromCat.items = nextItems;
+                    recomputeCategoryTotals(fromCat);
+                } else {
+                    const nextFrom = [...fromCat.items];
+                    const [moved] = nextFrom.splice(oldIndex, 1);
+                    if (!moved || moved.id !== itemId) {
+                        // Fall back to DOM sync if Sortable indexes drifted (filtered footer rows).
+                        applyItemOrderFromDom([fromId, toId]);
+                    } else {
+                        const nextTo = [...toCat.items];
+                        nextTo.splice(newIndex, 0, moved);
+                        fromCat.items = nextFrom;
+                        toCat.items = nextTo;
+                        recomputeCategoryTotals(fromCat);
+                        recomputeCategoryTotals(toCat);
+                    }
+                }
+
+                persistItemGroups([fromId, toId]);
+                nextTick(() => initItemSortables());
+            },
+        });
+        itemSortables.set(cat.id, sortable);
+    }
+};
+
+const initSortables = () => {
+    initCategorySortable();
+    initItemSortables();
+};
+
+onMounted(() => {
+    nextTick(() => initSortables());
+});
+
+watch(canManage, () => {
+    nextTick(() => initSortables());
+});
+
+onBeforeUnmount(() => {
+    categorySortable?.destroy();
+    categorySortable = null;
+    destroyItemSortables();
+});
 </script>
 
 <template>
@@ -303,6 +562,7 @@ const budgetLineColumns = computed<TableColumn[]>(() => [
                     <template v-else>
                         Ongoing monthly plan. Tracked spend uses the current calendar month.
                     </template>
+                    <template v-if="canManage"> Drag categories or lines to reorder; drop a line onto another category to move it.</template>
                 </p>
             </div>
             <AppButton v-if="canManage" variant="primary" @click="openAddCategory">
@@ -312,7 +572,7 @@ const budgetLineColumns = computed<TableColumn[]>(() => [
         </div>
 
         <EmptyState
-            v-if="!(budget.categories ?? []).length"
+            v-if="!categories.length"
             class="mt-4"
             title="No categories yet"
             :description="
@@ -337,145 +597,178 @@ const budgetLineColumns = computed<TableColumn[]>(() => [
             </template>
         </EmptyState>
 
-        <div v-else class="mt-4 space-y-4">
-            <AppCard v-for="cat in budget.categories" :key="cat.id">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
-                    <div class="min-w-0">
-                        <h3 class="text-base font-semibold text-slate-900">{{ cat.name }}</h3>
-                        <p class="mt-0.5 text-sm text-slate-500">
-                            Planned {{ formatCents(cat.period_planned_cents, budget.currency) }}
-                            <span v-if="cat.account_name"> · Tracking {{ cat.account_name }}</span>
-                            <span v-else> · Not tracking spend</span>
-                        </p>
-                    </div>
-                    <div v-if="canManage" class="flex items-center gap-2">
-                        <AppButton size="sm" variant="secondary" @click="openAddItem(cat)">
-                            Add line
-                        </AppButton>
-                        <InvoiceRowActionsMenu
-                            :actions="categoryActions"
-                            :aria-label="`Actions for ${cat.name}`"
-                            @select="onCategoryAction(cat, $event)"
-                        />
-                    </div>
-                </div>
-
-                <AppTable
-                    class="mt-3"
-                    embedded
-                    dense
-                    table-class="text-sm table-fixed"
-                    :columns="budgetLineColumns"
-                    :page="1"
-                    :last-page="1"
-                    :show-pagination="false"
-                >
-                    <tr v-if="!(cat.items ?? []).length">
-                        <td colspan="7" class="px-3 py-4 text-sm text-slate-500">
-                            No planned expenses yet.
-                            <button
+        <div v-else ref="categoriesListRef" class="mt-4 space-y-4">
+            <div
+                v-for="cat in categories"
+                :key="cat.id"
+                class="budget-category-card"
+                :data-category-id="cat.id"
+            >
+                <AppCard>
+                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                        <div class="flex min-w-0 items-start gap-2">
+                            <span
                                 v-if="canManage"
-                                type="button"
-                                class="ml-1 font-medium text-brand-700 hover:underline"
-                                @click="openAddItem(cat)"
+                                class="budget-category-drag-handle mt-0.5 inline-flex h-8 w-6 shrink-0 cursor-grab touch-manipulation items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                role="button"
+                                tabindex="0"
+                                :aria-label="`Drag to reorder ${cat.name}`"
                             >
-                                Add a line
-                            </button>
-                        </td>
-                    </tr>
-                    <tr
-                        v-for="item in cat.items"
-                        :key="item.id"
-                        class="align-middle"
-                    >
-                        <td class="min-w-0 px-3 py-2 text-slate-900">
-                            <div class="truncate" :title="item.label">{{ item.label }}</div>
-                            <p v-if="item.notes" class="mt-0.5 truncate text-xs font-normal text-slate-500" :title="item.notes">
-                                {{ item.notes }}
-                            </p>
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-2">
-                            <AppBadge
-                                :variant="
-                                    item.cadence === 'once_per_period'
-                                        ? 'warning'
-                                        : item.cadence === 'annually'
-                                          ? 'info'
-                                          : 'neutral'
-                                "
-                            >
-                                {{
-                                    item.cadence === 'once_per_period'
-                                        ? 'Once'
-                                        : item.cadence === 'annually'
-                                          ? 'Annually'
-                                          : 'Monthly'
-                                }}
-                            </AppBadge>
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{{ item.currency }}</td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {{ formatCents(item.monthly_amount_cents, item.currency) }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {{ formatCents(item.monthly_budget_currency_cents, budget.currency) }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {{ formatCents(item.period_total_budget_cents, budget.currency) }}
-                        </td>
-                        <td class="px-3 py-2 text-right" @click.stop>
+                                <GripVertical class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <h3 class="text-base font-semibold text-slate-900">{{ cat.name }}</h3>
+                                <p class="mt-0.5 text-sm text-slate-500">
+                                    Planned {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                                    <span v-if="cat.account_name"> · Tracking {{ cat.account_name }}</span>
+                                    <span v-else> · Not tracking spend</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div v-if="canManage" class="flex items-center gap-2">
+                            <AppButton size="sm" variant="secondary" @click="openAddItem(cat)">
+                                Add line
+                            </AppButton>
                             <InvoiceRowActionsMenu
-                                v-if="canManage"
-                                :actions="itemActions"
-                                :aria-label="`Actions for ${item.label}`"
-                                @select="onItemAction(cat, item, $event)"
+                                :actions="categoryActions"
+                                :aria-label="`Actions for ${cat.name}`"
+                                @select="onCategoryAction(cat, $event)"
                             />
-                        </td>
-                    </tr>
-                    <tr class="border-t border-slate-200 bg-slate-50/80 font-medium text-slate-900">
-                        <td class="px-3 py-2" colspan="4">Category total</td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {{ formatCents(cat.monthly_planned_cents, budget.currency) }}
-                        </td>
-                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {{ formatCents(cat.period_planned_cents, budget.currency) }}
-                        </td>
-                        <td class="px-3 py-2" />
-                    </tr>
-                </AppTable>
+                        </div>
+                    </div>
 
-                <div
-                    v-if="cat.has_account"
-                    class="mt-3 space-y-2"
-                >
-                    <div class="flex flex-wrap gap-4 text-sm text-slate-600">
-                        <span>
-                            Spent vs plan:
-                            <span class="font-medium tabular-nums text-slate-900">
-                                {{ formatCents(cat.spent_cents, budget.currency) }}
-                            </span>
-                            /
-                            <span class="font-medium tabular-nums text-slate-900">
+                    <AppTable
+                        class="mt-3"
+                        embedded
+                        dense
+                        table-class="text-sm table-fixed"
+                        :columns="budgetLineColumns"
+                        :page="1"
+                        :last-page="1"
+                        :show-pagination="false"
+                        :tbody-ref-fn="(el) => setItemTbodyRef(cat.id, el)"
+                    >
+                        <tr v-if="!(cat.items ?? []).length" class="budget-line-fixed">
+                            <td :colspan="lineColspan" class="px-3 py-4 text-sm text-slate-500">
+                                No planned expenses yet.
+                                <button
+                                    v-if="canManage"
+                                    type="button"
+                                    class="ml-1 font-medium text-brand-700 hover:underline"
+                                    @click="openAddItem(cat)"
+                                >
+                                    Add a line
+                                </button>
+                                <span v-if="canManage" class="mt-1 block text-xs text-slate-400">
+                                    Or drag a line here from another category.
+                                </span>
+                            </td>
+                        </tr>
+                        <tr
+                            v-for="item in cat.items"
+                            :key="item.id"
+                            class="budget-line-item align-middle"
+                            :data-item-id="item.id"
+                        >
+                            <td v-if="canManage" class="px-1 py-2 align-middle">
+                                <span
+                                    class="budget-item-drag-handle inline-flex h-8 w-6 cursor-grab touch-manipulation items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing"
+                                    role="button"
+                                    tabindex="0"
+                                    :aria-label="`Drag to reorder ${item.label}`"
+                                >
+                                    <GripVertical class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                </span>
+                            </td>
+                            <td class="min-w-0 px-3 py-2 text-slate-900">
+                                <div class="truncate" :title="item.label">{{ item.label }}</div>
+                                <p v-if="item.notes" class="mt-0.5 truncate text-xs font-normal text-slate-500" :title="item.notes">
+                                    {{ item.notes }}
+                                </p>
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-2">
+                                <AppBadge
+                                    :variant="
+                                        item.cadence === 'once_per_period'
+                                            ? 'warning'
+                                            : item.cadence === 'annually'
+                                              ? 'info'
+                                              : 'neutral'
+                                    "
+                                >
+                                    {{
+                                        item.cadence === 'once_per_period'
+                                            ? 'Once'
+                                            : item.cadence === 'annually'
+                                              ? 'Annually'
+                                              : 'Monthly'
+                                    }}
+                                </AppBadge>
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">{{ item.currency }}</td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                {{ formatCents(item.monthly_amount_cents, item.currency) }}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                {{ formatCents(item.monthly_budget_currency_cents, budget.currency) }}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                {{ formatCents(item.period_total_budget_cents, budget.currency) }}
+                            </td>
+                            <td class="px-3 py-2 text-right" @click.stop>
+                                <InvoiceRowActionsMenu
+                                    v-if="canManage"
+                                    :actions="itemActions"
+                                    :aria-label="`Actions for ${item.label}`"
+                                    @select="onItemAction(cat, item, $event)"
+                                />
+                            </td>
+                        </tr>
+                        <tr class="budget-line-fixed border-t border-slate-200 bg-slate-50/80 font-medium text-slate-900">
+                            <td class="px-3 py-2" :colspan="canManage ? 5 : 4">Category total</td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                {{ formatCents(cat.monthly_planned_cents, budget.currency) }}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                                 {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                            </td>
+                            <td class="px-3 py-2" />
+                        </tr>
+                    </AppTable>
+
+                    <div
+                        v-if="cat.has_account"
+                        class="mt-3 space-y-2"
+                    >
+                        <div class="flex flex-wrap gap-4 text-sm text-slate-600">
+                            <span>
+                                Spent vs plan:
+                                <span class="font-medium tabular-nums text-slate-900">
+                                    {{ formatCents(cat.spent_cents, budget.currency) }}
+                                </span>
+                                /
+                                <span class="font-medium tabular-nums text-slate-900">
+                                    {{ formatCents(cat.period_planned_cents, budget.currency) }}
+                                </span>
                             </span>
-                        </span>
-                        <span>
-                            Remaining:
-                            <span class="font-medium tabular-nums text-slate-900">
-                                {{ formatCents(cat.remaining_cents, budget.currency) }}
+                            <span>
+                                Remaining:
+                                <span class="font-medium tabular-nums text-slate-900">
+                                    {{ formatCents(cat.remaining_cents, budget.currency) }}
+                                </span>
                             </span>
-                        </span>
-                        <span class="tabular-nums">{{ cat.percentage }}%</span>
+                            <span class="tabular-nums">{{ cat.percentage }}%</span>
+                        </div>
+                        <div class="h-2 w-full rounded-full bg-slate-100">
+                            <div
+                                :class="progressColor(cat.percentage)"
+                                class="h-2 rounded-full"
+                                :style="{ width: `${Math.min(100, cat.percentage)}%` }"
+                            />
+                        </div>
                     </div>
-                    <div class="h-2 w-full rounded-full bg-slate-100">
-                        <div
-                            :class="progressColor(cat.percentage)"
-                            class="h-2 rounded-full"
-                            :style="{ width: `${Math.min(100, cat.percentage)}%` }"
-                        />
-                    </div>
-                </div>
-            </AppCard>
+                </AppCard>
+            </div>
         </div>
 
         <BudgetCategoryModal
