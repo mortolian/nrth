@@ -613,7 +613,7 @@ onBeforeUnmount(() => {
                 :data-category-id="cat.id"
             >
                 <AppCard class="overflow-hidden p-0">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-300 bg-slate-100 px-4 py-3 sm:px-5">
                         <div class="flex min-w-0 items-center gap-2">
                             <span
                                 v-if="canManage"
