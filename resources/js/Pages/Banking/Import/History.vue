@@ -123,8 +123,8 @@ const reimportStatement = (row: ImportRow) => {
             </template>
         </PageHeader>
 
-        <AppCard class="mt-5">
-            <form class="mb-4 max-w-sm" @submit.prevent="applyFilters()">
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <form class="border-b border-slate-100 px-5 py-4" @submit.prevent="applyFilters()">
                 <label class="mb-1 block text-xs font-medium text-slate-500">Account</label>
                 <AppSelect
                     :model-value="filters.account_id"
@@ -141,6 +141,8 @@ const reimportStatement = (row: ImportRow) => {
 
             <AppTable
                 v-if="imports.data.length"
+                embedded
+                dense
                 table-class="text-sm"
                 :show-pagination="false"
                 :columns="[
@@ -196,21 +198,22 @@ const reimportStatement = (row: ImportRow) => {
                 </tr>
             </AppTable>
 
-            <EmptyState
-                v-else
-                title="No imports yet"
-                description="Imported bank statements will appear here. Undo keeps the file so you can re-import later."
-            >
-                <template #action>
-                    <AppButton variant="primary" @click="router.visit(route('banking.import.create'))">
-                        Import statement
-                    </AppButton>
-                </template>
-            </EmptyState>
+            <div v-else class="px-5 py-8">
+                <EmptyState
+                    title="No imports yet"
+                    description="Imported bank statements will appear here. Undo keeps the file so you can re-import later."
+                >
+                    <template #action>
+                        <AppButton variant="primary" @click="router.visit(route('banking.import.create'))">
+                            Import statement
+                        </AppButton>
+                    </template>
+                </EmptyState>
+            </div>
 
             <div
                 v-if="imports.last_page > 1"
-                class="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"
+                class="flex items-center justify-between border-t border-slate-100 px-5 py-4"
             >
                 <p class="text-sm text-slate-500">
                     Page {{ imports.current_page }} of {{ imports.last_page }} · {{ imports.total }} total

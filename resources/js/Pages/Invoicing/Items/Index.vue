@@ -120,7 +120,6 @@ const hasRows = computed(() => props.items.data.length > 0);
         section="items"
         :tabs="moneyInTabs"
         document-title="Items"
-        subtitle="Reusable products and services for invoice and estimate lines"
     >
         <template #actions>
             <AppButton

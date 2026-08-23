@@ -561,6 +561,9 @@ const deleteCustomRole = (summary: RoleSummary) => {
                         </p>
                         <div class="mt-4 overflow-hidden rounded-lg border border-slate-200/90 bg-white">
                             <AppTable
+                                embedded
+                                dense
+                                table-class="text-sm"
                                 :columns="[
                                     { key: 'member', label: 'Member' },
                                     { key: 'role', label: 'Role' },

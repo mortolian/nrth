@@ -282,9 +282,9 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
             </div>
         </AppCard>
 
-        <AppCard class="mt-5">
-            <div class="mb-3 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-slate-900">Expense list</h3>
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <div class="flex items-center justify-between gap-3 border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                <h3 class="text-base font-semibold text-slate-900">Expense list</h3>
                 <div class="flex gap-2">
                     <AppButton
                         variant="secondary"
@@ -298,6 +298,8 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
             </div>
 
             <AppTable
+                embedded
+                dense
                 table-class="text-sm"
                 :columns="[
                     { key: 'select', label: '', widthClass: 'w-10' },

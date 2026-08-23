@@ -95,7 +95,6 @@ const hasRows = computed(() => props.clients.data.length > 0);
         section="clients"
         :tabs="moneyInTabs"
         document-title="Clients"
-        subtitle="People and companies you invoice"
     >
         <template #actions>
             <AppButton

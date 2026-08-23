@@ -152,7 +152,7 @@ const columns: TableColumn[] = [
             </form>
         </AppCard>
 
-        <AppCard class="mt-6">
+        <AppCard class="mt-6 overflow-hidden p-0">
             <AppTable v-if="allowances.length" :columns="columns" :show-pagination="false" dense table-class="text-sm" embedded>
                 <tr v-for="row in allowances" :key="row.id">
                     <td class="whitespace-nowrap px-3 py-2 font-medium">{{ row.label }}</td>
@@ -174,7 +174,7 @@ const columns: TableColumn[] = [
                     </td>
                 </tr>
             </AppTable>
-            <p v-else class="text-sm text-slate-500">No contribution allowances yet.</p>
+            <p v-else class="px-5 py-6 text-sm text-slate-500">No contribution allowances yet.</p>
         </AppCard>
     </AppLayout>
 </template>

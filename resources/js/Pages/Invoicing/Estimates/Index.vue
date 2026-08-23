@@ -157,8 +157,11 @@ const onAction = (estimate: EstimateRow, actionId: string) => {
                 </div>
             </AppCard>
 
-            <AppCard>
+            <AppCard class="overflow-hidden p-0">
                 <AppTable
+                    embedded
+                    dense
+                    table-class="text-sm"
                     :columns="[
                         { key: 'number', label: 'Estimate' },
                         { key: 'client', label: 'Client' },

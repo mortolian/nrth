@@ -222,14 +222,16 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
             </AppCard>
         </div>
 
-        <AppCard class="mt-5">
-            <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h3 class="text-lg font-semibold text-slate-900">Expenses</h3>
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <div class="flex flex-col gap-2 border-b border-canvas-200 bg-canvas-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <h3 class="text-base font-semibold text-slate-900">Expenses</h3>
                 <Link :href="route('expenses.index', { supplier: supplier.name })" class="text-sm font-medium text-brand-600 hover:underline">
                     View in expense list
                 </Link>
             </div>
             <AppTable
+                embedded
+                dense
                 table-class="text-sm"
                 :columns="[
                     { key: 'date', label: 'Date' },

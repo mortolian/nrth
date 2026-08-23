@@ -106,8 +106,11 @@ const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
             </AppCard>
         </div>
 
-        <AppCard v-else class="mt-5">
+        <AppCard v-else class="mt-5 overflow-hidden p-0">
             <AppTable
+                embedded
+                dense
+                table-class="text-sm"
                 :columns="[
                     { key: 'name', label: 'Name' },
                     { key: 'email', label: 'Email' },

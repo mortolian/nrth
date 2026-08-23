@@ -19,14 +19,17 @@ defineProps<{
 
 <template>
     <InstanceSettingsShell section="teams">
-        <AppCard>
-            <h3 class="text-base font-semibold text-slate-900">All businesses</h3>
-            <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                Instance operators can open any business to manage members, roles, and invitations — even if you are not a member yourself.
-            </p>
+        <AppCard class="overflow-hidden p-0">
+            <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                <h3 class="text-base font-semibold text-slate-900">All businesses</h3>
+                <p class="mt-0.5 text-sm text-slate-500">
+                    Instance operators can open any business to manage members, roles, and invitations — even if you are not a member yourself.
+                </p>
+            </div>
 
             <AppTable
-                class="mt-4"
+                embedded
+                dense
                 table-class="text-sm"
                 :columns="[
                     { key: 'id', label: 'Business ID', widthClass: 'whitespace-nowrap tabular-nums' },

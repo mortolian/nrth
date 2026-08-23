@@ -128,8 +128,8 @@ const undoImport = (row: ImportRow) => {
             </AppButton>
         </template>
 
-        <AppCard>
-            <form class="mb-4" @submit.prevent="applyFilters()">
+        <AppCard class="overflow-hidden p-0">
+            <form class="border-b border-slate-100 px-5 py-4" @submit.prevent="applyFilters()">
                 <label class="mb-1 block text-xs font-medium text-slate-500">Vehicle</label>
                 <AppSelect
                     :model-value="filters.vehicle_id"
@@ -147,6 +147,7 @@ const undoImport = (row: ImportRow) => {
             <AppTable
                 v-if="imports.data.length"
                 embedded
+                dense
                 table-class="text-sm"
                 :show-pagination="false"
                 :columns="[
@@ -183,21 +184,22 @@ const undoImport = (row: ImportRow) => {
                 </tr>
             </AppTable>
 
-            <EmptyState
-                v-else
-                title="No imports yet"
-                description="Confirmed Smart AI imports appear here so you can undo a whole batch if needed."
-            >
-                <template v-if="aiEnabled" #action>
-                    <AppButton variant="primary" @click="router.visit(route('vehicles.trips.import.create'))">
-                        Smart AI import
-                    </AppButton>
-                </template>
-            </EmptyState>
+            <div v-else class="px-5 py-8">
+                <EmptyState
+                    title="No imports yet"
+                    description="Confirmed Smart AI imports appear here so you can undo a whole batch if needed."
+                >
+                    <template v-if="aiEnabled" #action>
+                        <AppButton variant="primary" @click="router.visit(route('vehicles.trips.import.create'))">
+                            Smart AI import
+                        </AppButton>
+                    </template>
+                </EmptyState>
+            </div>
 
             <div
                 v-if="imports.last_page > 1"
-                class="mt-4 flex items-center justify-between border-t border-slate-100 pt-4"
+                class="flex items-center justify-between border-t border-slate-100 px-5 py-4"
             >
                 <p class="text-sm text-slate-500">
                     Page {{ imports.current_page }} of {{ imports.last_page }} · {{ imports.total }} total

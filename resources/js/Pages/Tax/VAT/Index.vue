@@ -132,9 +132,14 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
             </AppCard>
         </div>
 
-        <AppCard class="mt-5">
-            <h3 class="mb-3 text-lg font-semibold text-slate-900">Supporting Transactions</h3>
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                <h3 class="text-base font-semibold text-slate-900">Supporting Transactions</h3>
+            </div>
             <AppTable
+                embedded
+                dense
+                table-class="text-sm"
                 :columns="[
                     { key: 'date', label: 'Date' },
                     { key: 'reference', label: 'Reference' },
@@ -174,9 +179,14 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
             </AppTable>
         </AppCard>
 
-        <AppCard class="mt-5">
-            <h3 class="mb-3 text-lg font-semibold text-slate-900">Past Periods</h3>
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                <h3 class="text-base font-semibold text-slate-900">Past Periods</h3>
+            </div>
             <AppTable
+                embedded
+                dense
+                table-class="text-sm"
                 :columns="[
                     { key: 'period', label: 'Period' },
                     { key: 'status', label: 'Status' },

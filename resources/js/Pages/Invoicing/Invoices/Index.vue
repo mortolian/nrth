@@ -521,10 +521,10 @@ const exportSelectedPdfZip = async () => {
                 </div>
             </AppCard>
 
-            <AppCard>
-                <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <AppCard class="overflow-hidden p-0">
+                <div class="flex flex-col gap-3 border-b border-canvas-200 bg-canvas-100 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex min-w-0 items-baseline gap-2">
-                        <h3 class="text-lg font-semibold text-slate-900">Invoice list</h3>
+                        <h3 class="text-base font-semibold text-slate-900">Invoice list</h3>
                         <p
                             class="text-sm text-slate-500 tabular-nums"
                             :class="hasSelection ? 'visible' : 'invisible'"
@@ -563,7 +563,7 @@ const exportSelectedPdfZip = async () => {
                     </div>
                 </div>
 
-                <div class="mb-4 space-y-3 md:hidden">
+                <div class="mb-0 space-y-3 px-5 py-4 md:hidden">
                     <div
                         v-if="invoices.data.length"
                         class="flex items-center gap-2 px-1"
@@ -634,7 +634,9 @@ const exportSelectedPdfZip = async () => {
 
                 <div class="hidden md:block">
                     <AppTable
-                    table-class="min-w-[920px]"
+                    embedded
+                    dense
+                    table-class="min-w-[920px] text-sm"
                     :columns="[
                         { key: 'select', label: '', widthClass: 'w-10 shrink-0' },
                         { key: 'number', label: 'Invoice #', sortable: true, widthClass: 'whitespace-nowrap' },

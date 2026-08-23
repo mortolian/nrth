@@ -351,63 +351,75 @@ const onInvoiceAction = (invoice, actionId) => {
             </div>
 
             <div class="grid gap-6 xl:grid-cols-3">
-                <AppCard class="xl:col-span-2">
-                    <div class="mb-3 sm:mb-4">
-                        <h3 class="text-base font-semibold text-slate-900 sm:text-lg">Revenue vs Expenses</h3>
-                        <p v-if="chartSubtitle" class="mt-1 text-sm text-slate-500">{{ chartSubtitle }}</p>
+                <AppCard class="overflow-hidden p-0 xl:col-span-2">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">Revenue vs Expenses</h3>
+                        <p v-if="chartSubtitle" class="mt-0.5 text-sm text-slate-500">{{ chartSubtitle }}</p>
                     </div>
-                    <div
-                        v-if="isChartLoading"
-                        class="flex h-56 items-center justify-center rounded-md border-2 border-dashed border-slate-200 bg-slate-50 px-4 text-center md:h-80"
-                    >
-                        <div class="space-y-2">
-                            <p class="text-sm font-medium text-slate-700">No chart data yet</p>
-                            <p class="text-xs text-slate-500">
-                                Revenue vs Expenses will appear once there are posted transactions for this period.
-                            </p>
+                    <div class="px-5 py-4">
+                        <div
+                            v-if="isChartLoading"
+                            class="flex h-56 items-center justify-center rounded-md bg-slate-50 px-4 text-center md:h-80"
+                        >
+                            <div class="space-y-2">
+                                <p class="text-sm font-medium text-slate-700">No chart data yet</p>
+                                <p class="text-xs text-slate-500">
+                                    Revenue vs Expenses will appear once there are posted transactions for this period.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                    <div v-else class="h-56 w-full md:h-80">
-                        <VChart class="h-full w-full" :option="chartOptions" autoresize />
+                        <div v-else class="h-56 w-full md:h-80">
+                            <VChart class="h-full w-full" :option="chartOptions" autoresize />
+                        </div>
                     </div>
                 </AppCard>
 
-                <AppCard v-if="props.vat_enabled">
-                    <h3 class="mb-4 text-lg font-semibold text-slate-900">VAT Summary</h3>
-                    <div v-if="isLoading" class="space-y-3">
-                        <div v-for="n in 5" :key="`vat-skeleton-${n}`" class="h-4 animate-pulse rounded bg-slate-100" />
+                <AppCard v-if="props.vat_enabled" class="overflow-hidden p-0">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">VAT Summary</h3>
                     </div>
-                    <div v-else class="space-y-3 text-sm">
-                        <p class="text-slate-500">Current period: <span class="font-medium text-slate-700">{{ vat_summary.current_period }}</span></p>
-                        <div class="flex items-center justify-between"><span>Output VAT</span><span class="font-semibold">{{ formatCents(vat_summary.output_vat) }}</span></div>
-                        <div class="flex items-center justify-between"><span>Input VAT</span><span class="font-semibold">{{ formatCents(vat_summary.input_vat) }}</span></div>
-                        <div class="flex items-center justify-between border-t border-slate-200 pt-2"><span class="font-medium">Net VAT</span><span class="font-semibold">{{ formatCents(vat_summary.net_vat) }}</span></div>
-                        <div class="text-xs text-slate-500">Due date: <DateDisplay :value="vat_summary.due_date" /></div>
+                    <div class="px-5 py-4">
+                        <div v-if="isLoading" class="space-y-3">
+                            <div v-for="n in 5" :key="`vat-skeleton-${n}`" class="h-4 animate-pulse rounded bg-slate-100" />
+                        </div>
+                        <div v-else class="space-y-3 text-sm">
+                            <p class="text-slate-500">Current period: <span class="font-medium text-slate-700">{{ vat_summary.current_period }}</span></p>
+                            <div class="flex items-center justify-between"><span>Output VAT</span><span class="font-semibold">{{ formatCents(vat_summary.output_vat) }}</span></div>
+                            <div class="flex items-center justify-between"><span>Input VAT</span><span class="font-semibold">{{ formatCents(vat_summary.input_vat) }}</span></div>
+                            <div class="flex items-center justify-between border-t border-slate-200 pt-2"><span class="font-medium">Net VAT</span><span class="font-semibold">{{ formatCents(vat_summary.net_vat) }}</span></div>
+                            <div class="text-xs text-slate-500">Due date: <DateDisplay :value="vat_summary.due_date" /></div>
+                        </div>
                     </div>
                 </AppCard>
-                <AppCard v-else>
-                    <h3 class="mb-2 text-lg font-semibold text-slate-900">VAT is disabled</h3>
-                    <p class="text-sm text-slate-600">
-                        VAT cards and reports are hidden until VAT is enabled in business settings.
-                    </p>
-                    <a
-                        v-if="canManageBusinessSettings"
-                        :href="route('settings.business', { tab: 'tax' })"
-                        class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
-                    >
-                        Enable VAT in Business settings
-                    </a>
+                <AppCard v-else class="overflow-hidden p-0">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">VAT is disabled</h3>
+                    </div>
+                    <div class="px-5 py-4">
+                        <p class="text-sm text-slate-600">
+                            VAT cards and reports are hidden until VAT is enabled in business settings.
+                        </p>
+                        <a
+                            v-if="canManageBusinessSettings"
+                            :href="route('settings.business', { tab: 'tax' })"
+                            class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline"
+                        >
+                            Enable VAT in Business settings
+                        </a>
+                    </div>
                 </AppCard>
             </div>
 
             <div class="grid gap-6 xl:grid-cols-3">
-                <AppCard id="outstanding-invoices" class="xl:col-span-2">
-                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Outstanding Invoices</h3>
-                    <div class="space-y-3 md:hidden">
+                <AppCard id="outstanding-invoices" class="overflow-hidden p-0 xl:col-span-2">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">Outstanding Invoices</h3>
+                    </div>
+                    <div class="divide-y divide-slate-100 md:hidden">
                         <div
                             v-for="invoice in outstanding_invoices.data ?? []"
                             :key="`mo-${invoice.id}`"
-                            class="rounded-xl border border-slate-200 bg-slate-50/80 p-4"
+                            class="px-5 py-4"
                         >
                             <div class="flex items-start justify-between gap-2">
                                 <div class="min-w-0">
@@ -422,7 +434,7 @@ const onInvoiceAction = (invoice, actionId) => {
                                 </AppBadge>
                             </div>
                             <div class="mt-2 flex items-center justify-between text-sm">
-                                <span class="text-slate-500 whitespace-nowrap">Due <DateDisplay :value="invoice.due_date" /></span>
+                                <span class="whitespace-nowrap text-slate-500">Due <DateDisplay :value="invoice.due_date" /></span>
                                 <span class="font-semibold">{{ formatRowCents(invoice.amount, invoice.currency) }}</span>
                             </div>
                             <div class="mt-3 flex justify-end">
@@ -433,10 +445,15 @@ const onInvoiceAction = (invoice, actionId) => {
                                 />
                             </div>
                         </div>
-                        <p v-if="!isLoading && !(outstanding_invoices.data ?? []).length" class="text-sm text-slate-500">No outstanding invoices.</p>
+                        <p v-if="!isLoading && !(outstanding_invoices.data ?? []).length" class="px-5 py-4 text-sm text-slate-500">
+                            No outstanding invoices.
+                        </p>
                     </div>
                     <AppTable
                         class="hidden md:block"
+                        embedded
+                        dense
+                        table-class="min-w-[820px] text-sm"
                         :columns="[
                             { key: 'client', label: 'Client' },
                             { key: 'number', label: 'Invoice #' },
@@ -445,7 +462,6 @@ const onInvoiceAction = (invoice, actionId) => {
                             { key: 'days_overdue', label: 'Days Overdue' },
                             { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
                         ]"
-                        table-class="min-w-[820px]"
                         :page="outstanding_invoices.current_page ?? 1"
                         :last-page="outstanding_invoices.last_page ?? 1"
                         :loading="isLoading"
@@ -458,10 +474,10 @@ const onInvoiceAction = (invoice, actionId) => {
                                 daysOverdueInt(invoice.days_overdue) > 0 ? 'border-l-2 border-l-rose-300' : '',
                             ]"
                         >
-                            <td class="px-4 py-3 whitespace-nowrap">{{ invoice.client }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap font-medium">{{ invoice.number }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap">{{ formatRowCents(invoice.amount, invoice.currency) }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap"><DateDisplay :value="invoice.due_date" /></td>
+                            <td class="whitespace-nowrap px-4 py-3">{{ invoice.client }}</td>
+                            <td class="whitespace-nowrap px-4 py-3 font-medium">{{ invoice.number }}</td>
+                            <td class="whitespace-nowrap px-4 py-3">{{ formatRowCents(invoice.amount, invoice.currency) }}</td>
+                            <td class="whitespace-nowrap px-4 py-3"><DateDisplay :value="invoice.due_date" /></td>
                             <td class="px-4 py-3">
                                 <AppBadge
                                     class="whitespace-nowrap capitalize"
@@ -486,39 +502,48 @@ const onInvoiceAction = (invoice, actionId) => {
                     </AppTable>
                 </AppCard>
 
-                <AppCard>
-                    <h3 class="mb-4 text-lg font-semibold text-slate-900">Budget vs plan (this month)</h3>
-                    <div v-if="isLoading" class="space-y-3">
-                        <div v-for="n in 4" :key="`budget-skeleton-${n}`" class="h-8 animate-pulse rounded bg-slate-100" />
+                <AppCard class="overflow-hidden p-0">
+                    <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                        <h3 class="text-base font-semibold text-slate-900">Budget vs plan (this month)</h3>
                     </div>
-                    <div v-else class="space-y-4">
-                        <div v-for="item in budget_progress" :key="item.category">
-                            <div class="mb-1 flex items-center justify-between text-sm">
-                                <span class="font-medium text-slate-700">{{ item.category }}</span>
-                                <span class="text-slate-500">
-                                    {{ formatBudgetCents(item.spent) }} / {{ formatBudgetCents(item.planned) }}
-                                </span>
-                            </div>
-                            <div class="h-2 rounded-full bg-slate-100">
-                                <div
-                                    :class="[
-                                        'h-2 rounded-full',
-                                        item.percentage < 75 ? 'bg-brand-500' : item.percentage <= 90 ? 'bg-amber-500' : 'bg-rose-500',
-                                    ]"
-                                    :style="{ width: `${Math.min(item.percentage, 100)}%` }"
-                                />
-                            </div>
+                    <div class="px-5 py-4">
+                        <div v-if="isLoading" class="space-y-3">
+                            <div v-for="n in 4" :key="`budget-skeleton-${n}`" class="h-8 animate-pulse rounded bg-slate-100" />
                         </div>
-                        <p v-if="!budget_progress.length" class="text-sm text-slate-500">
-                            No tracked categories for this month. Link expense accounts on an active budget under Planning → Budgets to see progress against plan.
-                        </p>
+                        <div v-else class="space-y-4">
+                            <div v-for="item in budget_progress" :key="item.category">
+                                <div class="mb-1 flex items-center justify-between text-sm">
+                                    <span class="font-medium text-slate-700">{{ item.category }}</span>
+                                    <span class="text-slate-500">
+                                        {{ formatBudgetCents(item.spent) }} / {{ formatBudgetCents(item.planned) }}
+                                    </span>
+                                </div>
+                                <div class="h-2 rounded-full bg-slate-100">
+                                    <div
+                                        :class="[
+                                            'h-2 rounded-full',
+                                            item.percentage < 75 ? 'bg-brand-500' : item.percentage <= 90 ? 'bg-amber-500' : 'bg-rose-500',
+                                        ]"
+                                        :style="{ width: `${Math.min(item.percentage, 100)}%` }"
+                                    />
+                                </div>
+                            </div>
+                            <p v-if="!budget_progress.length" class="text-sm text-slate-500">
+                                No tracked categories for this month. Link expense accounts on an active budget under Planning → Budgets to see progress against plan.
+                            </p>
+                        </div>
                     </div>
                 </AppCard>
             </div>
 
-            <AppCard>
-                <h3 class="mb-4 text-lg font-semibold text-slate-900">Recent Transactions</h3>
+            <AppCard class="overflow-hidden p-0">
+                <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
+                    <h3 class="text-base font-semibold text-slate-900">Recent Transactions</h3>
+                </div>
                 <AppTable
+                    embedded
+                    dense
+                    table-class="text-sm"
                     :columns="[
                         { key: 'date', label: 'Date', sortable: true },
                         { key: 'description', label: 'Description' },

@@ -199,10 +199,10 @@ const exportSelectedCsv = () => {
             </div>
         </AppCard>
 
-        <AppCard class="mt-5">
-            <div class="mb-3 flex items-center justify-between gap-3">
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <div class="flex items-center justify-between gap-3 border-b border-canvas-200 bg-canvas-100 px-5 py-3">
                 <div>
-                    <h3 class="text-lg font-semibold text-slate-900">Statement entries</h3>
+                    <h3 class="text-base font-semibold text-slate-900">Statement entries</h3>
                     <p class="mt-0.5 text-xs text-slate-500">Amounts are in your business currency ({{ bookCurrency }}).</p>
                 </div>
                 <AppButton
@@ -215,11 +215,13 @@ const exportSelectedCsv = () => {
                 </AppButton>
             </div>
 
-            <div class="mb-2 rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+            <div class="border-b border-slate-100 bg-slate-50 px-5 py-2 text-sm font-medium text-slate-700">
                 Opening balance: {{ formatCents(opening_balance) }}
             </div>
 
             <AppTable
+                embedded
+                dense
                 table-class="text-sm"
                 :columns="[
                     { key: 'select', label: '', widthClass: 'w-10' },
@@ -277,7 +279,7 @@ const exportSelectedCsv = () => {
                 </tr>
             </AppTable>
 
-            <div class="mt-3 rounded-md bg-slate-50 px-4 py-2 text-sm">
+            <div class="border-t border-slate-100 bg-slate-50 px-5 py-2 text-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="font-medium text-slate-700">Totals</p>
                     <p class="text-slate-600">Debits: <span class="font-semibold">{{ formatCents(totals.debits) }}</span></p>
@@ -285,7 +287,7 @@ const exportSelectedCsv = () => {
                 </div>
             </div>
 
-            <div class="mt-2 rounded-md bg-slate-200 px-4 py-2 text-sm font-bold text-slate-800">
+            <div class="border-t border-slate-200 bg-slate-100 px-5 py-2 text-sm font-bold text-slate-800">
                 Closing balance: {{ formatCents(closing_balance) }}
             </div>
         </AppCard>

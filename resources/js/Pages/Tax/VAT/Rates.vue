@@ -146,8 +146,8 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
             </div>
         </AppCard>
 
-        <AppCard class="mt-5">
-            <div class="overflow-x-auto rounded-md border border-slate-200">
+        <AppCard class="mt-5 overflow-hidden p-0">
+            <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-slate-200 text-sm">
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         <tr>
@@ -225,7 +225,7 @@ const removeVatRate = (rate: (typeof props.tax_rates)[number]) => {
                     </tbody>
                 </table>
             </div>
-            <p v-if="editingVatRateForm.hasErrors" class="mt-2 text-xs text-rose-600">
+            <p v-if="editingVatRateForm.hasErrors" class="border-t border-slate-100 px-5 py-2 text-xs text-rose-600">
                 Please fix the VAT rate form errors and try again.
             </p>
         </AppCard>

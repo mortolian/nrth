@@ -159,7 +159,6 @@ const hasRows = computed(() => props.recurring.data.length > 0);
         section="recurring"
         :tabs="moneyInTabs"
         document-title="Recurring"
-        subtitle="Scheduled invoice templates that generate on a cadence"
     >
         <template #actions>
             <AppButton

@@ -160,8 +160,10 @@ const confirmImport = () => {
             <p v-if="form.errors.keys" class="mt-2 text-xs text-red-600">{{ form.errors.keys }}</p>
         </AppCard>
 
-        <AppCard class="mt-5">
+        <AppCard class="mt-5 overflow-hidden p-0">
             <AppTable
+                embedded
+                dense
                 table-class="text-sm"
                 :columns="[
                     { key: 'include', label: '' },
@@ -220,7 +222,7 @@ const confirmImport = () => {
                 </tr>
             </AppTable>
 
-            <FormActions bordered class="mt-4">
+            <FormActions bordered class="mt-0 px-5 pb-5">
                 <AppButton
                     variant="primary"
                     :loading="form.processing"

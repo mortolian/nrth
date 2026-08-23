@@ -126,8 +126,11 @@ const formatCents = (cents, currency = 'ZAR') =>
             </template>
         </EmptyState>
 
-        <AppCard v-else class="mt-5">
+        <AppCard v-else class="mt-5 overflow-hidden p-0">
             <AppTable
+                embedded
+                dense
+                table-class="text-sm"
                 :columns="[
                     { key: 'name', label: 'Name' },
                     { key: 'period', label: 'Period' },
@@ -182,14 +185,18 @@ const formatCents = (cents, currency = 'ZAR') =>
             </AppTable>
         </AppCard>
 
-        <AppCard v-if="canManageBudgets && (trashed_budgets ?? []).length" class="mt-5 border-dashed border-slate-300 bg-slate-50/50">
-            <h3 class="text-lg font-semibold text-slate-900">Trash</h3>
-            <p class="mt-1 text-sm text-slate-500">
-                Budgets you moved to trash can be restored or permanently deleted. Permanent deletion removes all categories and
-                lines.
-            </p>
+        <AppCard v-if="canManageBudgets && (trashed_budgets ?? []).length" class="mt-5 overflow-hidden border-dashed border-slate-300 bg-slate-50/50 p-0">
+            <div class="border-b border-slate-200 px-5 py-4">
+                <h3 class="text-lg font-semibold text-slate-900">Trash</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    Budgets you moved to trash can be restored or permanently deleted. Permanent deletion removes all categories and
+                    lines.
+                </p>
+            </div>
             <AppTable
-                class="mt-4"
+                embedded
+                dense
+                table-class="text-sm"
                 :columns="[
                     { key: 'name', label: 'Name' },
                     { key: 'period', label: 'Period' },
