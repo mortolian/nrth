@@ -31,6 +31,7 @@ const props = defineProps<{
     canConfirm: boolean;
     canChangeMapping?: boolean;
     mappingFromProfile?: boolean;
+    batch?: { index: number; total: number } | null;
 }>();
 
 const pageTitle = computed(() => `Import preview — ${props.bankImport.original_filename}`);
@@ -61,6 +62,9 @@ const confirmImport = (importId: number) => {
         <PageHeader :title="pageTitle">
             <template #subtitle>
                 <p class="text-sm text-slate-500">{{ bankImport.account.name }} · {{ bankImport.account.currency }}</p>
+                <p v-if="batch" class="mt-1 text-sm text-slate-500">
+                    Statement {{ batch.index }} of {{ batch.total }}
+                </p>
                 <p v-if="mappingFromProfile" class="mt-1 text-sm text-slate-500">
                     Columns were mapped using this account’s saved CSV profile.
                 </p>
@@ -118,7 +122,12 @@ const confirmImport = (importId: number) => {
                 :loading="confirming"
                 @click="confirmImport(bankImport.id)"
             >
-                {{ confirming ? 'Importing…' : 'Confirm import' }}
+                {{ confirming
+                    ? 'Importing…'
+                    : batch && batch.index < batch.total
+                        ? 'Confirm and continue'
+                        : 'Confirm import'
+                }}
             </AppButton>
             <AppButton
                 v-if="canChangeMapping"

@@ -89,12 +89,7 @@ const statusVariant = (status: string) => {
     if (status === 'undone') {
         return 'warning';
     }
-    if (status === 'failed') {
-        return 'danger';
-    }
-    if (status === 'parsed') {
-        return 'info';
-    }
+
     return 'neutral';
 };
 
@@ -144,11 +139,8 @@ const deleteImport = (row: ImportRow) => {
     router.delete(route('banking.imports.destroy', row.id));
 };
 
-const rowActions = (row: ImportRow): RowActionItem[] => {
+const overflowActions = (row: ImportRow): RowActionItem[] => {
     const actions: RowActionItem[] = [];
-    if (row.can_undo) {
-        actions.push({ id: 'undo', label: 'Undo' });
-    }
     if (row.can_reimport) {
         actions.push({ id: 'reimport', label: 'Re-import' });
     }
@@ -159,10 +151,6 @@ const rowActions = (row: ImportRow): RowActionItem[] => {
 };
 
 const onRowAction = (row: ImportRow, actionId: string) => {
-    if (actionId === 'undo') {
-        undoImport(row);
-        return;
-    }
     if (actionId === 'reimport') {
         reimportStatement(row);
         return;
@@ -260,9 +248,22 @@ const onRowAction = (row: ImportRow, actionId: string) => {
                         </span>
                     </td>
                     <td class="px-3 py-2 text-right" @click.stop>
-                        <div v-if="rowActions(row).length" class="inline-flex justify-end">
+                        <div
+                            v-if="row.can_undo || overflowActions(row).length"
+                            class="inline-flex items-center justify-end gap-1"
+                        >
+                            <AppButton
+                                v-if="row.can_undo"
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                @click="undoImport(row)"
+                            >
+                                Undo
+                            </AppButton>
                             <InvoiceRowActionsMenu
-                                :actions="rowActions(row)"
+                                v-if="overflowActions(row).length"
+                                :actions="overflowActions(row)"
                                 :aria-label="`Actions for ${row.original_filename}`"
                                 @select="(actionId) => onRowAction(row, actionId)"
                             />

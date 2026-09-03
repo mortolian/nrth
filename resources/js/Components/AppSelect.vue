@@ -87,7 +87,12 @@ const triggerClass = computed(() =>
 </script>
 
 <template>
-    <SelectRoot v-model="selectModel" :disabled="props.disabled" @update:open="onOpenChange">
+    <SelectRoot
+        v-model="selectModel"
+        class="block w-full"
+        :disabled="props.disabled"
+        @update:open="onOpenChange"
+    >
         <SelectTrigger
             :class="[triggerClass, props.disabled ? 'cursor-not-allowed opacity-60' : '']"
         >
@@ -95,7 +100,7 @@ const triggerClass = computed(() =>
             <ChevronDown class="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
         </SelectTrigger>
         <SelectPortal :to="portalTo">
-            <SelectContent class="z-[200] max-h-72 min-w-[10rem] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+            <SelectContent class="z-[200] max-h-72 w-[var(--radix-select-trigger-width)] min-w-[10rem] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-sm">
                 <SelectViewport>
                     <SelectItem
                         v-for="option in normalizedOptions"

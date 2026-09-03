@@ -12,11 +12,16 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class BankingStatementImportController extends Controller
 {
+    private const QUEUE_SESSION_KEY = 'banking_import_queue';
+
+    private const MAX_BATCH_FILES = 12;
+
     public function __construct(
         private readonly BankingStatementImportService $importService,
         private readonly CsvBankStatementImporter $csvImporter,
@@ -35,7 +40,8 @@ class BankingStatementImportController extends Controller
     {
         $this->authorizeTeam('banking.manage', $request);
 
-        $validated = $request->validate([
+        $fileRules = $this->statementFileRules();
+        $request->validate([
             'account_id' => [
                 'required',
                 Rule::exists('banking_accounts', 'id')->where(
@@ -43,57 +49,61 @@ class BankingStatementImportController extends Controller
                     $request->user()->current_team_id
                 ),
             ],
-            'file' => [
-                'required',
-                'file',
-                'max:10240',
-                function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! $value instanceof UploadedFile) {
-                        return;
-                    }
-                    $ext = strtolower($value->getClientOriginalExtension());
-                    if (! in_array($ext, ['csv', 'txt', 'ofx'], true)) {
-                        $fail(__('Only CSV, TXT, and OFX files are allowed.'));
-                    }
-                },
-            ],
+            'file' => array_merge(['required_without:files'], $fileRules),
+            'files' => ['required_without:file', 'array', 'min:1', 'max:'.self::MAX_BATCH_FILES],
+            'files.*' => $fileRules,
         ]);
 
-        $account = BankingAccount::query()->findOrFail($validated['account_id']);
-        $import = $this->importService->storeUpload(
-            (int) $request->user()->current_team_id,
-            $account,
-            $validated['file']
-        );
-
-        $extension = strtolower((string) $import->file_type);
-        if (in_array($extension, ['csv', 'txt'], true)) {
-            $preview = $this->csvImporter->preview($this->importService->absolutePath($import));
-            $account->refresh();
-
-            if ($this->importService->profileMatches($account, $preview['headers'], $preview['delimiter'])) {
-                $profile = $account->csv_mapping_profile ?? [];
-                $parsed = $this->importService->parseImport($import, [
-                    'mapping' => $profile['mapping'] ?? [],
-                    'delimiter' => $preview['delimiter'],
-                    'headers' => $preview['headers'],
-                ]);
-
-                return redirect()->route('banking.import.preview', $import)
-                    ->with('summary', $this->importService->summarize($import, $parsed))
-                    ->with('mapping_from_profile', true);
-            }
-
-            return redirect()->route('banking.import.map', $import);
+        $files = $this->uploadedStatementFiles($request);
+        if ($files === []) {
+            return back()->withErrors([
+                'files' => __('Upload at least one CSV, TXT, or OFX file.'),
+            ]);
         }
 
-        $parsed = $this->importService->parseImport($import);
+        $account = BankingAccount::query()->findOrFail((int) $request->input('account_id'));
+        $teamId = (int) $request->user()->current_team_id;
+        $created = [];
+        $skipped = [];
 
-        return redirect()->route('banking.import.preview', $import)
-            ->with('summary', $this->importService->summarize($import, $parsed));
+        foreach ($files as $index => $file) {
+            try {
+                $created[] = $this->ingestUploadedFile($teamId, $account, $file);
+            } catch (ValidationException $e) {
+                $message = collect($e->errors())->flatten()->filter()->first();
+                $label = $file->getClientOriginalName();
+                $skipped[] = is_string($message) ? $label.': '.$message : $label;
+                if (count($files) === 1) {
+                    throw $e;
+                }
+            }
+        }
+
+        if ($created === []) {
+            return back()->withErrors([
+                'files' => $skipped[0] ?? __('No statements could be uploaded.'),
+            ]);
+        }
+
+        $request->session()->put(self::QUEUE_SESSION_KEY, [
+            'ids' => array_map(
+                static fn (BankingStatementImport $import): int => (int) $import->id,
+                $created
+            ),
+            'account_id' => (int) $account->id,
+        ]);
+
+        $redirect = $this->redirectToNextInQueue($request, $this->queueHasProfileMappedCsv($created));
+        if ($skipped !== []) {
+            $redirect->with('warning', __('Some files were skipped: :list', [
+                'list' => implode(' ', $skipped),
+            ]));
+        }
+
+        return $redirect;
     }
 
-    public function map(BankingStatementImport $import): Response|RedirectResponse
+    public function map(Request $request, BankingStatementImport $import): Response|RedirectResponse
     {
         $this->authorizeTeam('banking.view');
         $this->authorizeImport($import);
@@ -113,6 +123,7 @@ class BankingStatementImportController extends Controller
 
         return Inertia::render('Banking/Import/MapCsv', [
             'bankImport' => $this->importPayload($import),
+            'batch' => $this->batchMeta($request, $import),
             'headers' => $preview['headers'],
             'rows' => $preview['rows'],
             'delimiter' => $preview['delimiter'],
@@ -180,8 +191,9 @@ class BankingStatementImportController extends Controller
             $validated['mapping']
         );
 
-        return redirect()->route('banking.import.preview', $import)
-            ->with('summary', $this->importService->summarize($import, $parsed));
+        $this->tryParseQueuedCsvsWithSavedProfile($request, $import->account);
+
+        return $this->redirectToNextInQueue($request);
     }
 
     public function preview(Request $request, BankingStatementImport $import): Response|RedirectResponse
@@ -219,6 +231,7 @@ class BankingStatementImportController extends Controller
 
         return Inertia::render('Banking/Import/Preview', [
             'bankImport' => $this->importPayload($import),
+            'batch' => $this->batchMeta($request, $import),
             'summary' => $summary,
             'canConfirm' => $import->status === ImportStatus::Parsed,
             'canChangeMapping' => $import->status === ImportStatus::Parsed
@@ -227,7 +240,7 @@ class BankingStatementImportController extends Controller
         ]);
     }
 
-    public function confirm(BankingStatementImport $import): RedirectResponse
+    public function confirm(Request $request, BankingStatementImport $import): RedirectResponse
     {
         $this->authorizeTeam('banking.manage');
         $this->authorizeImport($import);
@@ -255,11 +268,9 @@ class BankingStatementImportController extends Controller
             );
         }
 
-        return redirect()
-            ->route('banking.transactions.index', [
-                'account_id' => $import->account_id,
-            ])
-            ->with('success', __('Bank statement imported successfully.'));
+        $this->tryParseQueuedCsvsWithSavedProfile($request, $import->account);
+
+        return $this->redirectAfterConfirm($request, $import);
     }
 
     public function index(Request $request): Response
@@ -268,8 +279,8 @@ class BankingStatementImportController extends Controller
         $teamId = (int) $request->user()->current_team_id;
         $accountId = (int) $request->integer('account_id');
         $status = (string) $request->string('status')->toString();
-        $allowedStatuses = array_map(fn (ImportStatus $case) => $case->value, ImportStatus::cases());
-        if ($status !== '' && ! in_array($status, $allowedStatuses, true)) {
+        $allowedFilters = ['imported', 'not_imported', 'undone'];
+        if ($status !== '' && ! in_array($status, $allowedFilters, true)) {
             $status = '';
         }
         $canManage = $request->user()?->canOnTeam('banking.manage') ?? false;
@@ -282,7 +293,10 @@ class BankingStatementImportController extends Controller
             $query->where('account_id', $accountId);
         }
         if ($status !== '') {
-            $query->where('status', $status);
+            $query->whereIn(
+                'status',
+                array_map(fn (ImportStatus $case): string => $case->value, ImportStatus::forHistoryFilter($status))
+            );
         }
 
         $imports = $query
@@ -293,8 +307,8 @@ class BankingStatementImportController extends Controller
                 'id' => $import->id,
                 'original_filename' => $import->original_filename,
                 'file_type' => $import->file_type,
-                'status' => $import->status->value,
-                'status_label' => $import->status->label(),
+                'status' => $import->status->historyGroup(),
+                'status_label' => $import->status->historyLabel(),
                 'total_rows' => $import->total_rows,
                 'imported_rows' => $import->imported_rows,
                 'duplicate_rows' => $import->duplicate_rows,
@@ -321,13 +335,7 @@ class BankingStatementImportController extends Controller
                 'account_id' => $accountId > 0 ? $accountId : null,
                 'status' => $status !== '' ? $status : null,
             ],
-            'status_options' => array_map(
-                fn (ImportStatus $case): array => [
-                    'value' => $case->value,
-                    'label' => $case->label(),
-                ],
-                ImportStatus::cases()
-            ),
+            'status_options' => ImportStatus::historyFilterOptions(),
         ]);
     }
 
@@ -458,6 +466,239 @@ class BankingStatementImportController extends Controller
         }
 
         return $empty;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function statementFileRules(): array
+    {
+        return [
+            'file',
+            'max:10240',
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! $value instanceof UploadedFile) {
+                    return;
+                }
+                $ext = strtolower($value->getClientOriginalExtension());
+                if (! in_array($ext, ['csv', 'txt', 'ofx'], true)) {
+                    $fail(__('Only CSV, TXT, and OFX files are allowed.'));
+                }
+            },
+        ];
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    private function uploadedStatementFiles(Request $request): array
+    {
+        $files = $request->file('files');
+        if (is_array($files) && $files !== []) {
+            return array_values(array_filter(
+                $files,
+                static fn (mixed $file): bool => $file instanceof UploadedFile
+            ));
+        }
+
+        $single = $request->file('file');
+
+        return $single instanceof UploadedFile ? [$single] : [];
+    }
+
+    private function ingestUploadedFile(int $teamId, BankingAccount $account, UploadedFile $file): BankingStatementImport
+    {
+        $import = $this->importService->storeUpload($teamId, $account, $file);
+        $extension = strtolower((string) $import->file_type);
+
+        if (in_array($extension, ['csv', 'txt'], true)) {
+            $preview = $this->csvImporter->preview($this->importService->absolutePath($import));
+            $account->refresh();
+
+            if ($this->importService->profileMatches($account, $preview['headers'], $preview['delimiter'])) {
+                $profile = $account->csv_mapping_profile ?? [];
+                $this->importService->parseImport($import, [
+                    'mapping' => $profile['mapping'] ?? [],
+                    'delimiter' => $preview['delimiter'],
+                    'headers' => $preview['headers'],
+                ]);
+            }
+
+            return $import->fresh() ?? $import;
+        }
+
+        $this->importService->parseImport($import);
+
+        return $import->fresh() ?? $import;
+    }
+
+    private function tryParseQueuedCsvsWithSavedProfile(Request $request, BankingAccount $account): void
+    {
+        $ids = $this->queueIds($request);
+        if ($ids === []) {
+            return;
+        }
+
+        $account->refresh();
+
+        foreach ($ids as $id) {
+            $queued = BankingStatementImport::queryWithoutTeamScope()->find($id);
+            if (
+                $queued === null
+                || $queued->status !== ImportStatus::Pending
+                || ! in_array($queued->file_type, ['csv', 'txt'], true)
+            ) {
+                continue;
+            }
+
+            $preview = $this->csvImporter->preview($this->importService->absolutePath($queued));
+            if (! $this->importService->profileMatches($account, $preview['headers'], $preview['delimiter'])) {
+                continue;
+            }
+
+            $profile = $account->csv_mapping_profile ?? [];
+            $this->importService->parseImport($queued, [
+                'mapping' => $profile['mapping'] ?? [],
+                'delimiter' => $preview['delimiter'],
+                'headers' => $preview['headers'],
+            ]);
+        }
+    }
+
+    private function redirectToNextInQueue(Request $request, bool $mappingFromProfile = false): RedirectResponse
+    {
+        $nextMap = $this->firstQueuedImport($request, ImportStatus::Pending);
+        if ($nextMap !== null) {
+            return redirect()->route('banking.import.map', $nextMap);
+        }
+
+        $nextPreview = $this->firstQueuedImport($request, ImportStatus::Parsed);
+        if ($nextPreview !== null) {
+            $options = $this->importService->parseOptionsFromMetadata($nextPreview);
+            $parsed = $this->importService->parseImport($nextPreview, $options);
+            $redirect = redirect()->route('banking.import.preview', $nextPreview)
+                ->with('summary', $this->importService->summarize($nextPreview, $parsed));
+
+            if ($mappingFromProfile && in_array($nextPreview->file_type, ['csv', 'txt'], true)) {
+                $redirect->with('mapping_from_profile', true);
+            }
+
+            return $redirect;
+        }
+
+        $accountId = $request->session()->get(self::QUEUE_SESSION_KEY.'.account_id');
+        $request->session()->forget(self::QUEUE_SESSION_KEY);
+
+        return redirect()->route('banking.transactions.index', [
+            'account_id' => $accountId,
+        ]);
+    }
+
+    private function redirectAfterConfirm(Request $request, BankingStatementImport $import): RedirectResponse
+    {
+        $ids = $this->queueIds($request);
+        if ($ids === [] || ! in_array((int) $import->id, $ids, true)) {
+            return redirect()
+                ->route('banking.transactions.index', [
+                    'account_id' => $import->account_id,
+                ])
+                ->with('success', __('Bank statement imported successfully.'));
+        }
+
+        $nextMap = $this->firstQueuedImport($request, ImportStatus::Pending);
+        if ($nextMap !== null) {
+            return redirect()->route('banking.import.map', $nextMap)
+                ->with('success', __(':file imported. Map the next statement.', [
+                    'file' => $import->original_filename,
+                ]));
+        }
+
+        $nextPreview = $this->firstQueuedImport($request, ImportStatus::Parsed);
+        if ($nextPreview !== null) {
+            $options = $this->importService->parseOptionsFromMetadata($nextPreview);
+            $parsed = $this->importService->parseImport($nextPreview, $options);
+
+            return redirect()->route('banking.import.preview', $nextPreview)
+                ->with('summary', $this->importService->summarize($nextPreview, $parsed))
+                ->with('success', __(':file imported. Review the next statement.', [
+                    'file' => $import->original_filename,
+                ]));
+        }
+
+        $count = count($ids);
+        $request->session()->forget(self::QUEUE_SESSION_KEY);
+
+        return redirect()
+            ->route('banking.transactions.index', [
+                'account_id' => $import->account_id,
+            ])
+            ->with('success', $count > 1
+                ? __(':count bank statements imported successfully.', ['count' => $count])
+                : __('Bank statement imported successfully.')
+            );
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function queueIds(Request $request): array
+    {
+        $ids = $request->session()->get(self::QUEUE_SESSION_KEY.'.ids', []);
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_map('intval', $ids));
+    }
+
+    private function firstQueuedImport(Request $request, ImportStatus $status): ?BankingStatementImport
+    {
+        foreach ($this->queueIds($request) as $id) {
+            $queued = BankingStatementImport::queryWithoutTeamScope()->find($id);
+            if ($queued !== null && $queued->status === $status) {
+                return $queued;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{index: int, total: int}|null
+     */
+    private function batchMeta(Request $request, BankingStatementImport $import): ?array
+    {
+        $ids = $this->queueIds($request);
+        if (count($ids) < 2) {
+            return null;
+        }
+
+        $position = array_search((int) $import->id, $ids, true);
+        if ($position === false) {
+            return null;
+        }
+
+        return [
+            'index' => $position + 1,
+            'total' => count($ids),
+        ];
+    }
+
+    /**
+     * @param  list<BankingStatementImport>  $imports
+     */
+    private function queueHasProfileMappedCsv(array $imports): bool
+    {
+        foreach ($imports as $import) {
+            if (
+                $import->status === ImportStatus::Parsed
+                && in_array($import->file_type, ['csv', 'txt'], true)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function authorizeImport(BankingStatementImport $import): void
