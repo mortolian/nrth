@@ -267,6 +267,12 @@ class BankingStatementImportController extends Controller
         $this->authorizeTeam('banking.view', $request);
         $teamId = (int) $request->user()->current_team_id;
         $accountId = (int) $request->integer('account_id');
+        $status = (string) $request->string('status')->toString();
+        $allowedStatuses = array_map(fn (ImportStatus $case) => $case->value, ImportStatus::cases());
+        if ($status !== '' && ! in_array($status, $allowedStatuses, true)) {
+            $status = '';
+        }
+        $canManage = $request->user()?->canOnTeam('banking.manage') ?? false;
 
         $query = BankingStatementImport::queryWithoutTeamScope()
             ->where('team_id', $teamId)
@@ -274,6 +280,9 @@ class BankingStatementImportController extends Controller
 
         if ($accountId > 0) {
             $query->where('account_id', $accountId);
+        }
+        if ($status !== '') {
+            $query->where('status', $status);
         }
 
         $imports = $query
@@ -285,13 +294,16 @@ class BankingStatementImportController extends Controller
                 'original_filename' => $import->original_filename,
                 'file_type' => $import->file_type,
                 'status' => $import->status->value,
+                'status_label' => $import->status->label(),
                 'total_rows' => $import->total_rows,
                 'imported_rows' => $import->imported_rows,
                 'duplicate_rows' => $import->duplicate_rows,
                 'failed_rows' => $import->failed_rows,
-                'can_undo' => $import->status === ImportStatus::Imported,
-                'can_reimport' => $import->status === ImportStatus::Undone
+                'can_undo' => $canManage && $import->status === ImportStatus::Imported,
+                'can_reimport' => $canManage
+                    && $import->status === ImportStatus::Undone
                     && $this->importService->hasStoredFile($import),
+                'can_delete' => $canManage && $import->status->canPermanentlyDelete(),
                 'created_at' => $import->created_at?->toIso8601String(),
                 'updated_at' => $import->updated_at?->toIso8601String(),
                 'account' => [
@@ -307,7 +319,15 @@ class BankingStatementImportController extends Controller
             'accounts' => $this->accountOptions(includeInactive: true),
             'filters' => [
                 'account_id' => $accountId > 0 ? $accountId : null,
+                'status' => $status !== '' ? $status : null,
             ],
+            'status_options' => array_map(
+                fn (ImportStatus $case): array => [
+                    'value' => $case->value,
+                    'label' => $case->label(),
+                ],
+                ImportStatus::cases()
+            ),
         ]);
     }
 
@@ -346,6 +366,18 @@ class BankingStatementImportController extends Controller
         }
 
         return $redirect->with('success', __('Statement restored. Review and confirm to import again.'));
+    }
+
+    public function destroy(BankingStatementImport $import): RedirectResponse
+    {
+        $this->authorizeTeam('banking.manage');
+        $this->authorizeImport($import);
+
+        $this->importService->deleteImport($import);
+
+        return redirect()
+            ->back()
+            ->with('success', __('Statement file deleted.'));
     }
 
     /**

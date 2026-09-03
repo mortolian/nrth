@@ -53,10 +53,10 @@ export function useBankingTabs() {
     return computed((): AppTabItem[] =>
         [
             { id: 'transactions', label: 'Transactions', href: route('banking.transactions.index') },
-            { id: 'reconciliation', label: 'Reconciliation', href: route('banking.reconciliation.index') },
             canTeam('banking.manage')
                 ? { id: 'import', label: 'Import statement', href: route('banking.import.create') }
                 : null,
+            { id: 'import-history', label: 'Import history', href: route('banking.imports.index') },
             { id: 'accounts', label: 'Accounts', href: route('banking.accounts.index') },
         ].filter(Boolean) as AppTabItem[],
     );

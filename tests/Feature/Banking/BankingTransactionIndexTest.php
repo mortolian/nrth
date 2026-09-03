@@ -4,6 +4,7 @@ namespace Tests\Feature\Banking;
 
 use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Models\BankingTransaction;
 use App\Models\Team;
 use App\Models\User;
@@ -108,6 +109,39 @@ class BankingTransactionIndexTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->has('transactions.data', 1)
                 ->where('transactions.data.0.reference', 'REF-ABC-99')
+            );
+    }
+
+    public function test_index_includes_source_import_on_rows(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        $account = BankingAccount::factory()->for($team)->create();
+        $import = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'original_filename' => 'june-statement.csv',
+        ]);
+
+        BankingTransaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'account_id' => $account->id,
+            'banking_statement_import_id' => $import->id,
+            'transaction_date' => '2026-06-15',
+            'description' => 'Imported debit',
+            'amount' => '40.00',
+            'currency' => 'ZAR',
+            'direction' => TransactionDirection::Debit,
+            'source_hash' => hash('sha256', 'imported-debit'),
+            'duplicate_key' => hash('sha256', 'imported-debit-key'),
+        ]);
+
+        $this->get(route('banking.transactions.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('transactions.data.0.import.id', $import->id)
+                ->where('transactions.data.0.import.original_filename', 'june-statement.csv')
             );
     }
 }

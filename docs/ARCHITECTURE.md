@@ -61,7 +61,7 @@ Exceptions/   # when needed
 |---------|------|
 | **Accounting** | Chart of accounts, journal transactions, journal lines, suppliers, posting/void, ledger balances, P&L |
 | **Invoicing** | Clients, invoices, estimates, items, recurring, payments, PDFs, online pay sessions |
-| **Banking** | Bank accounts (linked to GL), statement import, imported lines, recon match/exclude |
+| **Banking** | Bank accounts (linked to GL), statement import, imported lines, match/exclude on the transactions page |
 | **Expenses** | Receipt parse helpers used by the expenses UI (posted expenses are accounting transactions) |
 | **Tax** | VAT rates, periods, and returns |
 | **Takeout** | Team data export jobs (Settings → Backups & exports) |

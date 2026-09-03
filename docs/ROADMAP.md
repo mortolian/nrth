@@ -15,7 +15,7 @@ These areas exist and are usable. 1.0 is not promised yet.
 | **Invoicing & estimates** | Clients, items catalog, recurring invoices, discounts, note templates, income accounts on send, PDFs, email, payments, Stripe/PayFast pay links, multi-currency |
 | **Expenses & suppliers** | Receipts, VAT on purchases, categories, supplier records |
 | **Accounting** | Chart of accounts, journal, general ledger, account statements |
-| **Banking** | CSV/OFX import, duplicate detection, transaction list, match/exclude reconciliation |
+| **Banking** | CSV/OFX import, duplicate detection, match/exclude imported transactions |
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
 | **Budgeting** | Category budgets with variance views |
 | **Teams** | Multi-user businesses via Jetstream |

@@ -266,7 +266,7 @@ const commandPaletteData = computed<PaletteData>(() => ({
         { id: 'expenses', label: 'Expenses', href: route('expenses.index') },
         { id: 'suppliers', label: 'Suppliers', href: route('suppliers.index') },
         { id: 'banking-transactions', label: 'Banking Transactions', href: route('banking.transactions.index') },
-        { id: 'banking-reconciliation', label: 'Bank Reconciliation', href: route('banking.reconciliation.index') },
+        { id: 'banking-import-history', label: 'Bank Import History', href: route('banking.imports.index') },
         ...(moduleEnabled('travel') ? [
             { id: 'vehicles-trips', label: 'Trip Log', href: route('vehicles.trips.index') },
             { id: 'vehicles', label: 'Vehicles', href: route('vehicles.index') },

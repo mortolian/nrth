@@ -47,7 +47,8 @@ class BankingIsolationTest extends TestCase
 
         $this->get(route('banking.accounts.index'))->assertOk()->assertDontSee(self::BANK_NAME);
         $this->get(route('banking.transactions.index'))->assertOk()->assertDontSee(self::LINE_DESCRIPTION);
-        $this->get(route('banking.reconciliation.index'))->assertOk()->assertDontSee(self::LINE_DESCRIPTION);
+        $this->get(route('banking.reconciliation.index'))
+            ->assertRedirect(route('banking.transactions.index'));
 
         $this->assertHiddenFromOtherTeam($this->put(route('banking.accounts.update', $account), [
             'name' => 'Hijacked',

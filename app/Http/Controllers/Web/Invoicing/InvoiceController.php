@@ -30,6 +30,8 @@ use App\Domain\Invoicing\Services\InvoiceNumberService;
 use App\Domain\Invoicing\Services\InvoiceTotalsCalculator;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
+use App\Support\FinancialYear;
 use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\InvoicePayQrCode;
 use App\Support\Iso4217Currencies;
@@ -471,6 +473,9 @@ class InvoiceController extends Controller
                     'overdue_count' => 0,
                     'overdue_total' => 0,
                     'overdue_totals_by_currency' => [],
+                    'fy_paid_total' => 0,
+                    'fy_paid_currency' => 'ZAR',
+                    'fy_label' => null,
                 ],
                 'filters' => $this->activeFilters($request),
                 'filter_client' => null,
@@ -549,9 +554,12 @@ class InvoiceController extends Controller
             $query->where('total_cents', '<=', $maxCents);
         }
 
+        $sort = (string) $request->string('sort')->toString();
+        $direction = strtolower((string) $request->string('direction')->toString()) === 'asc' ? 'asc' : 'desc';
+        $this->applyInvoiceIndexSort($query, $sort, $direction);
+
         $invoices = $query
             ->withCount('payments')
-            ->orderByDesc('issue_date')
             ->paginate(15)
             ->withQueryString()
             ->through(function (Invoice $invoice) use ($today, $statusesWherePastDueMatters): array {
@@ -627,6 +635,9 @@ class InvoiceController extends Controller
             ->values()
             ->all();
 
+        $team = $request->user()->currentTeam;
+        $fyPaid = $this->fyPaidIncomeSummary($teamId, $team);
+
         return Inertia::render('Invoicing/Invoices/Index', [
             'invoices' => $invoices,
             'summary' => [
@@ -635,10 +646,98 @@ class InvoiceController extends Controller
                 'overdue_count' => $overdueRows->count(),
                 'overdue_total' => $overdueTotal,
                 'overdue_totals_by_currency' => $overdueTotalsByCurrencyRows,
+                'fy_paid_total' => $fyPaid['total'],
+                'fy_paid_currency' => $fyPaid['currency'],
+                'fy_label' => $fyPaid['label'],
             ],
             'filters' => $this->activeFilters($request),
             'filter_client' => $filterClientContext,
         ]);
+    }
+
+    /**
+     * Invoice payments received in the team's current financial year (by payment date),
+     * expressed in the business (book) currency.
+     *
+     * @return array{total: int, currency: string, label: string}
+     */
+    private function fyPaidIncomeSummary(int $teamId, ?Team $team): array
+    {
+        $settings = $team?->mergedBusinessSettings() ?? [];
+        $businessCurrency = Iso4217Currencies::normalize(
+            (string) ($settings['invoice_default_currency'] ?? 'ZAR')
+        );
+        $endMonth = (int) ($settings['financial_year_end_month'] ?? 2);
+        $startMonth = FinancialYear::startMonthFromEndMonth($endMonth);
+        [$fyStart, $fyEnd] = FinancialYear::windowContaining(now(), $startMonth);
+        $label = FinancialYear::labelForWindow($fyStart, $fyEnd);
+
+        if ($teamId <= 0 || ! Schema::hasTable('payments')) {
+            return [
+                'total' => 0,
+                'currency' => $businessCurrency,
+                'label' => $label,
+            ];
+        }
+
+        $payments = Payment::queryWithoutTeamScope()
+            ->with([
+                'invoice:id,currency,business_currency_code,fx_rate_invoice_to_business,total_cents,total_business_currency_cents',
+            ])
+            ->where('team_id', $teamId)
+            ->whereDate('payment_date', '>=', $fyStart->toDateString())
+            ->whereDate('payment_date', '<=', $fyEnd->toDateString())
+            ->get([
+                'id',
+                'invoice_id',
+                'amount_cents',
+                'currency',
+                'bank_amount_business_cents',
+            ]);
+
+        $total = 0;
+        foreach ($payments as $payment) {
+            $total += $this->paymentAmountInBusinessCurrency($payment, $businessCurrency);
+        }
+
+        return [
+            'total' => $total,
+            'currency' => $businessCurrency,
+            'label' => $label,
+        ];
+    }
+
+    private function paymentAmountInBusinessCurrency(Payment $payment, string $businessCurrency): int
+    {
+        $amount = (int) $payment->getRawOriginal('amount_cents');
+        $payCurrency = Iso4217Currencies::normalize((string) ($payment->currency ?? 'ZAR'));
+
+        if ($payCurrency === $businessCurrency) {
+            return $amount;
+        }
+
+        $bankBusiness = $payment->getRawOriginal('bank_amount_business_cents');
+        if ($bankBusiness !== null && $bankBusiness !== '') {
+            return (int) $bankBusiness;
+        }
+
+        $invoice = $payment->invoice;
+        if ($invoice === null) {
+            return 0;
+        }
+
+        $rate = $invoice->fx_rate_invoice_to_business;
+        if ($rate !== null && is_numeric($rate) && (float) $rate > 0) {
+            return (int) round($amount * (float) $rate);
+        }
+
+        $invoiceTotal = (int) $invoice->getRawOriginal('total_cents');
+        $invoiceBusinessTotal = $invoice->getRawOriginal('total_business_currency_cents');
+        if ($invoiceTotal > 0 && $invoiceBusinessTotal !== null && $invoiceBusinessTotal !== '') {
+            return (int) round($amount * ((int) $invoiceBusinessTotal) / $invoiceTotal);
+        }
+
+        return 0;
     }
 
     public function show(Request $request, Invoice $invoice): Response
@@ -940,7 +1039,43 @@ class InvoiceController extends Controller
             'client_id' => $clientId > 0 ? $clientId : null,
             'min_amount' => $request->filled('min_amount') ? (float) $request->input('min_amount') : null,
             'max_amount' => $request->filled('max_amount') ? (float) $request->input('max_amount') : null,
+            'sort' => $this->resolvedInvoiceIndexSort((string) $request->string('sort')->toString()),
+            'direction' => strtolower((string) $request->string('direction')->toString()) === 'asc' ? 'asc' : 'desc',
         ];
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<\App\Domain\Invoicing\Models\Invoice>  $query
+     */
+    private function applyInvoiceIndexSort($query, string $sort, string $direction): void
+    {
+        $sort = $this->resolvedInvoiceIndexSort($sort);
+        $direction = $direction === 'asc' ? 'asc' : 'desc';
+
+        match ($sort) {
+            'number' => $query->orderBy('number', $direction),
+            'client' => $query->orderBy(
+                Client::query()
+                    ->select('name')
+                    ->whereColumn('clients.id', 'invoices.client_id')
+                    ->limit(1),
+                $direction
+            ),
+            'due' => $query->orderBy('due_date', $direction),
+            'total' => $query->orderBy('total_cents', $direction),
+            'amount_due' => $query->orderByRaw('(total_cents - amount_paid_cents) '.$direction),
+            'status' => $query->orderBy('status', $direction),
+            default => $query->orderBy('issue_date', $direction),
+        };
+
+        $query->orderBy('id', $direction);
+    }
+
+    private function resolvedInvoiceIndexSort(string $sort): string
+    {
+        $allowed = ['number', 'client', 'issue', 'due', 'total', 'amount_due', 'status'];
+
+        return in_array($sort, $allowed, true) ? $sort : 'issue';
     }
 
     /**

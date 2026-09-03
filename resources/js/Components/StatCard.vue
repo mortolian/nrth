@@ -9,11 +9,14 @@ const props = withDefaults(defineProps<{
     trendPercent?: number | null;
     hint?: string;
     icon?: unknown;
+    /** Denser padding/type for mobile strips and tight grids. */
+    compact?: boolean;
 }>(), {
     trend: 'neutral',
     trendPercent: null,
     hint: '',
     icon: null,
+    compact: false,
 });
 
 const trendMeta = computed(() => ({
@@ -24,18 +27,33 @@ const trendMeta = computed(() => ({
 </script>
 
 <template>
-    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div
+        :class="[
+            'flex h-full flex-col rounded-xl border border-slate-200 bg-white shadow-sm',
+            compact ? 'p-3' : 'p-4',
+        ]"
+    >
         <div class="flex items-start justify-between gap-3">
-            <div>
+            <div class="min-w-0">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">{{ title }}</p>
-                <p class="mt-1 text-2xl font-semibold text-slate-900">{{ value }}</p>
+                <p
+                    :class="[
+                        'mt-1 break-words font-semibold tabular-nums text-slate-900',
+                        compact ? 'text-lg leading-snug' : 'text-2xl',
+                    ]"
+                >
+                    {{ value }}
+                </p>
             </div>
-            <div v-if="icon" class="rounded-lg bg-slate-100 p-2 text-slate-600">
+            <div v-if="icon" class="shrink-0 rounded-lg bg-slate-100 p-2 text-slate-600">
                 <component :is="icon" class="h-4 w-4" />
             </div>
         </div>
 
-        <div v-if="trendPercent !== null || hint" class="mt-2 flex items-center gap-2 text-xs">
+        <div
+            v-if="!compact && (trendPercent !== null || hint)"
+            class="mt-auto flex items-center gap-2 pt-2 text-xs"
+        >
             <span
                 v-if="trendPercent !== null"
                 :class="[trendMeta.bg, trendMeta.color]"
@@ -44,7 +62,7 @@ const trendMeta = computed(() => ({
                 <component :is="trendMeta.icon" class="h-3.5 w-3.5" />
                 {{ trendMeta.sign }}{{ trendPercent }}%
             </span>
-            <span class="text-slate-500">{{ hint }}</span>
+            <span class="min-w-0 text-slate-500">{{ hint }}</span>
         </div>
     </div>
 </template>

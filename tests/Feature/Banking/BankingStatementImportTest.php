@@ -440,7 +440,119 @@ class BankingStatementImportTest extends TestCase
                 ->component('Banking/Import/History')
                 ->has('imports.data', 1)
                 ->where('imports.data.0.id', $import->id)
-                ->where('imports.data.0.can_undo', true));
+                ->where('imports.data.0.can_undo', true)
+                ->where('imports.data.0.can_delete', false));
+    }
+
+    public function test_history_filters_by_status(): void
+    {
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $imported = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Imported,
+            'original_filename' => 'imported.csv',
+        ]);
+        $undone = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Undone,
+            'original_filename' => 'undone.csv',
+        ]);
+
+        $this->get(route('banking.imports.index', ['status' => 'undone']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('imports.data', 1)
+                ->where('imports.data.0.id', $undone->id)
+                ->where('filters.status', 'undone'));
+
+        $this->get(route('banking.imports.index', ['status' => 'imported']))
+            ->assertInertia(fn ($page) => $page
+                ->has('imports.data', 1)
+                ->where('imports.data.0.id', $imported->id));
+    }
+
+    public function test_can_delete_undone_import_and_stored_file(): void
+    {
+        Storage::fake('local');
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $storedPath = sprintf('banking/%d/deleted/2026/06/statement.csv', $account->id);
+        Storage::disk('local')->put($storedPath, 'statement-contents');
+
+        $import = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Undone,
+            'stored_path' => $storedPath,
+            'original_filename' => 'june-statement.csv',
+        ]);
+
+        $this->get(route('banking.imports.index'))
+            ->assertInertia(fn ($page) => $page
+                ->where('imports.data.0.can_delete', true)
+                ->where('imports.data.0.can_reimport', true));
+
+        $this->delete(route('banking.imports.destroy', $import))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertNull(BankingStatementImport::queryWithoutTeamScope()->find($import->id));
+        Storage::disk('local')->assertMissing($storedPath);
+    }
+
+    public function test_can_delete_pending_reimport_statement(): void
+    {
+        Storage::fake('local');
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $storedPath = sprintf('banking/%d/2026/06/restored.csv', $account->id);
+        Storage::disk('local')->put($storedPath, 'statement-contents');
+
+        $import = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Pending,
+            'stored_path' => $storedPath,
+            'metadata' => ['reimported_at' => now()->toIso8601String()],
+        ]);
+
+        $this->delete(route('banking.imports.destroy', $import))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertNull(BankingStatementImport::queryWithoutTeamScope()->find($import->id));
+        Storage::disk('local')->assertMissing($storedPath);
+    }
+
+    public function test_cannot_delete_imported_statement(): void
+    {
+        Storage::fake('local');
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $storedPath = sprintf('banking/%d/2026/06/live.csv', $account->id);
+        Storage::disk('local')->put($storedPath, 'statement-contents');
+
+        $import = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Imported,
+            'stored_path' => $storedPath,
+        ]);
+
+        $this->delete(route('banking.imports.destroy', $import))
+            ->assertSessionHasErrors('import');
+
+        $this->assertNotNull(BankingStatementImport::queryWithoutTeamScope()->find($import->id));
+        Storage::disk('local')->assertExists($storedPath);
+    }
+
+    public function test_cannot_delete_other_team_import(): void
+    {
+        Storage::fake('local');
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $import = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Undone,
+        ]);
+
+        $otherUser = User::factory()->withPersonalTeam()->create();
+        $this->actingTeamContext($otherUser, $otherUser->currentTeam);
+
+        $this->delete(route('banking.imports.destroy', $import))->assertNotFound();
+        $this->assertNotNull(BankingStatementImport::queryWithoutTeamScope()->find($import->id));
     }
 
     public function test_rejects_duplicate_file_hash_after_successful_import(): void

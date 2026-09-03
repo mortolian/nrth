@@ -511,6 +511,29 @@ final class BankingStatementImportService
         return $target;
     }
 
+    public function deleteImport(BankingStatementImport $import): void
+    {
+        if (! $import->status->canPermanentlyDelete()) {
+            throw ValidationException::withMessages([
+                'import' => __('Undo the import before deleting the statement file.'),
+            ]);
+        }
+
+        $paths = array_values(array_unique(array_filter([
+            $import->stored_path,
+            $import->metadata['active_stored_path'] ?? null,
+        ], static fn (mixed $path): bool => is_string($path) && $path !== '')));
+
+        $disk = Storage::disk('local');
+        foreach ($paths as $path) {
+            if ($disk->exists($path)) {
+                $disk->delete($path);
+            }
+        }
+
+        $import->delete();
+    }
+
     /**
      * @return list<array<string, mixed>>
      */
