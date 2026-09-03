@@ -26,6 +26,7 @@ final class AdditiveMigrationPolicy
     {
         return [
             '2026_08_19_121000_drop_contracts_table.php',
+            '2026_08_22_201200_drop_envelope_cents_from_budget_categories.php',
         ];
     }
 

@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * One-off: drop unused `envelope_cents` after category envelopes were removed.
+ * Additive up() still applies to every other post-2026-08-18 migration.
+ * Allowlisted in AdditiveMigrationPolicy::destructiveUpAllowlist().
+ */
 return new class extends Migration
 {
     public function up(): void
