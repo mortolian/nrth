@@ -2,6 +2,15 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.28](https://github.com/mortolian/nrth/compare/v0.1.27...v0.1.28) (2026-09-03)
+
+
+### Features
+
+* **banking:** enhance import history management and transaction handling ([438f44e](https://github.com/mortolian/nrth/commit/438f44ee10529687fd3164cd8bdeb211ca85b352))
+* **invoicing:** add financial year paid income summary and sorting functionality ([6ba2bbd](https://github.com/mortolian/nrth/commit/6ba2bbd5f6cf21c3556f5688f2bffd06c09ce6a6))
+* **migration:** add migration to drop unused `envelope_cents` column and update allowlist ([bf593cc](https://github.com/mortolian/nrth/commit/bf593cc5153cfe1a3ab711e70ea078bc64222f3c))
+
 ## [0.1.27](https://github.com/mortolian/nrth/compare/v0.1.26...v0.1.27) (2026-08-23)
 
 
