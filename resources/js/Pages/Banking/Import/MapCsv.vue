@@ -20,6 +20,7 @@ const props = defineProps<{
     delimiter: string;
     initialMapping?: Record<string, string>;
     mappingFields: MappingField[];
+    batch?: { index: number; total: number } | null;
 }>();
 
 const headerOptions = computed(() =>
@@ -63,6 +64,9 @@ const pageTitle = computed(() => `Map columns — ${props.bankImport.original_fi
         <PageHeader :title="pageTitle">
             <template #subtitle>
                 <p class="text-sm text-slate-500">Account: {{ bankImport.account.name }} ({{ bankImport.account.currency }})</p>
+                <p v-if="batch" class="mt-1 text-sm text-slate-500">
+                    File {{ batch.index }} of {{ batch.total }}
+                </p>
             </template>
         </PageHeader>
 
@@ -94,7 +98,7 @@ const pageTitle = computed(() => `Map columns — ${props.bankImport.original_fi
 
             <FormActions>
                 <AppButton variant="primary" :loading="form.processing" @click="submit">
-                    {{ form.processing ? 'Working…' : 'Preview import' }}
+                    {{ form.processing ? 'Working…' : batch && batch.total > 1 ? 'Preview and continue' : 'Preview import' }}
                 </AppButton>
             </FormActions>
         </AppCard>

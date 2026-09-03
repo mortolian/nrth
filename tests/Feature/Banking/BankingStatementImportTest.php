@@ -313,7 +313,9 @@ class BankingStatementImportTest extends TestCase
         $this->get(route('banking.imports.index'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
+                ->where('imports.data.0.status', 'undone')
                 ->where('imports.data.0.can_reimport', true)
+                ->where('imports.data.0.can_delete', true)
                 ->where('imports.data.0.can_undo', false));
 
         $response = $this->post(route('banking.imports.reimport', $import));
@@ -440,6 +442,8 @@ class BankingStatementImportTest extends TestCase
                 ->component('Banking/Import/History')
                 ->has('imports.data', 1)
                 ->where('imports.data.0.id', $import->id)
+                ->where('imports.data.0.status', 'imported')
+                ->where('imports.data.0.status_label', 'Imported')
                 ->where('imports.data.0.can_undo', true)
                 ->where('imports.data.0.can_delete', false));
     }
@@ -456,18 +460,33 @@ class BankingStatementImportTest extends TestCase
             'status' => ImportStatus::Undone,
             'original_filename' => 'undone.csv',
         ]);
+        BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Pending,
+            'original_filename' => 'abandoned.csv',
+        ]);
 
         $this->get(route('banking.imports.index', ['status' => 'undone']))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('imports.data', 1)
                 ->where('imports.data.0.id', $undone->id)
+                ->where('imports.data.0.status', 'undone')
+                ->where('imports.data.0.status_label', 'Undone')
                 ->where('filters.status', 'undone'));
+
+        $this->get(route('banking.imports.index', ['status' => 'not_imported']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('imports.data', 1)
+                ->where('imports.data.0.status', 'not_imported')
+                ->where('imports.data.0.status_label', 'Not imported')
+                ->where('filters.status', 'not_imported'));
 
         $this->get(route('banking.imports.index', ['status' => 'imported']))
             ->assertInertia(fn ($page) => $page
                 ->has('imports.data', 1)
-                ->where('imports.data.0.id', $imported->id));
+                ->where('imports.data.0.id', $imported->id)
+                ->where('imports.data.0.status', 'imported'));
     }
 
     public function test_can_delete_undone_import_and_stored_file(): void
@@ -613,5 +632,153 @@ class BankingStatementImportTest extends TestCase
         $this->post(route('banking.import.confirm', $import));
 
         $this->assertSame(2, BankingTransaction::queryWithoutTeamScope()->where('account_id', $account->id)->count());
+    }
+
+    public function test_multiple_ofx_files_are_queued_then_confirmed_in_order(): void
+    {
+        Storage::fake('local');
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $first = new UploadedFile(
+            base_path('tests/Fixtures/bank-statements/sample.ofx'),
+            'january.ofx',
+            'application/x-ofx',
+            null,
+            true
+        );
+
+        $secondPath = tempnam(sys_get_temp_dir(), 'nrth-ofx-');
+        $this->assertNotFalse($secondPath);
+        file_put_contents($secondPath, <<<'OFX'
+OFXHEADER:100
+DATA:OFXSGML
+VERSION:102
+SECURITY:NONE
+ENCODING:USASCII
+CHARSET:1252
+COMPRESSION:NONE
+OLDFILEUID:NONE
+NEWFILEUID:NONE
+
+<OFX>
+<BANKMSGSRSV1>
+<STMTTRNRS>
+<STMTRS>
+<BANKTRANLIST>
+<STMTTRN>
+<TRNTYPE>DEBIT
+<DTPOSTED>20260208
+<TRNAMT>-12.50
+<FITID>20260208001
+<NAME>Parking
+<MEMO>Parking fee
+</STMTTRN>
+<STMTTRN>
+<TRNTYPE>CREDIT
+<DTPOSTED>20260212
+<TRNAMT>100.00
+<FITID>20260212001
+<NAME>Refund
+<MEMO>Partial refund
+</STMTTRN>
+</BANKTRANLIST>
+</STMTRS>
+</STMTTRNRS>
+</BANKMSGSRSV1>
+</OFX>
+OFX
+        );
+
+        try {
+            $response = $this->from(route('banking.import.create'))
+                ->post(route('banking.import.store'), [
+                    'account_id' => $account->id,
+                    'files' => [
+                        $first,
+                        new UploadedFile($secondPath, 'february.ofx', 'application/x-ofx', null, true),
+                    ],
+                ]);
+        } finally {
+            @unlink($secondPath);
+        }
+
+        $response->assertSessionHasNoErrors()->assertRedirect();
+
+        $imports = BankingStatementImport::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $imports);
+        $this->assertTrue($imports->every(fn (BankingStatementImport $import) => $import->status === ImportStatus::Parsed));
+        $response->assertRedirect(route('banking.import.preview', $imports[0]));
+
+        $this->post(route('banking.import.confirm', $imports[0]))
+            ->assertRedirect(route('banking.import.preview', $imports[1]));
+
+        $this->post(route('banking.import.confirm', $imports[1]))
+            ->assertRedirect(route('banking.transactions.index', ['account_id' => $account->id]));
+
+        $this->assertSame(
+            4,
+            BankingTransaction::queryWithoutTeamScope()->where('account_id', $account->id)->count()
+        );
+    }
+
+    public function test_multiple_csv_files_reuse_mapping_after_first_file(): void
+    {
+        Storage::fake('local');
+        [, $team, $account] = $this->teamWithImportAccount();
+
+        $firstPath = base_path('tests/Fixtures/bank-statements/sample-signed-amount.csv');
+        $secondPath = tempnam(sys_get_temp_dir(), 'nrth-csv-');
+        $this->assertNotFalse($secondPath);
+        file_put_contents(
+            $secondPath,
+            "Date,Description,Amount,Reference\n2026-02-05,Office rent,-8000.00,RENT\n2026-02-10,Client payment,4200.00,INV9\n2026-02-15,Fuel,-650.00,\n"
+        );
+
+        try {
+            $response = $this->post(route('banking.import.store'), [
+                'account_id' => $account->id,
+                'files' => [
+                    $this->uploadedCsv($firstPath, 'january.csv'),
+                    $this->uploadedCsv($secondPath, 'february.csv'),
+                ],
+            ]);
+        } finally {
+            @unlink($secondPath);
+        }
+
+        $imports = BankingStatementImport::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $imports);
+        $response->assertRedirect(route('banking.import.map', $imports[0]));
+
+        $this->post(route('banking.import.map.store', $imports[0]), [
+            'mapping' => [
+                'transaction_date' => 'Date',
+                'description' => 'Description',
+                'amount' => 'Amount',
+                'reference' => 'Reference',
+            ],
+            'delimiter' => ',',
+        ])->assertRedirect(route('banking.import.preview', $imports[0]));
+
+        $this->assertSame(ImportStatus::Parsed, $imports[1]->fresh()->status);
+
+        $this->post(route('banking.import.confirm', $imports[0]))
+            ->assertRedirect(route('banking.import.preview', $imports[1]));
+
+        $this->post(route('banking.import.confirm', $imports[1]))
+            ->assertRedirect(route('banking.transactions.index', ['account_id' => $account->id]));
+
+        $this->assertSame(
+            6,
+            BankingTransaction::queryWithoutTeamScope()->where('account_id', $account->id)->count()
+        );
     }
 }

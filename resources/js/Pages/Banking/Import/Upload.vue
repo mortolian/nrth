@@ -6,6 +6,7 @@ import FeatureShell from '@/Components/FeatureShell.vue';
 import { useBankingTabs } from '@/Composables/useFeatureTabs';
 
 const bankingTabs = useBankingTabs();
+const maxFiles = 12;
 
 type AccountOption = {
     id: number;
@@ -20,10 +21,10 @@ const props = defineProps<{
 
 const form = useForm<{
     account_id: number | '';
-    file: File | null;
+    files: File[];
 }>({
     account_id: '',
-    file: null,
+    files: [],
 });
 
 const accountSelectOptions = computed(() =>
@@ -55,22 +56,52 @@ const isAcceptedFile = (file: File) => {
     );
 };
 
-const setFile = (file: File | null) => {
+const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
+
+const addFiles = (incoming: File[]) => {
     fileError.value = null;
+    form.clearErrors('files');
     form.clearErrors('file');
-    form.file = file;
+
+    const accepted: File[] = [];
+    let rejected = false;
+    for (const file of incoming) {
+        if (! isAcceptedFile(file)) {
+            rejected = true;
+            continue;
+        }
+        accepted.push(file);
+    }
+
+    if (rejected && accepted.length === 0) {
+        fileError.value = 'Upload CSV, TXT, or OFX files.';
+        return;
+    }
+
+    const existing = new Set(form.files.map(fileKey));
+    const merged = [...form.files];
+    for (const file of accepted) {
+        if (existing.has(fileKey(file))) {
+            continue;
+        }
+        if (merged.length >= maxFiles) {
+            fileError.value = `You can upload up to ${maxFiles} statements at once.`;
+            break;
+        }
+        existing.add(fileKey(file));
+        merged.push(file);
+    }
+
+    if (rejected && fileError.value === null) {
+        fileError.value = 'Some files were skipped. Use CSV, TXT, or OFX.';
+    }
+
+    form.files = merged;
 };
 
 const onFileChange = (event: Event) => {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0] ?? null;
-    if (file && !isAcceptedFile(file)) {
-        setFile(null);
-        fileError.value = 'Upload a CSV, TXT, or OFX file.';
-        input.value = '';
-        return;
-    }
-    setFile(file);
+    addFiles(Array.from(input.files ?? []));
     input.value = '';
 };
 
@@ -100,20 +131,14 @@ const onDragLeave = (event: DragEvent) => {
 const onDrop = (event: DragEvent) => {
     event.preventDefault();
     dropActive.value = false;
-    const file = event.dataTransfer?.files?.[0] ?? null;
-    if (!file) {
-        return;
-    }
-    if (!isAcceptedFile(file)) {
-        setFile(null);
-        fileError.value = 'Upload a CSV, TXT, or OFX file.';
-        return;
-    }
-    setFile(file);
+    addFiles(Array.from(event.dataTransfer?.files ?? []));
 };
 
-const clearFile = () => {
-    setFile(null);
+const removeFile = (index: number) => {
+    form.files = form.files.filter((_, i) => i !== index);
+    if (form.files.length < maxFiles) {
+        fileError.value = null;
+    }
 };
 
 const formatFileSize = (bytes: number) => {
@@ -140,7 +165,7 @@ const submit = () => {
         section="import"
         :tabs="bankingTabs"
         document-title="Import bank statement"
-        subtitle="Upload a CSV, TXT, or OFX statement for a banking account."
+        subtitle="Upload one or more CSV, TXT, or OFX statements for a banking account."
     >
         <AppCard class="overflow-hidden p-0">
             <form class="w-full" @submit.prevent="submit">
@@ -162,7 +187,7 @@ const submit = () => {
                     </div>
 
                     <div class="w-full">
-                        <p class="mb-1.5 text-xs font-medium text-slate-500">Statement file</p>
+                        <p class="mb-1.5 text-xs font-medium text-slate-500">Statement files</p>
                         <label
                             class="flex min-h-48 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition"
                             :class="dropActive
@@ -178,34 +203,39 @@ const submit = () => {
                                 {{
                                     dropActive
                                         ? 'Drop to upload'
-                                        : form.file
-                                            ? 'Replace file'
-                                            : 'Drop statement here'
+                                        : form.files.length
+                                            ? 'Add more statements'
+                                            : 'Drop statements here'
                                 }}
                             </span>
                             <span class="text-xs text-slate-500">
-                                CSV, TXT, or OFX — click or drag · max 10MB
+                                CSV, TXT, or OFX — click or drag · up to {{ maxFiles }} files · 10MB each
                             </span>
                             <input
                                 type="file"
+                                multiple
                                 accept=".csv,.txt,.ofx,text/csv,text/plain,application/x-ofx"
                                 class="hidden"
                                 @change="onFileChange"
                             >
                         </label>
-                        <div
-                            v-if="form.file"
-                            class="mt-3 flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
-                        >
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-medium text-slate-900">{{ form.file.name }}</p>
-                                <p class="text-xs text-slate-500">{{ formatFileSize(form.file.size) }}</p>
-                            </div>
-                            <AppButton type="button" variant="ghost" size="sm" @click="clearFile">
-                                Remove
-                            </AppButton>
-                        </div>
+                        <ul v-if="form.files.length" class="mt-3 space-y-2">
+                            <li
+                                v-for="(file, index) in form.files"
+                                :key="fileKey(file)"
+                                class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2"
+                            >
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-slate-900">{{ file.name }}</p>
+                                    <p class="text-xs text-slate-500">{{ formatFileSize(file.size) }}</p>
+                                </div>
+                                <AppButton type="button" variant="ghost" size="sm" @click="removeFile(index)">
+                                    Remove
+                                </AppButton>
+                            </li>
+                        </ul>
                         <p v-if="fileError" class="mt-1.5 text-xs text-red-600">{{ fileError }}</p>
+                        <p v-if="form.errors.files" class="mt-1.5 text-xs text-red-600">{{ form.errors.files }}</p>
                         <p v-if="form.errors.file" class="mt-1.5 text-xs text-red-600">{{ form.errors.file }}</p>
                     </div>
                 </div>
@@ -215,9 +245,9 @@ const submit = () => {
                         type="submit"
                         variant="primary"
                         :loading="form.processing"
-                        :disabled="!accounts.length || !form.file"
+                        :disabled="!accounts.length || !form.files.length"
                     >
-                        {{ form.processing ? 'Uploading…' : 'Continue' }}
+                        {{ form.processing ? 'Uploading…' : form.files.length > 1 ? `Continue with ${form.files.length} files` : 'Continue' }}
                     </AppButton>
                     <AppButton
                         type="button"
