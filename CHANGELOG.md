@@ -2,6 +2,14 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.29](https://github.com/mortolian/nrth/compare/v0.1.28...v0.1.29) (2026-09-03)
+
+
+### Features
+
+* **banking:** improve multi-file import functionality and enhance user experience ([a38d1b9](https://github.com/mortolian/nrth/commit/a38d1b9c48aab31a565bb8c2a82273064601381e))
+* **upload:** enhance file upload functionality with drag-and-drop support and file validation ([2f339c9](https://github.com/mortolian/nrth/commit/2f339c9d8f5d22c84bec9edf2279842ef2e403c2))
+
 ## [0.1.28](https://github.com/mortolian/nrth/compare/v0.1.27...v0.1.28) (2026-09-03)
 
 
