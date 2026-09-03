@@ -1,35 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { router, useForm, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
+import EmptyState from '@/Components/EmptyState.vue';
+import DialogModal from '@/Components/DialogModal.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useBankingTabs } from '@/Composables/useFeatureTabs';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 
 const bankingTabs = useBankingTabs();
+const page = usePage();
 
-type TransactionRow = {
-    id: number;
-    transaction_date: string | null;
-    value_date: string | null;
-    description: string;
-    reference: string | null;
-    amount: string;
-    currency: string;
-    direction: 'debit' | 'credit';
-    running_balance: string | null;
-    reconciliation_status: 'unreviewed' | 'partially_matched' | 'matched' | 'excluded';
-    reconciliation_status_label: string;
-    account: {
-        id: number;
-        name: string;
-        bank_name: string | null;
-    };
-    import: {
-        id: number;
-        original_filename: string;
-        imported_at: string | null;
-    } | null;
-};
+type ReconciliationStatus = 'unreviewed' | 'partially_matched' | 'matched' | 'excluded';
 
 type AccountOption = {
     id: number;
@@ -38,24 +20,97 @@ type AccountOption = {
     currency: string;
 };
 
+type SourceImport = {
+    id: number;
+    original_filename: string;
+    imported_at: string | null;
+};
+
+type AccountingRecord = {
+    id: number;
+    type: string;
+    type_label: string;
+    transaction_date: string | null;
+    reference: string | null;
+    description: string | null;
+    supplier: string | null;
+    invoice_number: string | null;
+    matchable_cents: number;
+    remaining_cents: number;
+    context_label: string;
+};
+
+type Candidate = AccountingRecord & {
+    score: number;
+    suggested_amount_cents: number;
+};
+
+type Allocation = {
+    id: number;
+    amount_cents: number;
+    note: string | null;
+    transaction: AccountingRecord | null;
+};
+
+type LineRow = {
+    id: number;
+    transaction_date: string | null;
+    description: string;
+    reference: string | null;
+    amount_cents: number;
+    allocated_cents: number;
+    remaining_cents: number;
+    currency: string;
+    direction: 'debit' | 'credit';
+    reconciliation_status: ReconciliationStatus;
+    reconciliation_status_label: string;
+    account: {
+        id: number;
+        name: string;
+        bank_name: string | null;
+    };
+    import: SourceImport | null;
+};
+
+type SelectedLine = LineRow & {
+    exclusion_note: string | null;
+    excluded_at: string | null;
+    allocations: Allocation[];
+    candidates: Candidate[];
+};
+
 const props = defineProps<{
     transactions: {
-        data: TransactionRow[];
+        data: LineRow[];
         current_page: number;
         last_page: number;
         total: number;
     };
+    selected: SelectedLine | null;
     accounts: AccountOption[];
     filters: {
+        status: string;
         from: string | null;
         to: string | null;
         account_id: number | null;
         direction: string | null;
         search: string | null;
+        selected: number | null;
     };
+    counts: Record<string, number>;
+    can_manage: boolean;
 }>();
 
+const canManage = computed(() => {
+    if (props.can_manage) {
+        return true;
+    }
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('banking.manage');
+});
+
 const filters = ref({
+    status: props.filters.status || 'all',
     from: props.filters.from ?? '',
     to: props.filters.to ?? '',
     account_id: props.filters.account_id ? String(props.filters.account_id) : 'all',
@@ -63,37 +118,139 @@ const filters = ref({
     search: props.filters.search ?? '',
 });
 
-const formatAmount = (row: TransactionRow) => {
-    const value = Number(row.amount) || 0;
-    const signed = row.direction === 'debit' ? -value : value;
-    return useFormatCurrency(signed, row.currency);
+const excludeNote = ref(props.selected?.exclusion_note ?? '');
+const customAmount = ref('');
+const sourceFileRow = ref<LineRow | null>(null);
+
+const allocateForm = useForm({
+    transaction_id: 0,
+    amount_cents: 0,
+    note: '',
+});
+
+const excludeForm = useForm({
+    exclusion_note: '',
+});
+
+const formatCents = (cents: number, currency = 'ZAR') =>
+    useFormatCurrency((Number(cents) || 0) / 100, currency);
+
+const signedAmount = (row: LineRow) => {
+    const signed = row.direction === 'debit' ? -row.amount_cents : row.amount_cents;
+    return formatCents(signed, row.currency);
 };
 
-const accountLabel = (account: TransactionRow['account']) =>
+const accountLabel = (account: LineRow['account']) =>
     account.bank_name ? `${account.name} (${account.bank_name})` : account.name;
 
-const statusVariant = (status: TransactionRow['reconciliation_status']) => {
+const statusVariant = (status: ReconciliationStatus) => {
     if (status === 'matched') return 'success';
     if (status === 'partially_matched') return 'info';
     if (status === 'excluded') return 'neutral';
     return 'warning';
 };
 
-const applyFilters = (page = 1) => {
-    router.get(route('banking.transactions.index'), {
-        from: filters.value.from || undefined,
-        to: filters.value.to || undefined,
-        account_id: filters.value.account_id === 'all' ? undefined : filters.value.account_id,
-        direction: filters.value.direction === 'all' ? undefined : filters.value.direction,
-        search: filters.value.search || undefined,
-        page,
-    }, { preserveState: true, preserveScroll: true, replace: true });
+const formatImportedAt = (value: string | null) => {
+    if (!value) {
+        return null;
+    }
+    try {
+        return new Date(value.replace(' ', 'T')).toLocaleString();
+    } catch {
+        return value;
+    }
+};
+
+const statusFilters = computed(() => [
+    { value: 'attention', label: 'Needs review', count: props.counts.attention ?? 0 },
+    { value: 'unreviewed', label: 'Unreviewed', count: props.counts.unreviewed ?? 0 },
+    { value: 'partially_matched', label: 'Partial', count: props.counts.partially_matched ?? 0 },
+    { value: 'matched', label: 'Matched', count: props.counts.matched ?? 0 },
+    { value: 'excluded', label: 'Excluded', count: props.counts.excluded ?? 0 },
+    { value: 'all', label: 'All', count: props.counts.all ?? 0 },
+]);
+
+const queryPayload = (pageNumber = 1, selectedId: number | null = props.selected?.id ?? props.filters.selected) => ({
+    status: filters.value.status || undefined,
+    from: filters.value.from || undefined,
+    to: filters.value.to || undefined,
+    account_id: filters.value.account_id === 'all' ? undefined : filters.value.account_id,
+    direction: filters.value.direction === 'all' ? undefined : filters.value.direction,
+    search: filters.value.search || undefined,
+    selected: selectedId || undefined,
+    page: pageNumber,
+});
+
+const applyFilters = (pageNumber = 1, selectedId: number | null = props.selected?.id ?? null) => {
+    router.get(route('banking.transactions.index'), queryPayload(pageNumber, selectedId), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
 };
 
 const clearFilters = () => {
-    filters.value = { from: '', to: '', account_id: 'all', direction: 'all', search: '' };
-    applyFilters();
+    filters.value = { status: 'all', from: '', to: '', account_id: 'all', direction: 'all', search: '' };
+    applyFilters(1, null);
 };
+
+const selectLine = (row: LineRow) => {
+    applyFilters(props.transactions.current_page, row.id);
+};
+
+const matchCandidate = (candidate: Candidate) => {
+    const override = customAmount.value.trim();
+    const amountCents = override !== ''
+        ? Math.round(Number(override) * 100)
+        : candidate.suggested_amount_cents;
+
+    allocateForm.transaction_id = candidate.id;
+    allocateForm.amount_cents = amountCents;
+    allocateForm.note = '';
+    allocateForm.post(route('banking.reconciliation.allocations.store', props.selected!.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            customAmount.value = '';
+        },
+    });
+};
+
+const removeAllocation = (allocation: Allocation) => {
+    router.delete(
+        route('banking.reconciliation.allocations.destroy', {
+            bankingTransaction: props.selected!.id,
+            allocation: allocation.id,
+        }),
+        { preserveScroll: true },
+    );
+};
+
+const excludeLine = () => {
+    excludeForm.exclusion_note = excludeNote.value;
+    excludeForm.post(route('banking.reconciliation.exclude', props.selected!.id), {
+        preserveScroll: true,
+    });
+};
+
+const resetLine = () => {
+    router.post(route('banking.reconciliation.reset', props.selected!.id), {}, { preserveScroll: true });
+};
+
+const openSourceFile = (row: LineRow) => {
+    sourceFileRow.value = row;
+};
+
+const closeSourceFile = () => {
+    sourceFileRow.value = null;
+};
+
+watch(
+    () => props.selected?.id,
+    () => {
+        excludeNote.value = props.selected?.exclusion_note ?? '';
+        customAmount.value = '';
+    },
+);
 </script>
 
 <template>
@@ -101,17 +258,28 @@ const clearFilters = () => {
         title="Banking"
         section="transactions"
         :tabs="bankingTabs"
-        document-title="Imported transactions"
+        document-title="Bank transactions"
+        subtitle="Match imported lines to posted records, or exclude personal / out-of-scope activity."
     >
-        <template #actions>
-            <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
-                Import history
-            </AppButton>
-        </template>
-
-        <AppCard class="mt-5">
-            <form @submit.prevent="applyFilters()">
-                <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+        <AppCard>
+            <p class="text-sm text-slate-600">
+                Imported statements can mix personal and business activity. You do not need to match every line.
+                Match the business ones, exclude the rest, and leave anything still undecided as unreviewed.
+            </p>
+            <form class="mt-4" @submit.prevent="applyFilters()">
+                <div class="flex flex-wrap gap-2">
+                    <AppButton
+                        v-for="item in statusFilters"
+                        :key="item.value"
+                        type="button"
+                        size="sm"
+                        :variant="filters.status === item.value ? 'primary' : 'secondary'"
+                        @click="filters.status = item.value; applyFilters(1, selected?.id ?? null)"
+                    >
+                        {{ item.label }} ({{ item.count }})
+                    </AppButton>
+                </div>
+                <div class="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">From</label>
                         <AppInput v-model="filters.from" type="date" />
@@ -126,9 +294,9 @@ const clearFilters = () => {
                             :model-value="filters.account_id"
                             :options="[
                                 { label: 'All accounts', value: 'all' },
-                                ...accounts.map((a) => ({
-                                    label: a.bank_name ? `${a.name} (${a.bank_name})` : a.name,
-                                    value: String(a.id),
+                                ...accounts.map((account) => ({
+                                    label: account.bank_name ? `${account.name} (${account.bank_name})` : account.name,
+                                    value: String(account.id),
                                 })),
                             ]"
                             @update:model-value="filters.account_id = $event"
@@ -148,7 +316,7 @@ const clearFilters = () => {
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-slate-500">Search</label>
-                        <AppInput v-model="filters.search" placeholder="Description or reference..." />
+                        <AppInput v-model="filters.search" placeholder="Description or reference…" />
                     </div>
                 </div>
                 <div class="mt-3 flex gap-2">
@@ -158,103 +326,264 @@ const clearFilters = () => {
             </form>
         </AppCard>
 
-        <AppCard class="mt-5">
-            <p class="mb-3 text-sm text-slate-500">
-                {{ transactions.total }} transaction{{ transactions.total === 1 ? '' : 's' }}
-            </p>
+        <div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.9fr)]">
+            <AppCard>
+                <p class="mb-3 text-sm text-slate-500">
+                    {{ transactions.total }} transaction{{ transactions.total === 1 ? '' : 's' }}
+                </p>
 
-            <div v-if="transactions.data.length" class="overflow-x-auto">
-                <table class="min-w-full text-left text-sm">
-                    <thead>
-                        <tr class="border-b border-slate-200">
-                            <th class="px-3 py-2 font-medium text-slate-600">Date</th>
-                            <th class="px-3 py-2 font-medium text-slate-600">Account</th>
-                            <th class="px-3 py-2 font-medium text-slate-600">Description</th>
-                            <th class="px-3 py-2 font-medium text-slate-600">Reference</th>
-                            <th class="px-3 py-2 font-medium text-slate-600 text-right">Amount</th>
-                            <th class="px-3 py-2 font-medium text-slate-600">Status</th>
-                            <th class="px-3 py-2 font-medium text-slate-600 text-right">Balance</th>
-                            <th class="px-3 py-2 font-medium text-slate-600">Source file</th>
-                            <th class="px-3 py-2 font-medium text-slate-600"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="row in transactions.data"
-                            :key="row.id"
-                            class="cursor-pointer border-b border-slate-100 hover:bg-slate-50/80"
-                            @click="router.visit(route('banking.reconciliation.index', { selected: row.id, status: 'all' }))"
+                <AppTable
+                    v-if="transactions.data.length"
+                    embedded
+                    dense
+                    table-class="text-sm"
+                    :columns="[
+                        { key: 'date', label: 'Date' },
+                        { key: 'description', label: 'Description' },
+                        { key: 'amount', label: 'Amount', align: 'right' },
+                        { key: 'remaining', label: 'Left', align: 'right' },
+                        { key: 'status', label: 'Status' },
+                        { key: 'actions', label: '' },
+                    ]"
+                    :page="transactions.current_page"
+                    :last-page="transactions.last_page"
+                    :show-pagination="transactions.last_page > 1"
+                    @page-change="applyFilters($event, selected?.id ?? null)"
+                >
+                    <tr
+                        v-for="row in transactions.data"
+                        :key="row.id"
+                        class="cursor-pointer hover:bg-slate-50"
+                        :class="selected?.id === row.id ? 'bg-slate-50' : ''"
+                        @click="selectLine(row)"
+                    >
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-700">{{ row.transaction_date }}</td>
+                        <td class="max-w-[16rem] px-3 py-2">
+                            <div class="truncate font-medium text-slate-900" :title="row.description">{{ row.description }}</div>
+                            <div class="truncate text-xs text-slate-500">{{ accountLabel(row.account) }}</div>
+                        </td>
+                        <td
+                            class="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums"
+                            :class="row.direction === 'debit' ? 'text-red-700' : 'text-emerald-700'"
                         >
-                            <td class="whitespace-nowrap px-3 py-2 text-slate-700">{{ row.transaction_date }}</td>
-                            <td class="px-3 py-2 text-slate-600">{{ accountLabel(row.account) }}</td>
-                            <td class="max-w-xs truncate px-3 py-2 text-slate-900" :title="row.description">
-                                {{ row.description }}
-                            </td>
-                            <td class="px-3 py-2 text-slate-500">{{ row.reference || '—' }}</td>
-                            <td
-                                class="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums"
-                                :class="row.direction === 'debit' ? 'text-red-700' : 'text-emerald-700'"
+                            {{ signedAmount(row) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-600">
+                            {{ formatCents(row.remaining_cents, row.currency) }}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2">
+                            <AppBadge :variant="statusVariant(row.reconciliation_status)">
+                                {{ row.reconciliation_status_label }}
+                            </AppBadge>
+                        </td>
+                        <td class="px-3 py-2 text-right" @click.stop>
+                            <div class="inline-flex justify-end">
+                                <InvoiceRowActionsMenu
+                                    :actions="[{ id: 'source-file', label: 'Source file' }]"
+                                    :aria-label="`Actions for ${row.description}`"
+                                    @select="(actionId) => actionId === 'source-file' && openSourceFile(row)"
+                                />
+                            </div>
+                        </td>
+                    </tr>
+                </AppTable>
+
+                <EmptyState
+                    v-else
+                    :title="filters.status === 'all' ? 'No imported transactions yet' : 'Nothing in this queue'"
+                    :description="filters.status === 'all'
+                        ? 'Import a statement to start matching bank lines to posted records.'
+                        : 'Import a statement, or switch filters to see matched and excluded lines. Personal activity can stay excluded.'"
+                >
+                    <template #action>
+                        <AppButton variant="secondary" @click="router.visit(route('banking.import.create'))">
+                            Import a statement
+                        </AppButton>
+                    </template>
+                </EmptyState>
+            </AppCard>
+
+            <AppCard class="lg:sticky lg:top-4 h-fit">
+                <template v-if="selected">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-semibold text-slate-900">{{ selected.description }}</h2>
+                            <p class="mt-1 text-sm text-slate-500">
+                                {{ selected.transaction_date }} · {{ accountLabel(selected.account) }}
+                            </p>
+                        </div>
+                        <AppBadge :variant="statusVariant(selected.reconciliation_status)">
+                            {{ selected.reconciliation_status_label }}
+                        </AppBadge>
+                    </div>
+
+                    <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <dt class="text-xs text-slate-500">Amount</dt>
+                            <dd class="font-medium tabular-nums" :class="selected.direction === 'debit' ? 'text-red-700' : 'text-emerald-700'">
+                                {{ signedAmount(selected) }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs text-slate-500">Remaining</dt>
+                            <dd class="font-medium tabular-nums">{{ formatCents(selected.remaining_cents, selected.currency) }}</dd>
+                        </div>
+                        <div class="col-span-2">
+                            <dt class="text-xs text-slate-500">Reference</dt>
+                            <dd>{{ selected.reference || '—' }}</dd>
+                        </div>
+                    </dl>
+
+                    <div v-if="selected.allocations.length" class="mt-5">
+                        <h3 class="text-sm font-semibold text-slate-900">Allocations</h3>
+                        <ul class="mt-2 space-y-2">
+                            <li
+                                v-for="allocation in selected.allocations"
+                                :key="allocation.id"
+                                class="rounded-md border border-slate-200 px-3 py-2 text-sm"
                             >
-                                {{ formatAmount(row) }}
-                            </td>
-                            <td class="whitespace-nowrap px-3 py-2">
-                                <AppBadge :variant="statusVariant(row.reconciliation_status)">
-                                    {{ row.reconciliation_status_label }}
-                                </AppBadge>
-                            </td>
-                            <td class="whitespace-nowrap px-3 py-2 text-right text-slate-600 tabular-nums">
-                                {{ row.running_balance != null ? useFormatCurrency(Number(row.running_balance), row.currency) : '—' }}
-                            </td>
-                            <td class="max-w-[10rem] truncate px-3 py-2 text-xs text-slate-500" :title="row.import?.original_filename">
-                                {{ row.import?.original_filename ?? '—' }}
-                            </td>
-                            <td class="whitespace-nowrap px-3 py-2 text-right" @click.stop>
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p class="font-medium text-slate-900">
+                                            {{ allocation.transaction?.context_label ?? 'Accounting transaction' }}
+                                        </p>
+                                        <p class="text-xs text-slate-500">
+                                            {{ allocation.transaction?.transaction_date }}
+                                            · {{ formatCents(allocation.amount_cents, selected.currency) }}
+                                        </p>
+                                    </div>
+                                    <AppButton
+                                        v-if="canManage"
+                                        variant="ghost"
+                                        size="sm"
+                                        @click="removeAllocation(allocation)"
+                                    >
+                                        Remove
+                                    </AppButton>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div v-if="canManage && selected.reconciliation_status !== 'matched'" class="mt-5">
+                        <h3 class="text-sm font-semibold text-slate-900">Suggested matches</h3>
+                        <p class="mt-1 text-xs text-slate-500">
+                            Split a bank line across more than one posted payment, expense, or journal entry if needed.
+                        </p>
+                        <div class="mt-2">
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Amount override (optional)</label>
+                            <AppInput v-model="customAmount" placeholder="Leave blank to use remaining" inputmode="decimal" />
+                        </div>
+                        <ul v-if="selected.candidates.length" class="mt-3 space-y-2">
+                            <li
+                                v-for="candidate in selected.candidates"
+                                :key="candidate.id"
+                                class="rounded-md border border-slate-200 px-3 py-2 text-sm"
+                            >
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p class="font-medium text-slate-900">{{ candidate.context_label }}</p>
+                                        <p class="text-xs text-slate-500">
+                                            {{ candidate.transaction_date }}
+                                            · left {{ formatCents(candidate.remaining_cents, selected.currency) }}
+                                        </p>
+                                        <p v-if="candidate.description" class="mt-1 text-xs text-slate-600">
+                                            {{ candidate.description }}
+                                        </p>
+                                    </div>
+                                    <AppButton
+                                        variant="secondary"
+                                        size="sm"
+                                        :loading="allocateForm.processing && allocateForm.transaction_id === candidate.id"
+                                        @click="matchCandidate(candidate)"
+                                    >
+                                        Match
+                                    </AppButton>
+                                </div>
+                            </li>
+                        </ul>
+                        <p v-else class="mt-3 text-sm text-slate-500">
+                            No posted candidates in the nearby date window. You can still exclude this line if it is personal.
+                        </p>
+                    </div>
+
+                    <div v-if="canManage" class="mt-5 border-t border-slate-200 pt-4">
+                        <template v-if="selected.reconciliation_status === 'excluded'">
+                            <p class="text-sm text-slate-600">
+                                Excluded as personal / not business{{ selected.exclusion_note ? `: ${selected.exclusion_note}` : '' }}.
+                            </p>
+                            <AppButton class="mt-3" variant="secondary" @click="resetLine">
+                                Mark unreviewed
+                            </AppButton>
+                        </template>
+                        <template v-else>
+                            <label class="mb-1 block text-xs font-medium text-slate-500">Exclusion note (optional)</label>
+                            <AppInput v-model="excludeNote" placeholder="e.g. Personal groceries" />
+                            <div class="mt-3 flex flex-wrap gap-2">
                                 <AppButton
-                                    variant="ghost"
-                                    size="sm"
-                                    @click="router.visit(route('banking.reconciliation.index', { selected: row.id, status: 'all' }))"
+                                    variant="secondary"
+                                    :loading="excludeForm.processing"
+                                    @click="excludeLine"
                                 >
-                                    Review
+                                    Exclude as personal
                                 </AppButton>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                                <AppButton
+                                    v-if="selected.reconciliation_status !== 'unreviewed'"
+                                    variant="ghost"
+                                    @click="resetLine"
+                                >
+                                    Reset to unreviewed
+                                </AppButton>
+                            </div>
+                        </template>
+                    </div>
+                </template>
 
-            <p v-else class="py-8 text-center text-sm text-slate-500">
-                No imported transactions yet.
-                <button
-                    type="button"
-                    class="text-brand-700 underline hover:text-brand-800"
-                    @click="router.visit(route('banking.import.create'))"
-                >
-                    Import a statement
-                </button>
-                to get started.
-            </p>
+                <EmptyState
+                    v-else
+                    title="Select a bank line"
+                    description="Choose a row to match it to posted business records or exclude it from the books."
+                />
+            </AppCard>
+        </div>
 
-            <div v-if="transactions.last_page > 1" class="mt-4 flex items-center justify-between">
-                <AppButton
-                    variant="secondary"
-                    size="sm"
-                    :disabled="transactions.current_page <= 1"
-                    @click="applyFilters(transactions.current_page - 1)"
-                >
-                    Previous
-                </AppButton>
-                <span class="text-sm text-slate-500">
-                    Page {{ transactions.current_page }} of {{ transactions.last_page }}
-                </span>
-                <AppButton
-                    variant="secondary"
-                    size="sm"
-                    :disabled="transactions.current_page >= transactions.last_page"
-                    @click="applyFilters(transactions.current_page + 1)"
-                >
-                    Next
-                </AppButton>
-            </div>
-        </AppCard>
+        <DialogModal :show="sourceFileRow !== null" max-width="md" @close="closeSourceFile">
+            <template #title>
+                Source file
+            </template>
+            <template #content>
+                <template v-if="sourceFileRow?.import">
+                    <dl class="space-y-3 text-left">
+                        <div>
+                            <dt class="text-xs font-medium text-slate-500">File</dt>
+                            <dd class="mt-0.5 break-all font-medium text-slate-900">
+                                {{ sourceFileRow.import.original_filename }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium text-slate-500">Imported</dt>
+                            <dd class="mt-0.5 text-slate-700">
+                                {{ formatImportedAt(sourceFileRow.import.imported_at) ?? '—' }}
+                            </dd>
+                        </div>
+                    </dl>
+                </template>
+                <p v-else class="text-left">
+                    This line is not linked to an imported statement file.
+                </p>
+            </template>
+            <template #footer>
+                <div class="flex justify-end gap-2">
+                    <AppButton
+                        v-if="sourceFileRow?.import"
+                        variant="secondary"
+                        @click="router.visit(route('banking.imports.index'))"
+                    >
+                        Import history
+                    </AppButton>
+                    <AppButton variant="primary" @click="closeSourceFile">Close</AppButton>
+                </div>
+            </template>
+        </DialogModal>
     </FeatureShell>
 </template>

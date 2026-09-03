@@ -1,19 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout from '@/Layouts/AppLayout.vue';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
+import type { RowActionItem } from '@/Components/InvoiceRowActionsMenu.vue';
+import { useBankingTabs } from '@/Composables/useFeatureTabs';
+
+const bankingTabs = useBankingTabs();
 
 type ImportRow = {
     id: number;
     original_filename: string;
     file_type: string;
     status: string;
+    status_label: string;
     total_rows: number | null;
     imported_rows: number | null;
     duplicate_rows: number | null;
     failed_rows: number | null;
     can_undo: boolean;
     can_reimport: boolean;
+    can_delete: boolean;
     created_at: string | null;
     updated_at: string | null;
     account: {
@@ -31,6 +38,11 @@ type AccountOption = {
     currency: string;
 };
 
+type StatusOption = {
+    value: string;
+    label: string;
+};
+
 const props = defineProps<{
     imports: {
         data: ImportRow[];
@@ -41,31 +53,49 @@ const props = defineProps<{
     accounts: AccountOption[];
     filters: {
         account_id: number | null;
+        status: string | null;
     };
+    status_options: StatusOption[];
 }>();
 
 const filters = ref({
     account_id: props.filters.account_id ? String(props.filters.account_id) : 'all',
+    status: props.filters.status ?? 'all',
 });
+
+const hasActiveFilters = computed(() =>
+    filters.value.account_id !== 'all' || filters.value.status !== 'all',
+);
 
 const accountLabel = (account: ImportRow['account'] | AccountOption) =>
     account.bank_name ? `${account.name} (${account.bank_name})` : account.name;
 
-const statusLabel = (status: string) => {
-    switch (status) {
-        case 'imported':
-            return 'Imported';
-        case 'parsed':
-            return 'Previewed';
-        case 'pending':
-            return 'Pending';
-        case 'undone':
-            return 'Undone';
-        case 'failed':
-            return 'Failed';
-        default:
-            return status;
+const fileTypeLabel = (fileType: string) => fileType.toUpperCase();
+
+const fileTypeVariant = (fileType: string) => {
+    if (fileType === 'ofx') {
+        return 'accent';
     }
+    if (fileType === 'csv' || fileType === 'txt') {
+        return 'info';
+    }
+    return 'neutral';
+};
+
+const statusVariant = (status: string) => {
+    if (status === 'imported') {
+        return 'success';
+    }
+    if (status === 'undone') {
+        return 'warning';
+    }
+    if (status === 'failed') {
+        return 'danger';
+    }
+    if (status === 'parsed') {
+        return 'info';
+    }
+    return 'neutral';
 };
 
 const formatDate = (value: string | null) => {
@@ -82,6 +112,7 @@ const formatDate = (value: string | null) => {
 const applyFilters = (page = 1) => {
     router.get(route('banking.imports.index'), {
         account_id: filters.value.account_id === 'all' ? undefined : filters.value.account_id,
+        status: filters.value.status === 'all' ? undefined : filters.value.status,
         page,
     }, { preserveState: true, preserveScroll: true, replace: true });
 };
@@ -102,41 +133,86 @@ const reimportStatement = (row: ImportRow) => {
     }
     router.post(route('banking.imports.reimport', row.id));
 };
+
+const deleteImport = (row: ImportRow) => {
+    if (!row.can_delete) {
+        return;
+    }
+    if (!window.confirm(`Permanently delete “${row.original_filename}”? The statement file will be removed and you will not be able to re-import it from history.`)) {
+        return;
+    }
+    router.delete(route('banking.imports.destroy', row.id));
+};
+
+const rowActions = (row: ImportRow): RowActionItem[] => {
+    const actions: RowActionItem[] = [];
+    if (row.can_undo) {
+        actions.push({ id: 'undo', label: 'Undo' });
+    }
+    if (row.can_reimport) {
+        actions.push({ id: 'reimport', label: 'Re-import' });
+    }
+    if (row.can_delete) {
+        actions.push({ id: 'delete', label: 'Delete' });
+    }
+    return actions;
+};
+
+const onRowAction = (row: ImportRow, actionId: string) => {
+    if (actionId === 'undo') {
+        undoImport(row);
+        return;
+    }
+    if (actionId === 'reimport') {
+        reimportStatement(row);
+        return;
+    }
+    if (actionId === 'delete') {
+        deleteImport(row);
+    }
+};
 </script>
 
 <template>
-    <AppLayout
-        title="Import history"
-        :breadcrumbs="[
-            { label: 'Banking', href: route('banking.transactions.index') },
-            { label: 'Import history' },
-        ]"
+    <FeatureShell
+        title="Banking"
+        section="import-history"
+        :tabs="bankingTabs"
+        document-title="Import history"
+        subtitle="Undo keeps the statement file so you can re-import later, or delete it when you no longer need it."
     >
-        <PageHeader title="Import history">
-            <template #actions>
-                <AppButton variant="secondary" @click="router.visit(route('banking.transactions.index'))">
-                    Transactions
-                </AppButton>
-                <AppButton variant="primary" @click="router.visit(route('banking.import.create'))">
-                    Import statement
-                </AppButton>
-            </template>
-        </PageHeader>
-
-        <AppCard class="mt-5 overflow-hidden p-0">
+        <AppCard class="overflow-hidden p-0">
             <form class="border-b border-slate-100 px-5 py-4" @submit.prevent="applyFilters()">
-                <label class="mb-1 block text-xs font-medium text-slate-500">Account</label>
-                <AppSelect
-                    :model-value="filters.account_id"
-                    :options="[
-                        { label: 'All accounts', value: 'all' },
-                        ...accounts.map((a) => ({
-                            label: accountLabel(a),
-                            value: String(a.id),
-                        })),
-                    ]"
-                    @update:model-value="(value) => { filters.account_id = value; applyFilters(); }"
-                />
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Account</label>
+                        <AppSelect
+                            :model-value="filters.account_id"
+                            :options="[
+                                { label: 'All accounts', value: 'all' },
+                                ...accounts.map((a) => ({
+                                    label: accountLabel(a),
+                                    value: String(a.id),
+                                })),
+                            ]"
+                            @update:model-value="(value) => { filters.account_id = value; applyFilters(); }"
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Status</label>
+                        <AppSelect
+                            :model-value="filters.status"
+                            :options="[
+                                { label: 'All statuses', value: 'all' },
+                                ...status_options.map((option) => ({
+                                    label: option.label,
+                                    value: option.value,
+                                })),
+                            ]"
+                            @update:model-value="(value) => { filters.status = value; applyFilters(); }"
+                        />
+                    </div>
+                </div>
             </form>
 
             <AppTable
@@ -156,12 +232,22 @@ const reimportStatement = (row: ImportRow) => {
             >
                 <tr v-for="row in imports.data" :key="row.id" class="border-t border-slate-100">
                     <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ formatDate(row.created_at) }}</td>
-                    <td class="px-3 py-2 text-slate-900">
-                        <div class="font-medium">{{ row.original_filename }}</div>
-                        <div class="text-xs uppercase text-slate-500">{{ row.file_type }}</div>
+                    <td class="px-3 py-2">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <span class="truncate font-medium text-slate-900" :title="row.original_filename">
+                                {{ row.original_filename }}
+                            </span>
+                            <AppBadge :variant="fileTypeVariant(row.file_type)">
+                                {{ fileTypeLabel(row.file_type) }}
+                            </AppBadge>
+                        </div>
                     </td>
                     <td class="px-3 py-2 text-slate-600">{{ accountLabel(row.account) }}</td>
-                    <td class="px-3 py-2 text-slate-600">{{ statusLabel(row.status) }}</td>
+                    <td class="px-3 py-2">
+                        <AppBadge :variant="statusVariant(row.status)">
+                            {{ row.status_label }}
+                        </AppBadge>
+                    </td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600">
                         <span v-if="row.status === 'imported' || row.status === 'undone'">
                             {{ row.imported_rows ?? 0 }} imported
@@ -173,26 +259,13 @@ const reimportStatement = (row: ImportRow) => {
                             {{ row.total_rows ?? '—' }}
                         </span>
                     </td>
-                    <td class="px-3 py-2 text-right">
-                        <div class="flex justify-end gap-2">
-                            <AppButton
-                                v-if="row.can_undo"
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                @click="undoImport(row)"
-                            >
-                                Undo
-                            </AppButton>
-                            <AppButton
-                                v-if="row.can_reimport"
-                                type="button"
-                                variant="primary"
-                                size="sm"
-                                @click="reimportStatement(row)"
-                            >
-                                Re-import
-                            </AppButton>
+                    <td class="px-3 py-2 text-right" @click.stop>
+                        <div v-if="rowActions(row).length" class="inline-flex justify-end">
+                            <InvoiceRowActionsMenu
+                                :actions="rowActions(row)"
+                                :aria-label="`Actions for ${row.original_filename}`"
+                                @select="(actionId) => onRowAction(row, actionId)"
+                            />
                         </div>
                     </td>
                 </tr>
@@ -200,10 +273,12 @@ const reimportStatement = (row: ImportRow) => {
 
             <div v-else class="px-5 py-8">
                 <EmptyState
-                    title="No imports yet"
-                    description="Imported bank statements will appear here. Undo keeps the file so you can re-import later."
+                    :title="hasActiveFilters ? 'No imports match' : 'No imports yet'"
+                    :description="hasActiveFilters
+                        ? 'Try a different account or status filter.'
+                        : 'Imported bank statements will appear here. Undo keeps the file so you can re-import later, or delete it from history when you no longer need it.'"
                 >
-                    <template #action>
+                    <template v-if="!hasActiveFilters" #action>
                         <AppButton variant="primary" @click="router.visit(route('banking.import.create'))">
                             Import statement
                         </AppButton>
@@ -238,5 +313,5 @@ const reimportStatement = (row: ImportRow) => {
                 </div>
             </div>
         </AppCard>
-    </AppLayout>
+    </FeatureShell>
 </template>

@@ -118,21 +118,40 @@ class BankingReconciliationTest extends TestCase
             'excluded_at' => now(),
         ])->save();
 
-        $this->get(route('banking.reconciliation.index'))
+        $this->get(route('banking.transactions.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Banking/Reconciliation/Index')
+                ->component('Banking/Transactions/Index')
                 ->where('counts.unreviewed', 1)
                 ->where('counts.excluded', 1)
-                ->has('lines.data', 1)
-                ->where('lines.data.0.id', $unreviewed->id)
+                ->where('counts.all', 2)
+                ->has('transactions.data', 2)
             );
 
-        $this->get(route('banking.reconciliation.index', ['status' => 'excluded']))
+        $this->get(route('banking.transactions.index', ['status' => 'attention']))
             ->assertInertia(fn (Assert $page) => $page
-                ->has('lines.data', 1)
-                ->where('lines.data.0.id', $personal->id)
+                ->has('transactions.data', 1)
+                ->where('transactions.data.0.id', $unreviewed->id)
             );
+
+        $this->get(route('banking.transactions.index', ['status' => 'excluded']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('transactions.data', 1)
+                ->where('transactions.data.0.id', $personal->id)
+            );
+    }
+
+    public function test_legacy_reconciliation_url_redirects_to_transactions(): void
+    {
+        $this->teamWithBanking();
+
+        $this->get(route('banking.reconciliation.index', [
+            'status' => 'excluded',
+            'search' => 'grocery',
+        ]))->assertRedirect(route('banking.transactions.index', [
+            'status' => 'excluded',
+            'search' => 'grocery',
+        ]));
     }
 
     public function test_can_match_bank_line_to_posted_expense(): void
@@ -143,7 +162,7 @@ class BankingReconciliationTest extends TestCase
         $bankLine = $this->createBankLine($team, $banking, '2026-08-03', 'Corner Cafe', '45.00', TransactionDirection::Debit, 'cafe');
         $expense = $this->createExpense($team, $banking, $category, '2026-08-03', 4500, 'Corner Cafe');
 
-        $this->get(route('banking.reconciliation.index', ['selected' => $bankLine->id, 'status' => 'all']))
+        $this->get(route('banking.transactions.index', ['selected' => $bankLine->id, 'status' => 'all']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('selected.id', $bankLine->id)
@@ -286,7 +305,7 @@ class BankingReconciliationTest extends TestCase
         $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);
         $this->actingTeamContext($viewer, $team);
 
-        $this->get(route('banking.reconciliation.index'))
+        $this->get(route('banking.transactions.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('can_manage', false));
 

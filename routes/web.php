@@ -9,7 +9,6 @@ use App\Http\Controllers\Web\BackupsExportsController;
 use App\Http\Controllers\Web\Banking\BankingAccountController;
 use App\Http\Controllers\Web\Banking\BankingReconciliationController;
 use App\Http\Controllers\Web\Banking\BankingStatementImportController;
-use App\Http\Controllers\Web\Banking\BankingTransactionController;
 use App\Http\Controllers\Web\BudgetingController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ExpensesController;
@@ -134,18 +133,19 @@ Route::middleware([
     Route::post('/backups-exports/backups/{instanceBackupRun}/retry', [BackupsExportsController::class, 'retryBackup'])
         ->name('backups-exports.backups.retry');
     Route::prefix('banking')->name('banking.')->group(function () {
-        Route::get('/reconciliation', [BankingReconciliationController::class, 'index'])->name('reconciliation.index');
+        Route::get('/transactions', [BankingReconciliationController::class, 'index'])->name('transactions.index');
+        Route::get('/reconciliation', [BankingReconciliationController::class, 'redirectToTransactions'])->name('reconciliation.index');
         Route::post('/reconciliation/{bankingTransaction}/allocations', [BankingReconciliationController::class, 'storeAllocation'])->name('reconciliation.allocations.store');
         Route::delete('/reconciliation/{bankingTransaction}/allocations/{allocation}', [BankingReconciliationController::class, 'destroyAllocation'])->name('reconciliation.allocations.destroy');
         Route::post('/reconciliation/{bankingTransaction}/exclude', [BankingReconciliationController::class, 'exclude'])->name('reconciliation.exclude');
         Route::post('/reconciliation/{bankingTransaction}/reset', [BankingReconciliationController::class, 'reset'])->name('reconciliation.reset');
-        Route::get('/transactions', [BankingTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/accounts', [BankingAccountController::class, 'index'])->name('accounts.index');
         Route::post('/accounts', [BankingAccountController::class, 'store'])->name('accounts.store');
         Route::put('/accounts/{bankingAccount}', [BankingAccountController::class, 'update'])->name('accounts.update');
         Route::get('/imports', [BankingStatementImportController::class, 'index'])->name('imports.index');
         Route::post('/imports/{import}/undo', [BankingStatementImportController::class, 'undo'])->name('imports.undo');
         Route::post('/imports/{import}/reimport', [BankingStatementImportController::class, 'reimport'])->name('imports.reimport');
+        Route::delete('/imports/{import}', [BankingStatementImportController::class, 'destroy'])->name('imports.destroy');
         Route::get('/import', [BankingStatementImportController::class, 'create'])->name('import.create');
         Route::post('/import', [BankingStatementImportController::class, 'store'])->name('import.store');
         Route::get('/import/{import}/map', [BankingStatementImportController::class, 'map'])->name('import.map');

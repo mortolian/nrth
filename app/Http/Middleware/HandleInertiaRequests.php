@@ -253,7 +253,7 @@ class HandleInertiaRequests extends Middleware
             $can('expenses.view') ? ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')] : null,
             $can('suppliers.view') ? ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')] : null,
             $can('banking.view') ? ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')] : null,
-            $can('banking.view') ? ['id' => 'banking-reconciliation', 'label' => 'Bank Reconciliation', 'href' => route('banking.reconciliation.index')] : null,
+            $can('banking.view') ? ['id' => 'banking-import-history', 'label' => 'Bank Import History', 'href' => route('banking.imports.index')] : null,
             $can('banking.view') ? ['id' => 'banking-accounts', 'label' => 'Bank Accounts', 'href' => route('banking.accounts.index')] : null,
             ($moduleOn(ModuleCatalog::TRAVEL) && $can('vehicles.view'))
                 ? ['id' => 'vehicles-trips', 'label' => 'Trip Log', 'href' => route('vehicles.trips.index')]

@@ -220,9 +220,6 @@ const submit = () => {
         :subtitle="showForm ? (editingId ? 'Edit banking account' : 'New banking account') : 'Used for statement import and for posting expenses and invoice payments once linked to a ledger account.'"
     >
         <template v-if="!showForm" #actions>
-            <AppButton variant="secondary" @click="router.visit(route('banking.imports.index'))">
-                Import history
-            </AppButton>
             <AppButton variant="primary" @click="openCreate()">
                 New account
             </AppButton>

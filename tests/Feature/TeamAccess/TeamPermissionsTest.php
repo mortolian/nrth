@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\TeamAccess;
 
+use App\Domain\Banking\Enums\ImportStatus;
 use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
@@ -266,12 +268,39 @@ class TeamPermissionsTest extends TestCase
         ]);
 
         $this->actingAs($viewer)
-            ->get(route('banking.reconciliation.index'))
+            ->get(route('banking.transactions.index'))
             ->assertOk();
 
         $this->actingAs($viewer)
             ->post(route('banking.reconciliation.exclude', $line))
             ->assertForbidden();
+    }
+
+    public function test_viewer_cannot_delete_undone_bank_import(): void
+    {
+        [$owner, $viewer] = $this->ownerAndMember(RolePresets::VIEWER);
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+
+        $account = BankingAccount::factory()->for($team)->create();
+        $import = BankingStatementImport::factory()->for($team)->for($account, 'account')->create([
+            'status' => ImportStatus::Undone,
+            'original_filename' => 'personal.csv',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get(route('banking.imports.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('imports.data.0.can_delete', false)
+                ->where('imports.data.0.can_reimport', false)
+                ->where('imports.data.0.can_undo', false));
+
+        $this->actingAs($viewer)
+            ->delete(route('banking.imports.destroy', $import))
+            ->assertForbidden();
+
+        $this->assertNotNull(BankingStatementImport::queryWithoutTeamScope()->find($import->id));
     }
 
     /**

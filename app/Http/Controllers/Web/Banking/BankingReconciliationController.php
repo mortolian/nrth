@@ -18,6 +18,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -32,18 +34,39 @@ class BankingReconciliationController extends Controller
     {
         $this->authorizeTeam('banking.view', $request);
 
+        if (! Schema::hasTable('banking_transactions')) {
+            return Inertia::render('Banking/Transactions/Index', [
+                'transactions' => new LengthAwarePaginator([], 0, 25),
+                'selected' => null,
+                'accounts' => [],
+                'filters' => $this->filters($request),
+                'counts' => [
+                    'all' => 0,
+                    'attention' => 0,
+                    ReconciliationStatus::Unreviewed->value => 0,
+                    ReconciliationStatus::PartiallyMatched->value => 0,
+                    ReconciliationStatus::Matched->value => 0,
+                    ReconciliationStatus::Excluded->value => 0,
+                ],
+                'can_manage' => $request->user()?->canOnTeam('banking.manage') ?? false,
+            ]);
+        }
+
         $teamId = (int) $request->user()->current_team_id;
         $filters = $this->filters($request);
-        $status = (string) ($filters['status'] ?? 'attention');
+        $status = (string) ($filters['status'] ?? 'all');
 
         $query = BankingTransaction::queryWithoutTeamScope()
             ->where('team_id', $teamId)
-            ->with(['account:id,name,bank_name,currency,gl_account_id'])
+            ->with([
+                'account:id,name,bank_name,currency,gl_account_id',
+                'import:id,original_filename,created_at',
+            ])
             ->withSum('allocations as allocated_cents', 'amount_cents');
 
         $this->applyFilters($query, $filters, $status);
 
-        $lines = $query
+        $transactions = $query
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->paginate(25)
@@ -57,6 +80,7 @@ class BankingReconciliationController extends Controller
                 ->where('team_id', $teamId)
                 ->with([
                     'account:id,name,bank_name,currency,gl_account_id',
+                    'import:id,original_filename,created_at',
                     'allocations.transaction.supplier',
                     'allocations.transaction.payments.invoice',
                     'allocations.transaction.journalEntries',
@@ -80,14 +104,21 @@ class BankingReconciliationController extends Controller
             ])
             ->all();
 
-        return Inertia::render('Banking/Reconciliation/Index', [
-            'lines' => $lines,
+        return Inertia::render('Banking/Transactions/Index', [
+            'transactions' => $transactions,
             'selected' => $selected,
             'accounts' => $accounts,
             'filters' => $filters,
             'counts' => $this->counts($teamId, $filters),
             'can_manage' => $request->user()?->canOnTeam('banking.manage') ?? false,
         ]);
+    }
+
+    public function redirectToTransactions(Request $request): RedirectResponse
+    {
+        $this->authorizeTeam('banking.view', $request);
+
+        return redirect()->route('banking.transactions.index', $request->query());
     }
 
     public function storeAllocation(
@@ -260,6 +291,11 @@ class BankingReconciliationController extends Controller
                 'name' => $line->account->name,
                 'bank_name' => $line->account->bank_name,
             ],
+            'import' => $line->import !== null ? [
+                'id' => $line->import->id,
+                'original_filename' => $line->import->original_filename,
+                'imported_at' => $line->import->created_at?->format('Y-m-d H:i'),
+            ] : null,
         ];
     }
 
@@ -355,7 +391,7 @@ class BankingReconciliationController extends Controller
             ...array_map(fn (ReconciliationStatus $case) => $case->value, ReconciliationStatus::cases()),
         ];
         if (! in_array($status, $allowed, true)) {
-            $status = 'attention';
+            $status = 'all';
         }
 
         return [
