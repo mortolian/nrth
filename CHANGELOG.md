@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.30](https://github.com/mortolian/nrth/compare/v0.1.29...v0.1.30) (2026-09-13)
+
+
+### Features
+
+* **expenses:** implement remembered filters for expense index and enhance expense deletion functionality ([e114b5d](https://github.com/mortolian/nrth/commit/e114b5d36d734cf289a31fde59e04084f07aff64))
+
 ## [0.1.29](https://github.com/mortolian/nrth/compare/v0.1.28...v0.1.29) (2026-09-03)
 
 
