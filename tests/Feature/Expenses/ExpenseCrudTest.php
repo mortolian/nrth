@@ -311,7 +311,9 @@ class ExpenseCrudTest extends TestCase
 
         $this->assertCount(0, $txn->fresh()->getMedia('attachments'));
 
-        $this->delete(route('expenses.destroy', $txn->fresh()))->assertRedirect(route('expenses.index'));
+        $this->delete(route('expenses.destroy', $txn->fresh()))
+            ->assertRedirect(route('expenses.index'))
+            ->assertSessionHas('success');
         $this->assertNull(Transaction::queryWithoutTeamScope()->find($txn->id));
     }
 
@@ -618,7 +620,171 @@ class ExpenseCrudTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Expenses/Form')
                 ->where('expense.vat_rate', 'vat15')
-                ->where('expense.vat_amount', 30));
+                ->where('expense.vat_amount', 30)
+                ->where('expense.can_delete', true));
+    }
+
+    public function test_index_supplier_filter_is_case_insensitive(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $supplier = Supplier::factory()->for($team)->create(['name' => 'Acme Trading']);
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier_id' => $supplier->id,
+            'category_account_id' => $category->id,
+            'description' => 'Widgets',
+            'amount_excl_vat_cents' => 100_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-02',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 45_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-03',
+            'supplier' => 'Unrelated Co',
+            'category_account_id' => $category->id,
+            'description' => 'Other',
+            'amount_excl_vat_cents' => 20_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->get(route('expenses.index', ['supplier' => 'acme']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->has('expenses.data', 1)
+                ->where('expenses.data.0.supplier', 'Acme Trading'));
+
+        $this->get(route('expenses.index', ['supplier' => 'CORNER']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->has('expenses.data', 1)
+                ->where('expenses.data.0.supplier', 'Corner Cafe'));
+    }
+
+    public function test_index_filters_persist_when_returning_from_expense_form(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 45_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-02',
+            'supplier' => 'Unrelated Co',
+            'category_account_id' => $category->id,
+            'description' => 'Other',
+            'amount_excl_vat_cents' => 20_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $match = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->where('reference', 'Corner Cafe')
+            ->first();
+        $this->assertNotNull($match);
+
+        $this->get(route('expenses.index', [
+            'supplier' => 'corner',
+            'has_receipt' => 'no',
+            'vat_status' => 'non_claimable',
+        ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->has('expenses.data', 1)
+                ->where('filters.supplier', 'corner')
+                ->where('filters.has_receipt', 'no')
+                ->where('filters.vat_status', 'non_claimable'));
+
+        $this->get(route('expenses.edit', $match))->assertOk();
+
+        $this->get(route('expenses.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->has('expenses.data', 1)
+                ->where('filters.supplier', 'corner')
+                ->where('filters.has_receipt', 'no')
+                ->where('filters.vat_status', 'non_claimable')
+                ->where('expenses.data.0.supplier', 'Corner Cafe'));
+    }
+
+    public function test_index_clear_filters_clears_remembered_state(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 45_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-02',
+            'supplier' => 'Unrelated Co',
+            'category_account_id' => $category->id,
+            'description' => 'Other',
+            'amount_excl_vat_cents' => 20_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->get(route('expenses.index', ['supplier' => 'corner']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('expenses.data', 1));
+
+        $this->get(route('expenses.index', [
+            'from' => '',
+            'to' => '',
+            'categories' => '',
+            'supplier' => '',
+            'has_receipt' => 'all',
+            'vat_status' => 'all',
+        ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('expenses.data', 2)
+                ->where('filters.supplier', null));
+
+        $this->get(route('expenses.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('expenses.data', 2)
+                ->where('filters.supplier', null));
     }
 
     public function test_export_csv_rejects_empty_selection(): void

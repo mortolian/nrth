@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\TeamAccess;
 
+use App\Domain\Accounting\Enums\TransactionStatus;
+use App\Domain\Accounting\Enums\TransactionType;
+use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Enums\ImportStatus;
 use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
@@ -60,6 +63,29 @@ class TeamPermissionsTest extends TestCase
         $this->actingAs($accountant)
             ->get(route('settings.team'))
             ->assertForbidden();
+
+        $expense = Transaction::queryWithoutTeamScope()->create([
+            'team_id' => $owner->currentTeam->id,
+            'type' => TransactionType::Expense,
+            'status' => TransactionStatus::Posted,
+            'reference' => 'Corner Cafe',
+            'description' => 'Coffee',
+            'transaction_date' => now()->toDateString(),
+            'created_by' => $owner->id,
+        ]);
+
+        $this->actingAs($accountant)
+            ->get(route('expenses.edit', $expense))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Form')
+                ->where('expense.can_delete', false));
+
+        $this->actingAs($accountant)
+            ->delete(route('expenses.destroy', $expense))
+            ->assertForbidden();
+
+        $this->assertNotNull(Transaction::queryWithoutTeamScope()->find($expense->id));
     }
 
     public function test_viewer_cannot_open_business_or_team_settings(): void

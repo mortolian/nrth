@@ -21,6 +21,7 @@ use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Models\User;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Http\JsonResponse;
@@ -59,12 +60,13 @@ class ExpensesController extends Controller
         }
 
         $teamId = (int) $request->user()->current_team_id;
-        $start = (string) $request->string('from')->toString();
-        $end = (string) $request->string('to')->toString();
-        $categoryList = array_values(array_filter(explode(',', (string) $request->string('categories')->toString())));
-        $supplier = trim((string) $request->string('supplier')->toString());
-        $hasReceipt = (string) $request->string('has_receipt')->toString();
-        $vatStatus = (string) $request->string('vat_status')->toString();
+        $filters = $this->rememberedIndexFilters($request, $teamId);
+        $start = (string) ($filters['from'] ?? '');
+        $end = (string) ($filters['to'] ?? '');
+        $categoryList = $filters['categories'];
+        $supplier = trim((string) ($filters['supplier'] ?? ''));
+        $hasReceipt = (string) $filters['has_receipt'];
+        $vatStatus = (string) $filters['vat_status'];
 
         $query = Transaction::queryWithoutTeamScope()
             ->where('team_id', $teamId)
@@ -79,10 +81,11 @@ class ExpensesController extends Controller
             $query->whereDate('transaction_date', '<=', $end);
         }
         if ($supplier !== '') {
-            $query->where(function ($q) use ($supplier): void {
-                $q->where('reference', 'like', '%'.$supplier.'%')
-                    ->orWhere('description', 'like', '%'.$supplier.'%')
-                    ->orWhereHas('supplier', fn ($sq) => $sq->where('name', 'like', '%'.$supplier.'%'));
+            $pattern = '%'.mb_strtolower($supplier).'%';
+            $query->where(function ($q) use ($pattern): void {
+                $q->whereRaw('LOWER(reference) LIKE ?', [$pattern])
+                    ->orWhereRaw('LOWER(description) LIKE ?', [$pattern])
+                    ->orWhereHas('supplier', fn ($sq) => $sq->whereRaw('LOWER(name) LIKE ?', [$pattern]));
             });
         }
         if ($hasReceipt === 'yes') {
@@ -103,7 +106,7 @@ class ExpensesController extends Controller
 
         $expenses = $query
             ->orderByDesc('transaction_date')
-            ->paginate(15)
+            ->paginate(15, ['*'], 'page', $filters['page'])
             ->withQueryString()
             ->through(function (Transaction $transaction): array {
                 $expenseLines = $transaction->journalEntries->filter(
@@ -172,7 +175,14 @@ class ExpensesController extends Controller
                 'awaiting_receipts' => $awaitingReceipts,
             ],
             'categories' => $categories,
-            'filters' => $this->filters($request),
+            'filters' => [
+                'from' => $filters['from'],
+                'to' => $filters['to'],
+                'categories' => $filters['categories'],
+                'supplier' => $filters['supplier'],
+                'has_receipt' => $filters['has_receipt'],
+                'vat_status' => $filters['vat_status'],
+            ],
         ]);
     }
 
@@ -288,10 +298,15 @@ class ExpensesController extends Controller
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
+        $user = $request->user();
 
         return Inertia::render('Expenses/Form', [
             'isEditing' => true,
-            'expense' => $this->serializeExpenseForForm($transaction, $team),
+            'expense' => $this->serializeExpenseForForm(
+                $transaction,
+                $team,
+                $user instanceof User ? $user : null,
+            ),
             'prefill' => null,
             ...$this->expenseFormSharedProps($teamId),
         ]);
@@ -569,7 +584,7 @@ class ExpensesController extends Controller
             return back()->withErrors($e->errors());
         }
 
-        return to_route('expenses.index');
+        return to_route('expenses.index')->with('success', __('Expense deleted.'));
     }
 
     public function storeReceipt(Request $request, Transaction $transaction): RedirectResponse
@@ -1121,7 +1136,7 @@ class ExpensesController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serializeExpenseForForm(Transaction $transaction, Team $team): array
+    private function serializeExpenseForForm(Transaction $transaction, Team $team, ?User $user = null): array
     {
         $transaction->loadMissing(['journalEntries.account', 'taxLines', 'supplier']);
 
@@ -1187,6 +1202,9 @@ class ExpensesController extends Controller
             'distance_km' => (float) ($meta['distance_km'] ?? 0),
             'rate_per_km' => (float) ($meta['rate_per_km'] ?? 4.84),
             'attachments' => $attachments,
+            'can_delete' => DeleteTransactionAction::canDelete($transaction)
+                && $user !== null
+                && $user->canOnTeam('expenses.delete', $team),
         ];
     }
 
@@ -1283,5 +1301,75 @@ class ExpensesController extends Controller
             'has_receipt' => $request->string('has_receipt')->toString() ?: 'all',
             'vat_status' => $request->string('vat_status')->toString() ?: 'all',
         ];
+    }
+
+    /**
+     * Keep list filters when leaving for an expense (receipt preview / edit) and returning via breadcrumbs.
+     *
+     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, has_receipt: string, vat_status: string, page: int}
+     */
+    private function rememberedIndexFilters(Request $request, int $teamId): array
+    {
+        $sessionKey = $this->indexFiltersSessionKey($teamId);
+        $queryKeys = ['from', 'to', 'categories', 'supplier', 'has_receipt', 'vat_status', 'page'];
+
+        if ($request->hasAny($queryKeys)) {
+            $filters = $this->normalizeIndexFilters(
+                $this->filters($request),
+                $request->has('page') ? (int) $request->integer('page') : 1,
+            );
+            $request->session()->put($sessionKey, $filters);
+
+            return $filters;
+        }
+
+        $stored = $request->session()->get($sessionKey);
+        if (! is_array($stored)) {
+            return $this->normalizeIndexFilters();
+        }
+
+        return $this->normalizeIndexFilters($stored, (int) ($stored['page'] ?? 1));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, has_receipt: string, vat_status: string, page: int}
+     */
+    private function normalizeIndexFilters(array $filters = [], int $page = 1): array
+    {
+        $hasReceipt = $filters['has_receipt'] ?? 'all';
+        if (! in_array($hasReceipt, ['yes', 'no', 'all'], true)) {
+            $hasReceipt = 'all';
+        }
+
+        $vatStatus = $filters['vat_status'] ?? 'all';
+        if (! in_array($vatStatus, ['claimable', 'non_claimable', 'all'], true)) {
+            $vatStatus = 'all';
+        }
+
+        $categories = $filters['categories'] ?? [];
+        if (! is_array($categories)) {
+            $categories = array_values(array_filter(explode(',', (string) $categories)));
+        }
+        $categories = array_values(array_filter(array_map('strval', $categories), fn (string $name): bool => $name !== ''));
+
+        $from = isset($filters['from']) ? trim((string) $filters['from']) : '';
+        $to = isset($filters['to']) ? trim((string) $filters['to']) : '';
+        $supplier = isset($filters['supplier']) ? trim((string) $filters['supplier']) : '';
+
+        return [
+            'from' => $from !== '' ? $from : null,
+            'to' => $to !== '' ? $to : null,
+            'categories' => $categories,
+            'supplier' => $supplier !== '' ? $supplier : null,
+            'has_receipt' => $hasReceipt,
+            'vat_status' => $vatStatus,
+            'page' => max(1, $page),
+        ];
+    }
+
+    private function indexFiltersSessionKey(int $teamId): string
+    {
+        return 'expenses.index_filters.'.$teamId;
     }
 }

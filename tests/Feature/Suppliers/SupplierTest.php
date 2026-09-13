@@ -81,6 +81,32 @@ class SupplierTest extends TestCase
         $this->assertNull(Supplier::queryWithoutTeamScope()->find($supplier->id));
     }
 
+    public function test_index_paginates_suppliers_in_grid_and_table_views(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        Supplier::factory()->for($team)->count(16)->create();
+
+        $this->get(route('suppliers.index', ['view' => 'grid']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Suppliers/Index')
+                ->has('suppliers.data', 15)
+                ->where('suppliers.current_page', 1)
+                ->where('suppliers.last_page', 2)
+                ->where('filters.view', 'grid'));
+
+        $this->get(route('suppliers.index', ['view' => 'grid', 'page' => 2]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('suppliers.data', 1)
+                ->where('suppliers.current_page', 2)
+                ->where('suppliers.last_page', 2));
+    }
+
     public function test_supplier_store_returns_json_for_inline_create(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

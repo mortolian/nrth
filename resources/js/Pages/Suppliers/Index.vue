@@ -85,25 +85,56 @@ const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
             </div>
         </AppCard>
 
-        <div v-if="filters.view === 'grid'" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <AppCard
-                v-for="supplier in suppliers.data"
-                :key="supplier.id"
-                class="cursor-pointer hover:border-brand-300"
-                @click="goToSupplier(supplier.id)"
-            >
-                <div class="flex items-start justify-between">
-                    <div>
-                        <h3 class="text-base font-semibold text-slate-900">{{ supplier.name }}</h3>
-                        <p class="text-sm text-slate-500">{{ supplier.email || 'No email' }}</p>
+        <div v-if="filters.view === 'grid'" class="mt-5">
+            <div v-if="suppliers.data.length" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <AppCard
+                    v-for="supplier in suppliers.data"
+                    :key="supplier.id"
+                    class="cursor-pointer hover:border-brand-300"
+                    @click="goToSupplier(supplier.id)"
+                >
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-900">{{ supplier.name }}</h3>
+                            <p class="text-sm text-slate-500">{{ supplier.email || 'No email' }}</p>
+                        </div>
+                        <AppBadge :variant="supplier.status === 'active' ? 'success' : 'neutral'">{{ supplier.status }}</AppBadge>
                     </div>
-                    <AppBadge :variant="supplier.status === 'active' ? 'success' : 'neutral'">{{ supplier.status }}</AppBadge>
+                    <div class="mt-3 space-y-1 text-sm">
+                        <p><span class="text-slate-500">Expenses:</span> <span class="font-medium">{{ supplier.expense_count }}</span></p>
+                        <p><span class="text-slate-500">Last expense:</span> {{ supplier.last_expense_date || '-' }}</p>
+                    </div>
+                </AppCard>
+            </div>
+            <EmptyState
+                v-else
+                title="No suppliers found"
+                description="Try adjusting filters or add a new supplier."
+            />
+            <div
+                v-if="suppliers.last_page > 1"
+                class="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"
+            >
+                <p>Page {{ suppliers.current_page }} of {{ suppliers.last_page }}</p>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                        :disabled="suppliers.current_page <= 1"
+                        @click="applyFilters(suppliers.current_page - 1)"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
+                        :disabled="suppliers.current_page >= suppliers.last_page"
+                        @click="applyFilters(suppliers.current_page + 1)"
+                    >
+                        Next
+                    </button>
                 </div>
-                <div class="mt-3 space-y-1 text-sm">
-                    <p><span class="text-slate-500">Expenses:</span> <span class="font-medium">{{ supplier.expense_count }}</span></p>
-                    <p><span class="text-slate-500">Last expense:</span> {{ supplier.last_expense_date || '-' }}</p>
-                </div>
-            </AppCard>
+            </div>
         </div>
 
         <AppCard v-else class="mt-5 overflow-hidden p-0">

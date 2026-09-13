@@ -38,7 +38,10 @@ type ExpenseFormRow = {
     distance_km: number;
     rate_per_km: number;
     attachments?: ExpenseAttachment[];
+    can_delete: boolean;
 };
+
+type ExpenseFormProps = ExpenseFormRow;
 
 const props = withDefaults(
     defineProps<{
@@ -176,22 +179,85 @@ const selectedTax = computed(
 const vatAutoCents = computed(() => Math.round(Number(form.amount_excl_vat || 0) * Number(selectedTax.value?.rate || 0) * 100));
 const totalCents = computed(() => Math.round(Number(form.amount_excl_vat || 0) * 100) + Math.round(Number(form.vat_amount || 0) * 100));
 
-const totalInclVat = computed({
-    get: () => totalCents.value / 100,
-    set: (value: string | number) => {
-        const total = Number(value);
-        if (!Number.isFinite(total) || total < 0) {
-            return;
-        }
-        const rate = Number(selectedTax.value?.rate || 0);
-        const totalC = Math.round(total * 100);
-        if (rate > 0) {
-            form.amount_excl_vat = Math.round(totalC / (1 + rate)) / 100;
-        } else {
-            form.amount_excl_vat = totalC / 100;
-        }
-    },
+const sanitizeMoneyTyping = (raw: string): string => {
+    const next = raw.replace(/\s/g, '').replace(',', '.').replace(/[^\d.]/g, '');
+    const dot = next.indexOf('.');
+    if (dot === -1) {
+        return next;
+    }
+
+    return `${next.slice(0, dot)}.${next.slice(dot + 1).replace(/\./g, '').slice(0, 2)}`;
+};
+
+const centsFromRandsInput = (raw: string): number | null => {
+    const cleaned = sanitizeMoneyTyping(raw).replace(/\.$/, '');
+    if (cleaned === '') {
+        return null;
+    }
+
+    const [wholePart = '0', fraction = ''] = cleaned.split('.');
+    const whole = Number(wholePart || '0');
+    if (!Number.isFinite(whole) || whole < 0) {
+        return null;
+    }
+
+    if (fraction === '') {
+        return whole * 100;
+    }
+
+    return whole * 100 + Number(fraction.padEnd(2, '0'));
+};
+
+const formatRandsFromCents = (cents: number): string => (Math.round(cents) / 100).toFixed(2);
+
+let applyingInclusiveTotal = false;
+
+const applyInclusiveTotalCents = (totalC: number) => {
+    const rate = Number(selectedTax.value?.rate || 0);
+    applyingInclusiveTotal = true;
+    if (rate > 0) {
+        const exclC = Math.round(totalC / (1 + rate));
+        form.amount_excl_vat = exclC / 100;
+        form.vat_amount = (totalC - exclC) / 100;
+    } else {
+        form.amount_excl_vat = totalC / 100;
+        form.vat_amount = 0;
+    }
+    applyingInclusiveTotal = false;
+};
+
+const totalInput = ref(formatRandsFromCents(totalCents.value));
+const totalFocused = ref(false);
+
+watch(totalCents, (cents) => {
+    if (!totalFocused.value) {
+        totalInput.value = formatRandsFromCents(cents);
+    }
 });
+
+const onTotalFocus = () => {
+    totalFocused.value = true;
+};
+
+const onTotalInput = (value: string | number | null) => {
+    totalInput.value = sanitizeMoneyTyping(String(value ?? ''));
+};
+
+const commitTotalInput = () => {
+    const cents = centsFromRandsInput(totalInput.value);
+    if (cents === null) {
+        totalInput.value = formatRandsFromCents(totalCents.value);
+        return;
+    }
+
+    applyInclusiveTotalCents(cents);
+    totalInput.value = formatRandsFromCents(totalCents.value);
+};
+
+const onTotalBlur = () => {
+    commitTotalInput();
+    totalFocused.value = false;
+};
 
 const selectedCategory = computed(() => {
     const id = Number(form.category_account_id || 0);
@@ -206,9 +272,12 @@ const travelDeduction = computed(() => Number(form.distance_km || 0) * Number(fo
 watch(
     () => [form.amount_excl_vat, form.vat_rate],
     () => {
+        if (applyingInclusiveTotal) {
+            return;
+        }
         form.vat_amount = vatAutoCents.value / 100;
     },
-    { immediate: true },
+    { immediate: true, flush: 'sync' },
 );
 
 const isImageMime = (mime: string, name = '') =>
@@ -882,6 +951,33 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
 
 const formErrors = ref<string[]>([]);
 const submitting = ref(false);
+const deleting = ref(false);
+
+const canDeleteExpense = computed(() => props.isEditing && Boolean(props.expense?.can_delete));
+
+const expenseSupplierLabel = computed(() => {
+    if (form.supplier_id > 0) {
+        return supplierList.value.find((supplier) => supplier.id === form.supplier_id)?.name ?? 'this supplier';
+    }
+
+    return form.supplier_custom?.trim() || 'this supplier';
+});
+
+const confirmDelete = () => {
+    if (!canDeleteExpense.value || !props.expense || submitting.value || deleting.value) {
+        return;
+    }
+    if (!confirm(`Delete expense from ${form.date || 'this date'} (${expenseSupplierLabel.value})? This removes the journal entry.`)) {
+        return;
+    }
+
+    deleting.value = true;
+    router.delete(route('expenses.destroy', props.expense.id), {
+        onFinish: () => {
+            deleting.value = false;
+        },
+    });
+};
 
 const inertiaErrors = computed(() => {
     const errors = page.props.errors as Record<string, string | string[]> | undefined;
@@ -917,6 +1013,7 @@ const submit = () => {
     }
 
     formErrors.value = [];
+    commitTotalInput();
     if (!hasCategories.value) {
         formErrors.value = ['Add at least one expense category before saving.'];
         return;
@@ -1024,7 +1121,18 @@ const submit = () => {
             { label: props.isEditing ? 'Edit' : 'Create' },
         ]"
     >
-        <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'" />
+        <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'">
+            <template v-if="canDeleteExpense" #actions>
+                <AppButton
+                    variant="danger"
+                    :disabled="submitting || deleting"
+                    :loading="deleting"
+                    @click="confirmDelete"
+                >
+                    Delete
+                </AppButton>
+            </template>
+        </PageHeader>
 
         <AppCard v-if="!hasCategories" class="mt-5">
             <p class="text-sm text-slate-700">Add at least one active expense category in your chart of accounts before recording expenses.</p>
@@ -1319,10 +1427,13 @@ const submit = () => {
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Total (incl VAT)</label>
                     <AppInput
-                        v-model="totalInclVat"
+                        :model-value="totalInput"
                         type="text"
                         inputmode="decimal"
                         class="min-h-12 text-base md:min-h-0 md:text-sm"
+                        @update:model-value="onTotalInput"
+                        @focus="onTotalFocus"
+                        @blur="onTotalBlur"
                     />
                     <p class="mt-1 text-xs text-slate-500">Enter the paid total to back-calculate amount excl VAT.</p>
                 </div>
@@ -1414,6 +1525,7 @@ const submit = () => {
                     size="touch"
                     class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
                     :loading="submitting"
+                    :disabled="deleting"
                     @click="submit"
                 >
                     {{ submitting ? 'Saving…' : props.isEditing ? 'Update Expense' : 'Save Expense' }}
@@ -1422,7 +1534,7 @@ const submit = () => {
                     variant="secondary"
                     size="touch"
                     class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
-                    :disabled="submitting"
+                    :disabled="submitting || deleting"
                     @click="router.visit(route('expenses.index'))"
                 >
                     Cancel
