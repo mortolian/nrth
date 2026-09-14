@@ -51,6 +51,7 @@ type AssetRow = {
     asset_type_label: string;
     institution: string | null;
     current_value_cents: number;
+    last_valued_on: string | null;
     period_movement_cents: number;
     financial_year_movement_cents: number;
     is_archived: boolean;
@@ -448,6 +449,7 @@ const columns: TableColumn[] = [
     { key: 'owner', label: 'Owner' },
     { key: 'type', label: 'Type' },
     { key: 'institution', label: 'Institution' },
+    { key: 'last_valued', label: 'Last valued' },
     { key: 'value', label: 'Current value', align: 'right' },
     { key: 'period', label: 'Period movement', align: 'right' },
     { key: 'fy', label: 'FY movement', align: 'right' },
@@ -771,6 +773,9 @@ const chartOptions = computed(() => {
                         <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.owner_name }}</td>
                         <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.asset_type_label }}</td>
                         <td class="whitespace-nowrap px-3 py-2 text-slate-600">{{ row.institution || '—' }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-600">
+                            <DateDisplay :value="row.last_valued_on" />
+                        </td>
                         <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">{{ formatCents(row.current_value_cents) }}</td>
                         <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.period_movement_cents) }}</td>
                         <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-700">{{ formatSigned(row.financial_year_movement_cents) }}</td>

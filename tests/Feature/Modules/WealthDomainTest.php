@@ -55,7 +55,8 @@ class WealthDomainTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Wealth/Index')
-                ->where('overview.total_cents', 4_800_000));
+                ->where('overview.total_cents', 4_800_000)
+                ->where('overview.assets.0.last_valued_on', '2026-04-01'));
     }
 
     public function test_owner_can_edit_opening_valuation_from_asset_form(): void

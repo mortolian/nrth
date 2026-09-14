@@ -34,11 +34,18 @@ final class PortfolioPerformanceService
     {
         $asOf = ($asOf ?? now())->copy()->startOfDay();
         $currency = $portfolio->base_currency;
-        $activeAssets = $portfolio->assets()->orderBy('name')->get();
+        $activeAssets = $portfolio->assets()
+            ->withMax('valuations as last_valued_on', 'valued_on')
+            ->orderBy('name')
+            ->get();
         $activeAssets->each->setRelation('portfolio', $portfolio);
 
         $listAssets = $includeArchived
-            ? $portfolio->assets()->withTrashed()->orderBy('name')->get()
+            ? $portfolio->assets()
+                ->withTrashed()
+                ->withMax('valuations as last_valued_on', 'valued_on')
+                ->orderBy('name')
+                ->get()
             : $activeAssets;
         $listAssets->each->setRelation('portfolio', $portfolio);
 
@@ -97,6 +104,9 @@ final class PortfolioPerformanceService
                 'liquidity_label' => $asset->liquidity->label(),
                 'currency' => $asset->currency,
                 'current_value_cents' => $asset->valueCentsAsOf($asOf),
+                'last_valued_on' => $asset->last_valued_on
+                    ? Carbon::parse($asset->last_valued_on)->toDateString()
+                    : null,
                 'period_movement_cents' => $period['investment_movement_cents'],
                 'financial_year_movement_cents' => $fy['investment_movement_cents'],
                 'interest_rate_bps' => $asset->interest_rate_bps,
