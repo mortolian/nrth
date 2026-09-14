@@ -41,6 +41,9 @@ export function useMoneyOutTabs() {
             canTeam('expenses.view')
                 ? { id: 'expenses', label: 'Expenses', href: route('expenses.index') }
                 : null,
+            canTeam('expenses.view')
+                ? { id: 'recurring', label: 'Recurring', href: route('expenses.recurring.index') }
+                : null,
             canTeam('suppliers.view')
                 ? { id: 'suppliers', label: 'Suppliers', href: route('suppliers.index') }
                 : null,

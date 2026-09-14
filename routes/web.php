@@ -11,6 +11,7 @@ use App\Http\Controllers\Web\Banking\BankingReconciliationController;
 use App\Http\Controllers\Web\Banking\BankingStatementImportController;
 use App\Http\Controllers\Web\BudgetingController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\Expenses\RecurringExpenseController;
 use App\Http\Controllers\Web\ExpensesController;
 use App\Http\Controllers\Web\InvoicePdfController;
 use App\Http\Controllers\Web\Invoicing\ClientController;
@@ -158,6 +159,19 @@ Route::middleware([
     Route::get('/expenses/create', [ExpensesController::class, 'create'])->name('expenses.create');
     Route::post('/expenses/parse-receipt', [ExpensesController::class, 'parseReceipt'])->name('expenses.parse-receipt');
     Route::post('/expenses', [ExpensesController::class, 'store'])->name('expenses.store');
+    Route::prefix('expenses/recurring')->name('expenses.recurring.')->group(function () {
+        Route::get('/', [RecurringExpenseController::class, 'index'])->name('index');
+        Route::get('/create', [RecurringExpenseController::class, 'create'])->name('create');
+        Route::post('/', [RecurringExpenseController::class, 'store'])->name('store');
+        Route::get('/{recurringExpense}', [RecurringExpenseController::class, 'show'])->name('show');
+        Route::get('/{recurringExpense}/edit', [RecurringExpenseController::class, 'edit'])->name('edit');
+        Route::put('/{recurringExpense}', [RecurringExpenseController::class, 'update'])->name('update');
+        Route::delete('/{recurringExpense}', [RecurringExpenseController::class, 'destroy'])->name('destroy');
+        Route::post('/{recurringExpense}/pause', [RecurringExpenseController::class, 'pause'])->name('pause');
+        Route::post('/{recurringExpense}/resume', [RecurringExpenseController::class, 'resume'])->name('resume');
+        Route::post('/{recurringExpense}/complete', [RecurringExpenseController::class, 'complete'])->name('complete');
+        Route::post('/{recurringExpense}/generate', [RecurringExpenseController::class, 'generateNow'])->name('generate');
+    });
     Route::get('/expenses/{transaction}/edit', [ExpensesController::class, 'edit'])->name('expenses.edit');
     Route::put('/expenses/{transaction}', [ExpensesController::class, 'update'])->name('expenses.update');
     Route::delete('/expenses/{transaction}', [ExpensesController::class, 'destroy'])->name('expenses.destroy');

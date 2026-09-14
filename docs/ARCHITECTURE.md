@@ -62,7 +62,7 @@ Exceptions/   # when needed
 | **Accounting** | Chart of accounts, journal transactions, journal lines, suppliers, posting/void, ledger balances, P&L |
 | **Invoicing** | Clients, invoices, estimates, items, recurring, payments, PDFs, online pay sessions |
 | **Banking** | Bank accounts (linked to GL), statement import, imported lines, match/exclude on the transactions page |
-| **Expenses** | Receipt parse helpers used by the expenses UI (posted expenses are accounting transactions) |
+| **Expenses** | Receipt parse helpers, recurring expense templates, and generate-from-schedule (posted expenses are accounting transactions) |
 | **Tax** | VAT rates, periods, and returns |
 | **Takeout** | Team data export jobs (Settings → Backups & exports) |
 | **Backup** | Instance backup runs (operator / `./scripts/backup`) |
@@ -108,7 +108,7 @@ public function execute(RecordPaymentDTO $dto): Payment
 - **Service** — reusable queries and calculations (`LedgerService`, `ProfitLossReportService`, `InvoiceTotalsCalculator`). Reports HTTP live in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php) and call those services.
 - **Posting** — [`PostTransactionAction`](../app/Domain/Accounting/Actions/PostTransactionAction.php) will not post an unbalanced journal. Voiding posts a reversal and marks the original void; the ledger still sees both so they net out ([`LedgerService`](../app/Domain/Accounting/Services/LedgerService.php)).
 
-Some screens (especially expenses) still contain more SQL in the controller than the ideal. New money-moving behaviour should go through an action.
+Some screens still contain more SQL in the controller than the ideal (expense updates and receipts). Expense **creates** go through [`CreateExpenseAction`](../app/Domain/Expenses/Actions/CreateExpenseAction.php); recurring templates generate through [`GenerateRecurringExpenseAction`](../app/Domain/Expenses/Actions/GenerateRecurringExpenseAction.php). New money-moving behaviour should go through an action.
 
 ## Money
 

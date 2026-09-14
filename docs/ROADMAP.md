@@ -13,7 +13,7 @@ These areas exist and are usable. 1.0 is not promised yet.
 | Area | Notes |
 |------|-------|
 | **Invoicing & estimates** | Clients, items catalog, recurring invoices, discounts, note templates, income accounts on send, PDFs, email, payments, Stripe/PayFast pay links, multi-currency |
-| **Expenses & suppliers** | Receipts, VAT on purchases, categories, supplier records |
+| **Expenses & suppliers** | Receipts, VAT on purchases, categories, supplier records, recurring expenses |
 | **Accounting** | Chart of accounts, journal, general ledger, account statements |
 | **Banking** | CSV/OFX import (one or more files), duplicate detection, match/exclude imported transactions |
 | **Tax (VAT)** | Rates, returns, periods — SA-oriented defaults |
@@ -47,7 +47,6 @@ Ideas under consideration, not scheduled:
 
 - Wealth module refinements (CSV import, multi-currency portfolios)
 - Additional bank statement formats and bank-specific CSV presets
-- Expense rules (recurring expenses)
 - Deeper SARS reporting (beyond current VAT scaffolding)
 - Mobile-friendly UI improvements
 - Published Docker image (GHCR) for simpler pulls
