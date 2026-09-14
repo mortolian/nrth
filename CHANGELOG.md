@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.31](https://github.com/mortolian/nrth/compare/v0.1.30...v0.1.31) (2026-09-14)
+
+
+### Features
+
+* **portfolio:** add last valued date to asset overview and update UI ([4d801ea](https://github.com/mortolian/nrth/commit/4d801eab623b8922fd922b9b8ebb975603496d33))
+
 ## [0.1.30](https://github.com/mortolian/nrth/compare/v0.1.29...v0.1.30) (2026-09-13)
 
 
