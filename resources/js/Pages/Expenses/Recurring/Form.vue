@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
+import { Plus } from 'lucide-vue-next';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import FieldHelp from '@/Components/FieldHelp.vue';
 import FormValidationBanner from '@/Components/FormValidationBanner.vue';
@@ -26,6 +27,9 @@ const toast = useToast();
 const page = usePage();
 const { fieldErrors, setFromServer, clear, messages: clientErrorMessages } = useFieldErrors();
 const taxRateList = computed(() => (props.tax_rates?.length ? props.tax_rates : FALLBACK_EXPENSE_TAX_RATES));
+const createdSuppliers = ref<SupplierOption[]>([]);
+const saveSupplierLoading = ref(false);
+const saveSupplierError = ref<string | null>(null);
 
 const help = {
     supplier: 'Who this expense is paid to each cycle.',
@@ -89,10 +93,120 @@ watch(
     },
 );
 
+const supplierList = computed(() => {
+    const byId = new Map<number, SupplierOption>();
+    for (const supplier of props.supplier_options) {
+        byId.set(supplier.id, supplier);
+    }
+    for (const supplier of createdSuppliers.value) {
+        byId.set(supplier.id, supplier);
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+});
+
 const supplierSelectOptions = computed(() => [
-    { label: 'One-off supplier…', value: '0' },
-    ...props.supplier_options.map((supplier) => ({ label: supplier.name, value: String(supplier.id) })),
+    { label: 'Custom (one-off)', value: '0' },
+    ...supplierList.value.map((supplier) => ({ label: supplier.name, value: String(supplier.id) })),
 ]);
+
+const canSaveAsSupplier = computed(
+    () => form.value.supplier_id === 0 && String(form.value.supplier_custom).trim().length > 0,
+);
+
+const recurringReturnPath = computed(() =>
+    props.isEditing && props.recurring?.id
+        ? `/expenses/recurring/${props.recurring.id}/edit`
+        : '/expenses/recurring/create',
+);
+
+const openNewSupplierForm = () => {
+    const query: Record<string, string> = { return: recurringReturnPath.value };
+    const name = String(form.value.supplier_custom).trim();
+    if (form.value.supplier_id === 0 && name) {
+        query.name = name;
+    }
+    router.get(route('suppliers.create'), query);
+};
+
+const saveAsSupplier = async () => {
+    const name = String(form.value.supplier_custom).trim();
+    if (!name || saveSupplierLoading.value) {
+        return;
+    }
+
+    const token = page.props.csrf_token as string | undefined;
+    if (!token) {
+        saveSupplierError.value = 'Unable to save supplier: missing security token. Refresh the page and try again.';
+        return;
+    }
+
+    saveSupplierLoading.value = true;
+    saveSupplierError.value = null;
+
+    try {
+        const res = await fetch(route('suppliers.store'), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': token,
+            },
+            body: JSON.stringify({
+                name,
+                contact_name: null,
+                email: null,
+                phone: null,
+                vat_number: null,
+                registration_number: null,
+                address: null,
+                notes: null,
+                is_active: true,
+            }),
+        });
+
+        const responsePayload = (await res.json().catch(() => null)) as {
+            data?: { id?: number; name?: string };
+            message?: string;
+            errors?: Record<string, string[]>;
+        } | null;
+
+        if (!res.ok) {
+            const firstError = responsePayload?.errors
+                ? Object.values(responsePayload.errors).flat()[0]
+                : null;
+            saveSupplierError.value = firstError || responsePayload?.message || 'Could not save this supplier.';
+            toast.error(saveSupplierError.value);
+            return;
+        }
+
+        const id = Number(responsePayload?.data?.id ?? 0);
+        const savedName = String(responsePayload?.data?.name ?? name);
+        if (id <= 0) {
+            saveSupplierError.value = 'Could not save this supplier.';
+            toast.error(saveSupplierError.value);
+            return;
+        }
+
+        createdSuppliers.value = [...createdSuppliers.value, { id, name: savedName }];
+        form.value.supplier_id = id;
+        form.value.supplier_custom = '';
+        toast.success('Supplier saved and selected.');
+    } catch {
+        saveSupplierError.value = 'Could not save this supplier. Try again.';
+        toast.error(saveSupplierError.value);
+    } finally {
+        saveSupplierLoading.value = false;
+    }
+};
+
+watch(
+    () => [form.value.supplier_id, form.value.supplier_custom],
+    () => {
+        saveSupplierError.value = null;
+    },
+);
 
 const categorySelectOptions = computed(() =>
     props.categories.map((category) => ({ label: category.name, value: String(category.id) })),
@@ -228,25 +342,55 @@ const submit = () => {
             :errors="visibleValidationErrors"
         />
 
-        <AppCard class="mt-5 max-w-3xl space-y-6">
+        <AppCard class="mt-5 space-y-6">
             <section class="space-y-4">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-900">Supplier &amp; amount</h3>
                     <p class="mt-0.5 text-xs text-slate-500">What is paid each cycle</p>
                 </div>
                 <div>
-                    <FieldHelp label="Supplier" :text="help.supplier" />
+                    <div class="mb-1 flex flex-wrap items-end justify-between gap-2">
+                        <FieldHelp label="Supplier" :text="help.supplier" />
+                        <AppButton
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            class="mb-1"
+                            @click="openNewSupplierForm"
+                        >
+                            <Plus class="mr-1 h-3.5 w-3.5" />
+                            New supplier
+                        </AppButton>
+                    </div>
                     <AppSelect
                         :model-value="String(form.supplier_id)"
                         :options="supplierSelectOptions"
+                        searchable
+                        placeholder="Select supplier"
+                        search-placeholder="Search suppliers..."
                         @update:model-value="form.supplier_id = Number($event)"
                     />
-                    <AppInput
-                        v-if="form.supplier_id === 0"
-                        v-model="form.supplier_custom"
-                        class="mt-2"
-                        placeholder="One-off supplier name"
-                    />
+                    <div v-if="form.supplier_id === 0" class="mt-2 space-y-2">
+                        <AppInput
+                            v-model="form.supplier_custom"
+                            placeholder="One-off supplier name"
+                        />
+                        <div v-if="canSaveAsSupplier" class="flex flex-wrap items-center gap-2">
+                            <AppButton
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                :loading="saveSupplierLoading"
+                                @click="saveAsSupplier"
+                            >
+                                {{ saveSupplierLoading ? 'Saving…' : 'Save as supplier' }}
+                            </AppButton>
+                            <p class="text-xs text-slate-500">
+                                Keep this vendor for future recurring and one-off expenses.
+                            </p>
+                        </div>
+                        <p v-if="saveSupplierError" class="text-xs text-rose-700">{{ saveSupplierError }}</p>
+                    </div>
                     <p v-if="fieldErrors.supplier_id || fieldErrors.supplier" class="mt-1 text-xs text-rose-600">
                         {{ fieldErrors.supplier_id || fieldErrors.supplier }}
                     </p>
@@ -257,7 +401,9 @@ const submit = () => {
                         <AppSelect
                             :model-value="form.category_account_id > 0 ? String(form.category_account_id) : ''"
                             :options="categorySelectOptions"
+                            searchable
                             placeholder="Select category"
+                            search-placeholder="Search categories..."
                             @update:model-value="form.category_account_id = Number($event) || 0"
                         />
                         <p v-if="fieldErrors.category_account_id" class="mt-1 text-xs text-rose-600">

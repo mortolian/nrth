@@ -145,6 +145,20 @@ class RecurringExpenseHttpTest extends TestCase
             ->assertInertia(fn ($page) => $page->component('Expenses/Recurring/Form'));
     }
 
+    public function test_create_form_prefills_supplier_from_query(): void
+    {
+        [$owner, $team] = $this->ownerWithPayload();
+        $supplier = Supplier::factory()->for($team)->create(['name' => 'Prefill Landlord']);
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['supplier_id' => $supplier->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Recurring/Form')
+                ->where('recurring.supplier_id', $supplier->id)
+                ->where('recurring.supplier_custom', ''));
+    }
+
     public function test_store_links_supplier_and_rejects_travel_category(): void
     {
         [$owner, $team, , $banking] = $this->ownerWithPayload();

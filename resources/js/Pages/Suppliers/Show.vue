@@ -162,6 +162,12 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
                 >
                     New Expense
                 </AppButton>
+                <AppButton
+                    variant="secondary"
+                    @click="router.visit(route('expenses.recurring.create', { supplier_id: supplier.id }))"
+                >
+                    New Recurring Expense
+                </AppButton>
                 <AppButton variant="primary" @click="router.visit(route('suppliers.edit', supplier.id))">Edit Supplier</AppButton>
                 <AppButton v-if="canDelete" variant="ghost" class="text-rose-600 hover:bg-rose-50" @click="deleteSupplier">Delete</AppButton>
             </template>

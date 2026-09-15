@@ -85,10 +85,26 @@ class RecurringExpenseController extends Controller
         (new DefaultTaxRatesSeeder)->runForTeam($team);
         (new EnsureDefaultBankingAccount)->execute($team);
 
+        $teamId = (int) $team->id;
+        $prefillSupplierId = (int) $request->integer('supplier_id');
+        $prefill = null;
+        if ($prefillSupplierId > 0) {
+            $supplierExists = Supplier::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->whereKey($prefillSupplierId)
+                ->exists();
+            if ($supplierExists) {
+                $prefill = [
+                    'supplier_id' => $prefillSupplierId,
+                    'supplier_custom' => '',
+                ];
+            }
+        }
+
         return Inertia::render('Expenses/Recurring/Form', [
             'isEditing' => false,
-            'recurring' => null,
-            ...$this->formMeta((int) $team->id),
+            'recurring' => $prefill,
+            ...$this->formMeta($teamId),
         ]);
     }
 
