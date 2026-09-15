@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.34](https://github.com/mortolian/nrth/compare/v0.1.33...v0.1.34) (2026-09-15)
+
+
+### Bug Fixes
+
+* **dashboard:** show recent transaction amounts including tax ([267bb8a](https://github.com/mortolian/nrth/commit/267bb8a0944a65a7340ea53084df0df3de64d0a9))
+
 ## [0.1.33](https://github.com/mortolian/nrth/compare/v0.1.32...v0.1.33) (2026-09-15)
 
 
