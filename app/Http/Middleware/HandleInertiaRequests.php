@@ -230,6 +230,9 @@ class HandleInertiaRequests extends Middleware
             $can('expenses.manage')
                 ? ['id' => 'new-expense', 'label' => 'New Expense', 'href' => route('expenses.create'), 'icon' => 'expense']
                 : null,
+            $can('expenses.manage')
+                ? ['id' => 'new-recurring-expense', 'label' => 'New Recurring Expense', 'href' => route('expenses.recurring.create'), 'icon' => 'expense']
+                : null,
             $can('invoices.manage')
                 ? ['id' => 'record-payment', 'label' => 'Record Payment', 'href' => route('dashboard').'#outstanding-invoices', 'icon' => 'payment']
                 : null,
@@ -251,6 +254,7 @@ class HandleInertiaRequests extends Middleware
             $can('clients.view') ? ['id' => 'clients', 'label' => 'Clients', 'href' => route('invoicing.clients.index')] : null,
             $can('items.view') ? ['id' => 'items', 'label' => 'Items', 'href' => route('invoicing.items.index')] : null,
             $can('expenses.view') ? ['id' => 'expenses', 'label' => 'Expenses', 'href' => route('expenses.index')] : null,
+            $can('expenses.view') ? ['id' => 'recurring-expenses', 'label' => 'Recurring Expenses', 'href' => route('expenses.recurring.index')] : null,
             $can('suppliers.view') ? ['id' => 'suppliers', 'label' => 'Suppliers', 'href' => route('suppliers.index')] : null,
             $can('banking.view') ? ['id' => 'banking-transactions', 'label' => 'Banking Transactions', 'href' => route('banking.transactions.index')] : null,
             $can('banking.view') ? ['id' => 'banking-import-history', 'label' => 'Bank Import History', 'href' => route('banking.imports.index')] : null,

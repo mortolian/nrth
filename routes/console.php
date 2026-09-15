@@ -20,6 +20,10 @@ Schedule::command('invoices:generate-recurring')
     ->dailyAt('01:30')
     ->withoutOverlapping();
 
+Schedule::command('expenses:generate-recurring')
+    ->dailyAt('01:35')
+    ->withoutOverlapping();
+
 Schedule::command('takeouts:prune')
     ->dailyAt('02:00')
     ->withoutOverlapping();

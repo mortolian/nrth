@@ -119,7 +119,7 @@ Instance backups are [Spatie Laravel Backup](https://spatie.be/docs/laravel-back
 
 The first admin is an **instance operator**. Manage backups under **Settings → Backups & exports → Instance backup**, and operators under **Settings → Instance → Operators**. Optional break-glass: `NRTH_OPERATOR_EMAILS` in `.env`. Existing installs with no operators: `./scripts/compose.sh exec app php artisan nrth:promote-first-operator` (also run by `./scripts/update`).
 
-Keep the Compose **`scheduler`** service running (or an equivalent cron for `php artisan schedule:run`). It also runs recurring invoices (`01:30`) and licence-disc reminder emails (`01:15`).
+Keep the Compose **`scheduler`** service running (or an equivalent cron for `php artisan schedule:run`). It also runs recurring invoices (`01:30`), recurring expenses (`01:35`), and licence-disc reminder emails (`01:15`).
 
 | | Data takeout | Instance backup |
 |--|--------------|-----------------|

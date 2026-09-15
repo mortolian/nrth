@@ -5,6 +5,7 @@ namespace App\Domain\Accounting\Models;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Banking\Models\BankingTransactionAllocation;
+use App\Domain\Expenses\Models\RecurringExpense;
 use App\Domain\Invoicing\Models\Payment;
 use App\Domain\Shared\HasTeamScope;
 use App\Models\Team;
@@ -27,6 +28,7 @@ class Transaction extends Model implements HasMedia
     protected $fillable = [
         'team_id',
         'supplier_id',
+        'recurring_expense_id',
         'type',
         'status',
         'reference',
@@ -73,6 +75,14 @@ class Transaction extends Model implements HasMedia
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /**
+     * @return BelongsTo<RecurringExpense, $this>
+     */
+    public function recurringExpense(): BelongsTo
+    {
+        return $this->belongsTo(RecurringExpense::class);
     }
 
     /**

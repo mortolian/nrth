@@ -15,24 +15,42 @@ class RecurringScheduleResolver
 {
     public function nextRunDateAfter(RecurringInvoice $recurring, Carbon $from): Carbon
     {
+        return $this->advance(
+            $recurring->frequency,
+            $from,
+            $recurring->generate_on_weekday !== null ? (int) $recurring->generate_on_weekday : null,
+            $recurring->generate_on_day !== null ? (int) $recurring->generate_on_day : null,
+            (bool) $recurring->generate_on_last_day,
+            $recurring->generate_on_month !== null ? (int) $recurring->generate_on_month : null,
+        );
+    }
+
+    public function advance(
+        RecurringFrequency $frequency,
+        Carbon $from,
+        ?int $generateOnWeekday,
+        ?int $generateOnDay,
+        bool $generateOnLastDay,
+        ?int $generateOnMonth,
+    ): Carbon {
         $base = $from->copy()->startOfDay();
 
-        return match ($recurring->frequency) {
+        return match ($frequency) {
             RecurringFrequency::Weekly => $this->nextWeekday(
                 $base->copy()->addDay(),
-                (int) ($recurring->generate_on_weekday ?? $base->isoWeekday()),
+                (int) ($generateOnWeekday ?? $base->isoWeekday()),
             ),
             RecurringFrequency::Monthly => ClampedMonthDate::forYearMonth(
                 (int) $base->year,
                 (int) $base->month + 1,
-                $recurring->generate_on_day,
-                (bool) $recurring->generate_on_last_day,
+                $generateOnDay,
+                $generateOnLastDay,
             ),
             RecurringFrequency::Yearly => ClampedMonthDate::forYearMonth(
                 (int) $base->year + 1,
-                (int) ($recurring->generate_on_month ?? $base->month),
-                $recurring->generate_on_day,
-                (bool) $recurring->generate_on_last_day,
+                (int) ($generateOnMonth ?? $base->month),
+                $generateOnDay,
+                $generateOnLastDay,
             ),
         };
     }

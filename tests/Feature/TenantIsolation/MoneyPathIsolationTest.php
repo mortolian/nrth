@@ -9,6 +9,8 @@ use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Expenses\Models\RecurringExpense;
 use App\Domain\Invoicing\Enums\EstimateStatus;
 use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Estimate;
@@ -140,6 +142,25 @@ class MoneyPathIsolationTest extends TestCase
     {
         $supplier = Supplier::factory()->for($this->teamA)->create(['name' => self::SUPPLIER_NAME]);
         $expense = $this->postedExpenseOnTeamA();
+        $category = Account::queryWithoutTeamScope()
+            ->where('team_id', $this->teamA->id)
+            ->where('name', self::ACCOUNT_NAME)
+            ->firstOrFail();
+        $bank = Account::queryWithoutTeamScope()
+            ->where('team_id', $this->teamA->id)
+            ->where('code', '1010')
+            ->firstOrFail();
+        $banking = BankingAccount::factory()->for($this->teamA)->create([
+            'gl_account_id' => $bank->id,
+            'is_active' => true,
+        ]);
+        $recurring = RecurringExpense::factory()->create([
+            'team_id' => $this->teamA->id,
+            'supplier_name' => self::SUPPLIER_NAME,
+            'category_account_id' => $category->id,
+            'paid_from_banking_account_id' => $banking->id,
+            'description' => 'Isolation recurring Alpha',
+        ]);
 
         $this->asOutsider();
 
@@ -155,12 +176,16 @@ class MoneyPathIsolationTest extends TestCase
         $this->assertHiddenFromOtherTeam($this->delete(route('expenses.destroy', $expense)));
         $this->assertHiddenFromOtherTeam($this->get(route('suppliers.show', $supplier)));
         $this->assertHiddenFromOtherTeam($this->delete(route('suppliers.destroy', $supplier)));
+        $this->assertHiddenFromOtherTeam($this->get(route('expenses.recurring.show', $recurring)));
+        $this->assertHiddenFromOtherTeam($this->delete(route('expenses.recurring.destroy', $recurring)));
 
         $this->get(route('expenses.index'))->assertOk()->assertDontSee(self::EXPENSE_DESCRIPTION);
         $this->get(route('suppliers.index'))->assertOk()->assertDontSee(self::SUPPLIER_NAME);
+        $this->get(route('expenses.recurring.index'))->assertOk()->assertDontSee('Isolation recurring Alpha');
 
         $this->assertNotNull(Transaction::queryWithoutTeamScope()->find($expense->id));
         $this->assertNotNull(Supplier::queryWithoutTeamScope()->find($supplier->id));
+        $this->assertNotNull(RecurringExpense::queryWithoutTeamScope()->find($recurring->id));
     }
 
     public function test_journal_and_chart_hide_other_business(): void
