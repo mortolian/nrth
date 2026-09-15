@@ -61,6 +61,9 @@ class BankingIsolationTest extends TestCase
         $this->assertHiddenFromOtherTeam($this->post(route('banking.reconciliation.allocations.store', $line), [
             'allocations' => [],
         ]));
+        $this->assertHiddenFromOtherTeam($this->get(route('expenses.create', [
+            'banking_transaction_id' => $line->id,
+        ])));
 
         $this->assertNotNull(BankingAccount::queryWithoutTeamScope()->find($account->id));
         $this->assertSame(self::BANK_NAME, BankingAccount::queryWithoutTeamScope()->find($account->id)?->name);

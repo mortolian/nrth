@@ -298,6 +298,10 @@ class TeamPermissionsTest extends TestCase
             ->assertOk();
 
         $this->actingAs($viewer)
+            ->get(route('expenses.create', ['banking_transaction_id' => $line->id]))
+            ->assertForbidden();
+
+        $this->actingAs($viewer)
             ->post(route('banking.reconciliation.exclude', $line))
             ->assertForbidden();
     }

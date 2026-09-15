@@ -49,6 +49,8 @@ class BankingReconciliationController extends Controller
                     ReconciliationStatus::Excluded->value => 0,
                 ],
                 'can_manage' => $request->user()?->canOnTeam('banking.manage') ?? false,
+                'can_create_expense' => ($request->user()?->canOnTeam('banking.manage') ?? false)
+                    && ($request->user()?->canOnTeam('expenses.manage') ?? false),
             ]);
         }
 
@@ -111,6 +113,8 @@ class BankingReconciliationController extends Controller
             'filters' => $filters,
             'counts' => $this->counts($teamId, $filters),
             'can_manage' => $request->user()?->canOnTeam('banking.manage') ?? false,
+            'can_create_expense' => ($request->user()?->canOnTeam('banking.manage') ?? false)
+                && ($request->user()?->canOnTeam('expenses.manage') ?? false),
         ]);
     }
 

@@ -14,8 +14,13 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\TaxLine;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Actions\AllocateBankingTransactionAction;
 use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
+use App\Domain\Banking\Enums\ReconciliationStatus;
+use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingTransaction;
+use App\Domain\Banking\Services\BankingReconciliationTotals;
 use App\Domain\Banking\Support\BankingPaymentAccounts;
 use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Domain\Tax\Models\TaxRate;
@@ -32,6 +37,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -268,7 +274,7 @@ class ExpensesController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response
+    public function create(Request $request, BankingReconciliationTotals $totals): Response
     {
         $this->authorizeTeam('expenses.manage', $request);
         $team = $request->user()?->currentTeam;
@@ -278,16 +284,11 @@ class ExpensesController extends Controller
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
-        $prefillSupplierId = (int) $request->integer('supplier_id');
-        $prefillSupplierCustom = trim((string) $request->string('supplier')->toString());
 
         return Inertia::render('Expenses/Form', [
             'isEditing' => false,
             'expense' => null,
-            'prefill' => [
-                'supplier_id' => $prefillSupplierId > 0 ? $prefillSupplierId : 0,
-                'supplier_custom' => $prefillSupplierId > 0 ? '' : $prefillSupplierCustom,
-            ],
+            'prefill' => $this->expenseCreatePrefill($request, $teamId, $totals),
             ...$this->expenseFormSharedProps($teamId),
         ]);
     }
@@ -434,8 +435,12 @@ class ExpensesController extends Controller
         return $files;
     }
 
-    public function store(Request $request, PostTransactionAction $postTransactionAction): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        PostTransactionAction $postTransactionAction,
+        AllocateBankingTransactionAction $allocateBankingTransactionAction,
+        BankingReconciliationTotals $totals,
+    ): RedirectResponse {
         $this->authorizeTeam('expenses.manage', $request);
         $team = $request->user()?->currentTeam;
         abort_if($team === null, 403);
@@ -499,6 +504,20 @@ class ExpensesController extends Controller
 
         if ($request->hasFile('receipts') || $request->hasFile('receipt')) {
             $this->attachReceiptUploads($request, $transaction);
+        }
+
+        $matchedBankLineId = $this->matchNewExpenseToBankLine(
+            $request,
+            $transaction,
+            $allocateBankingTransactionAction,
+            $totals,
+        );
+
+        if ($matchedBankLineId !== null) {
+            return to_route('banking.transactions.index', [
+                'selected' => $matchedBankLineId,
+                'status' => 'all',
+            ])->with('success', __('Expense created and matched to the bank line.'));
         }
 
         return to_route('expenses.index');
@@ -805,6 +824,7 @@ class ExpensesController extends Controller
             'receipts.*' => ['file', 'max:10240', 'mimes:jpeg,jpg,png,gif,webp,pdf'],
             'remove_attachment_ids' => ['nullable', 'array', 'max:50'],
             'remove_attachment_ids.*' => ['integer'],
+            'banking_transaction_id' => ['nullable', 'integer'],
         ]);
     }
 
@@ -1291,6 +1311,126 @@ class ExpensesController extends Controller
         abort_unless($transaction->type === TransactionType::Expense, 404);
 
         return $transaction;
+    }
+
+    /**
+     * @return array{
+     *     supplier_id: int,
+     *     supplier_custom: string,
+     *     date: ?string,
+     *     description: string,
+     *     amount_incl_vat_cents: int,
+     *     paid_from_banking_account_id: int,
+     *     reference: string,
+     *     banking_transaction_id: int
+     * }
+     */
+    private function expenseCreatePrefill(Request $request, int $teamId, BankingReconciliationTotals $totals): array
+    {
+        $prefillSupplierId = (int) $request->integer('supplier_id');
+        $prefillSupplierCustom = trim((string) $request->string('supplier')->toString());
+        $bankLineId = (int) $request->integer('banking_transaction_id');
+
+        $prefill = [
+            'supplier_id' => $prefillSupplierId > 0 ? $prefillSupplierId : 0,
+            'supplier_custom' => $prefillSupplierId > 0 ? '' : $prefillSupplierCustom,
+            'date' => null,
+            'description' => '',
+            'amount_incl_vat_cents' => 0,
+            'paid_from_banking_account_id' => 0,
+            'reference' => '',
+            'banking_transaction_id' => 0,
+        ];
+
+        if ($bankLineId < 1) {
+            return $prefill;
+        }
+
+        abort_unless($request->user()?->canOnTeam('banking.manage'), 403);
+
+        $line = BankingTransaction::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->with('account:id,gl_account_id')
+            ->find($bankLineId);
+
+        abort_if($line === null, 404);
+        abort_unless($line->direction === TransactionDirection::Debit, 404);
+        abort_if($line->reconciliation_status === ReconciliationStatus::Excluded, 404);
+
+        $remainingCents = $totals->remainingBankCents($line);
+        abort_if($remainingCents < 1, 404);
+
+        $description = trim((string) $line->description);
+        $matchedSupplier = $description === ''
+            ? null
+            : Supplier::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($description)])
+                ->first();
+
+        return [
+            'supplier_id' => $matchedSupplier !== null ? (int) $matchedSupplier->id : 0,
+            'supplier_custom' => $matchedSupplier !== null ? '' : Str::limit($description, 255, ''),
+            'date' => $line->transaction_date?->toDateString(),
+            'description' => $description,
+            'amount_incl_vat_cents' => $remainingCents,
+            'paid_from_banking_account_id' => (int) $line->account_id,
+            'reference' => trim((string) ($line->reference ?? '')),
+            'banking_transaction_id' => (int) $line->id,
+        ];
+    }
+
+    private function matchNewExpenseToBankLine(
+        Request $request,
+        Transaction $transaction,
+        AllocateBankingTransactionAction $allocateBankingTransactionAction,
+        BankingReconciliationTotals $totals,
+    ): ?int {
+        $bankLineId = (int) $request->integer('banking_transaction_id');
+        if ($bankLineId < 1) {
+            return null;
+        }
+
+        if (! $request->user()?->canOnTeam('banking.manage')) {
+            return null;
+        }
+
+        $teamId = (int) $request->user()->current_team_id;
+        $line = BankingTransaction::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->with('account')
+            ->find($bankLineId);
+
+        if ($line === null || $line->direction !== TransactionDirection::Debit) {
+            return null;
+        }
+
+        if ($line->reconciliation_status === ReconciliationStatus::Excluded) {
+            return null;
+        }
+
+        $transaction = $transaction->fresh(['journalEntries', 'taxLines']) ?? $transaction;
+        $remainingBank = $totals->remainingBankCents($line);
+        $remainingExpense = $totals->remainingTransactionCents($transaction, $line);
+        $amountCents = min($remainingBank, $remainingExpense);
+        if ($amountCents < 1) {
+            return null;
+        }
+
+        try {
+            $allocateBankingTransactionAction->execute(
+                $line,
+                $transaction,
+                $amountCents,
+                $teamId,
+                (int) $request->user()->id,
+                null,
+            );
+        } catch (ValidationException) {
+            return null;
+        }
+
+        return (int) $line->id;
     }
 
     private function expensesMissingReceiptsCount(int $teamId): int

@@ -126,6 +126,7 @@ class BankingReconciliationTest extends TestCase
                 ->where('counts.excluded', 1)
                 ->where('counts.all', 2)
                 ->has('transactions.data', 2)
+                ->where('can_create_expense', true)
             );
 
         $this->get(route('banking.transactions.index', ['status' => 'attention']))
@@ -307,7 +308,13 @@ class BankingReconciliationTest extends TestCase
 
         $this->get(route('banking.transactions.index'))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('can_manage', false));
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('can_manage', false)
+                ->where('can_create_expense', false)
+            );
+
+        $this->get(route('expenses.create', ['banking_transaction_id' => $bankLine->id]))
+            ->assertForbidden();
 
         $this->post(route('banking.reconciliation.allocations.store', $bankLine), [
             'transaction_id' => 1,
@@ -346,5 +353,62 @@ class BankingReconciliationTest extends TestCase
             'transaction_id' => $foreignExpense->id,
             'amount_cents' => 3000,
         ])->assertSessionHasErrors('transaction_id');
+    }
+
+    public function test_can_create_expense_from_unmatched_bank_debit_and_allocate(): void
+    {
+        [, $team, , $banking] = $this->teamWithBanking();
+        $category = Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '7500')->firstOrFail();
+        $bankLine = $this->createBankLine($team, $banking, '2026-08-12', 'Office Depot', '115.00', TransactionDirection::Debit, 'create-from-bank');
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-08-12',
+            'supplier' => 'Office Depot',
+            'category_account_id' => $category->id,
+            'description' => 'Office Depot',
+            'amount_excl_vat_cents' => 100_00,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 15_00,
+            'paid_from_banking_account_id' => $banking->id,
+            'reference' => 'STMT-1',
+            'notes' => null,
+            'banking_transaction_id' => $bankLine->id,
+        ])->assertRedirect(route('banking.transactions.index', [
+            'selected' => $bankLine->id,
+            'status' => 'all',
+        ]))->assertSessionHas('success');
+
+        $expense = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($expense);
+
+        $this->assertDatabaseHas('banking_transaction_allocations', [
+            'banking_transaction_id' => $bankLine->id,
+            'transaction_id' => $expense->id,
+            'amount_cents' => 115_00,
+        ]);
+        $this->assertSame(
+            ReconciliationStatus::Matched,
+            $bankLine->fresh()->reconciliation_status
+        );
+    }
+
+    public function test_create_expense_from_bank_line_is_hidden_when_nothing_remains(): void
+    {
+        [, $team, , $banking] = $this->teamWithBanking();
+        $category = Account::queryWithoutTeamScope()->where('team_id', $team->id)->where('code', '7500')->firstOrFail();
+        $bankLine = $this->createBankLine($team, $banking, '2026-08-13', 'Already matched', '45.00', TransactionDirection::Debit, 'already-matched');
+        $expense = $this->createExpense($team, $banking, $category, '2026-08-13', 4500, 'Already matched');
+
+        $this->post(route('banking.reconciliation.allocations.store', $bankLine), [
+            'transaction_id' => $expense->id,
+            'amount_cents' => 4500,
+        ])->assertRedirect();
+
+        $this->get(route('expenses.create', ['banking_transaction_id' => $bankLine->id]))
+            ->assertNotFound();
     }
 }

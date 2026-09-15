@@ -99,6 +99,7 @@ const props = defineProps<{
     };
     counts: Record<string, number>;
     can_manage: boolean;
+    can_create_expense: boolean;
 }>();
 
 const canManage = computed(() => {
@@ -108,6 +109,42 @@ const canManage = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) && perms.includes('banking.manage');
 });
+
+const canCreateExpense = computed(() => {
+    if (props.can_create_expense) {
+        return true;
+    }
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('banking.manage') && perms.includes('expenses.manage');
+});
+
+const canCreateExpenseFromLine = (row: LineRow) =>
+    canCreateExpense.value
+    && row.direction === 'debit'
+    && row.reconciliation_status !== 'excluded'
+    && row.remaining_cents >= 1;
+
+const goCreateExpense = (row: LineRow) => {
+    router.visit(route('expenses.create', { banking_transaction_id: row.id }));
+};
+
+const rowActions = (row: LineRow) => {
+    const actions = [{ id: 'source-file', label: 'Source file' }];
+    if (canCreateExpenseFromLine(row)) {
+        actions.unshift({ id: 'create-expense', label: 'Create expense' });
+    }
+    return actions;
+};
+
+const onRowAction = (actionId: string, row: LineRow) => {
+    if (actionId === 'source-file') {
+        openSourceFile(row);
+        return;
+    }
+    if (actionId === 'create-expense') {
+        goCreateExpense(row);
+    }
+};
 
 const filters = ref({
     status: props.filters.status || 'all',
@@ -379,9 +416,9 @@ watch(
                         <td class="px-3 py-2 text-right" @click.stop>
                             <div class="inline-flex justify-end">
                                 <InvoiceRowActionsMenu
-                                    :actions="[{ id: 'source-file', label: 'Source file' }]"
+                                    :actions="rowActions(row)"
                                     :aria-label="`Actions for ${row.description}`"
-                                    @select="(actionId) => actionId === 'source-file' && openSourceFile(row)"
+                                    @select="(actionId) => onRowAction(actionId, row)"
                                 />
                             </div>
                         </td>
@@ -433,6 +470,12 @@ watch(
                             <dd>{{ selected.reference || '—' }}</dd>
                         </div>
                     </dl>
+
+                    <div v-if="canCreateExpenseFromLine(selected)" class="mt-4">
+                        <AppButton variant="primary" size="sm" @click="goCreateExpense(selected)">
+                            Create expense
+                        </AppButton>
+                    </div>
 
                     <div v-if="selected.allocations.length" class="mt-5">
                         <h3 class="text-sm font-semibold text-slate-900">Allocations</h3>
@@ -503,7 +546,9 @@ watch(
                             </li>
                         </ul>
                         <p v-else class="mt-3 text-sm text-slate-500">
-                            No posted candidates in the nearby date window. You can still exclude this line if it is personal.
+                            No posted candidates in the nearby date window.
+                            <template v-if="canCreateExpenseFromLine(selected)"> Create an expense from this debit, or exclude it if it is personal.</template>
+                            <template v-else> You can still exclude this line if it is personal.</template>
                         </p>
                     </div>
 

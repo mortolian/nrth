@@ -9,7 +9,10 @@ use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Enums\ReconciliationStatus;
+use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Tax\Models\TaxRate;
 use App\Models\Team;
 use App\Models\User;
@@ -52,6 +55,28 @@ class ExpenseCrudTest extends TestCase
         ]);
 
         return [$user, $team, $category, $bankGl, $banking];
+    }
+
+    private function createBankLine(
+        Team $team,
+        BankingAccount $account,
+        string $date,
+        string $description,
+        string $amount,
+        TransactionDirection $direction,
+        string $hash,
+    ): BankingTransaction {
+        return BankingTransaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'account_id' => $account->id,
+            'transaction_date' => $date,
+            'description' => $description,
+            'amount' => $amount,
+            'currency' => 'ZAR',
+            'direction' => $direction,
+            'source_hash' => hash('sha256', $hash),
+            'duplicate_key' => hash('sha256', $hash.'-key'),
+        ]);
     }
 
     public function test_store_posts_credit_to_banking_linked_gl(): void
@@ -419,6 +444,90 @@ class ExpenseCrudTest extends TestCase
                 ->component('Expenses/Form')
                 ->where('prefill.supplier_id', $supplier->id)
                 ->has('paid_from_options'));
+    }
+
+    public function test_create_page_prefills_from_unmatched_bank_debit(): void
+    {
+        [, $team, , , $banking] = $this->teamWithExpenseAccounts();
+
+        $supplier = Supplier::factory()->for($team)->create(['name' => 'Corner Cafe']);
+        $line = $this->createBankLine(
+            $team,
+            $banking,
+            '2026-08-03',
+            'Corner Cafe',
+            '45.00',
+            TransactionDirection::Debit,
+            'expense-prefill-cafe',
+        );
+
+        $this->get(route('expenses.create', ['banking_transaction_id' => $line->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Form')
+                ->where('prefill.banking_transaction_id', $line->id)
+                ->where('prefill.supplier_id', $supplier->id)
+                ->where('prefill.supplier_custom', '')
+                ->where('prefill.date', '2026-08-03')
+                ->where('prefill.description', 'Corner Cafe')
+                ->where('prefill.amount_incl_vat_cents', 4500)
+                ->where('prefill.paid_from_banking_account_id', $banking->id));
+    }
+
+    public function test_create_page_uses_bank_description_as_one_off_supplier(): void
+    {
+        [, $team, , , $banking] = $this->teamWithExpenseAccounts();
+
+        $line = $this->createBankLine(
+            $team,
+            $banking,
+            '2026-08-04',
+            'Unknown Merchant',
+            '12.50',
+            TransactionDirection::Debit,
+            'expense-prefill-unknown',
+        );
+
+        $this->get(route('expenses.create', ['banking_transaction_id' => $line->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('prefill.supplier_id', 0)
+                ->where('prefill.supplier_custom', 'Unknown Merchant')
+                ->where('prefill.amount_incl_vat_cents', 1250)
+                ->where('prefill.reference', ''));
+    }
+
+    public function test_create_page_rejects_bank_credits_excluded_and_missing_lines(): void
+    {
+        [, $team, , , $banking] = $this->teamWithExpenseAccounts();
+
+        $credit = $this->createBankLine(
+            $team,
+            $banking,
+            '2026-08-05',
+            'Salary',
+            '20000.00',
+            TransactionDirection::Credit,
+            'expense-prefill-credit',
+        );
+        $excluded = $this->createBankLine(
+            $team,
+            $banking,
+            '2026-08-06',
+            'Grocery store',
+            '80.00',
+            TransactionDirection::Debit,
+            'expense-prefill-excluded',
+        );
+        $excluded->forceFill([
+            'reconciliation_status' => ReconciliationStatus::Excluded,
+            'exclusion_note' => 'Personal',
+            'excluded_at' => now(),
+        ])->save();
+
+        $this->get(route('expenses.create', ['banking_transaction_id' => $credit->id]))->assertNotFound();
+        $this->get(route('expenses.create', ['banking_transaction_id' => $excluded->id]))->assertNotFound();
+        $this->get(route('expenses.create', ['banking_transaction_id' => 999999]))->assertNotFound();
     }
 
     public function test_export_csv_downloads_selected_expenses(): void

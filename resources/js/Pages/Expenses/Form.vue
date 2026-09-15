@@ -47,7 +47,16 @@ const props = withDefaults(
     defineProps<{
         isEditing: boolean;
         expense: ExpenseFormProps | null;
-        prefill: { supplier_id: number; supplier_custom: string } | null;
+        prefill: {
+            supplier_id: number;
+            supplier_custom: string;
+            date?: string | null;
+            description?: string;
+            amount_incl_vat_cents?: number;
+            paid_from_banking_account_id?: number;
+            reference?: string;
+            banking_transaction_id?: number;
+        } | null;
         categories: CategoryOption[];
         paid_from_options: PaidFromOption[];
         supplier_options: SupplierOption[];
@@ -142,17 +151,22 @@ const initialFromProps = () => {
         };
     }
     const p = props.prefill;
+    const inclusiveCents = Number(p?.amount_incl_vat_cents || 0);
+    const vat15ExclCents = inclusiveCents > 0 ? Math.round(inclusiveCents / 1.15) : 0;
+
     return {
-        date: new Date().toISOString().slice(0, 10),
+        date: p?.date || new Date().toISOString().slice(0, 10),
         supplier_id: p?.supplier_id && p.supplier_id > 0 ? p.supplier_id : 0,
         supplier_custom: p?.supplier_custom ?? '',
         category_account_id: 0,
-        description: '',
-        amount_excl_vat: 0,
+        description: p?.description ?? '',
+        amount_excl_vat: inclusiveCents > 0 ? vat15ExclCents / 100 : 0,
         vat_rate: 'vat15' as const,
-        vat_amount: 0,
-        paid_from_banking_account_id: defaultPaidFromAccountId(),
-        reference: '',
+        vat_amount: inclusiveCents > 0 ? (inclusiveCents - vat15ExclCents) / 100 : 0,
+        paid_from_banking_account_id: p?.paid_from_banking_account_id && p.paid_from_banking_account_id > 0
+            ? p.paid_from_banking_account_id
+            : defaultPaidFromAccountId(),
+        reference: p?.reference ?? '',
         notes: '',
         office_percentage: 15,
         distance_km: 0,
@@ -946,6 +960,9 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
     pendingRemoveAttachmentIds.value.forEach((id, index) => {
         data.append(`remove_attachment_ids[${index}]`, String(id));
     });
+    if (fromBankLine.value) {
+        data.set('banking_transaction_id', String(props.prefill?.banking_transaction_id));
+    }
     return data;
 };
 
@@ -953,7 +970,20 @@ const formErrors = ref<string[]>([]);
 const submitting = ref(false);
 const deleting = ref(false);
 
+const fromBankLine = computed(() => Number(props.prefill?.banking_transaction_id || 0) > 0);
 const canDeleteExpense = computed(() => props.isEditing && Boolean(props.expense?.can_delete));
+
+const cancelExpense = () => {
+    if (fromBankLine.value) {
+        router.visit(route('banking.transactions.index', {
+            selected: props.prefill?.banking_transaction_id,
+            status: 'all',
+        }));
+        return;
+    }
+
+    router.visit(route('expenses.index'));
+};
 
 const expenseSupplierLabel = computed(() => {
     if (form.supplier_id > 0) {
@@ -1104,6 +1134,9 @@ const submit = () => {
         data.distance_km = parsed.data.distance_km ?? 0;
         data.rate_per_km = parsed.data.rate_per_km ?? props.sars_rate_per_km;
     }
+    if (fromBankLine.value) {
+        data.banking_transaction_id = Number(props.prefill?.banking_transaction_id);
+    }
     if (props.isEditing && props.expense) {
         data._method = 'put';
     }
@@ -1115,11 +1148,17 @@ const submit = () => {
 <template>
     <AppLayout
         :title="props.isEditing ? 'Edit Expense' : 'New Expense'"
-        :breadcrumbs="[
-            { label: 'Money Out' },
-            { label: 'Expenses', href: route('expenses.index') },
-            { label: props.isEditing ? 'Edit' : 'Create' },
-        ]"
+        :breadcrumbs="fromBankLine
+            ? [
+                { label: 'Banking' },
+                { label: 'Transactions', href: route('banking.transactions.index', { selected: prefill?.banking_transaction_id, status: 'all' }) },
+                { label: 'New expense' },
+            ]
+            : [
+                { label: 'Money Out' },
+                { label: 'Expenses', href: route('expenses.index') },
+                { label: props.isEditing ? 'Edit' : 'Create' },
+            ]"
     >
         <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'">
             <template v-if="canDeleteExpense" #actions>
@@ -1140,6 +1179,12 @@ const submit = () => {
         </AppCard>
 
         <AppCard v-else class="mt-5">
+            <p
+                v-if="fromBankLine"
+                class="mb-5 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+            >
+                Prefilling from a bank debit. Choose a category, check VAT, then save — this expense will be matched to that bank line.
+            </p>
             <div
                 v-if="visibleErrors.length"
                 class="mb-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
@@ -1540,7 +1585,7 @@ const submit = () => {
                     size="touch"
                     class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
                     :disabled="submitting || deleting"
-                    @click="router.visit(route('expenses.index'))"
+                    @click="cancelExpense"
                 >
                     Cancel
                 </AppButton>
