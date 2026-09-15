@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.35](https://github.com/mortolian/nrth/compare/v0.1.34...v0.1.35) (2026-09-15)
+
+
+### Features
+
+* **expenses:** improve recurring expense supplier UX and supplier entry points ([fe1f833](https://github.com/mortolian/nrth/commit/fe1f8335f7f5ee92c52d5bad6fcb0f06b24e637a))
+
 ## [0.1.34](https://github.com/mortolian/nrth/compare/v0.1.33...v0.1.34) (2026-09-15)
 
 
