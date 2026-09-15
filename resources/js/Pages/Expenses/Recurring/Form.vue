@@ -43,9 +43,16 @@ const help = {
         'Shifts month placeholders vs the expense date. Example: −1 = Rent for June when posting on 1 July.',
     limits: 'When the schedule stops: never, after N expenses, or after an end date.',
     description: 'Use tokens like {{month_year}}, {{month}}, {{year}}, {{issue_date}}, {{day}}. They resolve when each expense is generated.',
-    amount: 'Amount excluding VAT posted on every run.',
+    amount: 'Paid total including VAT. Excl. VAT and VAT are derived from the rate you select.',
     paidFrom: 'Bank, cash, or card account credited when each expense is posted.',
 };
+
+const initialExclCents = props.recurring?.amount_excl_vat_cents != null
+    ? Number(props.recurring.amount_excl_vat_cents)
+    : 0;
+const initialVatCents = props.recurring?.vat_amount_cents != null
+    ? Number(props.recurring.vat_amount_cents)
+    : 0;
 
 const form = ref({
     supplier_id: Number(props.recurring?.supplier_id ?? 0),
@@ -67,13 +74,8 @@ const form = ref({
     description: String(props.recurring?.description ?? 'Rent for {{month_year}}'),
     notes: String(props.recurring?.notes ?? ''),
     reference: String(props.recurring?.reference ?? ''),
-    amount_excl_vat: props.recurring?.amount_excl_vat_cents != null
-        ? Number(props.recurring.amount_excl_vat_cents) / 100
-        : 0,
+    amount_incl_vat: (initialExclCents + initialVatCents) / 100,
     vat_rate: (props.recurring?.vat_rate ?? 'no_vat') as VatRate,
-    vat_amount: props.recurring?.vat_amount_cents != null
-        ? Number(props.recurring.vat_amount_cents) / 100
-        : 0,
 });
 
 const saving = ref(false);
@@ -96,16 +98,30 @@ const selectedTax = computed(
     () => taxRateList.value.find((rate) => rate.value === form.value.vat_rate) ?? taxRateList.value[0],
 );
 
-const vatAutoAmount = computed(() =>
-    Number((Number(form.value.amount_excl_vat || 0) * Number(selectedTax.value?.rate || 0)).toFixed(2)),
-);
+const normalizeMoneyInput = (raw: unknown): number => {
+    const cleaned = String(raw ?? '').trim().replace(',', '.');
+    if (cleaned === '') return 0;
+    const parsed = Number(cleaned);
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Number(parsed.toFixed(2));
+};
 
-watch(
-    () => [form.value.amount_excl_vat, form.value.vat_rate],
-    () => {
-        form.value.vat_amount = vatAutoAmount.value;
-    },
-);
+const amountBreakdown = computed(() => {
+    const inclCents = Math.round(normalizeMoneyInput(form.value.amount_incl_vat) * 100);
+    const rate = Number(selectedTax.value?.rate || 0);
+    if (rate > 0) {
+        const exclCents = Math.round(inclCents / (1 + rate));
+        return {
+            exclCents,
+            vatCents: inclCents - exclCents,
+            inclCents,
+        };
+    }
+    return { exclCents: inclCents, vatCents: 0, inclCents };
+});
+
+const amountExclVatDisplay = computed(() => (amountBreakdown.value.exclCents / 100).toFixed(2));
+const vatAmountDisplay = computed(() => (amountBreakdown.value.vatCents / 100).toFixed(2));
 
 const supplierList = computed(() => {
     const byId = new Map<number, SupplierOption>();
@@ -254,14 +270,6 @@ const insertToken = (token: string) => {
     form.value.description = `${form.value.description || ''}${token}`;
 };
 
-const normalizeMoneyInput = (raw: unknown): number => {
-    const cleaned = String(raw ?? '').trim().replace(',', '.');
-    if (cleaned === '') return 0;
-    const parsed = Number(cleaned);
-    if (!Number.isFinite(parsed) || parsed < 0) return 0;
-    return Number(parsed.toFixed(2));
-};
-
 const submit = () => {
     if (saving.value) return;
 
@@ -304,9 +312,9 @@ const submit = () => {
         description: form.value.description || null,
         notes: form.value.notes || null,
         reference: form.value.reference || null,
-        amount_excl_vat_cents: Math.round(normalizeMoneyInput(form.value.amount_excl_vat) * 100),
+        amount_excl_vat_cents: amountBreakdown.value.exclCents,
         vat_rate: form.value.vat_rate,
-        vat_amount_cents: Math.round(normalizeMoneyInput(form.value.vat_amount) * 100),
+        vat_amount_cents: amountBreakdown.value.vatCents,
     };
 
     const opts = {
@@ -462,15 +470,15 @@ const submit = () => {
                     </div>
                     <AppInput v-model="form.description" placeholder="Rent for {{month_year}}" />
                 </div>
-                <div class="grid gap-4 sm:grid-cols-3">
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div>
-                        <FieldHelp label="Amount (excl VAT)" :text="help.amount" />
+                        <FieldHelp label="Total (incl VAT)" :text="help.amount" />
                         <AppInput
-                            :model-value="String(form.amount_excl_vat)"
+                            :model-value="String(form.amount_incl_vat)"
                             type="text"
                             inputmode="decimal"
                             class="tabular-nums"
-                            @update:model-value="form.amount_excl_vat = Number($event || 0)"
+                            @update:model-value="form.amount_incl_vat = Number($event || 0)"
                         />
                     </div>
                     <div>
@@ -482,13 +490,23 @@ const submit = () => {
                         />
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount</label>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">Amount (excl VAT)</label>
                         <AppInput
-                            :model-value="String(form.vat_amount)"
+                            :model-value="amountExclVatDisplay"
                             type="text"
                             inputmode="decimal"
                             class="tabular-nums"
-                            @update:model-value="form.vat_amount = Number($event || 0)"
+                            disabled
+                        />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-slate-500">VAT amount</label>
+                        <AppInput
+                            :model-value="vatAmountDisplay"
+                            type="text"
+                            inputmode="decimal"
+                            class="tabular-nums"
+                            disabled
                         />
                     </div>
                 </div>

@@ -274,6 +274,10 @@ const onOverflow = (actionId: string) => {
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Amounts</p>
                         <dl class="space-y-2 text-sm">
                             <div>
+                                <dt class="text-slate-500">Total (incl. VAT)</dt>
+                                <dd class="tabular-nums font-medium text-slate-900">{{ formatCents(recurring.total_cents) }}</dd>
+                            </div>
+                            <div>
                                 <dt class="text-slate-500">Excl. VAT</dt>
                                 <dd class="tabular-nums text-slate-900">{{ formatCents(recurring.amount_excl_vat_cents) }}</dd>
                             </div>
