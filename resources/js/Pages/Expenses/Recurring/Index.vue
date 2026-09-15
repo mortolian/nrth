@@ -279,8 +279,15 @@ const hasRows = computed(() => props.recurring.data.length > 0);
                         class="cursor-pointer border-b border-slate-100 hover:bg-slate-50"
                         @click="router.visit(route('expenses.recurring.show', row.id))"
                     >
-                        <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-900">
-                            {{ row.supplier_name }}
+                        <td class="max-w-xs px-3 py-2">
+                            <div class="font-medium text-slate-900">{{ row.supplier_name }}</div>
+                            <div
+                                v-if="row.description"
+                                class="mt-0.5 truncate text-xs text-slate-500"
+                                :title="row.description"
+                            >
+                                {{ row.description }}
+                            </div>
                         </td>
                         <td class="whitespace-nowrap px-3 py-2 text-slate-600">
                             {{ row.category }}
