@@ -34,9 +34,10 @@ class SupplierController extends Controller
         $query = Supplier::queryWithoutTeamScope()->where('team_id', $teamId);
 
         if ($search !== '') {
-            $query->where(function ($q) use ($search): void {
-                $q->where('name', 'like', '%'.$search.'%')
-                    ->orWhere('email', 'like', '%'.$search.'%');
+            $pattern = '%'.mb_strtolower($search).'%';
+            $query->where(function ($q) use ($pattern): void {
+                $q->whereRaw('LOWER(name) LIKE ?', [$pattern])
+                    ->orWhereRaw('LOWER(email) LIKE ?', [$pattern]);
             });
         }
 
