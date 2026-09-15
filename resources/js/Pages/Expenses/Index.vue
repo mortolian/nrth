@@ -41,6 +41,7 @@ const props = defineProps<{
         to: string | null;
         categories: string[];
         supplier: string | null;
+        description: string | null;
         has_receipt: 'yes' | 'no' | 'all';
         vat_status: 'claimable' | 'non_claimable' | 'all';
     };
@@ -52,6 +53,7 @@ const filters = ref({
     to: props.filters.to ?? '',
     categories: props.filters.categories ?? [],
     supplier: props.filters.supplier ?? '',
+    description: props.filters.description ?? '',
     has_receipt: props.filters.has_receipt ?? 'all',
     vat_status: props.filters.vat_status ?? 'all',
 });
@@ -218,11 +220,12 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 <p :class="summary.awaiting_receipts > 0 ? 'text-rose-600' : 'text-slate-900'" class="mt-1 text-2xl font-semibold">
                     {{ summary.awaiting_receipts }}
                 </p>
+                <p class="mt-2 text-xs text-slate-500">All expenses without an attached file</p>
             </AppCard>
         </div>
 
         <AppCard class="mt-5">
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">From</label>
                     <AppInput v-model="filters.from" type="date" />
@@ -230,10 +233,6 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">To</label>
                     <AppInput v-model="filters.to" type="date" />
-                </div>
-                <div class="xl:col-span-2">
-                    <label class="mb-1 block text-xs font-medium text-slate-500">Supplier</label>
-                    <AppInput v-model="filters.supplier" placeholder="Search supplier..." />
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Has receipt</label>
@@ -250,6 +249,14 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                         :options="[{ label: 'All', value: 'all' }, { label: 'Claimable', value: 'claimable' }, { label: 'Non-claimable', value: 'non_claimable' }]"
                         @update:model-value="filters.vat_status = $event as 'claimable' | 'non_claimable' | 'all'"
                     />
+                </div>
+                <div class="xl:col-span-2">
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Supplier</label>
+                    <AppInput v-model="filters.supplier" placeholder="Search supplier..." />
+                </div>
+                <div class="xl:col-span-2">
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Description</label>
+                    <AppInput v-model="filters.description" placeholder="Search description..." />
                 </div>
             </div>
             <div class="mt-3">
@@ -275,7 +282,7 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 <AppButton variant="secondary" @click="applyFilters()">Apply filters</AppButton>
                 <AppButton
                     variant="ghost"
-                    @click="filters = { from: '', to: '', categories: [], supplier: '', has_receipt: 'all', vat_status: 'all' }; applyFilters()"
+                    @click="filters = { from: '', to: '', categories: [], supplier: '', description: '', has_receipt: 'all', vat_status: 'all' }; applyFilters()"
                 >
                     Clear filters
                 </AppButton>

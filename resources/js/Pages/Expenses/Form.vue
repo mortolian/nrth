@@ -1366,6 +1366,9 @@ const submit = () => {
                     <AppSelect
                         :model-value="String(form.supplier_id)"
                         :options="supplierSelectOptions"
+                        searchable
+                        placeholder="Select supplier"
+                        search-placeholder="Search suppliers..."
                         @update:model-value="form.supplier_id = Number($event)"
                     />
                     <div v-if="form.supplier_id === 0" class="mt-2 space-y-2">
@@ -1408,7 +1411,9 @@ const submit = () => {
                     <AppSelect
                         :model-value="form.category_account_id > 0 ? String(form.category_account_id) : ''"
                         :options="categorySelectOptions"
+                        searchable
                         placeholder="Select category"
+                        search-placeholder="Search categories..."
                         @update:model-value="form.category_account_id = Number($event) || 0"
                     />
                 </div>

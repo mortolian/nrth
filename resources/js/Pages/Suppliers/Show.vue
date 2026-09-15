@@ -13,6 +13,7 @@ type ExpenseHistoryRow = {
     description: string | null;
     amount_cents: number;
     vat_amount_cents: number;
+    total_cents: number;
     status: string;
     has_receipt: boolean;
     can_delete: boolean;
@@ -218,7 +219,7 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
             <AppCard>
                 <h3 class="text-sm font-semibold text-slate-900">Spend summary</h3>
                 <p class="mt-2 text-2xl font-semibold text-slate-900">{{ formatCents(stats.total_expenses_cents, stats.currency) }}</p>
-                <p class="text-sm text-slate-500">Total recorded (excl. VAT lines) · {{ stats.expense_count }} expenses</p>
+                <p class="text-sm text-slate-500">Total recorded (incl. VAT) · {{ stats.expense_count }} expenses</p>
             </AppCard>
         </div>
 
@@ -237,8 +238,9 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
                     { key: 'date', label: 'Date' },
                     { key: 'category', label: 'Category' },
                     { key: 'description', label: 'Description' },
-                    { key: 'amount', label: 'Amount (excl VAT)' },
-                    { key: 'vat', label: 'VAT' },
+                    { key: 'amount', label: 'Amount (excl VAT)', align: 'right' },
+                    { key: 'vat', label: 'VAT', align: 'right' },
+                    { key: 'total', label: 'Total', align: 'right' },
                     { key: 'receipt', label: 'Receipt' },
                     { key: 'actions', label: '' },
                 ]"
@@ -259,11 +261,14 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
                     <td class="whitespace-nowrap px-3 py-2">{{ row.date || '-' }}</td>
                     <td class="whitespace-nowrap px-3 py-2"><AppBadge variant="info">{{ row.category }}</AppBadge></td>
                     <td class="px-3 py-2">{{ row.description || '-' }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatCents(row.amount_cents, stats.currency) }}</td>
-                    <td class="whitespace-nowrap px-3 py-2 tabular-nums">
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ formatCents(row.amount_cents, stats.currency) }}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                         <span :class="row.vat_amount_cents > 0 ? 'font-medium text-brand-600' : 'text-slate-500'">
                             {{ formatCents(row.vat_amount_cents, stats.currency) }}
                         </span>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums text-slate-900">
+                        {{ formatCents(row.total_cents, stats.currency) }}
                     </td>
                     <td class="px-3 py-2">
                         <Paperclip v-if="row.has_receipt" class="h-4 w-4 text-slate-600" />
@@ -280,7 +285,7 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
                     </td>
                 </tr>
                 <tr v-if="!expense_history.data.length">
-                    <td colspan="7" class="px-4 py-6">
+                    <td colspan="8" class="px-4 py-6">
                         <EmptyState title="No expenses yet" description="Expenses linked to this supplier will show up here." />
                     </td>
                 </tr>

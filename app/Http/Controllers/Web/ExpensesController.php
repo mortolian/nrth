@@ -24,6 +24,7 @@ use App\Models\Team;
 use App\Models\User;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,7 @@ class ExpensesController extends Controller
         $end = (string) ($filters['to'] ?? '');
         $categoryList = $filters['categories'];
         $supplier = trim((string) ($filters['supplier'] ?? ''));
+        $description = trim((string) ($filters['description'] ?? ''));
         $hasReceipt = (string) $filters['has_receipt'];
         $vatStatus = (string) $filters['vat_status'];
 
@@ -72,7 +74,7 @@ class ExpensesController extends Controller
             ->where('team_id', $teamId)
             ->where('type', TransactionType::Expense->value)
             ->with(['journalEntries.account', 'taxLines', 'supplier'])
-            ->withCount('media');
+            ->withCount(['media as media_count' => $this->expenseReceiptMediaConstraint()]);
 
         if ($start !== '') {
             $query->whereDate('transaction_date', '>=', $start);
@@ -84,14 +86,17 @@ class ExpensesController extends Controller
             $pattern = '%'.mb_strtolower($supplier).'%';
             $query->where(function ($q) use ($pattern): void {
                 $q->whereRaw('LOWER(reference) LIKE ?', [$pattern])
-                    ->orWhereRaw('LOWER(description) LIKE ?', [$pattern])
                     ->orWhereHas('supplier', fn ($sq) => $sq->whereRaw('LOWER(name) LIKE ?', [$pattern]));
             });
         }
+        if ($description !== '') {
+            $pattern = '%'.mb_strtolower($description).'%';
+            $query->whereRaw('LOWER(description) LIKE ?', [$pattern]);
+        }
         if ($hasReceipt === 'yes') {
-            $query->has('media');
+            $query->whereHas('media', $this->expenseReceiptMediaConstraint());
         } elseif ($hasReceipt === 'no') {
-            $query->doesntHave('media');
+            $query->whereDoesntHave('media', $this->expenseReceiptMediaConstraint());
         }
         if (! empty($categoryList)) {
             $query->whereHas('journalEntries.account', fn ($q) => $q
@@ -140,7 +145,6 @@ class ExpensesController extends Controller
             ->where('type', TransactionType::Expense->value)
             ->whereBetween('transaction_date', [$monthStart, $monthEnd])
             ->with(['journalEntries.account', 'taxLines'])
-            ->withCount('media')
             ->get();
 
         $totalThisMonth = $monthRows->sum(function (Transaction $transaction): int {
@@ -151,7 +155,7 @@ class ExpensesController extends Controller
             return $exclCents + $this->expenseVatAmountCents($transaction);
         });
         $totalVat = (int) $monthRows->sum(fn (Transaction $t): int => $this->expenseVatAmountCents($t));
-        $awaitingReceipts = $monthRows->filter(fn (Transaction $t): bool => (int) $t->media_count === 0)->count();
+        $awaitingReceipts = $this->expensesMissingReceiptsCount($teamId);
 
         $categories = Transaction::queryWithoutTeamScope()
             ->where('team_id', $teamId)
@@ -180,6 +184,7 @@ class ExpensesController extends Controller
                 'to' => $filters['to'],
                 'categories' => $filters['categories'],
                 'supplier' => $filters['supplier'],
+                'description' => $filters['description'],
                 'has_receipt' => $filters['has_receipt'],
                 'vat_status' => $filters['vat_status'],
             ],
@@ -203,7 +208,7 @@ class ExpensesController extends Controller
             ->where('type', TransactionType::Expense->value)
             ->whereIn('id', $ids)
             ->with(['journalEntries.account', 'taxLines', 'supplier'])
-            ->withCount('media')
+            ->withCount(['media as media_count' => $this->expenseReceiptMediaConstraint()])
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->get();
@@ -1288,6 +1293,27 @@ class ExpensesController extends Controller
         return $transaction;
     }
 
+    private function expensesMissingReceiptsCount(int $teamId): int
+    {
+        return Transaction::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->where('type', TransactionType::Expense->value)
+            ->whereDoesntHave('media', $this->expenseReceiptMediaConstraint())
+            ->count();
+    }
+
+    /**
+     * Receipt files live in the Spatie `attachments` collection.
+     *
+     * @return \Closure(Builder<Media>): void
+     */
+    private function expenseReceiptMediaConstraint(): \Closure
+    {
+        return function ($query): void {
+            $query->where('collection_name', 'attachments');
+        };
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1298,6 +1324,7 @@ class ExpensesController extends Controller
             'to' => $request->string('to')->toString() ?: null,
             'categories' => array_values(array_filter(explode(',', (string) $request->string('categories')->toString()))),
             'supplier' => $request->string('supplier')->toString() ?: null,
+            'description' => $request->string('description')->toString() ?: null,
             'has_receipt' => $request->string('has_receipt')->toString() ?: 'all',
             'vat_status' => $request->string('vat_status')->toString() ?: 'all',
         ];
@@ -1306,12 +1333,12 @@ class ExpensesController extends Controller
     /**
      * Keep list filters when leaving for an expense (receipt preview / edit) and returning via breadcrumbs.
      *
-     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, has_receipt: string, vat_status: string, page: int}
+     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, description: ?string, has_receipt: string, vat_status: string, page: int}
      */
     private function rememberedIndexFilters(Request $request, int $teamId): array
     {
         $sessionKey = $this->indexFiltersSessionKey($teamId);
-        $queryKeys = ['from', 'to', 'categories', 'supplier', 'has_receipt', 'vat_status', 'page'];
+        $queryKeys = ['from', 'to', 'categories', 'supplier', 'description', 'has_receipt', 'vat_status', 'page'];
 
         if ($request->hasAny($queryKeys)) {
             $filters = $this->normalizeIndexFilters(
@@ -1333,7 +1360,7 @@ class ExpensesController extends Controller
 
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, has_receipt: string, vat_status: string, page: int}
+     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, description: ?string, has_receipt: string, vat_status: string, page: int}
      */
     private function normalizeIndexFilters(array $filters = [], int $page = 1): array
     {
@@ -1356,12 +1383,14 @@ class ExpensesController extends Controller
         $from = isset($filters['from']) ? trim((string) $filters['from']) : '';
         $to = isset($filters['to']) ? trim((string) $filters['to']) : '';
         $supplier = isset($filters['supplier']) ? trim((string) $filters['supplier']) : '';
+        $description = isset($filters['description']) ? trim((string) $filters['description']) : '';
 
         return [
             'from' => $from !== '' ? $from : null,
             'to' => $to !== '' ? $to : null,
             'categories' => $categories,
             'supplier' => $supplier !== '' ? $supplier : null,
+            'description' => $description !== '' ? $description : null,
             'has_receipt' => $hasReceipt,
             'vat_status' => $vatStatus,
             'page' => max(1, $page),

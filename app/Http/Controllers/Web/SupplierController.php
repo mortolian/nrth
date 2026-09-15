@@ -180,6 +180,7 @@ class SupplierController extends Controller
                     'description' => $transaction->description,
                     'amount_cents' => $amountCents,
                     'vat_amount_cents' => $vatAmount,
+                    'total_cents' => $amountCents + $vatAmount,
                     'status' => $transaction->status->value,
                     'has_receipt' => $transaction->media_count > 0,
                     'can_delete' => DeleteTransactionAction::canDelete($transaction),
@@ -190,13 +191,16 @@ class SupplierController extends Controller
             ->where('team_id', $teamId)
             ->where('type', TransactionType::Expense->value)
             ->where('supplier_id', $supplier->id)
-            ->with(['journalEntries.account'])
+            ->with(['journalEntries.account', 'taxLines'])
             ->get();
 
         $totalExpensesCents = $statsRows->sum(function (Transaction $transaction): int {
-            return (int) $transaction->journalEntries
+            $exclCents = (int) $transaction->journalEntries
                 ->filter(fn ($entry) => $entry->account?->type === AccountType::Expense)
                 ->sum(fn ($entry) => (int) $entry->getRawOriginal('amount_cents'));
+            $vatCents = (int) $transaction->taxLines->sum('tax_amount_cents');
+
+            return $exclCents + $vatCents;
         });
 
         return Inertia::render('Suppliers/Show', [

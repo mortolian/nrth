@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class ExpenseCrudTest extends TestCase
@@ -678,6 +679,94 @@ class ExpenseCrudTest extends TestCase
                 ->where('expenses.data.0.supplier', 'Corner Cafe'));
     }
 
+    public function test_index_description_filter_is_case_insensitive(): void
+    {
+        [, , $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Acme Trading',
+            'category_account_id' => $category->id,
+            'description' => 'Office widgets',
+            'amount_excl_vat_cents' => 80_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-02',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 45_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->get(route('expenses.index', ['description' => 'WIDGET']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->has('expenses.data', 1)
+                ->where('filters.description', 'WIDGET')
+                ->where('expenses.data.0.supplier', 'Acme Trading')
+                ->where('expenses.data.0.description', 'Office widgets'));
+
+        $this->get(route('expenses.index', ['supplier' => 'widget']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Index')
+                ->has('expenses.data', 0));
+    }
+
+    public function test_index_missing_receipts_counts_all_expenses_without_attachments(): void
+    {
+        Carbon::setTestNow('2026-09-15');
+
+        try {
+            [, , $category, , $banking] = $this->teamWithExpenseAccounts();
+
+            $base = [
+                'category_account_id' => $category->id,
+                'description' => 'Item',
+                'amount_excl_vat_cents' => 10_00,
+                'vat_rate' => 'no_vat',
+                'vat_amount_cents' => 0,
+                'paid_from_banking_account_id' => $banking->id,
+            ];
+
+            $this->post(route('expenses.store'), [
+                ...$base,
+                'date' => '2026-08-20',
+                'supplier' => 'Last month missing',
+            ])->assertRedirect(route('expenses.index'));
+
+            $this->post(route('expenses.store'), [
+                ...$base,
+                'date' => '2026-09-02',
+                'supplier' => 'This month missing',
+            ])->assertRedirect(route('expenses.index'));
+
+            $this->post(route('expenses.store'), [
+                ...$base,
+                'date' => '2026-09-03',
+                'supplier' => 'This month attached',
+                'receipt' => UploadedFile::fake()->create('rcpt.pdf', 80, 'application/pdf'),
+            ])->assertRedirect(route('expenses.index'));
+
+            $this->get(route('expenses.index'))
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->component('Expenses/Index')
+                    ->where('summary.awaiting_receipts', 2)
+                    ->has('expenses.data', 3));
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_index_filters_persist_when_returning_from_expense_form(): void
     {
         [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
@@ -713,6 +802,7 @@ class ExpenseCrudTest extends TestCase
 
         $this->get(route('expenses.index', [
             'supplier' => 'corner',
+            'description' => 'coffee',
             'has_receipt' => 'no',
             'vat_status' => 'non_claimable',
         ]))
@@ -721,6 +811,7 @@ class ExpenseCrudTest extends TestCase
                 ->component('Expenses/Index')
                 ->has('expenses.data', 1)
                 ->where('filters.supplier', 'corner')
+                ->where('filters.description', 'coffee')
                 ->where('filters.has_receipt', 'no')
                 ->where('filters.vat_status', 'non_claimable'));
 
@@ -732,6 +823,7 @@ class ExpenseCrudTest extends TestCase
                 ->component('Expenses/Index')
                 ->has('expenses.data', 1)
                 ->where('filters.supplier', 'corner')
+                ->where('filters.description', 'coffee')
                 ->where('filters.has_receipt', 'no')
                 ->where('filters.vat_status', 'non_claimable')
                 ->where('expenses.data.0.supplier', 'Corner Cafe'));
@@ -772,19 +864,22 @@ class ExpenseCrudTest extends TestCase
             'to' => '',
             'categories' => '',
             'supplier' => '',
+            'description' => '',
             'has_receipt' => 'all',
             'vat_status' => 'all',
         ]))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('expenses.data', 2)
-                ->where('filters.supplier', null));
+                ->where('filters.supplier', null)
+                ->where('filters.description', null));
 
         $this->get(route('expenses.index'))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('expenses.data', 2)
-                ->where('filters.supplier', null));
+                ->where('filters.supplier', null)
+                ->where('filters.description', null));
     }
 
     public function test_export_csv_rejects_empty_selection(): void

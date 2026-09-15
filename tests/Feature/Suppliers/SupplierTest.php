@@ -203,8 +203,8 @@ class SupplierTest extends TestCase
             'category_account_id' => $category->id,
             'description' => 'Office supplies',
             'amount_excl_vat_cents' => 100_00,
-            'vat_rate' => 'no_vat',
-            'vat_amount_cents' => 0,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => 15_00,
             'paid_from_banking_account_id' => $banking->id,
         ])->assertRedirect(route('expenses.index'));
 
@@ -223,7 +223,12 @@ class SupplierTest extends TestCase
                 ->has('expense_history.data', 1)
                 ->where('expense_history.data.0.id', $txn->id)
                 ->where('expense_history.data.0.can_delete', true)
-                ->where('expense_history.data.0.description', 'Office supplies'));
+                ->where('expense_history.data.0.description', 'Office supplies')
+                ->where('expense_history.data.0.amount_cents', 100_00)
+                ->where('expense_history.data.0.vat_amount_cents', 15_00)
+                ->where('expense_history.data.0.total_cents', 115_00)
+                ->where('stats.total_expenses_cents', 115_00)
+                ->where('stats.expense_count', 1));
     }
 
     public function test_other_team_cannot_view_supplier(): void
