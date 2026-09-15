@@ -26,7 +26,7 @@ final class TakeoutPreviewService
         return [
             'invoices_count' => $invoices->count(),
             'invoices_total_cents' => (int) $invoices->sum(
-                fn ($invoice) => (int) $invoice->getRawOriginal('total_cents')
+                fn ($invoice) => $invoice->totalBusinessCurrencyCents()
             ),
             'expenses_count' => $expenses->count(),
             'expense_receipts_count' => $expenses->filter(fn ($t) => (int) $t->media_count > 0)->count(),

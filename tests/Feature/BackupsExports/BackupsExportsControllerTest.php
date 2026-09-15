@@ -9,6 +9,9 @@ use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Backup\Services\InstanceBackupTypeResolver;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
+use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Invoicing\Models\Client;
+use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Takeout\Enums\TakeoutRunStatus;
 use App\Domain\Takeout\Jobs\GenerateTakeoutJob;
 use App\Domain\Takeout\Models\TakeoutRun;
@@ -69,6 +72,51 @@ class BackupsExportsControllerTest extends TestCase
             ->where('section', 'takeout')
             ->has('period')
             ->has('recent_takeouts'));
+    }
+
+    public function test_takeout_preview_sums_foreign_invoices_in_business_currency(): void
+    {
+        Config::set('nrth.operator_emails', []);
+
+        $user = User::factory()->withPersonalTeam()->create([
+            'email' => 'owner-fx@example.com',
+            'is_instance_operator' => false,
+        ]);
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingAsTeamOwner($user, $team);
+
+        $client = Client::factory()->for($team)->create();
+        Invoice::factory()->for($team)->for($client)->create([
+            'status' => InvoiceStatus::Sent,
+            'issue_date' => '2026-06-10',
+            'currency' => 'ZAR',
+            'total_cents' => 100_00,
+            'business_currency_code' => 'ZAR',
+            'fx_rate_invoice_to_business' => '1',
+            'total_business_currency_cents' => 100_00,
+        ]);
+        Invoice::factory()->for($team)->for($client)->create([
+            'status' => InvoiceStatus::Sent,
+            'issue_date' => '2026-06-12',
+            'currency' => 'USD',
+            'total_cents' => 100_00,
+            'business_currency_code' => 'ZAR',
+            'fx_rate_invoice_to_business' => '18',
+            'total_business_currency_cents' => 1800_00,
+        ]);
+
+        $this->get(route('backups-exports.index', [
+            'preset' => 'custom',
+            'from' => '2026-06-01',
+            'to' => '2026-06-30',
+        ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('BackupsExports/Index')
+                ->where('document_categories.0.key', 'invoices')
+                ->where('document_categories.0.count', 2)
+                ->where('document_categories.0.total', 1900_00));
     }
 
     public function test_operator_sees_backup_section(): void

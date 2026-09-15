@@ -161,6 +161,27 @@ class Invoice extends Model implements HasMedia
         return $this->total_cents->minus($this->amount_paid_cents);
     }
 
+    /**
+     * Invoice total in the business (book) currency.
+     *
+     * Foreign invoices store this on the FX snapshot; ZAR invoices equal `total_cents`.
+     */
+    public function totalBusinessCurrencyCents(): int
+    {
+        $stored = $this->getRawOriginal('total_business_currency_cents');
+        if ($stored !== null && $stored !== '') {
+            return (int) $stored;
+        }
+
+        $totalCents = (int) $this->getRawOriginal('total_cents');
+        $rate = $this->fx_rate_invoice_to_business;
+        if ($rate !== null && is_numeric((string) $rate) && (float) $rate > 0) {
+            return (int) round($totalCents * (float) $rate);
+        }
+
+        return $totalCents;
+    }
+
     public function isOverdue(?Carbon $asOf = null): bool
     {
         if (! $this->status->isOpen()) {

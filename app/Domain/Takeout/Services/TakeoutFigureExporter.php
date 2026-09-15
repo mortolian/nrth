@@ -85,9 +85,6 @@ final class TakeoutFigureExporter
         ];
 
         $rows = $this->collector->invoices($run)->map(function (Invoice $invoice) use ($documents): array {
-            $businessCode = $invoice->business_currency_code ?? $invoice->currency;
-            $businessTotal = $invoice->getRawOriginal('total_business_currency_cents') ?? $invoice->getRawOriginal('total_cents');
-
             return [
                 $invoice->id,
                 $invoice->number,
@@ -99,10 +96,10 @@ final class TakeoutFigureExporter
                 (int) $invoice->getRawOriginal('subtotal_cents'),
                 (int) $invoice->getRawOriginal('vat_amount_cents'),
                 (int) $invoice->getRawOriginal('total_cents'),
-                $businessCode,
+                $invoice->business_currency_code ?? $invoice->currency,
                 $invoice->fx_rate_invoice_to_business,
                 $invoice->fx_rate_date?->toDateString(),
-                (int) $businessTotal,
+                $invoice->totalBusinessCurrencyCents(),
                 $invoice->voided_at?->toDateTimeString(),
                 $invoice->sent_at?->toDateTimeString(),
                 $documents->invoicePdfFilenames[$invoice->id] ?? '',
