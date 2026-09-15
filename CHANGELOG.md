@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.33](https://github.com/mortolian/nrth/compare/v0.1.32...v0.1.33) (2026-09-15)
+
+
+### Features
+
+* **expenses:** add recurring expenses ([e1c0463](https://github.com/mortolian/nrth/commit/e1c0463e21a6478cb963d504333d018ba35f9d7d))
+
 ## [0.1.32](https://github.com/mortolian/nrth/compare/v0.1.31...v0.1.32) (2026-09-15)
 
 
