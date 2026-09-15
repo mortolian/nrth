@@ -81,6 +81,36 @@ class SupplierTest extends TestCase
         $this->assertNull(Supplier::queryWithoutTeamScope()->find($supplier->id));
     }
 
+    public function test_suppliers_index_search_is_case_insensitive(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $this->assertNotNull($team);
+        $this->actingTeamContext($user, $team);
+
+        Supplier::factory()->for($team)->create([
+            'name' => 'Acme Supplies',
+            'email' => 'Billing@Acme.TEST',
+        ]);
+        Supplier::factory()->for($team)->create([
+            'name' => 'Other Vendor',
+            'email' => 'other@example.test',
+        ]);
+
+        $this->get(route('suppliers.index', ['search' => 'acme']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Suppliers/Index')
+                ->has('suppliers.data', 1)
+                ->where('suppliers.data.0.name', 'Acme Supplies'));
+
+        $this->get(route('suppliers.index', ['search' => 'BILLING@ACME']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('suppliers.data', 1)
+                ->where('suppliers.data.0.email', 'Billing@Acme.TEST'));
+    }
+
     public function test_index_paginates_suppliers_in_grid_and_table_views(): void
     {
         $user = User::factory()->withPersonalTeam()->create();

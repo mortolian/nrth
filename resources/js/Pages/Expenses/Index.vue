@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useMoneyOutTabs } from '@/Composables/useFeatureTabs';
@@ -8,6 +8,11 @@ import { useFormatCurrency } from '@/Composables/useFormatCurrency';
 import { Paperclip, TriangleAlert } from 'lucide-vue-next';
 
 const moneyOutTabs = useMoneyOutTabs();
+const page = usePage();
+const canManageExpenses = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('expenses.manage');
+});
 
 type ExpenseRow = {
     id: number;
@@ -171,6 +176,9 @@ const rowActionItems = (expense: ExpenseRow) => {
         { id: 'edit', label: 'Edit' },
         { id: 'attach_receipt', label: 'Attach receipt' },
     ];
+    if (canManageExpenses.value) {
+        actions.push({ id: 'make_recurring', label: 'Make recurring' });
+    }
     if (expense.can_delete) {
         actions.push({ id: 'delete', label: 'Delete' });
     }
@@ -185,6 +193,10 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
     }
     if (actionId === 'attach_receipt') {
         startAttachReceipt(expense.id);
+        return;
+    }
+    if (actionId === 'make_recurring') {
+        router.visit(route('expenses.recurring.create', { expense_id: expense.id }));
         return;
     }
     if (actionId === 'delete') {

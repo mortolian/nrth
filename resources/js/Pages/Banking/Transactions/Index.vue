@@ -124,12 +124,24 @@ const canCreateExpenseFromLine = (row: LineRow) =>
     && row.reconciliation_status !== 'excluded'
     && row.remaining_cents >= 1;
 
+const canMakeRecurringFromLine = (row: LineRow) =>
+    canCreateExpense.value
+    && row.direction === 'debit'
+    && row.reconciliation_status !== 'excluded';
+
 const goCreateExpense = (row: LineRow) => {
     router.visit(route('expenses.create', { banking_transaction_id: row.id }));
 };
 
+const goMakeRecurring = (row: LineRow) => {
+    router.visit(route('expenses.recurring.create', { banking_transaction_id: row.id }));
+};
+
 const rowActions = (row: LineRow) => {
     const actions = [{ id: 'source-file', label: 'Source file' }];
+    if (canMakeRecurringFromLine(row)) {
+        actions.unshift({ id: 'make-recurring', label: 'Make recurring' });
+    }
     if (canCreateExpenseFromLine(row)) {
         actions.unshift({ id: 'create-expense', label: 'Create expense' });
     }
@@ -143,6 +155,10 @@ const onRowAction = (actionId: string, row: LineRow) => {
     }
     if (actionId === 'create-expense') {
         goCreateExpense(row);
+        return;
+    }
+    if (actionId === 'make-recurring') {
+        goMakeRecurring(row);
     }
 };
 

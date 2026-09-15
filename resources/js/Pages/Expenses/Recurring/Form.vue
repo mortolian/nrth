@@ -78,6 +78,20 @@ const form = ref({
 
 const saving = ref(false);
 
+const prefillSource = computed(() => String(props.recurring?.prefill_source ?? ''));
+const prefillHint = computed(() => {
+    if (props.isEditing) {
+        return null;
+    }
+    if (prefillSource.value === 'expense') {
+        return 'Prefilled from an existing expense — adjust the schedule and save.';
+    }
+    if (prefillSource.value === 'banking') {
+        return 'Prefilled from a bank debit (amount treated as VAT-inclusive at 15%) — pick a category and adjust as needed.';
+    }
+    return null;
+});
+
 const selectedTax = computed(
     () => taxRateList.value.find((rate) => rate.value === form.value.vat_rate) ?? taxRateList.value[0],
 );
@@ -335,6 +349,13 @@ const submit = () => {
             :title="isEditing ? 'Edit recurring expense' : 'New recurring expense'"
             subtitle="Schedule a repeating bill — nrth posts it on each run date"
         />
+
+        <p
+            v-if="prefillHint"
+            class="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+        >
+            {{ prefillHint }}
+        </p>
 
         <FormValidationBanner
             class="mt-4"

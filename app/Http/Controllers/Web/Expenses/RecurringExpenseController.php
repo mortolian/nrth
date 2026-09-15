@@ -3,10 +3,17 @@
 namespace App\Http\Controllers\Web\Expenses;
 
 use App\Domain\Accounting\Enums\AccountType;
+use App\Domain\Accounting\Enums\EntryType;
+use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Banking\Actions\EnsureDefaultBankingAccount;
+use App\Domain\Banking\Enums\ReconciliationStatus;
+use App\Domain\Banking\Enums\TransactionDirection;
+use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingTransaction;
+use App\Domain\Banking\Services\BankingReconciliationTotals;
 use App\Domain\Banking\Support\BankingPaymentAccounts;
 use App\Domain\Expenses\Actions\GenerateRecurringExpenseAction;
 use App\Domain\Expenses\Enums\RecurringExpenseStatus;
@@ -14,11 +21,13 @@ use App\Domain\Expenses\Models\RecurringExpense;
 use App\Domain\Invoicing\Enums\RecurringFrequency;
 use App\Domain\Invoicing\Enums\RecurringLimitType;
 use App\Http\Controllers\Controller;
+use App\Models\Team;
 use Carbon\Carbon;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -76,7 +85,7 @@ class RecurringExpenseController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response
+    public function create(Request $request, BankingReconciliationTotals $totals): Response
     {
         $this->authorizeTeam('expenses.manage', $request);
         $team = $request->user()?->currentTeam;
@@ -86,20 +95,7 @@ class RecurringExpenseController extends Controller
         (new EnsureDefaultBankingAccount)->execute($team);
 
         $teamId = (int) $team->id;
-        $prefillSupplierId = (int) $request->integer('supplier_id');
-        $prefill = null;
-        if ($prefillSupplierId > 0) {
-            $supplierExists = Supplier::queryWithoutTeamScope()
-                ->where('team_id', $teamId)
-                ->whereKey($prefillSupplierId)
-                ->exists();
-            if ($supplierExists) {
-                $prefill = [
-                    'supplier_id' => $prefillSupplierId,
-                    'supplier_custom' => '',
-                ];
-            }
-        }
+        $prefill = $this->resolveCreatePrefill($request, $team, $totals);
 
         return Inertia::render('Expenses/Recurring/Form', [
             'isEditing' => false,
@@ -324,6 +320,212 @@ class RecurringExpenseController extends Controller
         $name = strtolower($category->name);
 
         return str_contains($name, 'travel') || str_contains($name, 'home office');
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveCreatePrefill(Request $request, Team $team, BankingReconciliationTotals $totals): ?array
+    {
+        $teamId = (int) $team->id;
+        $expenseId = (int) $request->integer('expense_id');
+        if ($expenseId > 0) {
+            return $this->prefillFromExpense($expenseId, $team);
+        }
+
+        $bankLineId = (int) $request->integer('banking_transaction_id');
+        if ($bankLineId > 0) {
+            return $this->prefillFromBankLine($request, $bankLineId, $teamId, $totals);
+        }
+
+        $prefillSupplierId = (int) $request->integer('supplier_id');
+        if ($prefillSupplierId < 1) {
+            return null;
+        }
+
+        $supplierExists = Supplier::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->whereKey($prefillSupplierId)
+            ->exists();
+
+        if (! $supplierExists) {
+            return null;
+        }
+
+        return [
+            'supplier_id' => $prefillSupplierId,
+            'supplier_custom' => '',
+            'prefill_source' => 'supplier',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function prefillFromExpense(int $expenseId, Team $team): array
+    {
+        $transaction = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense->value)
+            ->with(['journalEntries.account', 'taxLines', 'supplier:id,name'])
+            ->find($expenseId);
+
+        abort_if($transaction === null, 404);
+
+        $expenseLine = $transaction->journalEntries->first(
+            fn ($entry) => $entry->account?->type === AccountType::Expense
+        );
+        $amountExclCents = $expenseLine !== null
+            ? (int) $expenseLine->getRawOriginal('amount_cents')
+            : 0;
+        $vatAmountCents = $this->expenseVatAmountCents($transaction);
+        $meta = $transaction->expense_meta ?? [];
+
+        $categoryName = strtolower((string) ($expenseLine?->account?->name ?? ''));
+        if (str_contains($categoryName, 'home office')) {
+            if (isset($meta['entered_amount_excl_vat_cents'])) {
+                $amountExclCents = (int) $meta['entered_amount_excl_vat_cents'];
+                $vatAmountCents = (int) ($meta['entered_vat_amount_cents'] ?? 0);
+            }
+        }
+
+        $vatRate = 'no_vat';
+        if ($vatAmountCents > 0) {
+            $vatRate = 'vat15';
+        } elseif ($transaction->taxLines->isNotEmpty()) {
+            $vatRate = 'vat0';
+        }
+
+        $categoryAccountId = (int) ($expenseLine?->account_id ?? 0);
+        if ($categoryAccountId > 0 && $expenseLine?->account !== null && $this->isUnsupportedRecurringCategory($expenseLine->account)) {
+            $categoryAccountId = 0;
+        }
+
+        $expenseDate = $transaction->transaction_date ?? now();
+        $dayOfMonth = min(28, max(1, (int) $expenseDate->day));
+        $isLastDay = (int) $expenseDate->day === (int) $expenseDate->copy()->endOfMonth()->day;
+
+        return [
+            'supplier_id' => $transaction->supplier_id ?? 0,
+            'supplier_custom' => $transaction->supplier_id
+                ? ''
+                : (string) ($transaction->supplier?->name ?: ($transaction->reference ?? '')),
+            'category_account_id' => $categoryAccountId,
+            'paid_from_banking_account_id' => $this->paidFromBankingAccountIdFromExpense($transaction, $team),
+            'frequency' => RecurringFrequency::Monthly->value,
+            'generate_on_day' => $isLastDay ? 1 : $dayOfMonth,
+            'generate_on_last_day' => $isLastDay,
+            'next_run_date' => now()->toDateString(),
+            'description' => (string) ($transaction->description ?? ''),
+            'notes' => (string) ($meta['notes'] ?? ''),
+            'reference' => (string) ($meta['external_reference'] ?? ''),
+            'amount_excl_vat_cents' => $amountExclCents,
+            'vat_rate' => $vatRate,
+            'vat_amount_cents' => $vatAmountCents,
+            'prefill_source' => 'expense',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function prefillFromBankLine(
+        Request $request,
+        int $bankLineId,
+        int $teamId,
+        BankingReconciliationTotals $totals,
+    ): array {
+        abort_unless($request->user()?->canOnTeam('banking.manage'), 403);
+
+        $line = BankingTransaction::queryWithoutTeamScope()
+            ->where('team_id', $teamId)
+            ->find($bankLineId);
+
+        abort_if($line === null, 404);
+        abort_unless($line->direction === TransactionDirection::Debit, 404);
+        abort_if($line->reconciliation_status === ReconciliationStatus::Excluded, 404);
+
+        $amountInclCents = max(
+            $totals->bankAmountCents($line),
+            $totals->remainingBankCents($line),
+        );
+        abort_if($amountInclCents < 1, 404);
+
+        $exclCents = (int) round($amountInclCents / 1.15);
+        $vatCents = $amountInclCents - $exclCents;
+        $description = trim((string) $line->description);
+        $matchedSupplier = $description === ''
+            ? null
+            : Supplier::queryWithoutTeamScope()
+                ->where('team_id', $teamId)
+                ->whereRaw('LOWER(name) = ?', [mb_strtolower($description)])
+                ->first();
+
+        $txnDate = $line->transaction_date ?? now();
+        $dayOfMonth = min(28, max(1, (int) $txnDate->day));
+        $isLastDay = (int) $txnDate->day === (int) $txnDate->copy()->endOfMonth()->day;
+
+        return [
+            'supplier_id' => $matchedSupplier !== null ? (int) $matchedSupplier->id : 0,
+            'supplier_custom' => $matchedSupplier !== null ? '' : Str::limit($description, 255, ''),
+            'category_account_id' => 0,
+            'paid_from_banking_account_id' => (int) $line->account_id,
+            'frequency' => RecurringFrequency::Monthly->value,
+            'generate_on_day' => $isLastDay ? 1 : $dayOfMonth,
+            'generate_on_last_day' => $isLastDay,
+            'next_run_date' => now()->toDateString(),
+            'description' => $description,
+            'notes' => '',
+            'reference' => trim((string) ($line->reference ?? '')),
+            'amount_excl_vat_cents' => $exclCents,
+            'vat_rate' => 'vat15',
+            'vat_amount_cents' => $vatCents,
+            'prefill_source' => 'banking',
+        ];
+    }
+
+    private function expenseVatAmountCents(Transaction $transaction): int
+    {
+        $fromTaxLines = (int) $transaction->taxLines->sum('tax_amount_cents');
+        if ($fromTaxLines > 0) {
+            return $fromTaxLines;
+        }
+
+        return (int) $transaction->journalEntries
+            ->filter(fn ($entry) => $entry->type === EntryType::Debit && $entry->account?->code === '1200')
+            ->sum(fn ($entry) => (int) $entry->getRawOriginal('amount_cents'));
+    }
+
+    private function paidFromBankingAccountIdFromExpense(Transaction $transaction, Team $team): int
+    {
+        $meta = $transaction->expense_meta ?? [];
+        $fromMeta = (int) ($meta['paid_from_banking_account_id'] ?? 0);
+        if ($fromMeta > 0) {
+            $existing = BankingAccount::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->whereKey($fromMeta)
+                ->whereNotNull('gl_account_id')
+                ->first();
+            if ($existing !== null) {
+                return (int) $existing->id;
+            }
+        }
+
+        $creditLine = $transaction->journalEntries->first(
+            fn ($entry) => $entry->type === EntryType::Credit
+        );
+        $glAccountId = (int) ($creditLine?->account_id ?? 0);
+        if ($glAccountId > 0) {
+            $linked = BankingAccount::queryWithoutTeamScope()
+                ->where('team_id', $team->id)
+                ->where('gl_account_id', $glAccountId)
+                ->first();
+            if ($linked !== null) {
+                return (int) $linked->id;
+            }
+        }
+
+        return (int) (new EnsureDefaultBankingAccount)->execute($team)->id;
     }
 
     /**

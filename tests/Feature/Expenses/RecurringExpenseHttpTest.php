@@ -2,10 +2,14 @@
 
 namespace Tests\Feature\Expenses;
 
+use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Banking\Enums\ReconciliationStatus;
+use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingAccount;
+use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Expenses\Models\RecurringExpense;
 use App\Models\Team;
 use App\Models\User;
@@ -156,7 +160,172 @@ class RecurringExpenseHttpTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('Expenses/Recurring/Form')
                 ->where('recurring.supplier_id', $supplier->id)
-                ->where('recurring.supplier_custom', ''));
+                ->where('recurring.supplier_custom', '')
+                ->where('recurring.prefill_source', 'supplier'));
+    }
+
+    public function test_create_form_prefills_from_expense(): void
+    {
+        [$owner, $team, $category, $banking] = $this->ownerWithPayload();
+        $supplier = Supplier::factory()->for($team)->create(['name' => 'Monthly Host']);
+
+        $this->actingAs($owner)
+            ->post(route('expenses.store'), [
+                'date' => '2026-03-15',
+                'supplier_id' => $supplier->id,
+                'category_account_id' => $category->id,
+                'description' => 'Hosting for March',
+                'amount_excl_vat_cents' => 10000,
+                'vat_rate' => 'vat15',
+                'vat_amount_cents' => 1500,
+                'paid_from_banking_account_id' => $banking->id,
+                'reference' => 'INV-88',
+                'notes' => 'Keep receipt',
+            ])
+            ->assertRedirect(route('expenses.index'));
+
+        $expense = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($expense);
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['expense_id' => $expense->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Recurring/Form')
+                ->where('recurring.prefill_source', 'expense')
+                ->where('recurring.supplier_id', $supplier->id)
+                ->where('recurring.category_account_id', $category->id)
+                ->where('recurring.paid_from_banking_account_id', $banking->id)
+                ->where('recurring.amount_excl_vat_cents', 10000)
+                ->where('recurring.vat_rate', 'vat15')
+                ->where('recurring.vat_amount_cents', 1500)
+                ->where('recurring.description', 'Hosting for March')
+                ->where('recurring.notes', 'Keep receipt')
+                ->where('recurring.reference', 'INV-88')
+                ->where('recurring.frequency', 'monthly')
+                ->where('recurring.generate_on_day', 15)
+                ->where('recurring.generate_on_last_day', false));
+    }
+
+    public function test_create_form_clears_travel_category_when_prefilling_from_expense(): void
+    {
+        [$owner, $team, , $banking] = $this->ownerWithPayload();
+        $travel = Account::factory()->for($team)->expense()->create([
+            'code' => '7700',
+            'name' => 'Travel',
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('expenses.store'), [
+                'date' => '2026-04-10',
+                'supplier' => 'Airline',
+                'category_account_id' => $travel->id,
+                'description' => 'Flight',
+                'amount_excl_vat_cents' => 50000,
+                'vat_rate' => 'no_vat',
+                'vat_amount_cents' => 0,
+                'paid_from_banking_account_id' => $banking->id,
+                'distance_km' => 10,
+                'reference' => null,
+                'notes' => null,
+            ])
+            ->assertRedirect(route('expenses.index'));
+
+        $expense = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($expense);
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['expense_id' => $expense->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('recurring.prefill_source', 'expense')
+                ->where('recurring.category_account_id', 0)
+                ->where('recurring.description', 'Flight'));
+    }
+
+    public function test_create_form_prefills_from_bank_debit(): void
+    {
+        [$owner, $team, , $banking] = $this->ownerWithPayload();
+        $supplier = Supplier::factory()->for($team)->create(['name' => 'Corner Cafe']);
+        $line = BankingTransaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'account_id' => $banking->id,
+            'transaction_date' => '2026-08-03',
+            'description' => 'Corner Cafe',
+            'amount' => '45.00',
+            'currency' => 'ZAR',
+            'direction' => TransactionDirection::Debit,
+            'source_hash' => hash('sha256', 'recurring-prefill-cafe'),
+            'duplicate_key' => hash('sha256', 'recurring-prefill-cafe-key'),
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['banking_transaction_id' => $line->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Recurring/Form')
+                ->where('recurring.prefill_source', 'banking')
+                ->where('recurring.supplier_id', $supplier->id)
+                ->where('recurring.supplier_custom', '')
+                ->where('recurring.category_account_id', 0)
+                ->where('recurring.paid_from_banking_account_id', $banking->id)
+                ->where('recurring.amount_excl_vat_cents', 3913)
+                ->where('recurring.vat_rate', 'vat15')
+                ->where('recurring.vat_amount_cents', 587)
+                ->where('recurring.description', 'Corner Cafe')
+                ->where('recurring.frequency', 'monthly')
+                ->where('recurring.generate_on_day', 3));
+    }
+
+    public function test_create_form_rejects_bank_credits_and_excluded_lines(): void
+    {
+        [$owner, $team, , $banking] = $this->ownerWithPayload();
+
+        $credit = BankingTransaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'account_id' => $banking->id,
+            'transaction_date' => '2026-08-05',
+            'description' => 'Salary',
+            'amount' => '20000.00',
+            'currency' => 'ZAR',
+            'direction' => TransactionDirection::Credit,
+            'source_hash' => hash('sha256', 'recurring-prefill-credit'),
+            'duplicate_key' => hash('sha256', 'recurring-prefill-credit-key'),
+        ]);
+        $excluded = BankingTransaction::queryWithoutTeamScope()->create([
+            'team_id' => $team->id,
+            'account_id' => $banking->id,
+            'transaction_date' => '2026-08-06',
+            'description' => 'Transfer',
+            'amount' => '100.00',
+            'currency' => 'ZAR',
+            'direction' => TransactionDirection::Debit,
+            'source_hash' => hash('sha256', 'recurring-prefill-excluded'),
+            'duplicate_key' => hash('sha256', 'recurring-prefill-excluded-key'),
+        ]);
+        $excluded->forceFill([
+            'reconciliation_status' => ReconciliationStatus::Excluded,
+            'exclusion_note' => 'Personal',
+            'excluded_at' => now(),
+        ])->save();
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['banking_transaction_id' => $credit->id]))
+            ->assertNotFound();
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['banking_transaction_id' => $excluded->id]))
+            ->assertNotFound();
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['banking_transaction_id' => 999999]))
+            ->assertNotFound();
     }
 
     public function test_store_links_supplier_and_rejects_travel_category(): void
