@@ -2,6 +2,14 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.37](https://github.com/mortolian/nrth/compare/v0.1.36...v0.1.37) (2026-09-15)
+
+
+### Features
+
+* **expenses:** show description on recurring expense list ([9d49919](https://github.com/mortolian/nrth/commit/9d4991900168571060207f3160ddea2cb570981c))
+* **expenses:** update recurring expense form to include total amount with VAT ([103bed0](https://github.com/mortolian/nrth/commit/103bed0de1965d1c16031d24911c0a426c1982b4))
+
 ## [0.1.36](https://github.com/mortolian/nrth/compare/v0.1.35...v0.1.36) (2026-09-15)
 
 
