@@ -2,6 +2,15 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.32](https://github.com/mortolian/nrth/compare/v0.1.31...v0.1.32) (2026-09-15)
+
+
+### Features
+
+* **expenses:** add description filter to expense index and enhance receipt handling ([dd8988c](https://github.com/mortolian/nrth/commit/dd8988cded0c134d1f454615fa323c33c2d7d6c5))
+* **expenses:** enable expense creation from unmatched bank debits and enhance prefill functionality ([a4bd3c0](https://github.com/mortolian/nrth/commit/a4bd3c015d0842b9b67e35cac5e6eb7fb200bda4))
+* **invoicing:** add totalBusinessCurrencyCents method and update invoice exports ([6e4a255](https://github.com/mortolian/nrth/commit/6e4a2551cfe8577b6e361d5617d4054cd49bbf17))
+
 ## [0.1.31](https://github.com/mortolian/nrth/compare/v0.1.30...v0.1.31) (2026-09-14)
 
 
