@@ -554,7 +554,7 @@ const onInvoiceAction = (invoice, actionId) => {
                     :loading="isLoading"
                 >
                     <tr v-for="transaction in recent_transactions" :key="transaction.id" class="text-sm text-slate-700">
-                        <td class="px-4 py-3"><DateDisplay :value="transaction.date" /></td>
+                        <td class="whitespace-nowrap px-4 py-3"><DateDisplay :value="transaction.date" /></td>
                         <td class="px-4 py-3 font-medium">{{ transaction.description }}</td>
                         <td class="px-4 py-3">{{ transaction.account }}</td>
                         <td class="px-4 py-3">

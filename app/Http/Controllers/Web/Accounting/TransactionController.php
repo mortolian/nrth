@@ -86,10 +86,7 @@ class TransactionController extends Controller
                 $lines = $transaction->journalEntries;
                 $debits = $lines->filter(fn ($line) => $line->type === EntryType::Debit);
                 $credits = $lines->filter(fn ($line) => $line->type === EntryType::Credit);
-                $amount = (int) max(
-                    $debits->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents')),
-                    $credits->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents'))
-                );
+                $amount = $transaction->journalTotalCents();
 
                 $debitAccount = $debits->first()?->account?->name ?? '—';
                 $creditAccount = $credits->first()?->account?->name ?? '—';
@@ -203,10 +200,7 @@ class TransactionController extends Controller
                 $lines = $transaction->journalEntries;
                 $debits = $lines->filter(fn ($line) => $line->type === EntryType::Debit);
                 $credits = $lines->filter(fn ($line) => $line->type === EntryType::Credit);
-                $amountCents = (int) max(
-                    $debits->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents')),
-                    $credits->sum(fn ($line) => (int) $line->getRawOriginal('amount_cents'))
-                );
+                $amountCents = $transaction->journalTotalCents();
                 $debitAccount = $debits->first()?->account?->name ?? '—';
                 $creditAccount = $credits->first()?->account?->name ?? '—';
 

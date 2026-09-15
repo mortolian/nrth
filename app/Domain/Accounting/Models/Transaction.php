@@ -2,6 +2,7 @@
 
 namespace App\Domain\Accounting\Models;
 
+use App\Domain\Accounting\Enums\EntryType;
 use App\Domain\Accounting\Enums\TransactionStatus;
 use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Banking\Models\BankingTransactionAllocation;
@@ -150,6 +151,27 @@ class Transaction extends Model implements HasMedia
         $reference = trim((string) ($this->reference ?? ''));
 
         return $reference !== '' ? $reference : null;
+    }
+
+    /**
+     * Gross journal total (sum of the larger side), including VAT lines.
+     */
+    public function journalTotalCents(): int
+    {
+        $this->loadMissing('journalEntries');
+
+        $debits = 0;
+        $credits = 0;
+        foreach ($this->journalEntries as $line) {
+            $cents = (int) $line->getRawOriginal('amount_cents');
+            if ($line->type === EntryType::Debit) {
+                $debits += $cents;
+            } else {
+                $credits += $cents;
+            }
+        }
+
+        return max($debits, $credits);
     }
 
     /**

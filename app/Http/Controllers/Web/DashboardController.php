@@ -250,14 +250,13 @@ class DashboardController extends Controller
             ->get()
             ->map(function (Transaction $transaction): array {
                 $line = $transaction->journalEntries->first();
-                $amount = $line ? (int) $line->getRawOriginal('amount_cents') : 0;
 
                 return [
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
                     'description' => $transaction->description ?: $transaction->type->label(),
                     'account' => $line?->account?->name ?? 'N/A',
-                    'amount_cents' => $amount,
+                    'amount_cents' => $transaction->journalTotalCents(),
                     'type' => $transaction->type->label(),
                 ];
             })
