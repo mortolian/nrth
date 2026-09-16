@@ -34,6 +34,7 @@ type ExpenseFormRow = {
     paid_from_banking_account_id: number;
     reference: string;
     notes: string;
+    receipt_not_required: boolean;
     office_percentage: number;
     distance_km: number;
     rate_per_km: number;
@@ -121,6 +122,7 @@ const schema = z
         paid_from_banking_account_id: z.coerce.number().int().positive(),
         reference: z.string().optional(),
         notes: z.string().optional(),
+        receipt_not_required: z.boolean().optional(),
         office_percentage: z.coerce.number().min(0).max(100).optional(),
         distance_km: z.coerce.number().min(0).optional(),
         rate_per_km: z.coerce.number().min(0).optional(),
@@ -145,6 +147,7 @@ const initialFromProps = () => {
             paid_from_banking_account_id: e.paid_from_banking_account_id || defaultPaidFromAccountId(),
             reference: e.reference,
             notes: e.notes,
+            receipt_not_required: Boolean(e.receipt_not_required),
             office_percentage: e.office_percentage,
             distance_km: e.distance_km,
             rate_per_km: e.rate_per_km || props.sars_rate_per_km,
@@ -168,6 +171,7 @@ const initialFromProps = () => {
             : defaultPaidFromAccountId(),
         reference: p?.reference ?? '',
         notes: '',
+        receipt_not_required: false,
         office_percentage: 15,
         distance_km: 0,
         rate_per_km: props.sars_rate_per_km,
@@ -949,6 +953,7 @@ const buildFormData = (parsed: z.infer<typeof schema>) => {
     data.set('paid_from_banking_account_id', String(parsed.paid_from_banking_account_id));
     data.set('reference', parsed.reference ?? '');
     data.set('notes', parsed.notes ?? '');
+    data.set('receipt_not_required', form.receipt_not_required ? '1' : '0');
     if (isHomeOffice.value) data.set('office_percentage', String(parsed.office_percentage ?? 0));
     if (isTravel.value) {
         data.set('distance_km', String(parsed.distance_km ?? 0));
@@ -1032,6 +1037,7 @@ const snapshotForm = () => ({
     paid_from_banking_account_id: Number(form.paid_from_banking_account_id || 0),
     reference: String(form.reference ?? ''),
     notes: String(form.notes ?? ''),
+    receipt_not_required: Boolean(form.receipt_not_required),
     office_percentage: Number(form.office_percentage || 0),
     distance_km: Number(form.distance_km || 0),
     rate_per_km: Number(form.rate_per_km || props.sars_rate_per_km),
@@ -1111,7 +1117,7 @@ const submit = () => {
         return;
     }
 
-    const data: Record<string, string | number> = {
+    const data: Record<string, string | number | boolean> = {
         date: parsed.data.date,
         category_account_id: parsed.data.category_account_id,
         description: parsed.data.description ?? '',
@@ -1121,6 +1127,7 @@ const submit = () => {
         paid_from_banking_account_id: parsed.data.paid_from_banking_account_id,
         reference: parsed.data.reference ?? '',
         notes: parsed.data.notes ?? '',
+        receipt_not_required: form.receipt_not_required,
     };
     if (parsed.data.supplier_id > 0) {
         data.supplier_id = parsed.data.supplier_id;
@@ -1373,6 +1380,18 @@ const submit = () => {
                         </button>
                     </li>
                 </ul>
+
+                <label class="mt-3 flex items-start gap-2 text-sm text-slate-700">
+                    <input
+                        v-model="form.receipt_not_required"
+                        type="checkbox"
+                        class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    >
+                    <span>
+                        Receipt not required
+                        <span class="mt-0.5 block text-xs text-slate-500">Don’t warn when this expense has no attached file. Leave off unless you truly won’t have a receipt.</span>
+                    </span>
+                </label>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">

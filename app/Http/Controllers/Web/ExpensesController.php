@@ -141,6 +141,7 @@ class ExpensesController extends Controller
                     'total' => $amountCents + $vatAmount,
                     'status' => $transaction->status->value,
                     'has_receipt' => $transaction->media_count > 0,
+                    'receipt_not_required' => (bool) $transaction->receipt_not_required,
                     'can_delete' => DeleteTransactionAction::canDelete($transaction),
                 ];
             });
@@ -516,6 +517,7 @@ class ExpensesController extends Controller
                 'reference' => $reference,
                 'description' => $booking->expenseDescriptionFromPayload($payload),
                 'expense_meta' => $expenseMeta,
+                'receipt_not_required' => (bool) ($payload['receipt_not_required'] ?? false),
                 'transaction_date' => $payload['date'],
             ]);
             $transaction->save();
@@ -547,6 +549,31 @@ class ExpensesController extends Controller
         $this->detachReceiptAttachments($request, $transaction);
 
         return to_route('expenses.index');
+    }
+
+    public function updateReceiptRequirement(Request $request, Transaction $transaction): RedirectResponse
+    {
+        $this->authorizeTeam('expenses.manage', $request);
+        $transaction = $this->resolveTeamExpense($request, $transaction);
+
+        $request->merge([
+            'receipt_not_required' => $request->boolean('receipt_not_required'),
+        ]);
+
+        $validated = $request->validate([
+            'receipt_not_required' => ['required', 'boolean'],
+        ]);
+
+        $transaction->forceFill([
+            'receipt_not_required' => (bool) $validated['receipt_not_required'],
+        ])->save();
+
+        return back()->with(
+            'success',
+            $transaction->receipt_not_required
+                ? __('This expense will no longer warn about a missing receipt.')
+                : __('This expense will warn if no receipt is attached.'),
+        );
     }
 
     public function destroy(Request $request, Transaction $transaction, DeleteTransactionAction $deleteTransactionAction): RedirectResponse
@@ -748,6 +775,10 @@ class ExpensesController extends Controller
             $request->merge(['supplier_id' => null]);
         }
 
+        $request->merge([
+            'receipt_not_required' => $request->boolean('receipt_not_required'),
+        ]);
+
         return $request->validate([
             'date' => ['required', 'date'],
             'supplier_id' => ['nullable', 'integer', Rule::exists('suppliers', 'id')->where('team_id', $teamId)],
@@ -768,6 +799,7 @@ class ExpensesController extends Controller
             ],
             'reference' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'receipt_not_required' => ['required', 'boolean'],
             'office_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'distance_km' => ['nullable', 'numeric', 'min:0'],
             'rate_per_km' => ['nullable', 'numeric', 'min:0'],
@@ -902,6 +934,7 @@ class ExpensesController extends Controller
             'paid_from_banking_account_id' => $paidFromBankingAccountId,
             'reference' => (string) ($meta['external_reference'] ?? ''),
             'notes' => (string) ($meta['notes'] ?? ''),
+            'receipt_not_required' => (bool) $transaction->receipt_not_required,
             'office_percentage' => (float) ($meta['office_percentage'] ?? 15),
             'distance_km' => (float) ($meta['distance_km'] ?? 0),
             'rate_per_km' => (float) ($meta['rate_per_km'] ?? 4.84),
@@ -1117,6 +1150,7 @@ class ExpensesController extends Controller
         return Transaction::queryWithoutTeamScope()
             ->where('team_id', $teamId)
             ->where('type', TransactionType::Expense->value)
+            ->where('receipt_not_required', false)
             ->whereDoesntHave('media', $this->expenseReceiptMediaConstraint())
             ->count();
     }

@@ -26,6 +26,7 @@ type ExpenseRow = {
     total: number;
     status: string;
     has_receipt: boolean;
+    receipt_not_required: boolean;
     can_delete: boolean;
 };
 
@@ -177,6 +178,10 @@ const rowActionItems = (expense: ExpenseRow) => {
         { id: 'attach_receipt', label: 'Attach receipt' },
     ];
     if (canManageExpenses.value) {
+        actions.push({
+            id: 'toggle_receipt_requirement',
+            label: expense.receipt_not_required ? 'Require receipt' : 'Don’t require receipt',
+        });
         actions.push({ id: 'make_recurring', label: 'Make recurring' });
     }
     if (expense.can_delete) {
@@ -193,6 +198,12 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
     }
     if (actionId === 'attach_receipt') {
         startAttachReceipt(expense.id);
+        return;
+    }
+    if (actionId === 'toggle_receipt_requirement') {
+        router.patch(route('expenses.receipt-requirement.update', expense.id), {
+            receipt_not_required: !expense.receipt_not_required,
+        }, { preserveScroll: true });
         return;
     }
     if (actionId === 'make_recurring') {
@@ -232,7 +243,7 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 <p :class="summary.awaiting_receipts > 0 ? 'text-rose-600' : 'text-slate-900'" class="mt-1 text-2xl font-semibold">
                     {{ summary.awaiting_receipts }}
                 </p>
-                <p class="mt-2 text-xs text-slate-500">All expenses without an attached file</p>
+                <p class="mt-2 text-xs text-slate-500">Expenses still waiting for an attached file</p>
             </AppCard>
         </div>
 
@@ -387,8 +398,13 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                         {{ formatCents(expense.total) }}
                     </td>
                     <td class="px-3 py-2">
-                        <Paperclip v-if="expense.has_receipt" class="h-4 w-4 text-slate-600" />
-                        <TriangleAlert v-else class="h-4 w-4 text-rose-500" />
+                        <Paperclip v-if="expense.has_receipt" class="h-4 w-4 text-slate-600" aria-label="Receipt attached" />
+                        <span
+                            v-else-if="expense.receipt_not_required"
+                            class="text-xs text-slate-400"
+                            title="Receipt not required"
+                        >—</span>
+                        <TriangleAlert v-else class="h-4 w-4 text-rose-500" aria-label="Missing receipt" />
                     </td>
                     <td class="px-3 py-2" @click.stop>
                         <div class="flex justify-end">

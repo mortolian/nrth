@@ -30,7 +30,9 @@ final class TakeoutPreviewService
             ),
             'expenses_count' => $expenses->count(),
             'expense_receipts_count' => $expenses->filter(fn ($t) => (int) $t->media_count > 0)->count(),
-            'expenses_missing_receipts' => $expenses->filter(fn ($t) => (int) $t->media_count === 0)->count(),
+            'expenses_missing_receipts' => $expenses->filter(
+                fn ($t) => (int) $t->media_count === 0 && ! $t->receipt_not_required
+            )->count(),
             'expenses_total_cents' => $expenseTotalCents,
             'bank_statement_files' => $this->collector->bankStatementImports($run)->count(),
             'vat_periods_count' => $this->collector->vatPeriods($run)->count(),

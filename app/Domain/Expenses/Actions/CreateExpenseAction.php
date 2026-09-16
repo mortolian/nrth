@@ -65,6 +65,7 @@ class CreateExpenseAction
                 'reference' => $reference,
                 'description' => $this->booking->expenseDescriptionFromPayload($payload),
                 'expense_meta' => $expenseMeta,
+                'receipt_not_required' => $dto->receiptNotRequired,
                 'transaction_date' => $dto->date,
                 'created_by' => $dto->createdBy,
             ]);

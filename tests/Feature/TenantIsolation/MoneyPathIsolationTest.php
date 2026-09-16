@@ -173,6 +173,9 @@ class MoneyPathIsolationTest extends TestCase
             'vat_amount_cents' => 0,
             'category_account_id' => 1,
         ]));
+        $this->assertHiddenFromOtherTeam($this->patch(route('expenses.receipt-requirement.update', $expense), [
+            'receipt_not_required' => true,
+        ]));
         $this->assertHiddenFromOtherTeam($this->delete(route('expenses.destroy', $expense)));
         $this->assertHiddenFromOtherTeam($this->get(route('suppliers.show', $supplier)));
         $this->assertHiddenFromOtherTeam($this->delete(route('suppliers.destroy', $supplier)));
@@ -184,6 +187,7 @@ class MoneyPathIsolationTest extends TestCase
         $this->get(route('expenses.recurring.index'))->assertOk()->assertDontSee('Isolation recurring Alpha');
 
         $this->assertNotNull(Transaction::queryWithoutTeamScope()->find($expense->id));
+        $this->assertFalse((bool) $expense->fresh()->receipt_not_required);
         $this->assertNotNull(Supplier::queryWithoutTeamScope()->find($supplier->id));
         $this->assertNotNull(RecurringExpense::queryWithoutTeamScope()->find($recurring->id));
     }

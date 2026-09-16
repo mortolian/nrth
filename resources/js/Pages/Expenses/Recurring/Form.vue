@@ -73,6 +73,7 @@ const form = ref({
     period_offset_months: Number(props.recurring?.period_offset_months ?? 0),
     description: String(props.recurring?.description ?? 'Rent for {{month_year}}'),
     notes: String(props.recurring?.notes ?? ''),
+    receipt_not_required: Boolean(props.recurring?.receipt_not_required ?? false),
     reference: String(props.recurring?.reference ?? ''),
     amount_incl_vat: (initialExclCents + initialVatCents) / 100,
     vat_rate: (props.recurring?.vat_rate ?? 'no_vat') as VatRate,
@@ -311,6 +312,7 @@ const submit = () => {
         period_offset_months: Number(form.value.period_offset_months) || 0,
         description: form.value.description || null,
         notes: form.value.notes || null,
+        receipt_not_required: Boolean(form.value.receipt_not_required),
         reference: form.value.reference || null,
         amount_excl_vat_cents: amountBreakdown.value.exclCents,
         vat_rate: form.value.vat_rate,
@@ -520,6 +522,17 @@ const submit = () => {
                         <AppInput v-model="form.notes" placeholder="Optional (placeholders ok)" />
                     </div>
                 </div>
+                <label class="flex items-start gap-2 text-sm text-slate-700">
+                    <input
+                        v-model="form.receipt_not_required"
+                        type="checkbox"
+                        class="mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    >
+                    <span>
+                        Receipt not required
+                        <span class="mt-0.5 block text-xs text-slate-500">Generated expenses will skip the missing-receipt warning. You can still attach a receipt later.</span>
+                    </span>
+                </label>
             </section>
 
             <section class="space-y-4 border-t border-slate-100 pt-6">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Link, router } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
 import { useFormatCurrency } from '@/Composables/useFormatCurrency';
@@ -16,6 +16,7 @@ type ExpenseHistoryRow = {
     total_cents: number;
     status: string;
     has_receipt: boolean;
+    receipt_not_required: boolean;
     can_delete: boolean;
 };
 
@@ -53,6 +54,12 @@ const props = defineProps<{
 
 const formatCents = (cents: number, currency: string) =>
     useFormatCurrency((Number(cents) || 0) / 100, currency || 'ZAR');
+
+const page = usePage();
+const canManageExpenses = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('expenses.manage');
+});
 
 const addressLines = computed(() => {
     const a = props.supplier.address;
@@ -123,6 +130,12 @@ const rowActionItems = (expense: ExpenseHistoryRow) => {
         { id: 'edit', label: 'Edit' },
         { id: 'attach_receipt', label: 'Attach receipt' },
     ];
+    if (canManageExpenses.value) {
+        actions.push({
+            id: 'toggle_receipt_requirement',
+            label: expense.receipt_not_required ? 'Require receipt' : 'Don’t require receipt',
+        });
+    }
     if (expense.can_delete) {
         actions.push({ id: 'delete', label: 'Delete' });
     }
@@ -137,6 +150,12 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
     }
     if (actionId === 'attach_receipt') {
         startAttachReceipt(expense.id);
+        return;
+    }
+    if (actionId === 'toggle_receipt_requirement') {
+        router.patch(route('expenses.receipt-requirement.update', expense.id), {
+            receipt_not_required: !expense.receipt_not_required,
+        }, { preserveScroll: true });
         return;
     }
     if (actionId === 'delete') {
@@ -277,8 +296,13 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
                         {{ formatCents(row.total_cents, stats.currency) }}
                     </td>
                     <td class="px-3 py-2">
-                        <Paperclip v-if="row.has_receipt" class="h-4 w-4 text-slate-600" />
-                        <TriangleAlert v-else class="h-4 w-4 text-rose-500" />
+                        <Paperclip v-if="row.has_receipt" class="h-4 w-4 text-slate-600" aria-label="Receipt attached" />
+                        <span
+                            v-else-if="row.receipt_not_required"
+                            class="text-xs text-slate-400"
+                            title="Receipt not required"
+                        >—</span>
+                        <TriangleAlert v-else class="h-4 w-4 text-rose-500" aria-label="Missing receipt" />
                     </td>
                     <td class="px-3 py-2" @click.stop>
                         <div class="flex justify-end">
