@@ -87,6 +87,7 @@ class GenerateRecurringExpenseAction
                     reference: $resolveText($recurring->reference),
                     notes: $resolveText($recurring->notes),
                     recurringExpenseId: (int) $recurring->id,
+                    receiptNotRequired: (bool) $recurring->receipt_not_required,
                 ));
             } catch (Throwable $e) {
                 Log::warning('Recurring expense generation failed', [

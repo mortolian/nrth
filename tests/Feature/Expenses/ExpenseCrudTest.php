@@ -16,6 +16,8 @@ use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Tax\Models\TaxRate;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\TeamAccess\EnsureTeamSystemRoles;
+use App\Support\TeamAccess\RolePresets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -263,6 +265,7 @@ class ExpenseCrudTest extends TestCase
         $this->assertSame(TransactionStatus::Posted, $txn->status);
         $this->assertSame('PO-99', $txn->expense_meta['external_reference'] ?? null);
         $this->assertSame('Quarterly', $txn->expense_meta['notes'] ?? null);
+        $this->assertFalse((bool) $txn->receipt_not_required);
 
         $this->put(route('expenses.update', $txn), [
             'date' => '2026-05-02',
@@ -865,12 +868,19 @@ class ExpenseCrudTest extends TestCase
                 'receipt' => UploadedFile::fake()->create('rcpt.pdf', 80, 'application/pdf'),
             ])->assertRedirect(route('expenses.index'));
 
+            $this->post(route('expenses.store'), [
+                ...$base,
+                'date' => '2026-09-04',
+                'supplier' => 'This month waived',
+                'receipt_not_required' => true,
+            ])->assertRedirect(route('expenses.index'));
+
             $this->get(route('expenses.index'))
                 ->assertOk()
                 ->assertInertia(fn ($page) => $page
                     ->component('Expenses/Index')
                     ->where('summary.awaiting_receipts', 2)
-                    ->has('expenses.data', 3));
+                    ->has('expenses.data', 4));
         } finally {
             Carbon::setTestNow();
         }
@@ -997,5 +1007,133 @@ class ExpenseCrudTest extends TestCase
 
         $this->get(route('expenses.export'))
             ->assertSessionHasErrors('ids');
+    }
+
+    public function test_store_and_update_persist_receipt_not_required(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Bank fee',
+            'category_account_id' => $category->id,
+            'description' => 'Monthly fee',
+            'amount_excl_vat_cents' => 15_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+            'receipt_not_required' => true,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+        $this->assertTrue((bool) $txn->receipt_not_required);
+
+        $this->get(route('expenses.edit', $txn))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Form')
+                ->where('expense.receipt_not_required', true));
+
+        $this->put(route('expenses.update', $txn), [
+            'date' => '2026-05-01',
+            'supplier' => 'Bank fee',
+            'category_account_id' => $category->id,
+            'description' => 'Monthly fee',
+            'amount_excl_vat_cents' => 15_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+            'receipt_not_required' => false,
+        ])->assertRedirect(route('expenses.index'));
+
+        $this->assertFalse((bool) $txn->fresh()->receipt_not_required);
+    }
+
+    public function test_list_can_toggle_receipt_requirement(): void
+    {
+        [, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 45_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+        $this->assertFalse((bool) $txn->receipt_not_required);
+
+        $this->from(route('expenses.index'))
+            ->patch(route('expenses.receipt-requirement.update', $txn), [
+                'receipt_not_required' => true,
+            ])
+            ->assertRedirect(route('expenses.index'))
+            ->assertSessionHas('success');
+
+        $this->assertTrue((bool) $txn->fresh()->receipt_not_required);
+
+        $this->get(route('expenses.index'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('summary.awaiting_receipts', 0)
+                ->where('expenses.data.0.receipt_not_required', true));
+
+        $this->from(route('expenses.index'))
+            ->patch(route('expenses.receipt-requirement.update', $txn), [
+                'receipt_not_required' => false,
+            ])
+            ->assertRedirect(route('expenses.index'));
+
+        $this->assertFalse((bool) $txn->fresh()->receipt_not_required);
+    }
+
+    public function test_viewer_cannot_toggle_receipt_requirement(): void
+    {
+        [$owner, $team, $category, , $banking] = $this->teamWithExpenseAccounts();
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $this->post(route('expenses.store'), [
+            'date' => '2026-05-01',
+            'supplier' => 'Corner Cafe',
+            'category_account_id' => $category->id,
+            'description' => 'Coffee',
+            'amount_excl_vat_cents' => 45_00,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'paid_from_banking_account_id' => $banking->id,
+        ])->assertRedirect(route('expenses.index'));
+
+        $txn = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($txn);
+
+        $viewer = User::factory()->create();
+        $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);
+        $viewer->forceFill(['current_team_id' => $team->id])->save();
+
+        $this->actingAs($viewer)
+            ->patch(route('expenses.receipt-requirement.update', $txn), [
+                'receipt_not_required' => true,
+            ])
+            ->assertForbidden();
+
+        $this->assertFalse((bool) $txn->fresh()->receipt_not_required);
     }
 }

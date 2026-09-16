@@ -235,6 +235,7 @@ class RecurringExpenseController extends Controller
     {
         $request->merge([
             'generate_on_last_day' => $request->boolean('generate_on_last_day'),
+            'receipt_not_required' => $request->boolean('receipt_not_required'),
         ]);
 
         if ($request->has('supplier_id') && $request->string('supplier_id')->toString() === '') {
@@ -273,6 +274,7 @@ class RecurringExpenseController extends Controller
             'period_offset_months' => ['required', 'integer', 'min:-12', 'max:12'],
             'description' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'receipt_not_required' => ['required', 'boolean'],
             'reference' => ['nullable', 'string', 'max:255'],
             'amount_excl_vat_cents' => ['required', 'integer', 'min:0'],
             'vat_rate' => ['required', Rule::in(['vat15', 'vat0', 'exempt', 'no_vat'])],
@@ -308,6 +310,7 @@ class RecurringExpenseController extends Controller
             'period_offset_months' => (int) $validated['period_offset_months'],
             'description' => $validated['description'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'receipt_not_required' => (bool) $validated['receipt_not_required'],
             'reference' => $validated['reference'] ?? null,
             'amount_excl_vat_cents' => (int) $validated['amount_excl_vat_cents'],
             'vat_rate' => $validated['vat_rate'],
@@ -418,6 +421,7 @@ class RecurringExpenseController extends Controller
             'next_run_date' => now()->toDateString(),
             'description' => (string) ($transaction->description ?? ''),
             'notes' => (string) ($meta['notes'] ?? ''),
+            'receipt_not_required' => (bool) $transaction->receipt_not_required,
             'reference' => (string) ($meta['external_reference'] ?? ''),
             'amount_excl_vat_cents' => $amountExclCents,
             'vat_rate' => $vatRate,
@@ -476,6 +480,7 @@ class RecurringExpenseController extends Controller
             'next_run_date' => now()->toDateString(),
             'description' => $description,
             'notes' => '',
+            'receipt_not_required' => false,
             'reference' => trim((string) ($line->reference ?? '')),
             'amount_excl_vat_cents' => $exclCents,
             'vat_rate' => 'vat15',
@@ -610,6 +615,7 @@ class RecurringExpenseController extends Controller
             'limit_end_date' => optional($row->limit_end_date)->toDateString(),
             'period_offset_months' => (int) $row->period_offset_months,
             'notes' => $row->notes,
+            'receipt_not_required' => (bool) $row->receipt_not_required,
             'reference' => $row->reference,
             'vat_rate' => $row->vat_rate,
             'last_generated_at' => optional($row->last_generated_at)?->toIso8601String(),

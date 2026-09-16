@@ -87,6 +87,31 @@ class RecurringExpenseTest extends TestCase
         $recurring->refresh();
         $this->assertSame(1, (int) $recurring->generated_count);
         $this->assertSame('2026-08-01', $recurring->next_run_date->toDateString());
+        $this->assertFalse((bool) $expense->receipt_not_required);
+    }
+
+    public function test_generate_copies_receipt_not_required(): void
+    {
+        [, $team, $category, $banking] = $this->teamWithExpenseAccounts();
+
+        $recurring = RecurringExpense::factory()->create([
+            'team_id' => $team->id,
+            'supplier_name' => 'Bank',
+            'category_account_id' => $category->id,
+            'paid_from_banking_account_id' => $banking->id,
+            'frequency' => RecurringFrequency::Monthly,
+            'generate_on_day' => 1,
+            'next_run_date' => '2026-07-01',
+            'description' => 'Account fee',
+            'amount_excl_vat_cents' => 5000,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+            'receipt_not_required' => true,
+        ]);
+
+        $expense = app(GenerateRecurringExpenseAction::class)->execute($recurring, Carbon::parse('2026-07-01'));
+        $this->assertNotNull($expense);
+        $this->assertTrue((bool) $expense->receipt_not_required);
     }
 
     public function test_on_hold_and_count_limit(): void

@@ -184,6 +184,7 @@ class SupplierController extends Controller
                     'total_cents' => $amountCents + $vatAmount,
                     'status' => $transaction->status->value,
                     'has_receipt' => $transaction->media_count > 0,
+                    'receipt_not_required' => (bool) $transaction->receipt_not_required,
                     'can_delete' => DeleteTransactionAction::canDelete($transaction),
                 ];
             });

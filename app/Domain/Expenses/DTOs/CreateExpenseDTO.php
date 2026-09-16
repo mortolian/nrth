@@ -22,6 +22,7 @@ readonly class CreateExpenseDTO
         public ?float $distanceKm = null,
         public ?float $ratePerKm = null,
         public ?int $recurringExpenseId = null,
+        public bool $receiptNotRequired = false,
     ) {}
 
     /**
@@ -49,6 +50,7 @@ readonly class CreateExpenseDTO
             distanceKm: isset($payload['distance_km']) ? (float) $payload['distance_km'] : null,
             ratePerKm: isset($payload['rate_per_km']) ? (float) $payload['rate_per_km'] : null,
             recurringExpenseId: $recurringExpenseId,
+            receiptNotRequired: (bool) ($payload['receipt_not_required'] ?? false),
         );
     }
 

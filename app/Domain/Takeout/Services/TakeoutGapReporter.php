@@ -18,7 +18,9 @@ final class TakeoutGapReporter
         $gaps = [];
 
         $expenses = $this->collector->expenses($run);
-        $missingReceipts = $expenses->filter(fn ($txn) => (int) $txn->media_count === 0)->count();
+        $missingReceipts = $expenses->filter(
+            fn ($txn) => (int) $txn->media_count === 0 && ! $txn->receipt_not_required
+        )->count();
         if ($missingReceipts > 0) {
             $gaps[] = "{$missingReceipts} expense(s) without receipt attachments";
         }

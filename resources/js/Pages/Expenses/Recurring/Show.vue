@@ -36,6 +36,7 @@ const props = defineProps<{
         limit_end_date: string | null;
         period_offset_months: number;
         notes: string | null;
+        receipt_not_required: boolean;
         reference: string | null;
         vat_rate: string;
         paid_from_name: string | null;
@@ -267,6 +268,12 @@ const onOverflow = (actionId: string) => {
                             <div>
                                 <dt class="text-slate-500">Period label offset</dt>
                                 <dd class="text-slate-900">{{ periodOffsetLabel }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-slate-500">Receipt</dt>
+                                <dd class="text-slate-900">
+                                    {{ recurring.receipt_not_required ? 'Not required' : 'Expected' }}
+                                </dd>
                             </div>
                         </dl>
                     </div>

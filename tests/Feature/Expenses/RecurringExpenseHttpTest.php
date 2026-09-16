@@ -91,6 +91,7 @@ class RecurringExpenseHttpTest extends TestCase
         $this->assertNotNull($recurring);
         $this->assertSame('SaaS Co', $recurring->supplier_name);
         $this->assertSame(19900, (int) $recurring->amount_excl_vat_cents);
+        $this->assertFalse((bool) $recurring->receipt_not_required);
 
         $this->actingAs($owner)
             ->get(route('expenses.recurring.show', $recurring))
@@ -385,5 +386,59 @@ class RecurringExpenseHttpTest extends TestCase
         $this->assertNotNull($recurring);
         $this->assertSame($supplier->id, (int) $recurring->supplier_id);
         $this->assertNull($recurring->supplier_name);
+    }
+
+    public function test_store_persists_receipt_not_required_and_prefills_from_expense(): void
+    {
+        [$owner, $team, $category, $banking, $payload] = $this->ownerWithPayload();
+
+        $this->actingAs($owner)
+            ->post(route('expenses.recurring.store'), [
+                ...$payload,
+                'receipt_not_required' => true,
+            ])
+            ->assertRedirect();
+
+        $recurring = RecurringExpense::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($recurring);
+        $this->assertTrue((bool) $recurring->receipt_not_required);
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.edit', $recurring))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Recurring/Form')
+                ->where('recurring.receipt_not_required', true));
+
+        $this->actingAs($owner)
+            ->post(route('expenses.store'), [
+                'date' => '2026-03-15',
+                'supplier' => 'Fee Co',
+                'category_account_id' => $category->id,
+                'description' => 'Bank fee',
+                'amount_excl_vat_cents' => 1000,
+                'vat_rate' => 'no_vat',
+                'vat_amount_cents' => 0,
+                'paid_from_banking_account_id' => $banking->id,
+                'receipt_not_required' => true,
+            ])
+            ->assertRedirect(route('expenses.index'));
+
+        $expense = Transaction::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('type', TransactionType::Expense)
+            ->latest('id')
+            ->first();
+        $this->assertNotNull($expense);
+
+        $this->actingAs($owner)
+            ->get(route('expenses.recurring.create', ['expense_id' => $expense->id]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Expenses/Recurring/Form')
+                ->where('recurring.receipt_not_required', true));
     }
 }
