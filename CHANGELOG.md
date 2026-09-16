@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.39](https://github.com/mortolian/nrth/compare/v0.1.38...v0.1.39) (2026-09-16)
+
+
+### Features
+
+* **expenses:** add receipt not required feature for expenses ([80ab8d2](https://github.com/mortolian/nrth/commit/80ab8d26ea8722022cff91a141acbb5fcd0bce3d))
+
 ## [0.1.38](https://github.com/mortolian/nrth/compare/v0.1.37...v0.1.38) (2026-09-16)
 
 
