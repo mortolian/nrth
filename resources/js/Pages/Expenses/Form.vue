@@ -1160,18 +1160,7 @@ const submit = () => {
                 { label: props.isEditing ? 'Edit' : 'Create' },
             ]"
     >
-        <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'">
-            <template v-if="canDeleteExpense" #actions>
-                <AppButton
-                    variant="danger"
-                    :disabled="submitting || deleting"
-                    :loading="deleting"
-                    @click="confirmDelete"
-                >
-                    Delete
-                </AppButton>
-            </template>
-        </PageHeader>
+        <PageHeader :title="props.isEditing ? 'Edit Expense' : 'Create Expense'" />
 
         <AppCard v-if="!hasCategories" class="mt-5">
             <p class="text-sm text-slate-700">Add at least one active expense category in your chart of accounts before recording expenses.</p>
@@ -1588,6 +1577,17 @@ const submit = () => {
                     @click="cancelExpense"
                 >
                     Cancel
+                </AppButton>
+                <AppButton
+                    v-if="canDeleteExpense"
+                    variant="danger"
+                    size="touch"
+                    class="w-full sm:w-auto sm:min-h-0 sm:px-4 sm:py-2 sm:text-sm"
+                    :disabled="submitting || deleting"
+                    :loading="deleting"
+                    @click="confirmDelete"
+                >
+                    Delete
                 </AppButton>
             </FormActions>
         </AppCard>

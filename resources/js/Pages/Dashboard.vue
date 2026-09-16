@@ -547,6 +547,7 @@ const onInvoiceAction = (invoice, actionId) => {
                     :columns="[
                         { key: 'date', label: 'Date', sortable: true },
                         { key: 'description', label: 'Description' },
+                        { key: 'supplier', label: 'Supplier' },
                         { key: 'account', label: 'Account' },
                         { key: 'type', label: 'Type' },
                         { key: 'amount', label: 'Amount', sortable: true },
@@ -556,6 +557,9 @@ const onInvoiceAction = (invoice, actionId) => {
                     <tr v-for="transaction in recent_transactions" :key="transaction.id" class="text-sm text-slate-700">
                         <td class="whitespace-nowrap px-4 py-3"><DateDisplay :value="transaction.date" /></td>
                         <td class="px-4 py-3 font-medium">{{ transaction.description }}</td>
+                        <td class="max-w-[12rem] px-4 py-3 text-slate-600">
+                            <span class="line-clamp-2" :title="transaction.supplier || ''">{{ transaction.supplier || '—' }}</span>
+                        </td>
                         <td class="px-4 py-3">{{ transaction.account }}</td>
                         <td class="px-4 py-3">
                             <AppBadge variant="info">{{ transaction.type }}</AppBadge>
@@ -563,7 +567,7 @@ const onInvoiceAction = (invoice, actionId) => {
                         <td class="px-4 py-3">{{ formatCents(transaction.amount_cents) }}</td>
                     </tr>
                     <tr v-if="!isLoading && !recent_transactions.length">
-                        <td class="px-4 py-4 text-sm text-slate-500" colspan="5">No recent transactions.</td>
+                        <td class="px-4 py-4 text-sm text-slate-500" colspan="6">No recent transactions.</td>
                     </tr>
                 </AppTable>
             </AppCard>

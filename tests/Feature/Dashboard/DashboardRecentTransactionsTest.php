@@ -75,6 +75,7 @@ class DashboardRecentTransactionsTest extends TestCase
                 ->has('recent_transactions', 1)
                 ->where('recent_transactions.0.id', $txn->id)
                 ->where('recent_transactions.0.amount_cents', 115_00)
+                ->where('recent_transactions.0.supplier', 'Corner Cafe')
             );
     }
 }

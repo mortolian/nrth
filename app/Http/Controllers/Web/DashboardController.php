@@ -243,7 +243,7 @@ class DashboardController extends Controller
     private function recentTransactions(Team $team): array
     {
         return Transaction::queryWithoutTeamScope()
-            ->with(['journalEntries.account:id,name'])
+            ->with(['journalEntries.account:id,name', 'supplier:id,name'])
             ->where('team_id', $team->id)
             ->orderByDesc('transaction_date')
             ->limit(10)
@@ -255,6 +255,7 @@ class DashboardController extends Controller
                     'id' => $transaction->id,
                     'date' => optional($transaction->transaction_date)->toDateString(),
                     'description' => $transaction->description ?: $transaction->type->label(),
+                    'supplier' => $transaction->displaySupplier(),
                     'account' => $line?->account?->name ?? 'N/A',
                     'amount_cents' => $transaction->journalTotalCents(),
                     'type' => $transaction->type->label(),
