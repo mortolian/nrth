@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.38](https://github.com/mortolian/nrth/compare/v0.1.37...v0.1.38) (2026-09-16)
+
+
+### Features
+
+* **dashboard:** enhance recent transactions to include supplier information ([c889bcd](https://github.com/mortolian/nrth/commit/c889bcd563068d0a37100aed1f5f64b2230d6c38))
+
 ## [0.1.37](https://github.com/mortolian/nrth/compare/v0.1.36...v0.1.37) (2026-09-15)
 
 
