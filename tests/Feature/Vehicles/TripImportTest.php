@@ -3,6 +3,7 @@
 namespace Tests\Feature\Vehicles;
 
 use App\Domain\Vehicles\Enums\TripImportStatus;
+use App\Domain\Vehicles\Enums\TripPurpose;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\TripImport;
 use App\Domain\Vehicles\Models\Vehicle;
@@ -145,6 +146,46 @@ class TripImportTest extends TestCase
 
         $vehicle->refresh();
         $this->assertSame(10000.0, (float) $vehicle->starting_odometer_km);
+    }
+
+    public function test_confirm_applies_purpose_overrides_from_preview(): void
+    {
+        [, $team, $vehicle] = $this->actingTeamWithVehicle();
+        $this->configureAi($team);
+
+        $file = UploadedFile::fake()->createWithContent('LogBook.csv', $this->toyotaCsv());
+
+        $this->post(route('vehicles.trips.import.store'), [
+            'vehicle_id' => $vehicle->id,
+            'file' => $file,
+        ])->assertRedirect(route('vehicles.trips.import.preview'));
+
+        $trips = collect(session('trip_log_import')['trips']);
+        $private = $trips->firstWhere('purpose', 'private');
+        $business = $trips->firstWhere('purpose', 'business');
+        $this->assertIsArray($private);
+        $this->assertIsArray($business);
+
+        $this->post(route('vehicles.trips.import.confirm'), [
+            'vehicle_id' => $vehicle->id,
+            'keys' => [$private['key'], $business['key']],
+            'purposes' => [
+                $private['key'] => 'business',
+                $business['key'] => 'private',
+            ],
+        ])->assertRedirect(route('vehicles.trips.index'));
+
+        $this->assertSame(TripPurpose::Business, Trip::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('from_location', 'Office')
+            ->where('to_location', 'Home')
+            ->value('purpose'));
+
+        $this->assertSame(TripPurpose::Private, Trip::queryWithoutTeamScope()
+            ->where('team_id', $team->id)
+            ->where('from_location', 'Home')
+            ->where('to_location', 'Office')
+            ->value('purpose'));
     }
 
     public function test_import_can_be_undone(): void

@@ -58,12 +58,18 @@ const selected = ref(
     ),
 );
 
+const purposes = ref<Record<string, 'business' | 'private'>>(
+    Object.fromEntries(props.draft.trips.map((trip) => [trip.key, trip.purpose])),
+);
+
 const form = useForm<{
     vehicle_id: number;
     keys: string[];
+    purposes: Record<string, 'business' | 'private'>;
 }>({
     vehicle_id: props.draft.vehicle_id,
     keys: [],
+    purposes: {},
 });
 
 const vehicleSelectOptions = computed(() =>
@@ -100,8 +106,25 @@ const clearSelection = () => {
     selected.value = new Set();
 };
 
+const purposeOf = (trip: DraftTrip): 'business' | 'private' =>
+    purposes.value[trip.key] ?? trip.purpose;
+
+const togglePurpose = (trip: DraftTrip) => {
+    const current = purposeOf(trip);
+    purposes.value = {
+        ...purposes.value,
+        [trip.key]: current === 'business' ? 'private' : 'business',
+    };
+};
+
 const confirmImport = () => {
     form.keys = Array.from(selected.value);
+    form.purposes = Object.fromEntries(
+        form.keys.map((key) => {
+            const trip = props.draft.trips.find((row) => row.key === key);
+            return [key, purposes.value[key] ?? trip?.purpose ?? 'business'];
+        }),
+    );
     form.post(route('vehicles.trips.import.confirm'));
 };
 </script>
@@ -156,6 +179,7 @@ const confirmImport = () => {
             <p class="mt-2 text-xs text-slate-500">
                 Source segments: {{ draft.source_segments_count }}
                 · Parser: {{ draft.parser === 'telematics' ? 'fleet/GPS columns' : 'AI' }}
+                · Click a purpose pill to switch business and private before import.
             </p>
             <p v-if="form.errors.keys" class="mt-2 text-xs text-red-600">{{ form.errors.keys }}</p>
         </AppCard>
@@ -201,10 +225,18 @@ const confirmImport = () => {
                         </span>
                         <span v-else class="text-slate-400">—</span>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2">
-                        <AppBadge :variant="trip.purpose === 'business' ? 'info' : 'neutral'">
-                            {{ trip.purpose }}
-                        </AppBadge>
+                    <td class="whitespace-nowrap px-3 py-2" @click.stop>
+                        <button
+                            type="button"
+                            class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:scale-[0.98]"
+                            :title="purposeOf(trip) === 'business' ? 'Switch to private' : 'Switch to business'"
+                            :aria-label="purposeOf(trip) === 'business' ? 'Switch to private' : 'Switch to business'"
+                            @click="togglePurpose(trip)"
+                        >
+                            <AppBadge :variant="purposeOf(trip) === 'business' ? 'info' : 'neutral'">
+                                {{ purposeOf(trip) }}
+                            </AppBadge>
+                        </button>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ formatKm(trip.distance_km) }}</td>
                     <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ trip.segments_merged || 1 }}</td>
