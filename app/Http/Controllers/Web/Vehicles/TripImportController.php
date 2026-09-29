@@ -125,9 +125,16 @@ class TripImportController extends Controller
             ],
             'keys' => ['required', 'array', 'min:1'],
             'keys.*' => ['required', 'string'],
+            'purposes' => ['sometimes', 'array'],
+            'purposes.*' => ['required', 'string', Rule::in([
+                TripPurpose::Business->value,
+                TripPurpose::Private->value,
+            ])],
         ]);
 
         $selectedKeys = array_flip($validated['keys']);
+        /** @var array<string, string> $purposeOverrides */
+        $purposeOverrides = $validated['purposes'] ?? [];
         $selected = [];
         foreach ($draft['trips'] as $trip) {
             if (! is_array($trip)) {
@@ -135,6 +142,9 @@ class TripImportController extends Controller
             }
             $key = (string) ($trip['key'] ?? '');
             if ($key !== '' && isset($selectedKeys[$key])) {
+                if (isset($purposeOverrides[$key])) {
+                    $trip['purpose'] = $purposeOverrides[$key];
+                }
                 $selected[] = $trip;
             }
         }
