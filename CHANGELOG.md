@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.40](https://github.com/mortolian/nrth/compare/v0.1.39...v0.1.40) (2026-09-29)
+
+
+### Features
+
+* **trips:** add purpose override functionality for trip imports ([5f5a839](https://github.com/mortolian/nrth/commit/5f5a83960690e48ced012bd12d5adb4b71e3aa1e))
+
 ## [0.1.39](https://github.com/mortolian/nrth/compare/v0.1.38...v0.1.39) (2026-09-16)
 
 
