@@ -2,6 +2,18 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.42](https://github.com/mortolian/nrth/compare/v0.1.41...v0.1.42) (2026-10-05)
+
+
+### Features
+
+* **backup:** show S3 and path copies in status email ([3d4486d](https://github.com/mortolian/nrth/commit/3d4486d3360ed92620a4abcd2a724d982bd1f326))
+
+
+### Documentation
+
+* enhance NFS mount instructions for backups ([783628c](https://github.com/mortolian/nrth/commit/783628c304837ccdc6c11629c5a7a140ab917c28))
+
 ## [0.1.41](https://github.com/mortolian/nrth/compare/v0.1.40...v0.1.41) (2026-10-05)
 
 
