@@ -160,7 +160,7 @@ A host-level snapshot of the Postgres volume (`mysql_data`) plus `storage_data` 
 | Setting | Purpose |
 |---------|---------|
 | `BACKUP_ARCHIVE_PASSWORD` in `.env` | Optional AES password for the zip. Store it off-host too — without it, restore cannot unzip. After changing it, refresh config (`./scripts/update` or `php artisan config:cache`). The restore guide notes when encryption is on. |
-| Instance SMTP (**Settings → Instance → Outbound email**) | From address for backup status mail. A zip is still marked Ready if the email fails. |
+| Instance SMTP (**Settings → Instance → Outbound email**) | From address for backup status mail. The message lists the local zip and whether the S3 and path/NFS copies were written. A zip is still marked Ready if the email fails. |
 | Recipients | Instance operators. `BACKUP_NOTIFICATION_EMAIL` is only the Spatie fallback when no operators are configured. Use a verified From domain (not `example.com`). |
 
 You do not need to edit `config/backup.php` for day-to-day operation. Offsite disks and retention are set in the UI; the scheduler runs **`nrth:backup-rotate`**, not Spatie’s `backup:clean`.
