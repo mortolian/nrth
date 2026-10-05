@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { computed, watch } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import SettingsShell from '@/Components/SettingsShell.vue';
 
@@ -44,7 +44,11 @@ const destinationsForm = useForm({
 
 watch(
     () => props.backup_destinations,
-    (next) => {
+    (next, prev) => {
+        if (prev && JSON.stringify(prev) === JSON.stringify(next)) {
+            return;
+        }
+
         destinationsForm.s3.enabled = next.s3.enabled;
         destinationsForm.s3.region = next.s3.region;
         destinationsForm.s3.bucket = next.s3.bucket;
@@ -81,6 +85,7 @@ const testS3 = () => {
         }))
         .post(route('settings.instance.backup-destinations.test-s3'), {
             preserveScroll: true,
+            preserveState: true,
         });
 };
 
@@ -91,8 +96,22 @@ const testPath = () => {
         }))
         .post(route('settings.instance.backup-destinations.test-path'), {
             preserveScroll: true,
+            preserveState: true,
         });
 };
+
+const pathRootError = computed(() =>
+    destinationsForm.errors['path.root']
+    || testPathForm.errors['path.root']
+    || testPathForm.errors.root
+    || '',
+);
+
+const s3BucketError = computed(() =>
+    destinationsForm.errors['s3.bucket']
+    || testS3Form.errors['s3.bucket']
+    || '',
+);
 </script>
 
 <template>
@@ -145,7 +164,7 @@ const testPath = () => {
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-slate-500">Bucket</label>
                             <AppInput v-model="destinationsForm.s3.bucket" type="text" />
-                            <p v-if="destinationsForm.errors['s3.bucket']" class="mt-1 text-xs text-rose-600">{{ destinationsForm.errors['s3.bucket'] }}</p>
+                            <p v-if="s3BucketError" class="mt-1 text-xs text-rose-600">{{ s3BucketError }}</p>
                         </div>
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-slate-500">Endpoint (optional)</label>
@@ -178,7 +197,7 @@ const testPath = () => {
                     <div class="mt-3">
                         <label class="mb-1.5 block text-xs font-medium text-slate-500">Absolute path</label>
                         <AppInput v-model="destinationsForm.path.root" type="text" placeholder="/mnt/backups" />
-                        <p v-if="destinationsForm.errors['path.root']" class="mt-1 text-xs text-rose-600">{{ destinationsForm.errors['path.root'] }}</p>
+                        <p v-if="pathRootError" class="mt-1 text-xs text-rose-600">{{ pathRootError }}</p>
                     </div>
                     <div class="mt-3">
                         <AppButton type="button" variant="secondary" size="sm" :loading="testPathForm.processing" @click="testPath">

@@ -110,5 +110,7 @@ class InstanceBackupDestinationSettingsTest extends TestCase
 
         $this->assertSame(['local', 'backup_path'], config('backup.backup.destination.disks'));
         $this->assertSame($root, config('filesystems.disks.backup_path.root'));
+        $this->assertSame(0, config('filesystems.disks.backup_path.lock'));
+        $this->assertSame('skip', config('filesystems.disks.backup_path.links'));
     }
 }

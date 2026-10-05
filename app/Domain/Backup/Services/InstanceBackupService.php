@@ -16,6 +16,7 @@ use Spatie\Backup\BackupDestination\Backup;
 use Spatie\Backup\BackupDestination\BackupDestination;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class InstanceBackupService
 {
@@ -532,6 +533,15 @@ class InstanceBackupService
             return false;
         }
 
+        $backupName = (string) config('backup.backup.name');
+        try {
+            if (Storage::disk($diskName)->exists($backupName.'/'.$safeName)) {
+                return true;
+            }
+        } catch (Throwable) {
+            // Listing below still decides when the disk cannot be checked directly.
+        }
+
         $destination = $this->destinations()->first(
             fn (BackupDestination $candidate): bool => $candidate->diskName() === $diskName,
         );
@@ -565,20 +575,90 @@ class InstanceBackupService
 
     public function mirrorWarningFor(string $filename): ?string
     {
+        $copyErrors = $this->copyMissingOffsiteMirrors($filename);
         $missing = $this->missingOffsiteDisksFor($filename);
         if ($missing === []) {
             return null;
         }
 
-        $labels = array_map(static function (string $disk): string {
-            return match ($disk) {
-                InstanceBackupDestinationSettings::DISK_S3 => 'S3',
-                InstanceBackupDestinationSettings::DISK_PATH => 'path/NFS',
-                default => $disk,
-            };
-        }, $missing);
+        $labels = array_map($this->offsiteDiskLabel(...), $missing);
+        $warning = 'Offsite mirror missing on: '.implode(', ', $labels).'.';
 
-        return 'Offsite mirror missing on: '.implode(', ', $labels).'.';
+        $details = [];
+        foreach ($missing as $disk) {
+            $message = trim($copyErrors[$disk] ?? '');
+            if ($message === '') {
+                continue;
+            }
+            $details[] = $this->offsiteDiskLabel($disk).': '.mb_substr($message, 0, 240);
+        }
+
+        if ($details !== []) {
+            $warning .= ' '.implode(' ', $details);
+        }
+
+        return $warning;
+    }
+
+    /**
+     * Spatie keeps going when an offsite disk fails. Copy the local zip again so a
+     * lock or listing failure on NFS does not leave the mirror missing.
+     *
+     * @return array<string, string>
+     */
+    private function copyMissingOffsiteMirrors(string $filename): array
+    {
+        $errors = [];
+        $safeName = $this->sanitizeFilename($filename);
+        if ($safeName === null) {
+            return $errors;
+        }
+
+        $missing = $this->missingOffsiteDisksFor($safeName);
+        if ($missing === []) {
+            return $errors;
+        }
+
+        if ($this->findBackup($safeName, 'local') === null) {
+            return $errors;
+        }
+
+        $relative = config('backup.backup.name').'/'.$safeName;
+
+        foreach ($missing as $disk) {
+            $read = null;
+            try {
+                $read = Storage::disk('local')->readStream($relative);
+                if (! is_resource($read)) {
+                    $errors[$disk] = 'Could not read the local backup zip.';
+
+                    continue;
+                }
+
+                $written = Storage::disk($disk)->writeStream($relative, $read);
+                if ($written === false) {
+                    $errors[$disk] = 'The offsite write failed.';
+                }
+            } catch (Throwable $e) {
+                $message = trim($e->getMessage());
+                $errors[$disk] = $message !== '' ? $message : 'The offsite write failed.';
+            } finally {
+                if (is_resource($read)) {
+                    fclose($read);
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    private function offsiteDiskLabel(string $disk): string
+    {
+        return match ($disk) {
+            InstanceBackupDestinationSettings::DISK_S3 => 'S3',
+            InstanceBackupDestinationSettings::DISK_PATH => 'path/NFS',
+            default => $disk,
+        };
     }
 
     public function download(string $filename): BinaryFileResponse|StreamedResponse

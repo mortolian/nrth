@@ -177,7 +177,7 @@ volumes:
   - /mnt/nas/nrth-backups:/mnt/backups
 ```
 
-Then set the path to `/mnt/backups` in the UI and use **Test path**.
+Then set the path to `/mnt/backups` in the UI and use **Test path**. The test leaves the path you typed in the field; save destinations so later backups use it. Writes to that folder do not use file locking, which NFS shares often reject. If a mirror still fails, the backup row shows the reason next to the path/NFS warning.
 
 Rotation and manual delete remove the zip from **every** configured destination. Downloads and the restore guide use the **local** copy — copy an offsite zip back into `storage/app/private/{APP_NAME}/` if you only have the offsite file.
 

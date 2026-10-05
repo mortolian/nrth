@@ -677,7 +677,7 @@ onBeforeUnmount(() => {
                                             {{ statusLabel(run.status) }}
                                         </span>
                                         <p v-if="run.error_message" class="mt-0.5 text-xs text-rose-600">{{ run.error_message }}</p>
-                                        <p v-if="run.mirror_warning" class="mt-0.5 text-xs text-amber-700">{{ run.mirror_warning }}</p>
+                                        <p v-if="run.mirror_warning" class="mt-0.5 break-words text-xs text-amber-700">{{ run.mirror_warning }}</p>
                                     </td>
                                     <td class="px-2 py-2">{{ formatFileSize(run.file_size_bytes) }}</td>
                                     <td class="px-2 py-2">{{ backupDateLabel(run) }}</td>
