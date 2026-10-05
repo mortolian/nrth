@@ -751,6 +751,126 @@ class InstanceBackupService
         return $names !== [] ? $names : ['local'];
     }
 
+    /**
+     * Destination lines for the backup status email.
+     *
+     * @return array{
+     *     filename: string|null,
+     *     finished_at: string|null,
+     *     warning: string|null,
+     *     offsite_missing: bool,
+     *     destinations: list<array{label: string, status: string, size: string|null}>
+     * }
+     */
+    public function statusMailReport(?string $filename = null): array
+    {
+        $locals = $this->listLocalBackups();
+        if ($filename === null && $locals !== []) {
+            $filename = $locals[0]['filename'];
+        }
+
+        $run = null;
+        if (is_string($filename) && $filename !== '') {
+            $run = InstanceBackupRun::query()
+                ->where('filename', $filename)
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        $byDisk = [];
+        if (is_string($filename) && $filename !== '') {
+            foreach ($this->listBackups() as $backup) {
+                if ($backup['filename'] === $filename) {
+                    $byDisk[$backup['disk']] = $backup;
+                }
+            }
+        }
+
+        $settings = $this->destinationsSettings->current();
+        $local = $byDisk['local'] ?? null;
+        $destinations = [
+            [
+                'label' => 'Local',
+                'status' => $local !== null ? 'Saved' : 'Missing',
+                'size' => $local !== null ? $this->formatBytes((int) $local['size_bytes']) : null,
+            ],
+            $this->offsiteMailRow(
+                'S3',
+                (bool) $settings['s3']['enabled'],
+                $byDisk[InstanceBackupDestinationSettings::DISK_S3] ?? null,
+            ),
+            $this->offsiteMailRow(
+                'Path / NFS',
+                $settings['path']['enabled'] && $settings['path']['root'] !== '',
+                $byDisk[InstanceBackupDestinationSettings::DISK_PATH] ?? null,
+            ),
+        ];
+
+        $offsiteMissing = false;
+        foreach ($destinations as $destination) {
+            if ($destination['label'] !== 'Local' && $destination['status'] === 'Missing') {
+                $offsiteMissing = true;
+            }
+        }
+
+        return [
+            'filename' => $filename,
+            'finished_at' => $run?->completed_at?->timezone((string) config('app.timezone'))->format('Y-m-d H:i'),
+            'warning' => is_string($run?->mirror_warning) && $run->mirror_warning !== '' ? $run->mirror_warning : null,
+            'offsite_missing' => $offsiteMissing,
+            'destinations' => $destinations,
+        ];
+    }
+
+    /**
+     * @param  array{filename: string, path: string, disk: string, date: string|null, size_bytes: int}|null  $backup
+     * @return array{label: string, status: string, size: string|null}
+     */
+    private function offsiteMailRow(string $label, bool $enabled, ?array $backup): array
+    {
+        if (! $enabled) {
+            return [
+                'label' => $label,
+                'status' => 'Not enabled',
+                'size' => null,
+            ];
+        }
+
+        if ($backup === null) {
+            return [
+                'label' => $label,
+                'status' => 'Missing',
+                'size' => null,
+            ];
+        }
+
+        return [
+            'label' => $label,
+            'status' => 'Copied',
+            'size' => $this->formatBytes((int) $backup['size_bytes']),
+        ];
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes.' B';
+        }
+
+        $value = $bytes / 1024;
+        foreach (['KB', 'MB', 'GB', 'TB'] as $unit) {
+            if ($value < 1024 || $unit === 'TB') {
+                $precision = $value >= 10 ? 0 : 1;
+
+                return number_format($value, $precision).' '.$unit;
+            }
+
+            $value /= 1024;
+        }
+
+        return $bytes.' B';
+    }
+
     private function sanitizeFilename(string $filename): ?string
     {
         $name = basename(str_replace(["\0", '\\'], '', $filename));

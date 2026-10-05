@@ -160,7 +160,7 @@ A host-level snapshot of the Postgres volume (`mysql_data`) plus `storage_data` 
 | Setting | Purpose |
 |---------|---------|
 | `BACKUP_ARCHIVE_PASSWORD` in `.env` | Optional AES password for the zip. Store it off-host too — without it, restore cannot unzip. After changing it, refresh config (`./scripts/update` or `php artisan config:cache`). The restore guide notes when encryption is on. |
-| Instance SMTP (**Settings → Instance → Outbound email**) | From address for backup status mail. A zip is still marked Ready if the email fails. |
+| Instance SMTP (**Settings → Instance → Outbound email**) | From address for backup status mail. The message lists the local zip and whether the S3 and path/NFS copies were written. A zip is still marked Ready if the email fails. |
 | Recipients | Instance operators. `BACKUP_NOTIFICATION_EMAIL` is only the Spatie fallback when no operators are configured. Use a verified From domain (not `example.com`). |
 
 You do not need to edit `config/backup.php` for day-to-day operation. Offsite disks and retention are set in the UI; the scheduler runs **`nrth:backup-rotate`**, not Spatie’s `backup:clean`.
@@ -170,14 +170,42 @@ You do not need to edit `config/backup.php` for day-to-day operation. Offsite di
 Backups are always written to the local disk first. Operators can also mirror each zip under **Settings → Backups & exports → Offsite destinations**:
 
 - **S3-compatible** — AWS S3, Cloudflare R2, MinIO, etc. Credentials are stored encrypted in instance settings (no `.env` `AWS_*` required for backups when using the UI). Use **Test S3** after saving.
-- **Path / NFS** — an absolute path **inside the container**. Mount the share into `app`, `horizon`, and `scheduler`, for example:
+- **Path / NFS** — an absolute path **inside the container**. The same steps are shown under **Path / NFS** on Offsite destinations.
 
-```yaml
-volumes:
-  - /mnt/nas/nrth-backups:/mnt/backups
+Mount the share on the Docker host, then attach that folder to the `app`, `horizon`, and `scheduler` containers. The path in the UI is the path inside those containers.
+
+1. On the host, mount the export. Add the same mount to `/etc/fstab` so it returns after a reboot. Replace the address and export with your NAS:
+
+```bash
+sudo mkdir -p /mnt/nas/nrth-backups
+sudo mount -t nfs -o rw,nolock,nfsvers=4 192.168.1.50:/export/nrth-backups /mnt/nas/nrth-backups
 ```
 
-Then set the path to `/mnt/backups` in the UI and use **Test path**. The test leaves the path you typed in the field; save destinations so later backups use it. Writes to that folder do not use file locking, which NFS shares often reject. If a mirror still fails, the backup row shows the reason next to the path/NFS warning.
+2. Create `compose.override.yaml` next to `compose.yaml` so an app update does not drop the mount:
+
+```yaml
+services:
+  app:
+    volumes:
+      - /mnt/nas/nrth-backups:/mnt/backups
+  horizon:
+    volumes:
+      - /mnt/nas/nrth-backups:/mnt/backups
+  scheduler:
+    volumes:
+      - /mnt/nas/nrth-backups:/mnt/backups
+```
+
+3. Confirm the existing storage volumes are still present, then recreate the three services:
+
+```bash
+./scripts/compose.sh config
+./scripts/compose.sh up -d --force-recreate app horizon scheduler
+```
+
+4. In **Settings → Backups & exports → Offsite destinations**, set the path to `/mnt/backups`, use **Test path**, then save. The test leaves the path you typed in the field.
+
+These containers run as root. If the export uses `root_squash`, writes appear as `nobody` and the path test fails. Allow writes on a backup-only export. Writes to that folder do not use file locking, which NFS shares often reject. If a mirror still fails, the backup row shows the reason next to the path/NFS warning.
 
 Rotation and manual delete remove the zip from **every** configured destination. Downloads and the restore guide use the **local** copy — copy an offsite zip back into `storage/app/private/{APP_NAME}/` if you only have the offsite file.
 
