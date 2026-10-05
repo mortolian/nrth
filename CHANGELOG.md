@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.41](https://github.com/mortolian/nrth/compare/v0.1.40...v0.1.41) (2026-10-05)
+
+
+### Bug Fixes
+
+* **backup:** keep NFS path on test and mirror without file locks ([2448407](https://github.com/mortolian/nrth/commit/2448407a39aec2fbc8e539357d7df38d6f43aedd))
+
 ## [0.1.40](https://github.com/mortolian/nrth/compare/v0.1.39...v0.1.40) (2026-09-29)
 
 
