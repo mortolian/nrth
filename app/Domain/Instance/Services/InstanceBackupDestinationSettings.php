@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Spatie\Backup\Config\Config as SpatieBackupConfig;
 use Throwable;
 
 final class InstanceBackupDestinationSettings
@@ -214,7 +215,11 @@ final class InstanceBackupDestinationSettings
             $disks[self::DISK_PATH] = [
                 'driver' => 'local',
                 'root' => $settings['path']['root'],
-                'throw' => false,
+                // NFS rejects exclusive locks, and a symlink in the mount must not
+                // make the destination look empty after a successful write.
+                'lock' => 0,
+                'links' => 'skip',
+                'throw' => true,
                 'report' => false,
             ];
         } else {
@@ -226,6 +231,11 @@ final class InstanceBackupDestinationSettings
             'backup.backup.destination.disks' => $this->destinationDiskNames($settings),
             'backup.backup.destination.continue_on_failure' => true,
         ]);
+
+        // Spatie reads destination disks from a scoped config object. Rebind it
+        // so a long-lived worker picks up disks saved after the process booted.
+        app()->forgetInstance(SpatieBackupConfig::class);
+        SpatieBackupConfig::rebind();
 
         // Forget cached disk instances so updated credentials take effect.
         foreach ([self::DISK_S3, self::DISK_PATH] as $name) {
