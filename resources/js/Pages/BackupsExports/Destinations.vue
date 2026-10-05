@@ -204,6 +204,43 @@ const s3BucketError = computed(() =>
                             {{ testPathForm.processing ? 'Testing…' : 'Test path' }}
                         </AppButton>
                     </div>
+
+                    <div class="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">
+                        <p class="font-medium text-slate-800">NFS mount</p>
+                        <p class="mt-1">
+                            Mount the share on the Docker host, then attach that folder to the app, Horizon, and scheduler containers. The path above is the path inside those containers.
+                        </p>
+                        <ol class="mt-2 list-decimal space-y-2 pl-4">
+                            <li>
+                                On the host, mount the export. Add the same mount to <code class="rounded bg-white px-1 py-0.5 font-mono text-[11px] text-slate-700">/etc/fstab</code> so it returns after a reboot.
+                                <pre class="mt-1 overflow-x-auto rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-slate-800">sudo mkdir -p /mnt/nas/nrth-backups
+sudo mount -t nfs -o rw,nolock,nfsvers=4 192.168.1.50:/export/nrth-backups /mnt/nas/nrth-backups</pre>
+                            </li>
+                            <li>
+                                Create <code class="rounded bg-white px-1 py-0.5 font-mono text-[11px] text-slate-700">compose.override.yaml</code> next to <code class="rounded bg-white px-1 py-0.5 font-mono text-[11px] text-slate-700">compose.yaml</code>.
+                                <pre class="mt-1 overflow-x-auto rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-slate-800">services:
+  app:
+    volumes:
+      - /mnt/nas/nrth-backups:/mnt/backups
+  horizon:
+    volumes:
+      - /mnt/nas/nrth-backups:/mnt/backups
+  scheduler:
+    volumes:
+      - /mnt/nas/nrth-backups:/mnt/backups</pre>
+                            </li>
+                            <li>
+                                Recreate the three services.
+                                <pre class="mt-1 overflow-x-auto rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-relaxed text-slate-800">./scripts/compose.sh up -d --force-recreate app horizon scheduler</pre>
+                            </li>
+                            <li>
+                                Set the path above to <code class="rounded bg-white px-1 py-0.5 font-mono text-[11px] text-slate-700">/mnt/backups</code>, test it, then save.
+                            </li>
+                        </ol>
+                        <p class="mt-2">
+                            These containers run as root. If the export uses root_squash, writes appear as nobody and the path test fails. Allow writes on a backup-only export.
+                        </p>
+                    </div>
                 </div>
 
                 <FormActions class="!mt-2">
