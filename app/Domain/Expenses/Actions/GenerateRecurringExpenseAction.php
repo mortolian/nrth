@@ -22,11 +22,12 @@ class GenerateRecurringExpenseAction
     public function __construct(
         private readonly CreateExpenseAction $createExpenseAction,
         private readonly RecurringScheduleResolver $scheduleResolver,
+        private readonly SendRecurringExpenseCreatedMailAction $createdMail,
     ) {}
 
     public function execute(RecurringExpense $recurring, ?Carbon $runDate = null, ?int $createdBy = null): ?Transaction
     {
-        return DB::transaction(function () use ($recurring, $runDate, $createdBy): ?Transaction {
+        $transaction = DB::transaction(function () use ($recurring, $runDate, $createdBy): ?Transaction {
             /** @var RecurringExpense $recurring */
             $recurring = RecurringExpense::queryWithoutTeamScope()
                 ->lockForUpdate()
@@ -128,5 +129,19 @@ class GenerateRecurringExpenseAction
 
             return $transaction->fresh();
         });
+
+        if ($transaction !== null) {
+            try {
+                $this->createdMail->execute($transaction);
+            } catch (Throwable $e) {
+                Log::warning('Recurring expense created email failed', [
+                    'recurring_expense_id' => $recurring->id,
+                    'transaction_id' => $transaction->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $transaction;
     }
 }

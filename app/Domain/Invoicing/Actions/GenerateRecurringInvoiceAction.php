@@ -23,11 +23,12 @@ class GenerateRecurringInvoiceAction
         private readonly SendInvoiceAction $sendInvoiceAction,
         private readonly RecurringDueDateResolver $dueDateResolver,
         private readonly RecurringScheduleResolver $scheduleResolver,
+        private readonly SendRecurringInvoiceCreatedMailAction $createdMail,
     ) {}
 
     public function execute(RecurringInvoice $recurring, ?Carbon $runDate = null): ?Invoice
     {
-        return DB::transaction(function () use ($recurring, $runDate): ?Invoice {
+        $invoice = DB::transaction(function () use ($recurring, $runDate): ?Invoice {
             /** @var RecurringInvoice $recurring */
             $recurring = RecurringInvoice::queryWithoutTeamScope()
                 ->lockForUpdate()
@@ -139,5 +140,19 @@ class GenerateRecurringInvoiceAction
 
             return $invoice->fresh();
         });
+
+        if ($invoice !== null) {
+            try {
+                $this->createdMail->execute($invoice);
+            } catch (Throwable $e) {
+                Log::warning('Recurring invoice created email failed', [
+                    'recurring_invoice_id' => $recurring->id,
+                    'invoice_id' => $invoice->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $invoice;
     }
 }

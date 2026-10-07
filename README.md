@@ -21,8 +21,8 @@
 
 ## Features
 
-- **Invoicing & estimates** — clients, items catalog, recurring invoices, discounts, note templates, PDFs, payments, payment receipts, online pay links
-- **Expenses & suppliers** — receipts (with an optional “receipt not required” flag), AI document fill, categories, VAT on purchases, recurring expenses
+- **Invoicing & estimates** — clients, items catalog, recurring invoices (with an email when one is created), discounts, note templates, PDFs, payments, payment receipts, online pay links
+- **Expenses & suppliers** — receipts (with an optional “receipt not required” flag), AI document fill, categories, VAT on purchases, recurring expenses (with an email when one is created)
 - **Travel** — vehicles and a business/private trip log book (CSV export; smart AI import for fleet/GPS exports when AI is enabled, with purpose switched on the preview before confirm); licence disc expiry with email reminder about one month before
 - **Accounting** — chart of accounts, journal, general ledger, account statements
 - **Banking** — import CSV/OFX statements (one or more files per upload), duplicate detection, match or exclude imported lines (including mixed personal/business accounts), or create an expense from an unmatched debit

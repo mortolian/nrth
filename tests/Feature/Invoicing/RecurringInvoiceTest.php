@@ -13,12 +13,15 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\RecurringInvoice;
 use App\Domain\Invoicing\Services\RecurringDueDateResolver;
 use App\Domain\Invoicing\Services\RecurringPlaceholderResolver;
+use App\Mail\RecurringInvoiceCreatedMailer;
+use App\Models\TeamRole;
 use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use App\Support\TeamAccess\RolePresets;
 use Carbon\Carbon;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class RecurringInvoiceTest extends TestCase
@@ -205,5 +208,96 @@ class RecurringInvoiceTest extends TestCase
         $this->actingAs($viewer)
             ->get(route('invoicing.recurring.create'))
             ->assertForbidden();
+    }
+
+    public function test_generate_emails_members_who_can_view_invoices(): void
+    {
+        Mail::fake();
+
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $viewer = User::factory()->create();
+        $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);
+
+        $outsider = User::factory()->create();
+        $role = TeamRole::query()->create([
+            'team_id' => $team->id,
+            'key' => 'reports-only',
+            'name' => 'Reports only',
+            'description' => 'No invoices',
+            'permissions' => ['reports.view'],
+            'is_system' => false,
+        ]);
+        $team->users()->attach($outsider, ['role' => $role->key]);
+
+        $client = Client::factory()->create([
+            'team_id' => $team->id,
+            'name' => 'Acme',
+            'email' => 'client@example.com',
+            'payment_terms_days' => 30,
+        ]);
+        $recurring = RecurringInvoice::factory()->create([
+            'team_id' => $team->id,
+            'client_id' => $client->id,
+            'frequency' => RecurringFrequency::Monthly,
+            'generate_on_day' => 1,
+            'next_run_date' => '2026-07-01',
+            'due_date_rule' => RecurringDueDateRule::DaysAfterIssue,
+            'due_days' => 10,
+            'line_items' => [[
+                'description' => 'Fee',
+                'quantity' => 1,
+                'unit_price_cents' => 10000,
+                'vat_rate' => 0,
+            ]],
+        ]);
+
+        $invoice = app(GenerateRecurringInvoiceAction::class)->execute($recurring, Carbon::parse('2026-07-01'));
+        $this->assertNotNull($invoice);
+
+        Mail::assertQueued(RecurringInvoiceCreatedMailer::class, 2);
+        Mail::assertQueued(RecurringInvoiceCreatedMailer::class, function (RecurringInvoiceCreatedMailer $mail) use ($owner, $invoice): bool {
+            $html = $mail->render();
+
+            return $mail->hasTo($owner->email)
+                && $mail->invoice->is($invoice)
+                && str_contains($html, 'Acme')
+                && str_contains($html, 'saved as a draft');
+        });
+        Mail::assertQueued(RecurringInvoiceCreatedMailer::class, fn (RecurringInvoiceCreatedMailer $mail): bool => $mail->hasTo($viewer->email));
+        Mail::assertNotQueued(RecurringInvoiceCreatedMailer::class, fn (RecurringInvoiceCreatedMailer $mail): bool => $mail->hasTo($outsider->email));
+    }
+
+    public function test_generate_skips_invoice_email_when_opted_out(): void
+    {
+        Mail::fake();
+
+        $owner = User::factory()->withPersonalTeam()->create([
+            'preferences' => array_merge(User::defaultPreferences(), [
+                'notify_recurring_invoice' => false,
+            ]),
+        ]);
+        EnsureTeamSystemRoles::ensureFor($owner->currentTeam);
+        $client = Client::factory()->create([
+            'team_id' => $owner->current_team_id,
+            'payment_terms_days' => 30,
+        ]);
+        $recurring = RecurringInvoice::factory()->create([
+            'team_id' => $owner->current_team_id,
+            'client_id' => $client->id,
+            'next_run_date' => '2026-07-01',
+            'generate_on_day' => 1,
+            'line_items' => [[
+                'description' => 'Fee',
+                'quantity' => 1,
+                'unit_price_cents' => 10000,
+                'vat_rate' => 0,
+            ]],
+        ]);
+
+        $this->assertNotNull(app(GenerateRecurringInvoiceAction::class)->execute($recurring, Carbon::parse('2026-07-01')));
+        Mail::assertNothingQueued();
     }
 }

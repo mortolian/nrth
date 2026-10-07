@@ -19,6 +19,8 @@ class UserPreferencesController extends Controller
             'notify_invoice_overdue' => ['required', 'boolean'],
             'notify_vat_due' => ['required', 'boolean'],
             'notify_license_disk' => ['required', 'boolean'],
+            'notify_recurring_invoice' => ['required', 'boolean'],
+            'notify_recurring_expense' => ['required', 'boolean'],
             'date_format' => ['required', 'string', Rule::in(['Y-m-d', 'd/m/Y', 'd M Y'])],
             'theme' => ['required', 'string', Rule::in(['light', 'dark', 'system'])],
         ]);

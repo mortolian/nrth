@@ -106,6 +106,8 @@ class User extends Authenticatable
             'notify_invoice_overdue' => true,
             'notify_vat_due' => true,
             'notify_license_disk' => true,
+            'notify_recurring_invoice' => true,
+            'notify_recurring_expense' => true,
             'date_format' => 'Y-m-d',
             'theme' => 'system',
         ];

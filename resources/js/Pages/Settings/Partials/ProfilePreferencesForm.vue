@@ -9,6 +9,8 @@ const props = defineProps<{
         notify_invoice_overdue: boolean;
         notify_vat_due: boolean;
         notify_license_disk: boolean;
+        notify_recurring_invoice: boolean;
+        notify_recurring_expense: boolean;
         date_format: string;
         theme: string;
     };
@@ -20,6 +22,8 @@ const form = useForm({
     notify_invoice_overdue: props.preferences.notify_invoice_overdue,
     notify_vat_due: props.preferences.notify_vat_due,
     notify_license_disk: props.preferences.notify_license_disk,
+    notify_recurring_invoice: props.preferences.notify_recurring_invoice,
+    notify_recurring_expense: props.preferences.notify_recurring_expense,
     date_format: props.preferences.date_format,
     theme: props.preferences.theme,
 });
@@ -40,7 +44,7 @@ const submit = () => {
     <section class="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
         <h4 class="text-sm font-semibold text-slate-900">Notifications &amp; display</h4>
         <p class="mt-0.5 text-xs text-slate-500">
-            Email reminders for tax, invoicing, and vehicle deadlines, plus how dates and theme appear in the app.
+            Email reminders for tax, invoicing, expenses, and vehicle deadlines, plus how dates and theme appear in the app.
         </p>
 
         <form class="mt-4" @submit.prevent="submit">
@@ -69,6 +73,22 @@ const submit = () => {
                             class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                         >
                         Vehicle licence disc expiry reminders
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                        <input
+                            v-model="form.notify_recurring_invoice"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        >
+                        Recurring invoice created
+                    </label>
+                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                        <input
+                            v-model="form.notify_recurring_expense"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        >
+                        Recurring expense created
                     </label>
                 </div>
 
