@@ -2,6 +2,17 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.43](https://github.com/mortolian/nrth/compare/v0.1.42...v0.1.43) (2026-10-12)
+
+
+### Features
+
+* add email notifications for created recurring invoices and expenses ([0daf858](https://github.com/mortolian/nrth/commit/0daf858f01b3a73ce9d8990cba6f29135284dfb0))
+* enhance estimate email template with markdown and total formatting ([bdde6cc](https://github.com/mortolian/nrth/commit/bdde6ccfb4b81b1d93d3a79af1c344caf48c59b5))
+* implement dynamic pagination across various controllers and components ([57bd611](https://github.com/mortolian/nrth/commit/57bd6118f3f7c88a939b45d09c4f8a4412f8853b))
+* implement sticky filters across various controllers ([002fb0f](https://github.com/mortolian/nrth/commit/002fb0f2a62be96ef5d0ef4f9e30a333aca90625))
+* implement sticky filters functionality across various components ([336db93](https://github.com/mortolian/nrth/commit/336db93b4e3e3df1de546cabcb27fd9ccbaf7edd))
+
 ## [0.1.42](https://github.com/mortolian/nrth/compare/v0.1.41...v0.1.42) (2026-10-05)
 
 
