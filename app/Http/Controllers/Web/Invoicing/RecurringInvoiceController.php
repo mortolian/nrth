@@ -17,6 +17,7 @@ use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,12 @@ class RecurringInvoiceController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('invoices.view', $request);
+        StickyFilters::remember($request, 'recurring_invoices.index', [
+            'search' => null,
+            'status' => 'all',
+            'page' => 1,
+            'per_page' => null,
+        ]);
         $teamId = (int) $request->user()->current_team_id;
         $status = (string) $request->string('status')->toString();
         $search = trim((string) $request->string('search')->toString());

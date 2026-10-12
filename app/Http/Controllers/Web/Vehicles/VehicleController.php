@@ -7,6 +7,7 @@ use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Http\Controllers\Controller;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,6 +18,12 @@ class VehicleController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('vehicles.view', $request);
+        StickyFilters::remember($request, 'vehicles.index', [
+            'search' => null,
+            'status' => 'all',
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());

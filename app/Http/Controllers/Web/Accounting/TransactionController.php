@@ -13,6 +13,7 @@ use App\Domain\Invoicing\Models\Payment;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -26,6 +27,16 @@ class TransactionController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('accounting.view', $request);
+        StickyFilters::remember($request, 'accounting.transactions.index', [
+            'from' => null,
+            'to' => null,
+            'type' => 'all',
+            'status' => 'all',
+            'account_id' => null,
+            'search' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         if (! Schema::hasTable('transactions')) {
             return Inertia::render('Accounting/Transactions/Index', [

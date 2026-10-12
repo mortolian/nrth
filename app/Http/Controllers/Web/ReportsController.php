@@ -11,6 +11,7 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\LedgerService;
 use App\Domain\Accounting\Services\ProfitLossReportService;
 use App\Http\Controllers\Controller;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -27,6 +28,12 @@ class ReportsController extends Controller
     public function profitLoss(Request $request): Response
     {
         $this->authorizeTeam('reports.view', $request);
+        StickyFilters::remember($request, 'reports.profit_loss', [
+            'preset' => null,
+            'compare' => null,
+            'from' => null,
+            'to' => null,
+        ]);
         $team = $request->user()->currentTeam;
         $preset = (string) $request->string('preset')->toString() ?: 'this_month';
         $compare = (string) $request->string('compare')->toString() ?: 'none';
@@ -63,6 +70,9 @@ class ReportsController extends Controller
     public function balanceSheet(Request $request): Response
     {
         $this->authorizeTeam('reports.view', $request);
+        StickyFilters::remember($request, 'reports.balance_sheet', [
+            'as_of' => null,
+        ]);
         $team = $request->user()->currentTeam;
         $asOf = $request->string('as_of')->toString()
             ? Carbon::parse($request->string('as_of')->toString())->endOfDay()
@@ -131,6 +141,11 @@ class ReportsController extends Controller
     public function cashFlow(Request $request): Response
     {
         $this->authorizeTeam('reports.view', $request);
+        StickyFilters::remember($request, 'reports.cash_flow', [
+            'preset' => null,
+            'from' => null,
+            'to' => null,
+        ]);
         $team = $request->user()->currentTeam;
         $teamId = (int) $team->id;
         $preset = (string) $request->string('preset')->toString() ?: 'this_month';
@@ -313,6 +328,9 @@ class ReportsController extends Controller
     public function trialBalance(Request $request): Response
     {
         $this->authorizeTeam('reports.view', $request);
+        StickyFilters::remember($request, 'reports.trial_balance', [
+            'as_of' => null,
+        ]);
         $team = $request->user()->currentTeam;
         $asOf = $request->string('as_of')->toString()
             ? Carbon::parse($request->string('as_of')->toString())->endOfDay()

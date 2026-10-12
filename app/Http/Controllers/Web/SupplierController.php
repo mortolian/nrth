@@ -11,6 +11,7 @@ use App\Domain\Accounting\Services\ParseSupplierDocument;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +27,13 @@ class SupplierController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('suppliers.view', $request);
+        StickyFilters::remember($request, 'suppliers.index', [
+            'search' => null,
+            'status' => 'all',
+            'view' => 'grid',
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());

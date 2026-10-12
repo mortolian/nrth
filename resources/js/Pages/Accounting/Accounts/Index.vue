@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Link, router, usePage } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import InvoiceRowActionsMenu from '@/Components/InvoiceRowActionsMenu.vue';
@@ -52,8 +52,42 @@ const typeLabels: Record<string, string> = {
     expense: 'Expenses',
 };
 
-const showInactive = ref(false);
-const search = ref('');
+const accountListStickyKey = 'nrth.sticky.accounting.accounts';
+
+const readAccountListSticky = () => {
+    if (typeof sessionStorage === 'undefined') {
+        return { search: '', showInactive: false };
+    }
+
+    try {
+        const parsed = JSON.parse(sessionStorage.getItem(accountListStickyKey) ?? '') as {
+            search?: unknown;
+            showInactive?: unknown;
+        };
+
+        return {
+            search: typeof parsed.search === 'string' ? parsed.search : '',
+            showInactive: parsed.showInactive === true,
+        };
+    } catch {
+        return { search: '', showInactive: false };
+    }
+};
+
+const accountListSticky = readAccountListSticky();
+const showInactive = ref(accountListSticky.showInactive);
+const search = ref(accountListSticky.search);
+
+watch([search, showInactive], () => {
+    if (typeof sessionStorage === 'undefined') {
+        return;
+    }
+
+    sessionStorage.setItem(accountListStickyKey, JSON.stringify({
+        search: search.value,
+        showInactive: showInactive.value,
+    }));
+});
 
 const filteredGroups = computed(() =>
     props.groups

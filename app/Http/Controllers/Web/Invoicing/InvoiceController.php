@@ -37,6 +37,7 @@ use App\Support\InvoicePayQrCode;
 use App\Support\Iso4217Currencies;
 use App\Support\MailDelivery;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -465,6 +466,19 @@ class InvoiceController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('invoices.view', $request);
+        StickyFilters::remember($request, 'invoices.index', [
+            'status' => 'all',
+            'from' => null,
+            'to' => null,
+            'client' => null,
+            'client_id' => null,
+            'min_amount' => null,
+            'max_amount' => null,
+            'sort' => null,
+            'direction' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         if (! Schema::hasTable('invoices')) {
             return Inertia::render('Invoicing/Invoices/Index', [

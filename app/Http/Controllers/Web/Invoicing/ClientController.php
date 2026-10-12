@@ -9,6 +9,7 @@ use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,12 @@ class ClientController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('clients.view', $request);
+        StickyFilters::remember($request, 'clients.index', [
+            'search' => null,
+            'status' => 'active',
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());

@@ -7,6 +7,7 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
@@ -19,6 +20,12 @@ class AccountStatementController extends Controller
     {
         $this->authorizeTeam('accounting.view', $request);
         abort_unless($account->team_id === $request->user()->current_team_id, 403);
+        StickyFilters::remember($request, 'accounting.statement.'.$account->id, [
+            'from' => null,
+            'to' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $from = $request->string('from')->toString() ?: now()->startOfMonth()->toDateString();
         $to = $request->string('to')->toString() ?: now()->endOfMonth()->toDateString();
