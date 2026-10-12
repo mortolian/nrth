@@ -29,6 +29,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\User;
 use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Database\Eloquent\Builder;
@@ -1200,13 +1201,13 @@ class ExpensesController extends Controller
                 $this->filters($request),
                 $request->has('page') ? (int) $request->integer('page') : 1,
             );
-            $request->session()->put($sessionKey, $filters);
+            StickyFilters::put($request, $sessionKey, $filters);
 
             return $filters;
         }
 
-        $stored = $request->session()->get($sessionKey);
-        if (! is_array($stored)) {
+        $stored = StickyFilters::pull($request, $sessionKey);
+        if ($stored === null) {
             return $this->normalizeIndexFilters();
         }
 

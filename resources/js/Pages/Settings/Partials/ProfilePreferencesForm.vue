@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useForm } from '@inertiajs/vue3';
 import AppButton from '@/Components/AppButton.vue';
+import AppInput from '@/Components/AppInput.vue';
 import AppSelect from '@/Components/AppSelect.vue';
 import { useToast } from '@/Composables/useToast';
 
@@ -13,6 +14,8 @@ const props = defineProps<{
         notify_recurring_expense: boolean;
         date_format: string;
         theme: string;
+        sticky_filters_enabled: boolean;
+        sticky_filters_minutes: number;
     };
 }>();
 
@@ -26,6 +29,8 @@ const form = useForm({
     notify_recurring_expense: props.preferences.notify_recurring_expense,
     date_format: props.preferences.date_format,
     theme: props.preferences.theme,
+    sticky_filters_enabled: props.preferences.sticky_filters_enabled,
+    sticky_filters_minutes: props.preferences.sticky_filters_minutes,
 });
 
 const submit = () => {
@@ -90,6 +95,37 @@ const submit = () => {
                         >
                         Recurring expense created
                     </label>
+                </div>
+
+                <div class="space-y-3 rounded-lg border border-slate-200/90 bg-white px-3 py-3">
+                    <div>
+                        <p class="text-sm font-medium text-slate-900">Searches and filters</p>
+                        <p class="mt-0.5 text-xs text-slate-500">
+                            Keep a list’s search and filters when you open a record and come back. They clear after the time below, or when you use Clear.
+                        </p>
+                    </div>
+                    <label class="flex cursor-pointer items-center gap-2.5 text-sm text-slate-800">
+                        <input
+                            v-model="form.sticky_filters_enabled"
+                            type="checkbox"
+                            class="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        >
+                        Remember searches and filters
+                    </label>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="text-sm text-slate-800" for="sticky-filters-minutes">Forget them after</label>
+                        <AppInput
+                            id="sticky-filters-minutes"
+                            v-model.number="form.sticky_filters_minutes"
+                            type="number"
+                            inputmode="numeric"
+                            min="1"
+                            max="1440"
+                            class="w-24"
+                            :disabled="!form.sticky_filters_enabled"
+                        />
+                        <span class="text-sm text-slate-600">minutes</span>
+                    </div>
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-2">

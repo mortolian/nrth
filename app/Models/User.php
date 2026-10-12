@@ -110,6 +110,8 @@ class User extends Authenticatable
             'notify_recurring_expense' => true,
             'date_format' => 'Y-m-d',
             'theme' => 'system',
+            'sticky_filters_enabled' => true,
+            'sticky_filters_minutes' => 10,
         ];
     }
 

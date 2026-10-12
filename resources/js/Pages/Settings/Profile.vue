@@ -16,6 +16,8 @@ type Preferences = {
     notify_recurring_expense: boolean;
     date_format: string;
     theme: string;
+    sticky_filters_enabled: boolean;
+    sticky_filters_minutes: number;
 };
 
 defineProps<{

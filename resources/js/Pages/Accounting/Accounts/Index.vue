@@ -32,7 +32,10 @@ const props = defineProps<{
     can_manage: boolean;
 }>();
 
-const page = usePage<{ business_currency?: string }>();
+const page = usePage<{
+    business_currency?: string;
+    sticky_filters?: { enabled?: boolean; minutes?: number };
+}>();
 const pageErrors = computed(() => page.props.errors as Record<string, string> | undefined);
 
 const isTrulyEmpty = computed(() => props.account_count === 0);
@@ -54,23 +57,48 @@ const typeLabels: Record<string, string> = {
 
 const accountListStickyKey = 'nrth.sticky.accounting.accounts';
 
+const accountListStickyPolicy = () => {
+    const settings = page.props.sticky_filters;
+    const minutes = Number(settings?.minutes);
+
+    return {
+        enabled: settings?.enabled !== false,
+        minutes: Number.isFinite(minutes) && minutes > 0 ? minutes : 10,
+    };
+};
+
 const readAccountListSticky = () => {
+    const empty = { search: '', showInactive: false };
     if (typeof sessionStorage === 'undefined') {
-        return { search: '', showInactive: false };
+        return empty;
+    }
+
+    const policy = accountListStickyPolicy();
+    if (!policy.enabled) {
+        sessionStorage.removeItem(accountListStickyKey);
+
+        return empty;
     }
 
     try {
         const parsed = JSON.parse(sessionStorage.getItem(accountListStickyKey) ?? '') as {
             search?: unknown;
             showInactive?: unknown;
+            applied_at?: unknown;
         };
+        const appliedAt = typeof parsed.applied_at === 'number' ? parsed.applied_at : 0;
+        if (appliedAt <= 0 || Date.now() - appliedAt >= policy.minutes * 60_000) {
+            sessionStorage.removeItem(accountListStickyKey);
+
+            return empty;
+        }
 
         return {
             search: typeof parsed.search === 'string' ? parsed.search : '',
             showInactive: parsed.showInactive === true,
         };
     } catch {
-        return { search: '', showInactive: false };
+        return empty;
     }
 };
 
@@ -83,9 +111,16 @@ watch([search, showInactive], () => {
         return;
     }
 
+    if (!accountListStickyPolicy().enabled) {
+        sessionStorage.removeItem(accountListStickyKey);
+
+        return;
+    }
+
     sessionStorage.setItem(accountListStickyKey, JSON.stringify({
         search: search.value,
         showInactive: showInactive.value,
+        applied_at: Date.now(),
     }));
 });
 

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 
 /**
@@ -9,11 +10,19 @@ use Illuminate\Http\Request;
  *
  * A request that includes any of the screen's keys replaces the saved set
  * (omitted keys return to their defaults, which is how Clear works).
- * A later visit with none of those keys restores the saved set.
+ * A later visit with none of those keys restores the saved set until it expires.
  * `reset=1` forgets the saved set.
+ *
+ * Profile preferences `sticky_filters_enabled` and `sticky_filters_minutes`
+ * turn this off or change how long a saved set lasts. The clock starts when
+ * the filter is applied.
  */
 final class StickyFilters
 {
+    public const DEFAULT_MINUTES = 10;
+
+    public const MAX_MINUTES = 1440;
+
     /**
      * @param  array<string, mixed>  $defaults
      */
@@ -23,9 +32,11 @@ final class StickyFilters
         $sessionKey = 'sticky_filters.'.$screen.'.'.$teamId;
         $keys = array_keys($defaults);
 
-        if ($request->exists('reset')) {
+        if ($request->exists('reset') || ! self::enabled($request)) {
             $request->session()->forget($sessionKey);
-            $request->replace($request->except([...$keys, 'reset']));
+            if ($request->exists('reset')) {
+                $request->replace($request->except([...$keys, 'reset']));
+            }
 
             return;
         }
@@ -43,14 +54,14 @@ final class StickyFilters
                 $resolved[$key] = ($value === '' || $value === null) ? $default : $value;
             }
 
-            $request->session()->put($sessionKey, $resolved);
+            self::put($request, $sessionKey, $resolved);
             self::mergeOntoRequest($request, $resolved);
 
             return;
         }
 
-        $stored = $request->session()->get($sessionKey);
-        if (! is_array($stored)) {
+        $stored = self::pull($request, $sessionKey);
+        if ($stored === null) {
             return;
         }
 
@@ -62,6 +73,74 @@ final class StickyFilters
         }
 
         self::mergeOntoRequest($request, $resolved);
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    public static function put(Request $request, string $sessionKey, array $values): void
+    {
+        if (! self::enabled($request)) {
+            $request->session()->forget($sessionKey);
+
+            return;
+        }
+
+        $request->session()->put($sessionKey, [
+            'applied_at' => now()->getTimestamp(),
+            'values' => $values,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public static function pull(Request $request, string $sessionKey): ?array
+    {
+        if (! self::enabled($request)) {
+            $request->session()->forget($sessionKey);
+
+            return null;
+        }
+
+        $stored = $request->session()->get($sessionKey);
+        if (! is_array($stored) || ! isset($stored['values']) || ! is_array($stored['values'])) {
+            if (is_array($stored)) {
+                $request->session()->forget($sessionKey);
+            }
+
+            return null;
+        }
+
+        $appliedAt = (int) ($stored['applied_at'] ?? 0);
+        if ($appliedAt <= 0 || now()->getTimestamp() - $appliedAt >= self::ttlSeconds($request)) {
+            $request->session()->forget($sessionKey);
+
+            return null;
+        }
+
+        /** @var array<string, mixed> $values */
+        $values = $stored['values'];
+
+        return $values;
+    }
+
+    /**
+     * @return array{enabled: bool, minutes: int}
+     */
+    public static function forInertia(mixed $user): array
+    {
+        $preferences = $user instanceof User ? $user->mergedPreferences() : User::defaultPreferences();
+
+        return [
+            'enabled' => (bool) ($preferences['sticky_filters_enabled'] ?? true),
+            'minutes' => self::minutesFrom($preferences),
+        ];
+    }
+
+    public static function enabled(Request $request): bool
+    {
+        return (bool) (self::preferences($request)['sticky_filters_enabled'] ?? true);
     }
 
     /**
@@ -81,5 +160,30 @@ final class StickyFilters
         if ($payload !== []) {
             $request->merge($payload);
         }
+    }
+
+    private static function ttlSeconds(Request $request): int
+    {
+        return self::minutesFrom(self::preferences($request)) * 60;
+    }
+
+    /**
+     * @param  array<string, mixed>  $preferences
+     */
+    private static function minutesFrom(array $preferences): int
+    {
+        $minutes = (int) ($preferences['sticky_filters_minutes'] ?? self::DEFAULT_MINUTES);
+
+        return max(1, min(self::MAX_MINUTES, $minutes));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function preferences(Request $request): array
+    {
+        $user = $request->user();
+
+        return $user instanceof User ? $user->mergedPreferences() : User::defaultPreferences();
     }
 }

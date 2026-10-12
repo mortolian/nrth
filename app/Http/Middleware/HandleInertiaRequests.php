@@ -13,6 +13,7 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Support\Iso4217Currencies;
 use App\Support\Modules\ModuleCatalog;
+use App\Support\StickyFilters;
 use App\Support\TeamAccess\TeamAccess;
 use App\Support\Upgrade\SchemaUpgradeStatus;
 use App\Support\Version\GithubReleaseChecker;
@@ -64,6 +65,7 @@ class HandleInertiaRequests extends Middleware
             'csrf_token' => fn () => csrf_token(),
             'vat_enabled' => fn () => $request->user()?->currentTeam?->chargesVat() ?? false,
             'appName' => fn () => (string) config('app.name'),
+            'sticky_filters' => fn () => StickyFilters::forInertia($request->user()),
             'app_version' => function () {
                 try {
                     return app(GithubReleaseChecker::class)->forInertia();

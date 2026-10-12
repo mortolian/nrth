@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,8 @@ class UserPreferencesController extends Controller
             'notify_recurring_expense' => ['required', 'boolean'],
             'date_format' => ['required', 'string', Rule::in(['Y-m-d', 'd/m/Y', 'd M Y'])],
             'theme' => ['required', 'string', Rule::in(['light', 'dark', 'system'])],
+            'sticky_filters_enabled' => ['required', 'boolean'],
+            'sticky_filters_minutes' => ['required', 'integer', 'min:1', 'max:'.StickyFilters::MAX_MINUTES],
         ]);
 
         $user->preferences = array_merge($user->mergedPreferences(), $validated);
