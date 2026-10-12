@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Wealth\Services\PortfolioPerformanceService;
 use App\Modules\Wealth\Services\PortfolioValuationService;
 use App\Modules\Wealth\Services\ResolveWealthPortfolio;
+use App\Support\StickyFilters;
 use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,6 +24,10 @@ class WealthDashboardController extends Controller
 
         $team = $request->user()->currentTeam;
         abort_unless($team !== null, 403);
+        StickyFilters::remember($request, 'wealth.index', [
+            'portfolio' => null,
+            'show_archived' => null,
+        ]);
 
         $showArchived = $request->boolean('show_archived');
         $requestedId = $request->integer('portfolio') ?: null;

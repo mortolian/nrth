@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ArrowUpDown } from 'lucide-vue-next';
+import AppPagination from '@/Components/AppPagination.vue';
 import { cn } from '@/lib/utils';
 
 export type TableColumn = {
@@ -16,6 +17,8 @@ const props = withDefaults(defineProps<{
     columns?: string[] | TableColumn[];
     page?: number;
     lastPage?: number;
+    perPage?: number;
+    total?: number;
     loading?: boolean;
     clickableRows?: boolean;
     /** Merged onto `<table>` (e.g. `min-w-[920px]` so dense tables scroll instead of wrapping). */
@@ -36,6 +39,8 @@ const props = withDefaults(defineProps<{
     columns: () => [],
     page: 1,
     lastPage: 1,
+    perPage: 15,
+    total: 0,
     loading: false,
     clickableRows: false,
     tableClass: '',
@@ -54,6 +59,7 @@ const emit = defineEmits<{
     (e: 'sort', payload: { key: string; direction: 'asc' | 'desc' }): void;
     (e: 'row-click', row: unknown): void;
     (e: 'page-change', page: number): void;
+    (e: 'per-page-change', perPage: number): void;
 }>();
 
 const sortBy = ref<string | null>(props.sortKey ?? null);
@@ -99,13 +105,6 @@ const onSort = (column: TableColumn) => {
     emit('sort', { key: column.key, direction: sortDirection.value });
 };
 
-const nextPage = () => {
-    if (props.page < props.lastPage) emit('page-change', props.page + 1);
-};
-
-const prevPage = () => {
-    if (props.page > 1) emit('page-change', props.page - 1);
-};
 </script>
 
 <template>
@@ -164,15 +163,15 @@ const prevPage = () => {
                 </tfoot>
             </table>
         </div>
-        <div
-            v-if="showPagination"
-            class="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500"
-        >
-            <p>Page {{ page }} of {{ lastPage }}</p>
-            <div class="flex items-center gap-2">
-                <button class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50" :disabled="page <= 1" @click="prevPage">Previous</button>
-                <button class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50" :disabled="page >= lastPage" @click="nextPage">Next</button>
-            </div>
+        <div v-if="showPagination" class="border-t border-slate-200 px-4 py-3">
+            <AppPagination
+                :page="page"
+                :last-page="lastPage"
+                :per-page="perPage"
+                :total="total"
+                @page-change="emit('page-change', $event)"
+                @per-page-change="emit('per-page-change', $event)"
+            />
         </div>
     </div>
 </template>

@@ -12,6 +12,7 @@ import AppButton from '@/Components/AppButton.vue';
 import AppInput from '@/Components/AppInput.vue';
 import AppSelect from '@/Components/AppSelect.vue';
 import AppTable from '@/Components/AppTable.vue';
+import AppPagination from '@/Components/AppPagination.vue';
 import AppCard from '@/Components/AppCard.vue';
 import AppBadge from '@/Components/AppBadge.vue';
 import StatCard from '@/Components/StatCard.vue';
@@ -38,6 +39,7 @@ createInertiaApp({
             .component('AppInput', AppInput)
             .component('AppSelect', AppSelect)
             .component('AppTable', AppTable)
+            .component('AppPagination', AppPagination)
             .component('AppCard', AppCard)
             .component('AppBadge', AppBadge)
             .component('StatCard', StatCard)

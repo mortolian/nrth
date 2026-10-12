@@ -18,6 +18,7 @@ use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Support\Iso4217Currencies;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,10 @@ class EstimateController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('estimates.view', $request);
+        StickyFilters::remember($request, 'estimates.index', [
+            'search' => null,
+            'status' => 'all',
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $status = (string) $request->string('status')->toString();

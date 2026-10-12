@@ -22,6 +22,8 @@ use App\Domain\Invoicing\Enums\RecurringFrequency;
 use App\Domain\Invoicing\Enums\RecurringLimitType;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
@@ -38,6 +40,12 @@ class RecurringExpenseController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('expenses.view', $request);
+        StickyFilters::remember($request, 'recurring_expenses.index', [
+            'search' => null,
+            'status' => 'all',
+            'page' => 1,
+            'per_page' => null,
+        ]);
         $teamId = (int) $request->user()->current_team_id;
         $status = (string) $request->string('status')->toString();
         $search = trim((string) $request->string('search')->toString());
@@ -72,7 +80,7 @@ class RecurringExpenseController extends Controller
             });
         }
 
-        $rows = $query->orderBy('next_run_date')->paginate(25)->withQueryString()
+        $rows = $query->orderBy('next_run_date')->paginate(PageSize::resolve($request, 25))->withQueryString()
             ->through(fn (RecurringExpense $row): array => $this->serializeList($row));
 
         return Inertia::render('Expenses/Recurring/Index', [

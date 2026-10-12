@@ -8,6 +8,8 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\NoteTemplate;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +24,12 @@ class ClientController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('clients.view', $request);
+        StickyFilters::remember($request, 'clients.index', [
+            'search' => null,
+            'status' => 'active',
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());
@@ -42,7 +50,7 @@ class ClientController extends Controller
         $clients = $query
             ->with(['invoices' => fn ($q) => $q->latest('issue_date')])
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate(PageSize::resolve($request, 15))
             ->withQueryString()
             ->through(function (Client $client): array {
                 $invoices = $client->invoices;
@@ -130,7 +138,7 @@ class ClientController extends Controller
             ->where('client_id', $client->id)
             ->issued()
             ->orderByDesc('issue_date')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(function (Invoice $invoice) use ($today, $statusesWherePastDueMatters): array {
                 $total = (int) $invoice->getRawOriginal('total_cents');

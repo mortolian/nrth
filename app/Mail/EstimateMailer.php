@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Domain\Invoicing\Models\Estimate;
+use App\Support\FormatMoney;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -42,10 +43,14 @@ class EstimateMailer extends Mailable implements ShouldQueue
             : config('app.name');
 
         return new Content(
-            view: 'emails.estimate',
+            markdown: 'emails.estimate',
             with: [
                 'estimate' => $this->estimate,
                 'issuer_name' => $issuerName,
+                'total' => FormatMoney::minorUnits(
+                    (int) $this->estimate->getRawOriginal('total_cents'),
+                    (string) ($this->estimate->currency ?? 'ZAR'),
+                ),
             ],
         );
     }

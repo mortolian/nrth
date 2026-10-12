@@ -25,6 +25,8 @@ const props = defineProps<{
         data: VehicleRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     filters: {
         search: string | null;
@@ -59,13 +61,14 @@ const licenseDiskBadge = (value: string | null) => {
     return null;
 };
 
-const applyFilters = (page = 1) => {
+const applyFilters = (page = 1, perPage = props.vehicles.per_page ?? 15) => {
     router.get(
         route('vehicles.index'),
         {
             search: filters.value.search || undefined,
             status: filters.value.status === 'all' ? undefined : filters.value.status,
             page,
+            per_page: perPage,
         },
         { preserveState: true, preserveScroll: true, replace: true },
     );
@@ -136,7 +139,10 @@ const goToVehicle = (id: number) => router.visit(route('vehicles.show', id));
                 ]"
                 :page="vehicles.current_page"
                 :last-page="vehicles.last_page"
+                :per-page="vehicles.per_page"
+                :total="vehicles.total"
                 @page-change="applyFilters"
+                @per-page-change="applyFilters(1, $event)"
             >
                 <tr
                     v-for="vehicle in vehicles.data"

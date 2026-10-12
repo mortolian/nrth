@@ -27,6 +27,8 @@ const props = defineProps<{
         data: StatementEntry[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     opening_balance: number;
     closing_balance: number;
@@ -85,12 +87,13 @@ const goBack = () => {
     router.visit(route('accounting.accounts.index'));
 };
 
-const applyPeriod = (page = 1) => {
+const applyPeriod = (page = 1, perPage = props.entries.per_page ?? 25) => {
     router.get(route('accounting.accounts.statement', props.account.id), {
         from: period.value.from,
         to: period.value.to,
         source: props.source,
         page,
+        per_page: perPage,
     }, { preserveScroll: true, preserveState: true, replace: true });
 };
 
@@ -234,7 +237,10 @@ const exportSelectedCsv = () => {
                 ]"
                 :page="entries.current_page"
                 :last-page="entries.last_page"
+                :per-page="entries.per_page"
+                :total="entries.total"
                 @page-change="applyPeriod"
+                @per-page-change="applyPeriod(1, $event)"
             >
                 <template #header-select>
                     <input

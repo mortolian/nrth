@@ -84,6 +84,8 @@ const props = defineProps<{
         data: LineRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
         total: number;
     };
     selected: SelectedLine | null;
@@ -223,7 +225,11 @@ const statusFilters = computed(() => [
     { value: 'all', label: 'All', count: props.counts.all ?? 0 },
 ]);
 
-const queryPayload = (pageNumber = 1, selectedId: number | null = props.selected?.id ?? props.filters.selected) => ({
+const queryPayload = (
+    pageNumber = 1,
+    selectedId: number | null = props.selected?.id ?? props.filters.selected,
+    perPage = props.transactions.per_page ?? 25,
+) => ({
     status: filters.value.status || undefined,
     from: filters.value.from || undefined,
     to: filters.value.to || undefined,
@@ -232,10 +238,15 @@ const queryPayload = (pageNumber = 1, selectedId: number | null = props.selected
     search: filters.value.search || undefined,
     selected: selectedId || undefined,
     page: pageNumber,
+    per_page: perPage,
 });
 
-const applyFilters = (pageNumber = 1, selectedId: number | null = props.selected?.id ?? null) => {
-    router.get(route('banking.transactions.index'), queryPayload(pageNumber, selectedId), {
+const applyFilters = (
+    pageNumber = 1,
+    selectedId: number | null = props.selected?.id ?? null,
+    perPage = props.transactions.per_page ?? 25,
+) => {
+    router.get(route('banking.transactions.index'), queryPayload(pageNumber, selectedId, perPage), {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -400,8 +411,10 @@ watch(
                     ]"
                     :page="transactions.current_page"
                     :last-page="transactions.last_page"
-                    :show-pagination="transactions.last_page > 1"
+                    :per-page="transactions.per_page"
+                    :total="transactions.total"
                     @page-change="applyFilters($event, selected?.id ?? null)"
+                    @per-page-change="applyFilters(1, selected?.id ?? null, $event)"
                 >
                     <tr
                         v-for="row in transactions.data"

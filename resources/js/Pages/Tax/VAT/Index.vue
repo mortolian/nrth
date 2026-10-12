@@ -45,6 +45,8 @@ const props = defineProps<{
         }>;
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
 }>();
 
@@ -56,8 +58,8 @@ const submitPeriod = () => {
     router.post(route('tax.vat.submit', props.current_period.id));
 };
 
-const pageChange = (page: number) => {
-    router.get(route('tax.vat.index'), { page }, { preserveState: true, preserveScroll: true, replace: true });
+const pageChange = (page: number, perPage = props.vat_transactions.per_page ?? 25) => {
+    router.get(route('tax.vat.index'), { page, per_page: perPage }, { preserveState: true, preserveScroll: true, replace: true });
 };
 
 const totalExclVat = computed(() => props.vat_transactions.data.reduce((sum, row) => sum + Number(row.excl_vat || 0), 0));
@@ -151,7 +153,10 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
                 ]"
                 :page="vat_transactions.current_page"
                 :last-page="vat_transactions.last_page"
+                :per-page="vat_transactions.per_page"
+                :total="vat_transactions.total"
                 @page-change="pageChange"
+                @per-page-change="pageChange(1, $event)"
             >
                 <tr v-for="row in vat_transactions.data" :key="row.id">
                     <td class="px-4 py-3">{{ row.date || '-' }}</td>
@@ -195,8 +200,7 @@ const totalVat = computed(() => props.vat_transactions.data.reduce((sum, row) =>
                     { key: 'net', label: 'Net VAT' },
                     { key: 'submitted', label: 'Submitted' },
                 ]"
-                :page="1"
-                :last-page="1"
+                :show-pagination="false"
             >
                 <tr v-for="period in periods" :key="period.id">
                     <td class="px-4 py-3">{{ period.period_start }} — {{ period.period_end }}</td>

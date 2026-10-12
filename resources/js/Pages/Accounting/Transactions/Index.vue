@@ -37,6 +37,8 @@ const props = defineProps<{
         data: LedgerRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     filters: {
         from: string | null;
@@ -80,11 +82,12 @@ const bookCurrency = computed(() =>
 );
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, bookCurrency.value);
 
-const applyFilters = (page = 1) => {
+const applyFilters = (page = 1, perPage = props.transactions.per_page ?? 15) => {
     router.get(route('accounting.transactions.index'), {
         ...filters.value,
         account_id: filters.value.account_id === 'all' ? '' : filters.value.account_id,
         page,
+        per_page: perPage,
     }, { preserveState: true, preserveScroll: true, replace: true });
 };
 
@@ -198,11 +201,6 @@ const statusBadgeVariant = (status: string) => {
 };
 
 const typeLabel = (transaction: LedgerRow) => transaction.type_label || transaction.type;
-
-const goTransactionsPage = (page: number) => {
-    if (page < 1 || page > props.transactions.last_page) return;
-    applyFilters(page);
-};
 
 const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-x-auto';
 </script>
@@ -425,9 +423,6 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                         { key: 'status', label: 'Status', widthClass: 'whitespace-nowrap' },
                         { key: 'actions', label: '', widthClass: 'w-[1%] whitespace-nowrap text-right' },
                     ]"
-                    :page="transactions.current_page"
-                    :last-page="transactions.last_page"
-                    @page-change="applyFilters"
                 >
                     <template #header-select>
                         <input
@@ -532,28 +527,15 @@ const journalLinesBlock = 'rounded-md border border-slate-200 bg-white overflow-
                 </AppTable>
             </div>
 
-            <div
-                class="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between"
-            >
-                <p>Page {{ transactions.current_page }} of {{ transactions.last_page }}</p>
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        class="rounded border border-slate-200 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-                        :disabled="transactions.current_page <= 1"
-                        @click="goTransactionsPage(transactions.current_page - 1)"
-                    >
-                        Previous
-                    </button>
-                    <button
-                        type="button"
-                        class="rounded border border-slate-200 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-                        :disabled="transactions.current_page >= transactions.last_page"
-                        @click="goTransactionsPage(transactions.current_page + 1)"
-                    >
-                        Next
-                    </button>
-                </div>
+            <div class="border-t border-slate-200 px-4 py-3">
+                <AppPagination
+                    :page="transactions.current_page"
+                    :last-page="transactions.last_page"
+                    :per-page="transactions.per_page"
+                    :total="transactions.total"
+                    @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
+                />
             </div>
         </AppCard>
     </FeatureShell>

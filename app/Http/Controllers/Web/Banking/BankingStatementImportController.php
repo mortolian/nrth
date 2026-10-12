@@ -8,6 +8,8 @@ use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Services\BankingStatementImportService;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -276,6 +278,12 @@ class BankingStatementImportController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('banking.view', $request);
+        StickyFilters::remember($request, 'banking.imports.index', [
+            'account_id' => null,
+            'status' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
         $teamId = (int) $request->user()->current_team_id;
         $accountId = (int) $request->integer('account_id');
         $status = (string) $request->string('status')->toString();
@@ -301,7 +309,7 @@ class BankingStatementImportController extends Controller
 
         $imports = $query
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (BankingStatementImport $import): array => [
                 'id' => $import->id,

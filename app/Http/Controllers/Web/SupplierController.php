@@ -10,6 +10,8 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\ParseSupplierDocument;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,13 @@ class SupplierController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('suppliers.view', $request);
+        StickyFilters::remember($request, 'suppliers.index', [
+            'search' => null,
+            'status' => 'all',
+            'view' => 'grid',
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());
@@ -51,7 +60,7 @@ class SupplierController extends Controller
             ->withCount('expenseTransactions')
             ->withMax('expenseTransactions', 'transaction_date')
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate(PageSize::resolve($request, 15))
             ->withQueryString()
             ->through(function (Supplier $supplier): array {
                 return [
@@ -164,7 +173,7 @@ class SupplierController extends Controller
             ->with(['journalEntries.account', 'taxLines'])
             ->withCount('media')
             ->orderByDesc('transaction_date')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(function (Transaction $transaction): array {
                 $expenseLines = $transaction->journalEntries->filter(

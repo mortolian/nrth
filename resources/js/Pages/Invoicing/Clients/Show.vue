@@ -43,6 +43,8 @@ const props = defineProps<{
         data: InvoiceHistoryRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
         total?: number;
     };
     stats_by_currency: Array<{
@@ -72,8 +74,8 @@ const viewAllInvoicesUrl = computed(() =>
     route('invoicing.invoices.index', { client_id: props.client.id }),
 );
 
-const goHistoryPage = (page: number) => {
-    router.get(route('invoicing.clients.show', props.client.id), { page }, { preserveState: true, preserveScroll: true });
+const goHistoryPage = (page: number, perPage = props.invoice_history.per_page ?? 25) => {
+    router.get(route('invoicing.clients.show', props.client.id), { page, per_page: perPage }, { preserveState: true, preserveScroll: true });
 };
 </script>
 
@@ -206,9 +208,6 @@ const goHistoryPage = (page: number) => {
                 <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 class="text-base font-semibold text-slate-900">Invoice history</h3>
-                        <p v-if="invoice_history.last_page > 1" class="mt-1 text-xs text-slate-500">
-                            Page {{ invoice_history.current_page }} of {{ invoice_history.last_page }} · 25 per page
-                        </p>
                     </div>
                     <Link
                         :href="viewAllInvoicesUrl"
@@ -268,7 +267,6 @@ const goHistoryPage = (page: number) => {
                         embedded
                         dense
                         table-class="w-full text-sm"
-                        :show-pagination="invoice_history.last_page > 1"
                         :columns="[
                             { key: 'number', label: 'Invoice #' },
                             { key: 'issue_date', label: 'Issued' },
@@ -279,7 +277,10 @@ const goHistoryPage = (page: number) => {
                         ]"
                         :page="invoice_history.current_page"
                         :last-page="invoice_history.last_page"
+                        :per-page="invoice_history.per_page"
+                        :total="invoice_history.total"
                         @page-change="goHistoryPage"
+                        @per-page-change="goHistoryPage(1, $event)"
                     >
                         <tr
                             v-for="invoice in invoice_history.data"

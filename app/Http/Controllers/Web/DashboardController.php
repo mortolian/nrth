@@ -15,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Support\FinancialYear;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -190,7 +191,7 @@ class DashboardController extends Controller
     private function getOutstandingInvoices(Team $team, Carbon $asOf): LengthAwarePaginator
     {
         if (! Schema::hasTable('invoices')) {
-            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, 5);
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, PageSize::resolve(request(), 10));
         }
 
         return Invoice::queryWithoutTeamScope()
@@ -199,7 +200,7 @@ class DashboardController extends Controller
             ->where('team_id', $team->id)
             ->open()
             ->orderBy('due_date')
-            ->paginate(5)
+            ->paginate(PageSize::resolve(request(), 10))
             ->through(function (Invoice $invoice) use ($asOf): array {
                 $total = (int) $invoice->getRawOriginal('total_cents');
                 $paid = (int) $invoice->getRawOriginal('amount_paid_cents');

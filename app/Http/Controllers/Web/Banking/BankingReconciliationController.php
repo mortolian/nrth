@@ -15,6 +15,8 @@ use App\Domain\Banking\Models\BankingTransactionAllocation;
 use App\Domain\Banking\Services\BankingReconciliationTotals;
 use App\Domain\Banking\Services\SuggestReconciliationCandidates;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,6 +35,17 @@ class BankingReconciliationController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('banking.view', $request);
+        StickyFilters::remember($request, 'banking.transactions.index', [
+            'status' => 'all',
+            'from' => null,
+            'to' => null,
+            'account_id' => null,
+            'direction' => null,
+            'search' => null,
+            'selected' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         if (! Schema::hasTable('banking_transactions')) {
             return Inertia::render('Banking/Transactions/Index', [
@@ -71,7 +84,7 @@ class BankingReconciliationController extends Controller
         $transactions = $query
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (BankingTransaction $line): array => $this->serializeLine($line));
 

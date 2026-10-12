@@ -140,8 +140,6 @@ const formatCents = (cents, currency = 'ZAR') =>
                     { key: 'status', label: 'Status' },
                     { key: 'actions', label: '' },
                 ]"
-                :page="1"
-                :last-page="1"
                 :show-pagination="false"
             >
                 <tr
@@ -203,8 +201,6 @@ const formatCents = (cents, currency = 'ZAR') =>
                     { key: 'deleted', label: 'Moved to trash' },
                     { key: 'actions', label: '' },
                 ]"
-                :page="1"
-                :last-page="1"
                 :show-pagination="false"
             >
                 <tr v-for="row in trashed_budgets" :key="row.id" class="align-middle">

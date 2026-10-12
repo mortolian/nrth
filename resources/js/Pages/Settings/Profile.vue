@@ -12,8 +12,12 @@ type Preferences = {
     notify_invoice_overdue: boolean;
     notify_vat_due: boolean;
     notify_license_disk: boolean;
+    notify_recurring_invoice: boolean;
+    notify_recurring_expense: boolean;
     date_format: string;
     theme: string;
+    sticky_filters_enabled: boolean;
+    sticky_filters_minutes: number;
 };
 
 defineProps<{

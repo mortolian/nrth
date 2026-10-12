@@ -233,9 +233,9 @@ const setSection = (section: 'takeout' | 'backup') => {
         route('backups-exports.index'),
         {
             section,
-            ...(section === 'takeout'
-                ? { preset: state.value.preset, from: state.value.from, to: state.value.to }
-                : {}),
+            preset: state.value.preset,
+            from: state.value.from,
+            to: state.value.to,
         },
         { preserveState: false, preserveScroll: true },
     );

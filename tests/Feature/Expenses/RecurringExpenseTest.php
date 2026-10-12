@@ -11,7 +11,9 @@ use App\Domain\Expenses\Enums\RecurringExpenseStatus;
 use App\Domain\Expenses\Models\RecurringExpense;
 use App\Domain\Invoicing\Enums\RecurringFrequency;
 use App\Domain\Invoicing\Enums\RecurringLimitType;
+use App\Mail\RecurringExpenseCreatedMailer;
 use App\Models\Team;
+use App\Models\TeamRole;
 use App\Models\User;
 use App\Support\TeamAccess\EnsureTeamSystemRoles;
 use App\Support\TeamAccess\RolePresets;
@@ -19,6 +21,7 @@ use Carbon\Carbon;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class RecurringExpenseTest extends TestCase
@@ -180,5 +183,81 @@ class RecurringExpenseTest extends TestCase
         $this->actingAs($viewer)
             ->get(route('expenses.recurring.create'))
             ->assertForbidden();
+    }
+
+    public function test_generate_emails_members_who_can_view_expenses(): void
+    {
+        Mail::fake();
+
+        [$owner, $team, $category, $banking] = $this->teamWithExpenseAccounts();
+        $viewer = User::factory()->create();
+        $team->users()->attach($viewer, ['role' => RolePresets::VIEWER]);
+
+        $outsider = User::factory()->create();
+        $role = TeamRole::query()->create([
+            'team_id' => $team->id,
+            'key' => 'reports-only',
+            'name' => 'Reports only',
+            'description' => 'No expenses',
+            'permissions' => ['reports.view'],
+            'is_system' => false,
+        ]);
+        $team->users()->attach($outsider, ['role' => $role->key]);
+
+        $recurring = RecurringExpense::factory()->create([
+            'team_id' => $team->id,
+            'supplier_name' => 'Landlord Co',
+            'category_account_id' => $category->id,
+            'paid_from_banking_account_id' => $banking->id,
+            'frequency' => RecurringFrequency::Monthly,
+            'generate_on_day' => 1,
+            'next_run_date' => '2026-07-01',
+            'description' => 'Rent for {{month_year}}',
+            'amount_excl_vat_cents' => 1500000,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+        ]);
+
+        $expense = app(GenerateRecurringExpenseAction::class)->execute($recurring, Carbon::parse('2026-07-01'));
+        $this->assertNotNull($expense);
+
+        Mail::assertQueued(RecurringExpenseCreatedMailer::class, 2);
+        Mail::assertQueued(RecurringExpenseCreatedMailer::class, function (RecurringExpenseCreatedMailer $mail) use ($owner, $expense): bool {
+            $html = $mail->render();
+
+            return $mail->hasTo($owner->email)
+                && $mail->transaction->is($expense)
+                && str_contains($html, 'Rent for July 2026')
+                && str_contains($html, 'Landlord Co');
+        });
+        Mail::assertQueued(RecurringExpenseCreatedMailer::class, fn (RecurringExpenseCreatedMailer $mail): bool => $mail->hasTo($viewer->email));
+        Mail::assertNotQueued(RecurringExpenseCreatedMailer::class, fn (RecurringExpenseCreatedMailer $mail): bool => $mail->hasTo($outsider->email));
+    }
+
+    public function test_generate_skips_expense_email_when_opted_out(): void
+    {
+        Mail::fake();
+
+        [$owner, $team, $category, $banking] = $this->teamWithExpenseAccounts();
+        $owner->forceFill([
+            'preferences' => array_merge(User::defaultPreferences(), [
+                'notify_recurring_expense' => false,
+            ]),
+        ])->save();
+
+        $recurring = RecurringExpense::factory()->create([
+            'team_id' => $team->id,
+            'category_account_id' => $category->id,
+            'paid_from_banking_account_id' => $banking->id,
+            'next_run_date' => '2026-07-01',
+            'generate_on_day' => 1,
+            'description' => 'Account fee',
+            'amount_excl_vat_cents' => 5000,
+            'vat_rate' => 'no_vat',
+            'vat_amount_cents' => 0,
+        ]);
+
+        $this->assertNotNull(app(GenerateRecurringExpenseAction::class)->execute($recurring, Carbon::parse('2026-07-01')));
+        Mail::assertNothingQueued();
     }
 }

@@ -7,6 +7,8 @@ use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -19,6 +21,12 @@ class ItemController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('items.view', $request);
+        StickyFilters::remember($request, 'items.index', [
+            'search' => null,
+            'status' => 'all',
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $search = trim((string) $request->string('search')->toString());
@@ -41,7 +49,7 @@ class ItemController extends Controller
 
         $items = $query
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (Item $item): array => $this->serializeItem($item));
 

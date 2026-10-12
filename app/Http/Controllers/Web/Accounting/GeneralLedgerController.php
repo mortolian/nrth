@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Accounting;
 
 use App\Domain\Accounting\Models\Account;
 use App\Http\Controllers\Controller;
+use App\Support\StickyFilters;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,6 +16,10 @@ class GeneralLedgerController extends Controller
     public function __invoke(Request $request): Response
     {
         $this->authorizeTeam('accounting.view', $request);
+        StickyFilters::remember($request, 'accounting.journal', [
+            'from' => null,
+            'to' => null,
+        ]);
 
         if (! Schema::hasTable('accounts')) {
             return Inertia::render('Accounting/Journal/Index', [

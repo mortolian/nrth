@@ -7,6 +7,8 @@ use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Domain\Vehicles\Services\TripLogbookPdfService;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -27,6 +29,15 @@ class TripController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('vehicles.view', $request);
+        StickyFilters::remember($request, 'trips.index', [
+            'search' => null,
+            'purpose' => null,
+            'vehicle_id' => null,
+            'from' => null,
+            'to' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $filters = $this->filtersFromRequest($request);
@@ -37,7 +48,7 @@ class TripController extends Controller
         $trips = $query
             ->orderByDesc('trip_date')
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString();
 
         $trips->setCollection(

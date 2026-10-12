@@ -171,8 +171,7 @@ const onAction = (estimate: EstimateRow, actionId: string) => {
                         { key: 'status', label: 'Status' },
                         { key: 'actions', label: 'Actions' },
                     ]"
-                    :page="1"
-                    :last-page="1"
+                    :show-pagination="false"
                 >
                     <tr v-for="estimate in rows" :key="estimate.id" class="text-sm text-slate-700 hover:bg-slate-50">
                         <td class="px-4 py-3 font-medium text-brand-700">

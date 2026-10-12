@@ -569,8 +569,7 @@ const deleteCustomRole = (summary: RoleSummary) => {
                                     { key: 'role', label: 'Role' },
                                     { key: 'actions', label: '' },
                                 ]"
-                                :page="1"
-                                :last-page="1"
+                                :show-pagination="false"
                             >
                                 <tr v-for="m in members" :key="m.id" class="border-b border-slate-100 last:border-b-0">
                                     <td class="px-4 py-3">

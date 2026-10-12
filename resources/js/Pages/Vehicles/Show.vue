@@ -42,6 +42,8 @@ const props = defineProps<{
         data: TripHistoryRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     stats: {
         business_km_ytd: number;
@@ -88,8 +90,11 @@ const vehicleSubtitle = computed(() =>
 
 const canDelete = computed(() => props.stats.trip_count === 0);
 
-const goHistoryPage = (pageNumber: number) => {
-    router.get(route('vehicles.show', props.vehicle.id), { page: pageNumber }, { preserveState: true, preserveScroll: true });
+const goHistoryPage = (pageNumber: number, perPage = props.trip_history.per_page ?? 25) => {
+    router.get(route('vehicles.show', props.vehicle.id), {
+        page: pageNumber,
+        per_page: perPage,
+    }, { preserveState: true, preserveScroll: true });
 };
 
 const deleteVehicle = () => {
@@ -262,7 +267,10 @@ const onRowAction = (trip: TripHistoryRow, actionId: string) => {
                 ]"
                 :page="trip_history.current_page"
                 :last-page="trip_history.last_page"
+                :per-page="trip_history.per_page"
+                :total="trip_history.total"
                 @page-change="goHistoryPage"
+                @per-page-change="goHistoryPage(1, $event)"
             >
                 <tr
                     v-for="row in trip_history.data"

@@ -14,6 +14,7 @@ use App\Domain\Takeout\Models\TakeoutRun;
 use App\Domain\Takeout\Services\TakeoutPreviewService;
 use App\Domain\Takeout\Support\TakeoutPeriodResolver;
 use App\Http\Controllers\Controller;
+use App\Support\StickyFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -42,6 +43,12 @@ class BackupsExportsController extends Controller
         $canManageBackups = Gate::allows('manageInstanceBackups');
 
         abort_unless($isOwner || $canManageBackups, 403);
+        StickyFilters::remember($request, 'backups.index', [
+            'section' => null,
+            'preset' => null,
+            'from' => null,
+            'to' => null,
+        ]);
 
         $section = $request->string('section')->toString();
         if (! in_array($section, ['takeout', 'backup'], true)) {

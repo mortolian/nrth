@@ -36,7 +36,10 @@ use App\Support\InvoiceOnlinePaymentProviders;
 use App\Support\InvoicePayQrCode;
 use App\Support\Iso4217Currencies;
 use App\Support\MailDelivery;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -463,6 +466,19 @@ class InvoiceController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('invoices.view', $request);
+        StickyFilters::remember($request, 'invoices.index', [
+            'status' => 'all',
+            'from' => null,
+            'to' => null,
+            'client' => null,
+            'client_id' => null,
+            'min_amount' => null,
+            'max_amount' => null,
+            'sort' => null,
+            'direction' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         if (! Schema::hasTable('invoices')) {
             return Inertia::render('Invoicing/Invoices/Index', [
@@ -560,7 +576,7 @@ class InvoiceController extends Controller
 
         $invoices = $query
             ->withCount('payments')
-            ->paginate(15)
+            ->paginate(PageSize::resolve($request, 15))
             ->withQueryString()
             ->through(function (Invoice $invoice) use ($today, $statusesWherePastDueMatters): array {
                 $total = (int) $invoice->getRawOriginal('total_cents');
@@ -1045,7 +1061,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder<\App\Domain\Invoicing\Models\Invoice>  $query
+     * @param  Builder<Invoice>  $query
      */
     private function applyInvoiceIndexSort($query, string $sort, string $direction): void
     {

@@ -9,6 +9,8 @@ use App\Domain\Vehicles\Models\TripImport;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Domain\Vehicles\Services\ParseTripLogImport;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
+use App\Support\StickyFilters;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -200,6 +202,11 @@ class TripImportController extends Controller
     public function index(Request $request): Response
     {
         $this->authorizeTeam('vehicles.view', $request);
+        StickyFilters::remember($request, 'trip_imports.index', [
+            'vehicle_id' => null,
+            'page' => 1,
+            'per_page' => null,
+        ]);
 
         $teamId = (int) $request->user()->current_team_id;
         $vehicleId = (int) $request->integer('vehicle_id');
@@ -215,7 +222,7 @@ class TripImportController extends Controller
 
         $imports = $query
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (TripImport $import): array => [
                 'id' => $import->id,

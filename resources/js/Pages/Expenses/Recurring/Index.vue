@@ -32,6 +32,8 @@ const props = defineProps<{
         data: Row[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     summary: {
         active: number;
@@ -52,13 +54,14 @@ const filters = ref({
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
-const applyFilters = (pageNum = 1) => {
+const applyFilters = (pageNum = 1, perPage = props.recurring.per_page ?? 25) => {
     router.get(
         route('expenses.recurring.index'),
         {
             status: filters.value.status,
             search: filters.value.search || undefined,
             page: pageNum,
+            per_page: perPage,
         },
         { preserveState: true, preserveScroll: true, replace: true },
     );
@@ -254,7 +257,10 @@ const hasRows = computed(() => props.recurring.data.length > 0);
                     ]"
                     :page="recurring.current_page"
                     :last-page="recurring.last_page"
+                    :per-page="recurring.per_page"
+                    :total="recurring.total"
                     @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
                 >
                     <tr v-if="!hasRows">
                         <td colspan="7" class="px-4 py-10">
