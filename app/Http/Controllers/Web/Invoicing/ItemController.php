@@ -7,6 +7,7 @@ use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -41,7 +42,7 @@ class ItemController extends Controller
 
         $items = $query
             ->orderBy('name')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (Item $item): array => $this->serializeItem($item));
 

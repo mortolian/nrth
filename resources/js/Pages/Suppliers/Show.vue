@@ -43,6 +43,8 @@ const props = defineProps<{
         data: ExpenseHistoryRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
         total?: number;
     };
     stats: {
@@ -74,8 +76,8 @@ const hasAddress = computed(() => addressLines.value.length > 0);
 
 const canDelete = computed(() => props.stats.expense_count === 0);
 
-const goHistoryPage = (page: number) => {
-    router.get(route('suppliers.show', props.supplier.id), { page }, { preserveState: true, preserveScroll: true });
+const goHistoryPage = (page: number, perPage = props.expense_history.per_page ?? 25) => {
+    router.get(route('suppliers.show', props.supplier.id), { page, per_page: perPage }, { preserveState: true, preserveScroll: true });
 };
 
 const deleteSupplier = () => {
@@ -271,7 +273,10 @@ const onRowAction = (expense: ExpenseHistoryRow, actionId: string) => {
                 ]"
                 :page="expense_history.current_page"
                 :last-page="expense_history.last_page"
+                :per-page="expense_history.per_page"
+                :total="expense_history.total"
                 @page-change="goHistoryPage"
+                @per-page-change="goHistoryPage(1, $event)"
             >
                 <tr
                     v-for="row in expense_history.data"

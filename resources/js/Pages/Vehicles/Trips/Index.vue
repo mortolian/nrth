@@ -54,6 +54,8 @@ const props = defineProps<{
         data: TripRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     vehicles: VehicleOption[];
     filters: {
@@ -125,8 +127,8 @@ const hasActiveFilters = computed(() => Boolean(
 
 const pdfTripLimit = 1500;
 
-const applyFilters = (page = 1) => {
-    router.get(route('vehicles.trips.index'), { ...filterQuery(), page }, {
+const applyFilters = (page = 1, perPage = props.trips.per_page ?? 25) => {
+    router.get(route('vehicles.trips.index'), { ...filterQuery(), page, per_page: perPage }, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -448,30 +450,15 @@ const emptyColspan = computed(() => tableColumns.value.length);
                     title="No trips yet"
                     description="Log business and private trips to build your travel log book."
                 />
-                <div
-                    v-if="trips.last_page > 1"
-                    class="flex items-center justify-between border-t border-slate-200 pt-3 text-xs text-slate-500"
-                >
-                    <p>Page {{ trips.current_page }} of {{ trips.last_page }}</p>
-                    <div class="flex items-center gap-2">
-                        <button
-                            type="button"
-                            class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
-                            :disabled="trips.current_page <= 1"
-                            @click="applyFilters(trips.current_page - 1)"
-                        >
-                            Previous
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
-                            :disabled="trips.current_page >= trips.last_page"
-                            @click="applyFilters(trips.current_page + 1)"
-                        >
-                            Next
-                        </button>
-                    </div>
-                </div>
+                <AppPagination
+                    class="border-t border-slate-200 pt-3"
+                    :page="trips.current_page"
+                    :last-page="trips.last_page"
+                    :per-page="trips.per_page"
+                    :total="trips.total"
+                    @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
+                />
             </div>
 
             <div class="hidden lg:block">
@@ -481,7 +468,10 @@ const emptyColspan = computed(() => tableColumns.value.length);
                     :columns="tableColumns"
                     :page="trips.current_page"
                     :last-page="trips.last_page"
+                    :per-page="trips.per_page"
+                    :total="trips.total"
                     @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
                 >
                     <template v-if="canDelete" #header-select>
                         <input

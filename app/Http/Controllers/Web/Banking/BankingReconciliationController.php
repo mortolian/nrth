@@ -15,6 +15,7 @@ use App\Domain\Banking\Models\BankingTransactionAllocation;
 use App\Domain\Banking\Services\BankingReconciliationTotals;
 use App\Domain\Banking\Services\SuggestReconciliationCandidates;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,7 +72,7 @@ class BankingReconciliationController extends Controller
         $transactions = $query
             ->orderByDesc('transaction_date')
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (BankingTransaction $line): array => $this->serializeLine($line));
 

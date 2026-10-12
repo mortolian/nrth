@@ -8,6 +8,7 @@ use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingStatementImport;
 use App\Domain\Banking\Services\BankingStatementImportService;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -301,7 +302,7 @@ class BankingStatementImportController extends Controller
 
         $imports = $query
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (BankingStatementImport $import): array => [
                 'id' => $import->id,

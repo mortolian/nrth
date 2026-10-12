@@ -35,6 +35,8 @@ const props = defineProps<{
         data: ExpenseRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     summary: {
         total_this_month: number;
@@ -66,11 +68,12 @@ const filters = ref({
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, 'ZAR');
 
-const applyFilters = (page = 1) => {
+const applyFilters = (page = 1, perPage = props.expenses.per_page ?? 15) => {
     router.get(route('expenses.index'), {
         ...filters.value,
         categories: filters.value.categories.join(','),
         page,
+        per_page: perPage,
     }, { preserveScroll: true, preserveState: true, replace: true });
 };
 
@@ -344,7 +347,10 @@ const onRowAction = (expense: ExpenseRow, actionId: string) => {
                 ]"
                 :page="expenses.current_page"
                 :last-page="expenses.last_page"
+                :per-page="expenses.per_page"
+                :total="expenses.total"
                 @page-change="applyFilters"
+                @per-page-change="applyFilters(1, $event)"
             >
                 <template #header-select>
                     <input

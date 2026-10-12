@@ -29,6 +29,8 @@ const props = defineProps<{
         data: ClientRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     filters: {
         search: string | null;
@@ -46,13 +48,14 @@ const businessCurrency = computed(() => {
     return typeof fromPage === 'string' && fromPage.trim() !== '' ? fromPage : 'ZAR';
 });
 
-const applyFilters = (pageNum = 1) => {
+const applyFilters = (pageNum = 1, perPage = props.clients.per_page ?? 15) => {
     router.get(
         route('invoicing.clients.index'),
         {
             search: filters.value.search || undefined,
             status: filters.value.status,
             page: pageNum,
+            per_page: perPage,
         },
         { preserveState: true, preserveScroll: true, replace: true },
     );
@@ -150,7 +153,10 @@ const hasRows = computed(() => props.clients.data.length > 0);
                     ]"
                     :page="clients.current_page"
                     :last-page="clients.last_page"
+                    :per-page="clients.per_page"
+                    :total="clients.total"
                     @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
                 >
                     <tr v-if="!hasRows">
                         <td colspan="6" class="px-4 py-10">

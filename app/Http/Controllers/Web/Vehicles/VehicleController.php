@@ -6,6 +6,7 @@ use App\Domain\Vehicles\Enums\TripPurpose;
 use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -43,7 +44,7 @@ class VehicleController extends Controller
             ->withCount('trips')
             ->withMax('trips', 'trip_date')
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate(PageSize::resolve($request, 15))
             ->withQueryString()
             ->through(fn (Vehicle $vehicle): array => [
                 'id' => $vehicle->id,
@@ -111,7 +112,7 @@ class VehicleController extends Controller
             ->where('vehicle_id', $vehicle->id)
             ->orderByDesc('trip_date')
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (Trip $trip): array => $this->serializeTrip($trip));
 

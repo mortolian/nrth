@@ -21,6 +21,8 @@ const props = defineProps<{
         data: SupplierRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     filters: {
         search: string | null;
@@ -35,8 +37,12 @@ const filters = ref({
     view: props.filters.view ?? 'grid',
 });
 
-const applyFilters = (page = 1) => {
-    router.get(route('suppliers.index'), { ...filters.value, page }, { preserveState: true, preserveScroll: true, replace: true });
+const applyFilters = (page = 1, perPage = props.suppliers.per_page ?? 15) => {
+    router.get(route('suppliers.index'), {
+        ...filters.value,
+        page,
+        per_page: perPage,
+    }, { preserveState: true, preserveScroll: true, replace: true });
 };
 
 const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
@@ -111,30 +117,15 @@ const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
                 title="No suppliers found"
                 description="Try adjusting filters or add a new supplier."
             />
-            <div
-                v-if="suppliers.last_page > 1"
-                class="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500"
-            >
-                <p>Page {{ suppliers.current_page }} of {{ suppliers.last_page }}</p>
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
-                        :disabled="suppliers.current_page <= 1"
-                        @click="applyFilters(suppliers.current_page - 1)"
-                    >
-                        Previous
-                    </button>
-                    <button
-                        type="button"
-                        class="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:opacity-50"
-                        :disabled="suppliers.current_page >= suppliers.last_page"
-                        @click="applyFilters(suppliers.current_page + 1)"
-                    >
-                        Next
-                    </button>
-                </div>
-            </div>
+            <AppPagination
+                class="mt-4 rounded-lg border border-slate-200 bg-white px-4 py-3"
+                :page="suppliers.current_page"
+                :last-page="suppliers.last_page"
+                :per-page="suppliers.per_page"
+                :total="suppliers.total"
+                @page-change="applyFilters"
+                @per-page-change="applyFilters(1, $event)"
+            />
         </div>
 
         <AppCard v-else class="mt-5 overflow-hidden p-0">
@@ -151,7 +142,10 @@ const goToSupplier = (id: number) => router.visit(route('suppliers.show', id));
                 ]"
                 :page="suppliers.current_page"
                 :last-page="suppliers.last_page"
+                :per-page="suppliers.per_page"
+                :total="suppliers.total"
                 @page-change="applyFilters"
+                @per-page-change="applyFilters(1, $event)"
             >
                 <tr
                     v-for="supplier in suppliers.data"

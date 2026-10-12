@@ -16,6 +16,7 @@ use App\Domain\Invoicing\Models\RecurringInvoice;
 use App\Domain\Tax\Models\TaxRate;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +60,7 @@ class RecurringInvoiceController extends Controller
             });
         }
 
-        $rows = $query->orderBy('next_run_date')->paginate(25)->withQueryString()
+        $rows = $query->orderBy('next_run_date')->paginate(PageSize::resolve($request, 25))->withQueryString()
             ->through(fn (RecurringInvoice $row): array => $this->serializeList($row));
 
         return Inertia::render('Invoicing/Recurring/Index', [

@@ -6,6 +6,7 @@ use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
@@ -21,7 +22,7 @@ class AccountStatementController extends Controller
 
         $from = $request->string('from')->toString() ?: now()->startOfMonth()->toDateString();
         $to = $request->string('to')->toString() ?: now()->endOfMonth()->toDateString();
-        $perPage = 25;
+        $perPage = PageSize::resolve($request, 25);
         $page = max(1, (int) $request->integer('page', 1));
 
         $baseQuery = JournalEntry::query()

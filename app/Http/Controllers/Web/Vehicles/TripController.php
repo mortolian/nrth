@@ -7,6 +7,7 @@ use App\Domain\Vehicles\Models\Trip;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Domain\Vehicles\Services\TripLogbookPdfService;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -37,7 +38,7 @@ class TripController extends Controller
         $trips = $query
             ->orderByDesc('trip_date')
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString();
 
         $trips->setCollection(

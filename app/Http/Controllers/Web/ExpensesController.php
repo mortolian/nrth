@@ -28,6 +28,7 @@ use App\Domain\Expenses\Services\ParseExpenseReceipt;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\PageSize;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
 use Illuminate\Database\Eloquent\Builder;
@@ -118,7 +119,7 @@ class ExpensesController extends Controller
 
         $expenses = $query
             ->orderByDesc('transaction_date')
-            ->paginate(15, ['*'], 'page', $filters['page'])
+            ->paginate($filters['per_page'], ['*'], 'page', $filters['page'])
             ->withQueryString()
             ->through(function (Transaction $transaction): array {
                 $expenseLines = $transaction->journalEntries->filter(
@@ -1180,18 +1181,19 @@ class ExpensesController extends Controller
             'description' => $request->string('description')->toString() ?: null,
             'has_receipt' => $request->string('has_receipt')->toString() ?: 'all',
             'vat_status' => $request->string('vat_status')->toString() ?: 'all',
+            'per_page' => $request->input('per_page'),
         ];
     }
 
     /**
      * Keep list filters when leaving for an expense (receipt preview / edit) and returning via breadcrumbs.
      *
-     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, description: ?string, has_receipt: string, vat_status: string, page: int}
+     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, description: ?string, has_receipt: string, vat_status: string, page: int, per_page: int}
      */
     private function rememberedIndexFilters(Request $request, int $teamId): array
     {
         $sessionKey = $this->indexFiltersSessionKey($teamId);
-        $queryKeys = ['from', 'to', 'categories', 'supplier', 'description', 'has_receipt', 'vat_status', 'page'];
+        $queryKeys = ['from', 'to', 'categories', 'supplier', 'description', 'has_receipt', 'vat_status', 'page', 'per_page'];
 
         if ($request->hasAny($queryKeys)) {
             $filters = $this->normalizeIndexFilters(
@@ -1213,7 +1215,7 @@ class ExpensesController extends Controller
 
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, description: ?string, has_receipt: string, vat_status: string, page: int}
+     * @return array{from: ?string, to: ?string, categories: list<string>, supplier: ?string, description: ?string, has_receipt: string, vat_status: string, page: int, per_page: int}
      */
     private function normalizeIndexFilters(array $filters = [], int $page = 1): array
     {
@@ -1247,6 +1249,7 @@ class ExpensesController extends Controller
             'has_receipt' => $hasReceipt,
             'vat_status' => $vatStatus,
             'page' => max(1, $page),
+            'per_page' => PageSize::resolveValue($filters['per_page'] ?? null, 15),
         ];
     }
 

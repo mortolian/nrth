@@ -30,13 +30,21 @@ const props = defineProps({
             financial_year_end: '',
         }),
     },
-    outstanding_invoices: { type: Object, default: () => ({ data: [], current_page: 1, last_page: 1 }) },
+    outstanding_invoices: { type: Object, default: () => ({ data: [], current_page: 1, last_page: 1, per_page: 10, total: 0 }) },
     recent_transactions: { type: Array, default: () => [] },
     budget_progress: { type: Array, default: () => [] },
     budget_progress_currency: { type: String, default: 'ZAR' },
     vat_summary: { type: Object, default: () => ({}) },
     vat_enabled: { type: Boolean, default: false },
 });
+
+const goOutstandingPage = (page, perPage = props.outstanding_invoices.per_page ?? 10) => {
+    router.get(route('dashboard'), { page, per_page: perPage }, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+};
 
 const page = usePage();
 const bookCurrency = computed(() => {
@@ -449,6 +457,16 @@ const onInvoiceAction = (invoice, actionId) => {
                             No outstanding invoices.
                         </p>
                     </div>
+                    <div class="border-t border-slate-200 px-4 py-3 md:hidden">
+                        <AppPagination
+                            :page="outstanding_invoices.current_page ?? 1"
+                            :last-page="outstanding_invoices.last_page ?? 1"
+                            :per-page="outstanding_invoices.per_page ?? 10"
+                            :total="outstanding_invoices.total ?? 0"
+                            @page-change="goOutstandingPage"
+                            @per-page-change="goOutstandingPage(1, $event)"
+                        />
+                    </div>
                     <AppTable
                         class="hidden md:block"
                         embedded
@@ -464,7 +482,11 @@ const onInvoiceAction = (invoice, actionId) => {
                         ]"
                         :page="outstanding_invoices.current_page ?? 1"
                         :last-page="outstanding_invoices.last_page ?? 1"
+                        :per-page="outstanding_invoices.per_page ?? 10"
+                        :total="outstanding_invoices.total ?? 0"
                         :loading="isLoading"
+                        @page-change="goOutstandingPage"
+                        @per-page-change="goOutstandingPage(1, $event)"
                     >
                         <tr
                             v-for="invoice in outstanding_invoices.data ?? []"

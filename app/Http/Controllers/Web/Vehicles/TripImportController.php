@@ -9,6 +9,7 @@ use App\Domain\Vehicles\Models\TripImport;
 use App\Domain\Vehicles\Models\Vehicle;
 use App\Domain\Vehicles\Services\ParseTripLogImport;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -215,7 +216,7 @@ class TripImportController extends Controller
 
         $imports = $query
             ->orderByDesc('id')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(fn (TripImport $import): array => [
                 'id' => $import->id,

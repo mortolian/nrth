@@ -37,6 +37,8 @@ const props = defineProps<{
         data: InvoiceRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     summary: {
         draft_count: number;
@@ -107,6 +109,7 @@ const buildInvoiceIndexQuery = (extra: Record<string, string | number> = {}) => 
         status: localFilters.value.status,
         sort: localFilters.value.sort || 'issue',
         direction: localFilters.value.direction || 'desc',
+        per_page: props.invoices.per_page ?? 15,
         ...extra,
     };
     if (localFilters.value.from) q.from = localFilters.value.from;
@@ -257,8 +260,8 @@ const applyStatFilter = (status: string) => {
     applyFilters();
 };
 
-const navigateToPage = (page: number) => {
-    router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery({ page }), {
+const navigateToPage = (page: number, perPage = props.invoices.per_page ?? 15) => {
+    router.get(route('invoicing.invoices.index'), buildInvoiceIndexQuery({ page, per_page: perPage }), {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -747,9 +750,12 @@ const exportSelectedPdfZip = async () => {
                     ]"
                     :page="invoices.current_page"
                     :last-page="invoices.last_page"
+                    :per-page="invoices.per_page"
+                    :total="invoices.total"
                     :sort-key="localFilters.sort"
                     :sort-direction="localFilters.direction"
                     @page-change="navigateToPage"
+                    @per-page-change="navigateToPage(1, $event)"
                     @sort="onSort"
                 >
                     <template #header-select>

@@ -22,6 +22,7 @@ use App\Domain\Invoicing\Enums\RecurringFrequency;
 use App\Domain\Invoicing\Enums\RecurringLimitType;
 use App\Http\Controllers\Controller;
 use App\Models\Team;
+use App\Support\PageSize;
 use Carbon\Carbon;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
@@ -72,7 +73,7 @@ class RecurringExpenseController extends Controller
             });
         }
 
-        $rows = $query->orderBy('next_run_date')->paginate(25)->withQueryString()
+        $rows = $query->orderBy('next_run_date')->paginate(PageSize::resolve($request, 25))->withQueryString()
             ->through(fn (RecurringExpense $row): array => $this->serializeList($row));
 
         return Inertia::render('Expenses/Recurring/Index', [

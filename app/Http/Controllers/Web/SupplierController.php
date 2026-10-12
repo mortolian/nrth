@@ -10,6 +10,7 @@ use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\ParseSupplierDocument;
 use App\Http\Controllers\Controller;
 use App\Support\Iso4217Currencies;
+use App\Support\PageSize;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class SupplierController extends Controller
             ->withCount('expenseTransactions')
             ->withMax('expenseTransactions', 'transaction_date')
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate(PageSize::resolve($request, 15))
             ->withQueryString()
             ->through(function (Supplier $supplier): array {
                 return [
@@ -164,7 +165,7 @@ class SupplierController extends Controller
             ->with(['journalEntries.account', 'taxLines'])
             ->withCount('media')
             ->orderByDesc('transaction_date')
-            ->paginate(25)
+            ->paginate(PageSize::resolve($request, 25))
             ->withQueryString()
             ->through(function (Transaction $transaction): array {
                 $expenseLines = $transaction->journalEntries->filter(

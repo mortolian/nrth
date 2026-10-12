@@ -12,6 +12,7 @@ use App\Domain\Tax\Models\TaxPeriod;
 use App\Domain\Tax\Models\VATReturn;
 use App\Domain\Tax\Services\VATService;
 use App\Http\Controllers\Controller;
+use App\Support\PageSize;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -123,7 +124,7 @@ class VATController extends Controller
             ->sortByDesc(fn (array $row) => $row['date'] ?? '')
             ->values();
 
-        $perPage = 20;
+        $perPage = PageSize::resolve($request, 25);
         $page = max(1, (int) $request->integer('page', 1));
         $items = $allTransactions->slice(($page - 1) * $perPage, $perPage)->values();
         $vatTransactions = new LengthAwarePaginator(

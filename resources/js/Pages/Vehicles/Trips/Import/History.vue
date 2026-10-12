@@ -33,6 +33,8 @@ const props = defineProps<{
         data: ImportRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
         total: number;
     };
     vehicles: VehicleOption[];
@@ -88,10 +90,11 @@ const formatDate = (value: string | null) => {
     }
 };
 
-const applyFilters = (pageNum = 1) => {
+const applyFilters = (pageNum = 1, perPage = props.imports.per_page ?? 25) => {
     router.get(route('vehicles.trips.imports.index'), {
         vehicle_id: filters.value.vehicle_id === 'all' ? undefined : filters.value.vehicle_id,
         page: pageNum,
+        per_page: perPage,
     }, { preserveState: true, preserveScroll: true, replace: true });
 };
 
@@ -197,31 +200,15 @@ const undoImport = (row: ImportRow) => {
                 </EmptyState>
             </div>
 
-            <div
-                v-if="imports.last_page > 1"
-                class="flex items-center justify-between border-t border-slate-100 px-5 py-4"
-            >
-                <p class="text-sm text-slate-500">
-                    Page {{ imports.current_page }} of {{ imports.last_page }} · {{ imports.total }} total
-                </p>
-                <div class="flex gap-2">
-                    <AppButton
-                        variant="secondary"
-                        size="sm"
-                        :disabled="imports.current_page <= 1"
-                        @click="applyFilters(imports.current_page - 1)"
-                    >
-                        Previous
-                    </AppButton>
-                    <AppButton
-                        variant="secondary"
-                        size="sm"
-                        :disabled="imports.current_page >= imports.last_page"
-                        @click="applyFilters(imports.current_page + 1)"
-                    >
-                        Next
-                    </AppButton>
-                </div>
+            <div class="border-t border-slate-100 px-5 py-4">
+                <AppPagination
+                    :page="imports.current_page"
+                    :last-page="imports.last_page"
+                    :per-page="imports.per_page"
+                    :total="imports.total"
+                    @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
+                />
             </div>
         </AppCard>
     </FeatureShell>

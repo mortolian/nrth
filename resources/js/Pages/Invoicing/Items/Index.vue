@@ -32,6 +32,8 @@ const props = defineProps<{
         data: ItemRow[];
         current_page: number;
         last_page: number;
+        per_page: number;
+        total: number;
     };
     summary: {
         total: number;
@@ -50,13 +52,14 @@ const filters = ref({
     status: props.filters.status ?? 'all',
 });
 
-const applyFilters = (pageNum = 1) => {
+const applyFilters = (pageNum = 1, perPage = props.items.per_page ?? 25) => {
     router.get(
         route('invoicing.items.index'),
         {
             search: filters.value.search || undefined,
             status: filters.value.status,
             page: pageNum,
+            per_page: perPage,
         },
         { preserveState: true, preserveScroll: true, replace: true },
     );
@@ -192,7 +195,10 @@ const hasRows = computed(() => props.items.data.length > 0);
                     ]"
                     :page="items.current_page"
                     :last-page="items.last_page"
+                    :per-page="items.per_page"
+                    :total="items.total"
                     @page-change="applyFilters"
+                    @per-page-change="applyFilters(1, $event)"
                 >
                     <tr v-if="!hasRows">
                         <td colspan="6" class="px-4 py-10">
