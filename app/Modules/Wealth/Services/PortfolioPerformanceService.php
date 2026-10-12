@@ -23,7 +23,6 @@ final class PortfolioPerformanceService
      *     accessible_cents: int,
      *     restricted_cents: int,
      *     currency: string,
-     *     month: array<string, int|string>,
      *     financial_year: array<string, int|string>,
      *     by_asset_type: list<array{type: string, label: string, value_cents: int}>,
      *     by_owner: list<array{owner: string, value_cents: int}>,
@@ -59,7 +58,6 @@ final class PortfolioPerformanceService
         [$fyStart, $fyEnd] = WealthFinancialYear::windowContaining($asOf, (int) $portfolio->financial_year_start_month);
         $fyPeriodEnd = $asOf->lt($fyEnd) ? $asOf : $fyEnd;
 
-        $monthMovement = $this->movement->forAssets($activeAssets, $monthStart, $asOf, $currency);
         $fyMovement = $this->movement->forAssets($activeAssets, $fyStart, $fyPeriodEnd, $currency);
 
         foreach ($activeAssets as $asset) {
@@ -136,7 +134,6 @@ final class PortfolioPerformanceService
             'accessible_cents' => $accessible,
             'restricted_cents' => $restricted,
             'currency' => $currency,
-            'month' => $monthMovement,
             'financial_year' => [
                 ...$fyMovement,
                 'label' => WealthFinancialYear::labelForWindow($fyStart, $fyEnd),

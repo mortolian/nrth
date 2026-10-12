@@ -63,7 +63,6 @@ type Overview = {
     accessible_cents: number;
     restricted_cents: number;
     currency: string;
-    month: { investment_movement_cents: number; contributions_cents: number; withdrawals_cents: number };
     financial_year: {
         investment_movement_cents: number;
         contributions_cents: number;
@@ -561,7 +560,7 @@ const chartOptions = computed(() => {
             </template>
         </PageHeader>
 
-        <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Total wealth</p>
                 <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatCents(overview.total_cents) }}</p>
@@ -573,15 +572,6 @@ const chartOptions = computed(() => {
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Restricted / retirement</p>
                 <p class="mt-2 text-xl font-semibold tabular-nums text-slate-900">{{ formatCents(overview.restricted_cents) }}</p>
-            </AppCard>
-            <AppCard>
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Change this month</p>
-                <p
-                    class="mt-2 text-xl font-semibold tabular-nums"
-                    :class="changeClass(overview.month.investment_movement_cents)"
-                >
-                    {{ formatSigned(overview.month.investment_movement_cents) }}
-                </p>
             </AppCard>
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Change FY {{ overview.financial_year.label }}</p>
