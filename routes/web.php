@@ -26,6 +26,7 @@ use App\Http\Controllers\Web\Invoicing\RecurringInvoiceController;
 use App\Http\Controllers\Web\JoinTeamInvitationController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\PublicInvoicePayController;
+use App\Http\Controllers\Web\Reports\IncomeReportController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
 use App\Http\Controllers\Web\Settings\FeaturesSettingsController;
@@ -232,6 +233,8 @@ Route::middleware([
     Route::get('/tax/takeouts/{takeoutRun}/download', [TakeoutController::class, 'download'])->name('tax.takeouts.download');
     Route::delete('/tax/takeouts/{takeoutRun}', [TakeoutController::class, 'destroy'])->name('tax.takeouts.destroy');
     Route::post('/tax/takeouts/{takeoutRun}/retry', [TakeoutController::class, 'retry'])->name('tax.takeouts.retry');
+    Route::get('/reports/income', [IncomeReportController::class, 'show'])->name('reports.income');
+    Route::get('/reports/income/pdf', [IncomeReportController::class, 'pdf'])->name('reports.income.pdf');
     Route::get('/reports/profit-loss', [ReportsController::class, 'profitLoss'])->name('reports.profit-loss');
     Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');

@@ -180,10 +180,10 @@ const navItems = computed<MenuItem[]>(() => {
         });
     }
 
-    if (vatEnabled.value && canTeam('reports.view')) {
+    if (canTeam('reports.view')) {
         items.push({
             label: 'Reports',
-            href: route('reports.profit-loss'),
+            href: route('reports.income'),
             icon: ChartColumnBig,
             matchPrefixes: ['/reports'],
         });
@@ -699,12 +699,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey));
                             <Plus class="h-7 w-7" />
                         </button>
                     </div>
-                    <template v-if="vatEnabled && canTeam('reports.view')">
+                    <template v-if="canTeam('reports.view')">
                         <Link
-                            :href="route('reports.profit-loss')"
+                            :href="route('reports.income')"
                             :class="[
                                 'flex min-h-12 flex-col items-center justify-center gap-0.5 pb-2 text-[10px] font-medium',
-                                isActivePath(route('reports.profit-loss')) ? 'text-brand-700' : 'text-slate-600',
+                                currentPath.startsWith('/reports') ? 'text-brand-700' : 'text-slate-600',
                             ]"
                         >
                             <ChartColumnBig class="h-5 w-5 shrink-0" />

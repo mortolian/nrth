@@ -193,6 +193,35 @@ class TeamPermissionsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_reports_view_can_open_income_report_but_not_export_pdf(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $role = TeamRole::query()->create([
+            'team_id' => $team->id,
+            'key' => 'reporter',
+            'name' => 'Reporter',
+            'description' => 'Reports only',
+            'permissions' => ['reports.view'],
+            'is_system' => false,
+        ]);
+
+        $member = User::factory()->create();
+        $team->users()->attach($member, ['role' => $role->key]);
+        $member->forceFill(['current_team_id' => $team->id])->save();
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.income'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Reports/Income'));
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.income.pdf'))
+            ->assertForbidden();
+    }
+
     public function test_owner_can_create_custom_role(): void
     {
         $owner = User::factory()->withPersonalTeam()->create();

@@ -105,10 +105,18 @@ export function useTaxTabs() {
 }
 
 export function useReportsTabs() {
+    const page = usePage();
+    const vatEnabled = computed(() => Boolean(page.props.vat_enabled));
+
     return computed((): AppTabItem[] => [
-        { id: 'profit-loss', label: 'Profit And Loss', href: route('reports.profit-loss') },
-        { id: 'balance-sheet', label: 'Balance Sheet', href: route('reports.balance-sheet') },
-        { id: 'cash-flow', label: 'Cash Flow', href: route('reports.cash-flow') },
-        { id: 'trial-balance', label: 'Trial Balance', href: route('reports.trial-balance') },
+        { id: 'income', label: 'Income', href: route('reports.income') },
+        ...(vatEnabled.value
+            ? [
+                  { id: 'profit-loss', label: 'Profit And Loss', href: route('reports.profit-loss') },
+                  { id: 'balance-sheet', label: 'Balance Sheet', href: route('reports.balance-sheet') },
+                  { id: 'cash-flow', label: 'Cash Flow', href: route('reports.cash-flow') },
+                  { id: 'trial-balance', label: 'Trial Balance', href: route('reports.trial-balance') },
+              ]
+            : []),
     ]);
 }

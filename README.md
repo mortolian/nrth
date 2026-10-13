@@ -25,6 +25,7 @@
 - **Expenses & suppliers** — receipts (with an optional “receipt not required” flag), AI document fill, categories, VAT on purchases, recurring expenses (with an email when one is created)
 - **Travel** — vehicles and a business/private trip log book (CSV export; smart AI import for fleet/GPS exports when AI is enabled, with purpose switched on the preview before confirm); licence disc expiry with email reminder about one month before
 - **Accounting** — chart of accounts, journal, general ledger, account statements
+- **Reports** — financial-year income report with every income posting, exportable to PDF; profit and loss, balance sheet, cash flow, and trial balance when VAT is enabled
 - **Banking** — import CSV/OFX statements (one or more files per upload), duplicate detection, match or exclude imported lines (including mixed personal/business accounts), or create an expense from an unmatched debit
 - **Tax** — VAT returns and rates (configure during setup wizard)
 - **Teams** — multi-user companies via Jetstream

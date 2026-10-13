@@ -226,6 +226,11 @@ class MoneyPathIsolationTest extends TestCase
 
         $query = ['preset' => 'custom', 'from' => '2026-08-01', 'to' => '2026-08-31'];
 
+        $this->get(route('reports.income'))
+            ->assertOk()
+            ->assertDontSee(self::ACCOUNT_NAME)
+            ->assertDontSee(self::EXPENSE_DESCRIPTION);
+
         foreach ([
             'reports.profit-loss',
             'reports.balance-sheet',

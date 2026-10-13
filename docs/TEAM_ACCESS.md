@@ -77,8 +77,10 @@ Travel catalog keys are `vehicles.view`, `vehicles.manage`, and `vehicles.delete
 
 Wealth catalog keys are `wealth.view` and `wealth.manage`. **Travel**, **Planning**, and **Wealth** are optional modules (off by default for new businesses under Settings → Features). Existing businesses are opted in for Travel / Planning by migration when upgrading. Disabling a module hides nav and returns 403 without deleting data. Travel covers vehicles and trip log book; Planning covers budgets; Wealth covers portfolios, assets, valuation snapshots, cash-flow transactions, contribution allowances, and derived investment movement.
 
+Reports catalog keys are `reports.view` and `reports.export`. **View** opens the income report and, when VAT is enabled, profit and loss, balance sheet, cash flow, and trial balance. **Export** downloads the income report PDF. Viewer can open reports; Accountant can export them. The income report follows the business financial year and lists every posted transaction that touches an income account.
+
 ## Tests
 
 Feature coverage lives under [`tests/Feature/TeamAccess/`](../tests/Feature/TeamAccess/). Prefer HTTP 403 assertions plus `TeamAccess::allows` for custom role matrices.
 
-Cross-business isolation (owner of business B cannot open or mutate business A’s invoices, expenses, ledger, reports, VAT, or banking) lives under [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/). Report arithmetic on a known journal (P&L, trial balance, balance sheet, cash flow) lives under [`tests/Feature/Reports/`](../tests/Feature/Reports/).
+Cross-business isolation (owner of business B cannot open or mutate business A’s invoices, expenses, ledger, reports, VAT, or banking) lives under [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/). Report arithmetic on a known journal (income, P&L, trial balance, balance sheet, cash flow) lives under [`tests/Feature/Reports/`](../tests/Feature/Reports/).

@@ -60,6 +60,7 @@ Exceptions/   # when needed
 | Context | Owns |
 |---------|------|
 | **Accounting** | Chart of accounts, journal transactions, journal lines, suppliers, posting/void, ledger balances, P&L |
+| **Reports** | Financial-year income report (account totals, transaction register, PDF). Statement pages (P&L, balance sheet, cash flow, trial balance) still assemble in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php) |
 | **Invoicing** | Clients, invoices, estimates, items, recurring, payments, PDFs, online pay sessions |
 | **Banking** | Bank accounts (linked to GL), statement import, imported lines, match/exclude on the transactions page, create an expense from an unmatched debit |
 | **Expenses** | Receipt parse helpers, recurring expense templates, and generate-from-schedule (posted expenses are accounting transactions) |
@@ -105,7 +106,7 @@ public function execute(RecordPaymentDTO $dto): Payment
 
 - **Action** — named after a user intention (`CreateInvoiceAction`, `PostTransactionAction`, `AllocateBankingTransactionAction`). Constructor-inject services. Throw `ValidationException` for user-fixable errors.
 - **DTO** — immutable input from HTTP (or another action). Do not pass `Request` into the domain.
-- **Service** — reusable queries and calculations (`LedgerService`, `ProfitLossReportService`, `InvoiceTotalsCalculator`). Reports HTTP live in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php) and call those services.
+- **Service** — reusable queries and calculations (`LedgerService`, `ProfitLossReportService`, `IncomeReportService`, `InvoiceTotalsCalculator`). The income report lives in [`IncomeReportController`](../app/Http/Controllers/Web/Reports/IncomeReportController.php). Other statement pages still assemble in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php).
 - **Posting** — [`PostTransactionAction`](../app/Domain/Accounting/Actions/PostTransactionAction.php) will not post an unbalanced journal. Voiding posts a reversal and marks the original void; the ledger still sees both so they net out ([`LedgerService`](../app/Domain/Accounting/Services/LedgerService.php)).
 
 Some screens still contain more SQL in the controller than the ideal (expense updates and receipts). Expense **creates** go through [`CreateExpenseAction`](../app/Domain/Expenses/Actions/CreateExpenseAction.php); recurring templates generate through [`GenerateRecurringExpenseAction`](../app/Domain/Expenses/Actions/GenerateRecurringExpenseAction.php). New money-moving behaviour should go through an action.

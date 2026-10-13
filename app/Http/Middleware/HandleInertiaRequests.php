@@ -276,6 +276,7 @@ class HandleInertiaRequests extends Middleware
             ($moduleOn(ModuleCatalog::WEALTH) && $can('wealth.view'))
                 ? ['id' => 'wealth', 'label' => 'Wealth', 'href' => route('wealth.index')]
                 : null,
+            $can('reports.view') ? ['id' => 'income-report', 'label' => 'Income Report', 'href' => route('reports.income')] : null,
             $can('settings.business') ? ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')] : null,
             $can('settings.business') ? ['id' => 'note-templates', 'label' => 'Note Templates (Business)', 'href' => route('settings.note-templates.index')] : null,
             $can('settings.business') ? ['id' => 'features-settings', 'label' => 'Features', 'href' => route('settings.features')] : null,
