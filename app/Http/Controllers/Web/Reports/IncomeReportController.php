@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web\Reports;
 
 use App\Domain\Reports\Services\IncomeReportPdfService;
 use App\Domain\Reports\Services\IncomeReportService;
+use App\Domain\Reports\Services\ReportPeriod;
 use App\Http\Controllers\Controller;
 use App\Support\PageSize;
 use App\Support\StickyFilters;
@@ -27,24 +28,29 @@ class IncomeReportController extends Controller
         $this->authorizeTeam('reports.view', $request);
         StickyFilters::remember($request, 'reports.income', [
             'fy' => null,
+            'view' => null,
+            'breakdown' => null,
         ]);
 
         $team = $request->user()->currentTeam;
         abort_if($team === null, 403);
 
         $window = $this->incomeReportService->window($team, $this->requestedStartYear($request));
+        $presentation = $this->presentation($request);
         $from = Carbon::parse($window['from']);
         $to = Carbon::parse($window['to']);
         $teamId = (int) $team->id;
 
         return Inertia::render('Reports/Income', [
             'report' => $this->incomeReportService->summary($teamId, $from, $to),
-            'transactions' => $this->incomeReportService->paginate(
-                $teamId,
-                $from,
-                $to,
-                PageSize::resolve($request, 25),
-            ),
+            'transaction_count' => $this->incomeReportService->count($teamId, $from, $to),
+            'transactions' => $presentation['view'] === 'detailed'
+                ? $this->incomeReportService->paginate($teamId, $from, $to, PageSize::resolve($request, 25))
+                : null,
+            'months' => $presentation['breakdown'] === 'monthly'
+                ? $this->incomeReportService->monthly($teamId, $from, $to)
+                : [],
+            'presentation' => $presentation,
             'financial_year' => $window,
             'year_options' => $this->incomeReportService->yearOptions($team),
             'currency' => $this->incomeReportService->currency($team),
@@ -61,7 +67,7 @@ class IncomeReportController extends Controller
         $window = $this->incomeReportService->window($team, $this->requestedStartYear($request));
 
         try {
-            return $this->incomeReportPdfService->download($team, $window);
+            return $this->incomeReportPdfService->download($team, $window, $this->presentation($request));
         } catch (ValidationException $e) {
             return back()->with('error', collect($e->errors())->flatten()->first() ?: __('Could not export PDF.'));
         }
@@ -74,5 +80,16 @@ class IncomeReportController extends Controller
         }
 
         return (int) $request->input('fy');
+    }
+
+    /**
+     * @return array{view: string, breakdown: string}
+     */
+    private function presentation(Request $request): array
+    {
+        return ReportPeriod::presentation(
+            $request->filled('view') ? (string) $request->input('view') : null,
+            $request->filled('breakdown') ? (string) $request->input('breakdown') : null,
+        );
     }
 }

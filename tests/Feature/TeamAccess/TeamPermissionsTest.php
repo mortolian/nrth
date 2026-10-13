@@ -218,7 +218,16 @@ class TeamPermissionsTest extends TestCase
             ->assertInertia(fn ($page) => $page->component('Reports/Income'));
 
         $this->actingAs($member->fresh())
+            ->get(route('reports.expense'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Reports/Expenses'));
+
+        $this->actingAs($member->fresh())
             ->get(route('reports.income.pdf'))
+            ->assertForbidden();
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.expense.pdf'))
             ->assertForbidden();
     }
 

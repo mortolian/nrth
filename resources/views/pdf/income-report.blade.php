@@ -23,6 +23,11 @@
     $accounts = $report['accounts'] ?? [];
     $totalIncome = (int) ($report['totals']['income'] ?? 0);
     $transactions = $transactions ?? [];
+    $months = $months ?? [];
+    $presentation = $presentation ?? ['view' => 'detailed', 'breakdown' => 'year'];
+    $view = ($presentation['view'] ?? 'detailed') === 'summary' ? 'summary' : 'detailed';
+    $breakdown = ($presentation['breakdown'] ?? 'year') === 'monthly' ? 'monthly' : 'year';
+    $transactionCount = (int) ($transaction_count ?? count($transactions));
     $period = trim(($fy['from'] ?? '').' – '.($fy['to'] ?? ''), ' –');
 @endphp
     <title>Income report — {{ $businessName }} — FY {{ $fy['label'] ?? '' }}</title>
@@ -222,6 +227,14 @@
                     <td class="val">{{ $period !== '' ? $period : '—' }}</td>
                 </tr>
                 <tr>
+                    <td class="key">Report</td>
+                    <td class="val">{{ $view === 'summary' ? 'Summary' : 'Detailed' }}</td>
+                </tr>
+                <tr>
+                    <td class="key">Breakdown</td>
+                    <td class="val">{{ $breakdown === 'monthly' ? 'Monthly' : 'Full year' }}</td>
+                </tr>
+                <tr>
                     <td class="key">Currency</td>
                     <td class="val">{{ $currency }}</td>
                 </tr>
@@ -243,7 +256,7 @@
         </td>
         <td>
             <div class="label">Transactions</div>
-            <div class="value">{{ number_format(count($transactions)) }}</div>
+            <div class="value">{{ number_format($transactionCount) }}</div>
             <div class="hint">Posted entries that touch income</div>
         </td>
         <td>
@@ -254,6 +267,7 @@
     </tr>
 </table>
 
+@if($breakdown !== 'monthly')
 <div class="section-heading">Income by account</div>
 @if($accounts === [])
     <div class="empty-note">No income was recognised in this financial year.</div>
@@ -281,7 +295,42 @@
         </tbody>
     </table>
 @endif
+@endif
 
+@if($breakdown === 'monthly')
+<div class="section-heading">Monthly breakdown</div>
+@foreach($months as $month)
+    <div class="section-heading" style="margin-top: 12px; font-size: 10px; border-bottom-width: 1px;">{{ $month['label'] }}</div>
+    @if(($month['accounts'] ?? []) === [])
+        <div class="empty-note">No income in {{ $month['label'] }}.</div>
+    @else
+        <table class="sheet">
+            <thead>
+                <tr>
+                    <th style="width: 18%">Code</th>
+                    <th>Account</th>
+                    <th class="num" style="width: 22%">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($month['accounts'] as $index => $account)
+                    <tr class="{{ $index % 2 === 1 ? 'zebra' : '' }}">
+                        <td>{{ $account['code'] }}</td>
+                        <td>{{ $account['name'] }}</td>
+                        <td class="num">{{ $fmt((int) $account['amount']) }}</td>
+                    </tr>
+                @endforeach
+                <tr class="total">
+                    <td colspan="2">{{ $month['label'] }}</td>
+                    <td class="num">{{ $fmt((int) $month['total']) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
+@endforeach
+@endif
+
+@if($view === 'detailed')
 <div class="section-heading">Transaction register</div>
 @if($transactions === [])
     <div class="empty-note">No income transactions were posted in this financial year.</div>
@@ -391,6 +440,7 @@
             </div>
         </div>
     @endforeach
+@endif
 @endif
 
 <p class="disclaimer">

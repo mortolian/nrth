@@ -110,6 +110,7 @@ export function useReportsTabs() {
 
     return computed((): AppTabItem[] => [
         { id: 'income', label: 'Income', href: route('reports.income') },
+        { id: 'expenses', label: 'Expenses', href: route('reports.expense') },
         ...(vatEnabled.value
             ? [
                   { id: 'profit-loss', label: 'Profit And Loss', href: route('reports.profit-loss') },

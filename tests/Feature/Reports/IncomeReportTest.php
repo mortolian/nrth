@@ -170,6 +170,40 @@ class IncomeReportTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
     }
 
+    public function test_summary_omits_the_register_and_monthly_breakdown_splits_the_year(): void
+    {
+        [$user, $team, $accounts] = $this->seedBooks();
+        $this->postPair($team, $user, '2026-03-04', $accounts['ar'], $accounts['income'], 40_00, 'March retainer');
+        $this->postPair($team, $user, '2026-08-10', $accounts['ar'], $accounts['income'], 100_00, 'August consulting');
+
+        $this->actingAs($user)
+            ->get(route('reports.income', ['view' => 'summary', 'breakdown' => 'monthly']))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('presentation.view', 'summary')
+                ->where('presentation.breakdown', 'monthly')
+                ->where('transactions', null)
+                ->where('transaction_count', 2)
+                ->where('report.totals.income', 140_00)
+                ->where('months.0.label', 'March 2026')
+                ->where('months.0.total', 40_00)
+                ->where('months.5.label', 'August 2026')
+                ->where('months.5.total', 100_00)
+                ->where('months.1.total', 0));
+
+        $window = app(IncomeReportService::class)->window($team->fresh(), null);
+        $html = view('pdf.income-report', app(IncomeReportPdfService::class)->document(
+            $team->fresh(),
+            $window,
+            ['view' => 'summary', 'breakdown' => 'monthly'],
+        ))->render();
+
+        $this->assertStringContainsString('August 2026', $html);
+        $this->assertStringContainsString('March 2026', $html);
+        $this->assertStringNotContainsString('Transaction register', $html);
+        $this->assertStringNotContainsString('August consulting', $html);
+    }
+
     public function test_another_business_cannot_see_income_transactions(): void
     {
         [$user, $team, $accounts] = $this->seedBooks();

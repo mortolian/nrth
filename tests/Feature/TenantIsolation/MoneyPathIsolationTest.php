@@ -231,6 +231,11 @@ class MoneyPathIsolationTest extends TestCase
             ->assertDontSee(self::ACCOUNT_NAME)
             ->assertDontSee(self::EXPENSE_DESCRIPTION);
 
+        $this->get(route('reports.expense'))
+            ->assertOk()
+            ->assertDontSee(self::ACCOUNT_NAME)
+            ->assertDontSee(self::EXPENSE_DESCRIPTION);
+
         foreach ([
             'reports.profit-loss',
             'reports.balance-sheet',

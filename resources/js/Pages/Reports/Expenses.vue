@@ -1,0 +1,503 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import { ChevronRight } from 'lucide-vue-next';
+import FeatureShell from '@/Components/FeatureShell.vue';
+import EmptyState from '@/Components/EmptyState.vue';
+import { useReportsTabs } from '@/Composables/useFeatureTabs';
+import { useFormatCurrency } from '@/composables/useFormatCurrency';
+
+const reportsTabs = useReportsTabs();
+
+type ExpenseAccount = {
+    account_id: number;
+    code: string;
+    name: string;
+    amount: number;
+};
+
+type JournalLine = {
+    account_code: string;
+    account_name: string;
+    account_type: string | null;
+    entry_type: 'debit' | 'credit';
+    amount_cents: number;
+    description: string | null;
+    is_expense: boolean;
+};
+
+type TaxLine = {
+    type: string;
+    type_label: string;
+    rate_name: string;
+    rate_percent: string | null;
+    taxable_cents: number;
+    tax_cents: number;
+};
+
+type ExpenseTransaction = {
+    id: number;
+    date: string | null;
+    reference: string | null;
+    description: string | null;
+    type: string;
+    type_label: string;
+    status: string;
+    counterparty: string | null;
+    recorded_by: string | null;
+    paid_from: string | null;
+    notes: string | null;
+    receipt_not_required: boolean;
+    distance_km: number | null;
+    office_percentage: number | null;
+    expense_cents: number;
+    expense_accounts: Array<{ code: string; name: string; amount: number }>;
+    lines: JournalLine[];
+    tax_lines: TaxLine[];
+};
+
+const props = defineProps<{
+    report: {
+        accounts: ExpenseAccount[];
+        totals: { expenses: number };
+    };
+    transactions: {
+        data: ExpenseTransaction[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    } | null;
+    months: Array<{
+        key: string;
+        label: string;
+        total: number;
+        accounts: ExpenseAccount[];
+    }>;
+    presentation: {
+        view: 'summary' | 'detailed';
+        breakdown: 'year' | 'monthly';
+    };
+    transaction_count: number;
+    financial_year: {
+        start_year: number;
+        label: string;
+        from: string;
+        to: string;
+        is_current: boolean;
+    };
+    year_options: Array<{ start_year: number; label: string; from: string; to: string }>;
+    currency: string;
+}>();
+
+const page = usePage();
+const canExport = computed(() => {
+    const perms = page.props.team_permissions;
+    return Array.isArray(perms) && perms.includes('reports.export');
+});
+
+const state = ref({
+    fy: props.financial_year.start_year,
+    view: props.presentation.view,
+    breakdown: props.presentation.breakdown,
+});
+watch(
+    () => [props.financial_year.start_year, props.presentation.view, props.presentation.breakdown] as const,
+    ([year, view, breakdown]) => {
+        state.value.fy = year;
+        state.value.view = view;
+        state.value.breakdown = breakdown;
+    },
+);
+
+const expanded = ref<number[]>([]);
+watch(
+    () => props.transactions?.data.map((row) => row.id).join(',') ?? '',
+    () => {
+        expanded.value = [];
+    },
+);
+
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, props.currency || 'ZAR');
+
+const yearSelectOptions = computed(() =>
+    props.year_options.map((year) => ({
+        label: `FY ${year.label}`,
+        value: String(year.start_year),
+    })),
+);
+
+const pdfHref = computed(() =>
+    route('reports.expense.pdf', {
+        fy: props.financial_year.start_year,
+        view: props.presentation.view,
+        breakdown: props.presentation.breakdown,
+    }),
+);
+
+const apply = (pageNumber = 1, perPage = props.transactions?.per_page ?? 25) => {
+    router.get(
+        route('reports.expense'),
+        {
+            fy: state.value.fy,
+            view: state.value.view,
+            breakdown: state.value.breakdown,
+            page: pageNumber,
+            per_page: perPage,
+        },
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
+};
+
+const toggle = (id: number) => {
+    expanded.value = expanded.value.includes(id)
+        ? expanded.value.filter((open) => open !== id)
+        : [...expanded.value, id];
+};
+
+const isOpen = (id: number) => expanded.value.includes(id);
+
+const accountSummary = (row: ExpenseTransaction) => {
+    if (row.expense_accounts.length === 0) {
+        return '—';
+    }
+
+    const first = row.expense_accounts[0];
+    const label = `${first.code} ${first.name}`.trim();
+    if (row.expense_accounts.length === 1) {
+        return label;
+    }
+
+    return `${label} +${row.expense_accounts.length - 1}`;
+};
+
+const formatRate = (percent: string | null) => {
+    if (percent === null || percent.trim() === '') {
+        return '';
+    }
+    const value = Number(percent);
+    if (Number.isNaN(value)) {
+        return percent;
+    }
+    return `${value}%`;
+};
+
+const formatKm = (km: number | null) => {
+    if (km === null) {
+        return '';
+    }
+    return `${km.toLocaleString('en-ZA', { maximumFractionDigits: 1 })} km`;
+};
+</script>
+
+<template>
+    <FeatureShell
+        title="Reports"
+        section="expenses"
+        :tabs="reportsTabs"
+        document-title="Expense report"
+        :subtitle="presentation.view === 'summary'
+            ? 'Account totals for the financial year'
+            : 'Recognised expenses for the financial year, with every posting behind them'"
+    >
+        <template v-if="canExport" #actions>
+            <AppButton as="a" variant="secondary" :href="pdfHref">Export PDF</AppButton>
+        </template>
+
+        <AppCard>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,14rem)_minmax(0,12rem)_minmax(0,12rem)_auto] xl:items-end">
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Financial year</label>
+                    <AppSelect
+                        :model-value="String(state.fy)"
+                        :options="yearSelectOptions"
+                        @update:model-value="state.fy = Number($event)"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Report</label>
+                    <AppSelect
+                        :model-value="state.view"
+                        :options="[
+                            { label: 'Detailed', value: 'detailed' },
+                            { label: 'Summary', value: 'summary' },
+                        ]"
+                        @update:model-value="state.view = $event === 'summary' ? 'summary' : 'detailed'"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Breakdown</label>
+                    <AppSelect
+                        :model-value="state.breakdown"
+                        :options="[
+                            { label: 'Full year', value: 'year' },
+                            { label: 'Monthly', value: 'monthly' },
+                        ]"
+                        @update:model-value="state.breakdown = $event === 'monthly' ? 'monthly' : 'year'"
+                    />
+                </div>
+                <div>
+                    <AppButton variant="secondary" @click="apply(1)">Apply</AppButton>
+                </div>
+            </div>
+            <p class="mt-3 text-sm text-slate-500">
+                {{ financial_year.from }} → {{ financial_year.to }}
+                <span v-if="financial_year.is_current"> · current year</span>
+            </p>
+        </AppCard>
+
+        <div class="mt-5 grid gap-4 md:grid-cols-3">
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Total expenses</p>
+                <p
+                    class="mt-2 text-3xl font-semibold tabular-nums"
+                    :class="report.totals.expenses < 0 ? 'text-rose-700' : 'text-slate-900'"
+                >
+                    {{ formatCents(report.totals.expenses) }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500">Net of expense debits and credits</p>
+            </AppCard>
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Transactions</p>
+                <p class="mt-2 text-3xl font-semibold tabular-nums text-slate-900">{{ transaction_count }}</p>
+                <p class="mt-1 text-xs text-slate-500">Posted entries that touch an expense account</p>
+            </AppCard>
+            <AppCard>
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Accounts</p>
+                <p class="mt-2 text-3xl font-semibold tabular-nums text-slate-900">{{ report.accounts.length }}</p>
+                <p class="mt-1 text-xs text-slate-500">Expense accounts with a balance this year</p>
+            </AppCard>
+        </div>
+
+        <AppCard v-if="presentation.breakdown === 'year'" class="mt-5">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Expenses by account</h2>
+            <div class="mt-3">
+                <EmptyState
+                    v-if="report.accounts.length === 0"
+                    title="No expenses this year"
+                    description="Posted debits to expense accounts will appear here for the selected financial year."
+                />
+                <AppTable
+                    v-else
+                    embedded
+                    dense
+                    table-class="w-full table-fixed text-sm"
+                    :show-pagination="false"
+                    :columns="[
+                        { key: 'code', label: 'Code', widthClass: 'w-[18%]' },
+                        { key: 'name', label: 'Account', widthClass: 'w-[57%]' },
+                        { key: 'amount', label: 'Amount', align: 'right', widthClass: 'w-[25%]' },
+                    ]"
+                >
+                    <tr v-for="account in report.accounts" :key="account.account_id">
+                        <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{{ account.code }}</td>
+                        <td class="px-3 py-2 text-slate-900">{{ account.name }}</td>
+                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
+                            {{ formatCents(account.amount) }}
+                        </td>
+                    </tr>
+                    <template #footer>
+                        <tr class="border-t border-slate-200 bg-slate-50 font-semibold">
+                            <td class="px-3 py-2" colspan="2">Total expenses</td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                {{ formatCents(report.totals.expenses) }}
+                            </td>
+                        </tr>
+                    </template>
+                </AppTable>
+            </div>
+        </AppCard>
+
+        <template v-else>
+            <AppCard v-for="month in months" :key="month.key" class="mt-5">
+                <div class="flex flex-wrap items-baseline justify-between gap-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ month.label }}</h2>
+                    <p class="text-sm font-semibold tabular-nums text-slate-900">{{ formatCents(month.total) }}</p>
+                </div>
+                <div class="mt-3">
+                    <p v-if="month.accounts.length === 0" class="text-sm text-slate-500">No expenses this month.</p>
+                    <AppTable
+                        v-else
+                        embedded
+                        dense
+                        table-class="w-full table-fixed text-sm"
+                        :show-pagination="false"
+                        :columns="[
+                            { key: 'code', label: 'Code', widthClass: 'w-[18%]' },
+                            { key: 'name', label: 'Account', widthClass: 'w-[57%]' },
+                            { key: 'amount', label: 'Amount', align: 'right', widthClass: 'w-[25%]' },
+                        ]"
+                    >
+                        <tr v-for="account in month.accounts" :key="`${month.key}-${account.account_id}`">
+                            <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{{ account.code }}</td>
+                            <td class="truncate px-3 py-2 text-slate-900">{{ account.name }}</td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
+                                {{ formatCents(account.amount) }}
+                            </td>
+                        </tr>
+                    </AppTable>
+                </div>
+            </AppCard>
+        </template>
+
+        <AppCard v-if="presentation.view === 'detailed' && transactions" class="mt-5 overflow-hidden p-0">
+            <div class="border-b border-slate-200 px-5 py-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Transactions</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Open a row for the journal, tax, and supplier detail. The PDF includes every transaction in this financial year.
+                </p>
+            </div>
+
+            <div v-if="transactions.total === 0" class="px-5 py-8">
+                <EmptyState
+                    title="No expense transactions"
+                    description="Nothing was posted to an expense account in this financial year."
+                />
+            </div>
+            <AppTable
+                v-else
+                embedded
+                dense
+                table-class="w-full table-fixed text-sm"
+                :page="transactions.current_page"
+                :last-page="transactions.last_page"
+                :per-page="transactions.per_page"
+                :total="transactions.total"
+                :columns="[
+                    { key: 'expand', label: '', widthClass: 'w-[4%]' },
+                    { key: 'date', label: 'Date', widthClass: 'w-[11%]' },
+                    { key: 'reference', label: 'Reference', widthClass: 'w-[13%]' },
+                    { key: 'description', label: 'Description', widthClass: 'w-[26%]' },
+                    { key: 'counterparty', label: 'Supplier', widthClass: 'w-[16%]' },
+                    { key: 'account', label: 'Expense account', widthClass: 'w-[18%]' },
+                    { key: 'expense', label: 'Expense', align: 'right', widthClass: 'w-[12%]' },
+                ]"
+                @page-change="apply($event)"
+                @per-page-change="apply(1, $event)"
+            >
+                <template v-for="row in transactions.data" :key="row.id">
+                    <tr class="cursor-pointer hover:bg-slate-50" @click="toggle(row.id)">
+                        <td class="px-3 py-2 text-slate-400">
+                            <ChevronRight class="h-4 w-4 transition" :class="isOpen(row.id) ? 'rotate-90' : ''" />
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-2 text-slate-700">{{ row.date }}</td>
+                        <td class="truncate px-3 py-2 text-slate-700">{{ row.reference || '—' }}</td>
+                        <td class="truncate px-3 py-2 text-slate-900">{{ row.description || row.type_label }}</td>
+                        <td class="truncate px-3 py-2 text-slate-700">{{ row.counterparty || '—' }}</td>
+                        <td class="truncate px-3 py-2 text-slate-700">{{ accountSummary(row) }}</td>
+                        <td
+                            class="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums"
+                            :class="row.expense_cents < 0 ? 'text-rose-700' : 'text-slate-900'"
+                        >
+                            {{ formatCents(row.expense_cents) }}
+                        </td>
+                    </tr>
+                    <tr v-if="isOpen(row.id)" class="bg-slate-50">
+                        <td colspan="7" class="px-3 py-4">
+                            <div class="grid gap-4 lg:grid-cols-[minmax(0,16rem)_1fr]">
+                                <dl class="space-y-2 text-sm">
+                                    <div>
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Type</dt>
+                                        <dd class="text-slate-900">{{ row.type_label }}</dd>
+                                    </div>
+                                    <div v-if="row.paid_from">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Paid from</dt>
+                                        <dd class="text-slate-900">{{ row.paid_from }}</dd>
+                                    </div>
+                                    <div v-if="row.receipt_not_required">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Receipt</dt>
+                                        <dd class="text-slate-900">Not required</dd>
+                                    </div>
+                                    <div v-if="row.distance_km">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Distance</dt>
+                                        <dd class="text-slate-900">{{ formatKm(row.distance_km) }}</dd>
+                                    </div>
+                                    <div v-if="row.office_percentage">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Office use</dt>
+                                        <dd class="text-slate-900">{{ row.office_percentage }}%</dd>
+                                    </div>
+                                    <div v-if="row.recorded_by">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Recorded by</dt>
+                                        <dd class="text-slate-900">{{ row.recorded_by }}</dd>
+                                    </div>
+                                    <div v-if="row.description">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Description</dt>
+                                        <dd class="text-slate-900">{{ row.description }}</dd>
+                                    </div>
+                                    <div v-if="row.notes">
+                                        <dt class="text-xs uppercase tracking-wide text-slate-500">Notes</dt>
+                                        <dd class="text-slate-900">{{ row.notes }}</dd>
+                                    </div>
+                                </dl>
+
+                                <div class="space-y-4">
+                                    <table class="w-full table-fixed text-sm">
+                                        <thead>
+                                            <tr class="text-left text-xs uppercase tracking-wide text-slate-500">
+                                                <th class="w-[34%] py-1 pr-3 font-medium">Account</th>
+                                                <th class="w-[36%] py-1 pr-3 font-medium">Detail</th>
+                                                <th class="w-[15%] py-1 pr-3 text-right font-medium">Debit</th>
+                                                <th class="w-[15%] py-1 text-right font-medium">Credit</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr
+                                                v-for="(line, index) in row.lines"
+                                                :key="`${row.id}-line-${index}`"
+                                                class="border-t border-slate-200"
+                                            >
+                                                <td class="py-2 pr-3" :class="line.is_expense ? 'font-medium text-slate-900' : 'text-slate-700'">
+                                                    <span class="whitespace-nowrap">{{ line.account_code }}</span>
+                                                    {{ line.account_name }}
+                                                </td>
+                                                <td class="py-2 pr-3 text-slate-600">{{ line.description || '—' }}</td>
+                                                <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
+                                                    {{ line.entry_type === 'debit' ? formatCents(line.amount_cents) : '' }}
+                                                </td>
+                                                <td class="whitespace-nowrap py-2 text-right tabular-nums">
+                                                    {{ line.entry_type === 'credit' ? formatCents(line.amount_cents) : '' }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    <table v-if="row.tax_lines.length" class="w-full table-fixed text-sm">
+                                        <thead>
+                                            <tr class="text-left text-xs uppercase tracking-wide text-slate-500">
+                                                <th class="w-[30%] py-1 pr-3 font-medium">Tax</th>
+                                                <th class="w-[40%] py-1 pr-3 font-medium">Rate</th>
+                                                <th class="w-[15%] py-1 pr-3 text-right font-medium">Taxable</th>
+                                                <th class="w-[15%] py-1 text-right font-medium">Tax</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr
+                                                v-for="(tax, index) in row.tax_lines"
+                                                :key="`${row.id}-tax-${index}`"
+                                                class="border-t border-slate-200"
+                                            >
+                                                <td class="py-2 pr-3 text-slate-900">{{ tax.type_label }}</td>
+                                                <td class="py-2 pr-3 text-slate-700">
+                                                    {{ tax.rate_name }}
+                                                    <span v-if="formatRate(tax.rate_percent)" class="text-slate-500">
+                                                        {{ formatRate(tax.rate_percent) }}
+                                                    </span>
+                                                </td>
+                                                <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">
+                                                    {{ formatCents(tax.taxable_cents) }}
+                                                </td>
+                                                <td class="whitespace-nowrap py-2 text-right tabular-nums">
+                                                    {{ formatCents(tax.tax_cents) }}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+            </AppTable>
+        </AppCard>
+    </FeatureShell>
+</template>

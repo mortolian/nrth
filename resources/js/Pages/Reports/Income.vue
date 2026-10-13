@@ -69,7 +69,18 @@ const props = defineProps<{
         last_page: number;
         per_page: number;
         total: number;
+    } | null;
+    months: Array<{
+        key: string;
+        label: string;
+        total: number;
+        accounts: IncomeAccount[];
+    }>;
+    presentation: {
+        view: 'summary' | 'detailed';
+        breakdown: 'year' | 'monthly';
     };
+    transaction_count: number;
     financial_year: {
         start_year: number;
         label: string;
@@ -87,17 +98,23 @@ const canExport = computed(() => {
     return Array.isArray(perms) && perms.includes('reports.export');
 });
 
-const state = ref({ fy: props.financial_year.start_year });
+const state = ref({
+    fy: props.financial_year.start_year,
+    view: props.presentation.view,
+    breakdown: props.presentation.breakdown,
+});
 watch(
-    () => props.financial_year.start_year,
-    (year) => {
+    () => [props.financial_year.start_year, props.presentation.view, props.presentation.breakdown] as const,
+    ([year, view, breakdown]) => {
         state.value.fy = year;
+        state.value.view = view;
+        state.value.breakdown = breakdown;
     },
 );
 
 const expanded = ref<number[]>([]);
 watch(
-    () => props.transactions.data.map((row) => row.id).join(','),
+    () => props.transactions?.data.map((row) => row.id).join(',') ?? '',
     () => {
         expanded.value = [];
     },
@@ -113,13 +130,23 @@ const yearSelectOptions = computed(() =>
 );
 
 const pdfHref = computed(() =>
-    route('reports.income.pdf', { fy: props.financial_year.start_year }),
+    route('reports.income.pdf', {
+        fy: props.financial_year.start_year,
+        view: props.presentation.view,
+        breakdown: props.presentation.breakdown,
+    }),
 );
 
-const apply = (pageNumber = 1, perPage = props.transactions.per_page) => {
+const apply = (pageNumber = 1, perPage = props.transactions?.per_page ?? 25) => {
     router.get(
         route('reports.income'),
-        { fy: state.value.fy, page: pageNumber, per_page: perPage },
+        {
+            fy: state.value.fy,
+            view: state.value.view,
+            breakdown: state.value.breakdown,
+            page: pageNumber,
+            per_page: perPage,
+        },
         { preserveState: true, preserveScroll: true, replace: true },
     );
 };
@@ -164,20 +191,44 @@ const formatRate = (percent: string | null) => {
         section="income"
         :tabs="reportsTabs"
         document-title="Income report"
-        subtitle="Recognised income for the financial year, with every posting behind it"
+        :subtitle="presentation.view === 'summary'
+            ? 'Account totals for the financial year'
+            : 'Recognised income for the financial year, with every posting behind it'"
     >
         <template v-if="canExport" #actions>
             <AppButton as="a" variant="secondary" :href="pdfHref">Export PDF</AppButton>
         </template>
 
         <AppCard>
-            <div class="grid gap-3 md:grid-cols-[minmax(0,16rem)_auto] md:items-end">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,14rem)_minmax(0,12rem)_minmax(0,12rem)_auto] xl:items-end">
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500">Financial year</label>
                     <AppSelect
                         :model-value="String(state.fy)"
                         :options="yearSelectOptions"
                         @update:model-value="state.fy = Number($event)"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Report</label>
+                    <AppSelect
+                        :model-value="state.view"
+                        :options="[
+                            { label: 'Detailed', value: 'detailed' },
+                            { label: 'Summary', value: 'summary' },
+                        ]"
+                        @update:model-value="state.view = $event === 'summary' ? 'summary' : 'detailed'"
+                    />
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-500">Breakdown</label>
+                    <AppSelect
+                        :model-value="state.breakdown"
+                        :options="[
+                            { label: 'Full year', value: 'year' },
+                            { label: 'Monthly', value: 'monthly' },
+                        ]"
+                        @update:model-value="state.breakdown = $event === 'monthly' ? 'monthly' : 'year'"
                     />
                 </div>
                 <div>
@@ -203,7 +254,7 @@ const formatRate = (percent: string | null) => {
             </AppCard>
             <AppCard>
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Transactions</p>
-                <p class="mt-2 text-3xl font-semibold tabular-nums text-slate-900">{{ transactions.total }}</p>
+                <p class="mt-2 text-3xl font-semibold tabular-nums text-slate-900">{{ transaction_count }}</p>
                 <p class="mt-1 text-xs text-slate-500">Posted entries that touch an income account</p>
             </AppCard>
             <AppCard>
@@ -213,7 +264,7 @@ const formatRate = (percent: string | null) => {
             </AppCard>
         </div>
 
-        <AppCard class="mt-5">
+        <AppCard v-if="presentation.breakdown === 'year'" class="mt-5">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Income by account</h2>
             <div class="mt-3">
                 <EmptyState
@@ -252,7 +303,39 @@ const formatRate = (percent: string | null) => {
             </div>
         </AppCard>
 
-        <AppCard class="mt-5 overflow-hidden p-0">
+        <template v-else>
+            <AppCard v-for="month in months" :key="month.key" class="mt-5">
+                <div class="flex flex-wrap items-baseline justify-between gap-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">{{ month.label }}</h2>
+                    <p class="text-sm font-semibold tabular-nums text-slate-900">{{ formatCents(month.total) }}</p>
+                </div>
+                <div class="mt-3">
+                    <p v-if="month.accounts.length === 0" class="text-sm text-slate-500">No income this month.</p>
+                    <AppTable
+                        v-else
+                        embedded
+                        dense
+                        table-class="w-full table-fixed text-sm"
+                        :show-pagination="false"
+                        :columns="[
+                            { key: 'code', label: 'Code', widthClass: 'w-[18%]' },
+                            { key: 'name', label: 'Account', widthClass: 'w-[57%]' },
+                            { key: 'amount', label: 'Amount', align: 'right', widthClass: 'w-[25%]' },
+                        ]"
+                    >
+                        <tr v-for="account in month.accounts" :key="`${month.key}-${account.account_id}`">
+                            <td class="whitespace-nowrap px-3 py-2 font-medium text-slate-700">{{ account.code }}</td>
+                            <td class="truncate px-3 py-2 text-slate-900">{{ account.name }}</td>
+                            <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-900">
+                                {{ formatCents(account.amount) }}
+                            </td>
+                        </tr>
+                    </AppTable>
+                </div>
+            </AppCard>
+        </template>
+
+        <AppCard v-if="presentation.view === 'detailed' && transactions" class="mt-5 overflow-hidden p-0">
             <div class="border-b border-slate-200 px-5 py-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Transactions</h2>
                 <p class="mt-1 text-sm text-slate-500">

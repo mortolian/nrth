@@ -11,9 +11,6 @@ use App\Domain\Invoicing\Models\Client;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\Payment;
 use App\Models\Team;
-use App\Support\FinancialYear;
-use App\Support\Iso4217Currencies;
-use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,23 +31,7 @@ final class IncomeReportService
      */
     public function window(Team $team, ?int $startYear): array
     {
-        $startMonth = $this->startMonth($team);
-        [$currentStart] = FinancialYear::windowContaining(now(), $startMonth);
-
-        $start = $currentStart->copy();
-        if ($startYear !== null && $startYear >= 1970 && $startYear <= 2100) {
-            $start = Carbon::create($startYear, $startMonth, 1)->startOfDay();
-        }
-
-        $end = $start->copy()->addYear()->subDay()->startOfDay();
-
-        return [
-            'start_year' => (int) $start->year,
-            'label' => FinancialYear::labelForWindow($start, $end),
-            'from' => $start->toDateString(),
-            'to' => $end->toDateString(),
-            'is_current' => $start->equalTo($currentStart),
-        ];
+        return ReportPeriod::window($team, $startYear);
     }
 
     /**
@@ -58,22 +39,7 @@ final class IncomeReportService
      */
     public function yearOptions(Team $team): array
     {
-        $startMonth = $this->startMonth($team);
-        [$currentStart] = FinancialYear::windowContaining(now(), $startMonth);
-        $options = [];
-
-        for ($i = 0; $i < 8; $i++) {
-            $start = $currentStart->copy()->subYears($i)->startOfDay();
-            $end = $start->copy()->addYear()->subDay()->startOfDay();
-            $options[] = [
-                'start_year' => (int) $start->year,
-                'label' => FinancialYear::labelForWindow($start, $end),
-                'from' => $start->toDateString(),
-                'to' => $end->toDateString(),
-            ];
-        }
-
-        return $options;
+        return ReportPeriod::yearOptions($team);
     }
 
     /**
@@ -114,13 +80,7 @@ final class IncomeReportService
 
     public function currency(Team $team): string
     {
-        $settings = $team->mergedBusinessSettings();
-
-        return Iso4217Currencies::normalize(
-            is_string($settings['invoice_default_currency'] ?? null)
-                ? $settings['invoice_default_currency']
-                : null
-        );
+        return ReportPeriod::currency($team);
     }
 
     /**
@@ -158,14 +118,6 @@ final class IncomeReportService
         return $this->incomeTransactionsQuery($teamId, $from, $to)->count();
     }
 
-    private function startMonth(Team $team): int
-    {
-        $settings = $team->mergedBusinessSettings();
-        $endMonth = (int) ($settings['financial_year_end_month'] ?? 2);
-
-        return FinancialYear::startMonthFromEndMonth($endMonth);
-    }
-
     /**
      * @return Builder<Transaction>
      */
@@ -201,8 +153,28 @@ final class IncomeReportService
                 ->withoutGlobalScopes()
                 ->where('team_id', $teamId)
                 ->where('type', AccountType::Income->value))
-            ->with(['account' => fn ($query) => $query->withoutGlobalScopes()->select('id', 'code', 'name', 'type')])
+            ->with([
+                'account' => fn ($query) => $query->withoutGlobalScopes()->select('id', 'code', 'name', 'type'),
+                'transaction' => fn ($query) => $query->withoutGlobalScopes()->select('id', 'transaction_date'),
+            ])
             ->get();
+    }
+
+    /**
+     * @return list<array{key: string, label: string, accounts: list<array{account_id: int, code: string, name: string, amount: int}>, total: int}>
+     */
+    public function monthly(int $teamId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        return MonthlyAccountBreakdown::build(
+            $this->incomeEntries($teamId, $from, $to),
+            $from,
+            $to,
+            function (JournalEntry $line): int {
+                $cents = (int) $line->getRawOriginal('amount_cents');
+
+                return $line->type === EntryType::Credit ? $cents : -$cents;
+            },
+        );
     }
 
     /**
