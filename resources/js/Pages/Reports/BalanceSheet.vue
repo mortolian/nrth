@@ -21,7 +21,9 @@ const props = defineProps<{
 }>();
 
 const asOf = ref(props.as_of);
-const page = usePage<{ vat_enabled?: boolean; business_currency?: string }>();
+const page = usePage<{ vat_enabled?: boolean; business_currency?: string; team_permissions?: string[] }>();
+const canExport = computed(() => (page.props.team_permissions ?? []).includes('reports.export'));
+const pdfHref = computed(() => route('reports.balance-sheet.pdf', { as_of: props.as_of }));
 const bookCurrency = computed(() =>
     typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
         ? page.props.business_currency
@@ -47,9 +49,8 @@ const openStatement = (line: Line) => {
         document-title="Balance Sheet"
         subtitle="Statement of financial position"
     >
-        <template #actions>
-            <AppButton variant="secondary">Export PDF</AppButton>
-            <AppButton variant="secondary">Export Excel</AppButton>
+        <template v-if="vatEnabled && canExport" #actions>
+            <AppButton as="a" variant="secondary" :href="pdfHref">Export PDF</AppButton>
         </template>
 
         <AppCard v-if="!vatEnabled" class="mt-5">

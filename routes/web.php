@@ -26,6 +26,8 @@ use App\Http\Controllers\Web\Invoicing\RecurringInvoiceController;
 use App\Http\Controllers\Web\JoinTeamInvitationController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\PublicInvoicePayController;
+use App\Http\Controllers\Web\Reports\AgedReceivablesController;
+use App\Http\Controllers\Web\Reports\ClientStatementController;
 use App\Http\Controllers\Web\Reports\ExpenseReportController;
 use App\Http\Controllers\Web\Reports\IncomeReportController;
 use App\Http\Controllers\Web\ReportsController;
@@ -238,8 +240,14 @@ Route::middleware([
     Route::get('/reports/income/pdf', [IncomeReportController::class, 'pdf'])->name('reports.income.pdf');
     Route::get('/reports/expenses', [ExpenseReportController::class, 'show'])->name('reports.expense');
     Route::get('/reports/expenses/pdf', [ExpenseReportController::class, 'pdf'])->name('reports.expense.pdf');
+    Route::get('/reports/receivables', [AgedReceivablesController::class, 'show'])->name('reports.aged-receivables');
+    Route::get('/reports/receivables/pdf', [AgedReceivablesController::class, 'pdf'])->name('reports.aged-receivables.pdf');
+    Route::get('/reports/client-statement', [ClientStatementController::class, 'show'])->name('reports.client-statement');
+    Route::get('/reports/client-statement/pdf', [ClientStatementController::class, 'pdf'])->name('reports.client-statement.pdf');
     Route::get('/reports/profit-loss', [ReportsController::class, 'profitLoss'])->name('reports.profit-loss');
+    Route::get('/reports/profit-loss/pdf', [ReportsController::class, 'profitLossPdf'])->name('reports.profit-loss.pdf');
     Route::get('/reports/balance-sheet', [ReportsController::class, 'balanceSheet'])->name('reports.balance-sheet');
+    Route::get('/reports/balance-sheet/pdf', [ReportsController::class, 'balanceSheetPdf'])->name('reports.balance-sheet.pdf');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');
     Route::get('/reports/cash-flow', [ReportsController::class, 'cashFlow'])->name('reports.cash-flow');
     Route::prefix('vehicles')->name('vehicles.')->middleware('team.module:travel')->group(function () {

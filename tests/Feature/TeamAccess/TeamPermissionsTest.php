@@ -229,6 +229,32 @@ class TeamPermissionsTest extends TestCase
         $this->actingAs($member->fresh())
             ->get(route('reports.expense.pdf'))
             ->assertForbidden();
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.aged-receivables'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Reports/AgedReceivables'));
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.client-statement'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Reports/ClientStatement'));
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.aged-receivables.pdf'))
+            ->assertForbidden();
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.client-statement.pdf'))
+            ->assertForbidden();
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.profit-loss.pdf'))
+            ->assertForbidden();
+
+        $this->actingAs($member->fresh())
+            ->get(route('reports.balance-sheet.pdf'))
+            ->assertForbidden();
     }
 
     public function test_owner_can_create_custom_role(): void

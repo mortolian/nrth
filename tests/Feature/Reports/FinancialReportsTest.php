@@ -9,6 +9,9 @@ use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Account;
 use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
+use App\Domain\Accounting\Services\ProfitLossReportService;
+use App\Domain\Reports\Services\BalanceSheetPdfService;
+use App\Domain\Reports\Services\ProfitLossPdfService;
 use App\Models\Team;
 use App\Models\User;
 use Carbon\Carbon;
@@ -183,6 +186,40 @@ class FinancialReportsTest extends TestCase
                 ->where('report.totals.equity', 200_00)
                 ->where('report.totals.liabilities_plus_equity', 200_00)
                 ->where('report.is_balanced', false));
+    }
+
+    public function test_profit_loss_and_balance_sheet_pdfs_match_the_screens(): void
+    {
+        [$user, $team] = $this->seedKnownBooks();
+
+        $profitLoss = view('pdf.profit-loss', app(ProfitLossPdfService::class)->document($team, [
+            'report' => app(ProfitLossReportService::class)->forPeriod((int) $team->id, Carbon::parse('2026-08-01'), Carbon::parse('2026-08-31')),
+            'comparison' => null,
+            'period' => ['from' => '2026-08-01', 'to' => '2026-08-31', 'preset' => 'custom'],
+            'compare' => 'none',
+            'comparison_period' => null,
+        ]))->render();
+        $this->assertStringContainsString('Services', $profitLoss);
+        $this->assertStringContainsString('Office', $profitLoss);
+        $this->assertStringContainsString('70.00', $profitLoss);
+
+        $balanceSheet = view('pdf.balance-sheet', app(BalanceSheetPdfService::class)->document($team, Carbon::parse('2026-08-31')))->render();
+        $this->assertStringContainsString('Bank', $balanceSheet);
+        $this->assertStringContainsString('Accounts Receivable', $balanceSheet);
+        $this->assertStringContainsString('Owner Equity', $balanceSheet);
+        $this->assertStringContainsString('270.00', $balanceSheet);
+
+        $this->actingAs($user)
+            ->get(route('reports.profit-loss.pdf', [
+                'preset' => 'custom',
+                'from' => '2026-08-01',
+                'to' => '2026-08-31',
+            ]))
+            ->assertOk();
+
+        $this->actingAs($user)
+            ->get(route('reports.balance-sheet.pdf', ['as_of' => '2026-08-31']))
+            ->assertOk();
     }
 
     public function test_cash_flow_reconciles_opening_plus_net_change_to_closing_cash(): void

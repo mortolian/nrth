@@ -31,7 +31,14 @@ const state = ref({
     to: props.period.to,
 });
 
-const page = usePage<{ vat_enabled?: boolean; business_currency?: string }>();
+const page = usePage<{ vat_enabled?: boolean; business_currency?: string; team_permissions?: string[] }>();
+const canExport = computed(() => (page.props.team_permissions ?? []).includes('reports.export'));
+const pdfHref = computed(() => route('reports.profit-loss.pdf', {
+    preset: props.period.preset,
+    compare: props.compare,
+    from: props.period.from,
+    to: props.period.to,
+}));
 const bookCurrency = computed(() =>
     typeof page.props.business_currency === 'string' && page.props.business_currency.trim() !== ''
         ? page.props.business_currency
@@ -62,9 +69,8 @@ const drilldown = (line: Line) => {
         document-title="Profit & Loss"
         subtitle="Standard statement of income and expenses"
     >
-        <template #actions>
-            <AppButton variant="secondary">Export PDF</AppButton>
-            <AppButton variant="secondary">Export Excel</AppButton>
+        <template v-if="vatEnabled && canExport" #actions>
+            <AppButton as="a" variant="secondary" :href="pdfHref">Export PDF</AppButton>
         </template>
 
         <AppCard v-if="!vatEnabled" class="mt-5">

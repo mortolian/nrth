@@ -60,7 +60,7 @@ Exceptions/   # when needed
 | Context | Owns |
 |---------|------|
 | **Accounting** | Chart of accounts, journal transactions, journal lines, suppliers, posting/void, ledger balances, P&L |
-| **Reports** | Financial-year income and expense reports (account totals, transaction register, PDF). Statement pages (P&L, balance sheet, cash flow, trial balance) still assemble in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php) |
+| **Reports** | Financial-year income and expense reports, aged receivables, and client statements (each with a PDF). Profit and loss and the balance sheet export the same figures as the screens. Cash flow and trial balance still assemble in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php) |
 | **Invoicing** | Clients, invoices, estimates, items, recurring, payments, PDFs, online pay sessions |
 | **Banking** | Bank accounts (linked to GL), statement import, imported lines, match/exclude on the transactions page, create an expense from an unmatched debit |
 | **Expenses** | Receipt parse helpers, recurring expense templates, and generate-from-schedule (posted expenses are accounting transactions) |
@@ -106,7 +106,7 @@ public function execute(RecordPaymentDTO $dto): Payment
 
 - **Action** — named after a user intention (`CreateInvoiceAction`, `PostTransactionAction`, `AllocateBankingTransactionAction`). Constructor-inject services. Throw `ValidationException` for user-fixable errors.
 - **DTO** — immutable input from HTTP (or another action). Do not pass `Request` into the domain.
-- **Service** — reusable queries and calculations (`LedgerService`, `ProfitLossReportService`, `IncomeReportService`, `ExpenseReportService`, `InvoiceTotalsCalculator`). Income and expense reports live in [`IncomeReportController`](../app/Http/Controllers/Web/Reports/IncomeReportController.php) and [`ExpenseReportController`](../app/Http/Controllers/Web/Reports/ExpenseReportController.php). Other statement pages still assemble in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php).
+- **Service** — reusable queries and calculations (`LedgerService`, `ProfitLossReportService`, `BalanceSheetReportService`, `IncomeReportService`, `ExpenseReportService`, `AgedReceivablesService`, `ClientStatementService`, `InvoiceTotalsCalculator`). Income, expenses, aged receivables, and client statements live under [`app/Http/Controllers/Web/Reports/`](../app/Http/Controllers/Web/Reports). Profit and loss, balance sheet, cash flow, and trial balance still assemble in [`ReportsController`](../app/Http/Controllers/Web/ReportsController.php).
 - **Posting** — [`PostTransactionAction`](../app/Domain/Accounting/Actions/PostTransactionAction.php) will not post an unbalanced journal. Voiding posts a reversal and marks the original void; the ledger still sees both so they net out ([`LedgerService`](../app/Domain/Accounting/Services/LedgerService.php)).
 
 Some screens still contain more SQL in the controller than the ideal (expense updates and receipts). Expense **creates** go through [`CreateExpenseAction`](../app/Domain/Expenses/Actions/CreateExpenseAction.php); recurring templates generate through [`GenerateRecurringExpenseAction`](../app/Domain/Expenses/Actions/GenerateRecurringExpenseAction.php). New money-moving behaviour should go through an action.
@@ -199,7 +199,7 @@ These routes are outside the logged-in group. They must not trust `current_team_
 | Suite | Asserts |
 |-------|---------|
 | [`tests/Feature/TenantIsolation/`](../tests/Feature/TenantIsolation/) | Business B cannot read or mutate business A |
-| [`tests/Feature/Reports/`](../tests/Feature/Reports/) | P&L, trial balance, balance sheet, cash flow on a known journal |
+| [`tests/Feature/Reports/`](../tests/Feature/Reports/) | P&L, trial balance, balance sheet, cash flow, income, expenses, aged receivables, and client statements |
 | [`tests/Feature/Invoicing/InvoiceOverpaymentTest.php`](../tests/Feature/Invoicing/InvoiceOverpaymentTest.php) | Payment cannot exceed amount due |
 | [`tests/Feature/TeamAccess/`](../tests/Feature/TeamAccess/) | Viewer/custom role 403s |
 

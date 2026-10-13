@@ -10,19 +10,28 @@ use App\Domain\Accounting\Models\JournalEntry;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Accounting\Services\LedgerService;
 use App\Domain\Accounting\Services\ProfitLossReportService;
+use App\Domain\Reports\Services\BalanceSheetPdfService;
+use App\Domain\Reports\Services\BalanceSheetReportService;
+use App\Domain\Reports\Services\ProfitLossPdfService;
 use App\Http\Controllers\Controller;
 use App\Support\StickyFilters;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class ReportsController extends Controller
 {
     public function __construct(
         private readonly LedgerService $ledgerService,
         private readonly ProfitLossReportService $profitLossReportService,
+        private readonly ProfitLossPdfService $profitLossPdfService,
+        private readonly BalanceSheetReportService $balanceSheetReportService,
+        private readonly BalanceSheetPdfService $balanceSheetPdfService,
     ) {}
 
     public function profitLoss(Request $request): Response
@@ -34,37 +43,26 @@ class ReportsController extends Controller
             'from' => null,
             'to' => null,
         ]);
-        $team = $request->user()->currentTeam;
-        $preset = (string) $request->string('preset')->toString() ?: 'this_month';
-        $compare = (string) $request->string('compare')->toString() ?: 'none';
-
-        [$from, $to] = $this->resolvePeriod(
-            $preset,
-            $request->string('from')->toString() ?: null,
-            $request->string('to')->toString() ?: null
-        );
-
-        $report = $this->profitLossReportService->forPeriod((int) $team->id, $from, $to);
-        $comparison = null;
-        if ($compare === 'previous_period') {
-            $days = max(1, $from->diffInDays($to) + 1);
-            $compTo = $from->copy()->subDay();
-            $compFrom = $compTo->copy()->subDays($days - 1);
-            $comparison = $this->profitLossReportService->forPeriod((int) $team->id, $compFrom, $compTo);
-        } elseif ($compare === 'same_period_last_year') {
-            $comparison = $this->profitLossReportService->forPeriod((int) $team->id, $from->copy()->subYear(), $to->copy()->subYear());
-        }
+        $bundle = $this->profitLossBundle($request);
 
         return Inertia::render('Reports/ProfitLoss', [
-            'report' => $report,
-            'comparison' => $comparison,
-            'period' => [
-                'from' => $from->toDateString(),
-                'to' => $to->toDateString(),
-                'preset' => $preset,
-            ],
-            'compare' => $compare,
+            'report' => $bundle['report'],
+            'comparison' => $bundle['comparison'],
+            'period' => $bundle['period'],
+            'compare' => $bundle['compare'],
         ]);
+    }
+
+    public function profitLossPdf(Request $request): SymfonyResponse|RedirectResponse
+    {
+        $this->authorizeTeam('reports.export', $request);
+        abort_if($request->user()->currentTeam === null, 403);
+
+        try {
+            return $this->profitLossPdfService->download($request->user()->currentTeam, $this->profitLossBundle($request));
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first() ?: __('Could not export PDF.'));
+        }
     }
 
     public function balanceSheet(Request $request): Response
@@ -74,68 +72,25 @@ class ReportsController extends Controller
             'as_of' => null,
         ]);
         $team = $request->user()->currentTeam;
-        $asOf = $request->string('as_of')->toString()
-            ? Carbon::parse($request->string('as_of')->toString())->endOfDay()
-            : now()->endOfDay();
-
-        $trial = $this->ledgerService->trialBalance($team, $asOf);
-        $accounts = Account::queryWithoutTeamScope()
-            ->where('team_id', $team->id)
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->get()
-            ->keyBy('id');
-
-        $assets = [];
-        $liabilities = [];
-        $equity = [];
-
-        foreach ($trial as $row) {
-            $account = $accounts[$row->account->id] ?? null;
-            if ($account === null) {
-                continue;
-            }
-            $balance = $this->ledgerService->getBalance($account, $asOf)->getMinorAmount()->toInt();
-            if ($balance === 0) {
-                continue;
-            }
-
-            $line = [
-                'account_id' => $account->id,
-                'code' => $account->code,
-                'name' => $account->name,
-                'amount' => $balance,
-            ];
-
-            if ($account->type === AccountType::Asset) {
-                $assets[] = $line;
-            } elseif ($account->type === AccountType::Liability) {
-                $liabilities[] = $line;
-            } elseif ($account->type === AccountType::Equity) {
-                $equity[] = $line;
-            }
-        }
-
-        $totalAssets = array_sum(array_column($assets, 'amount'));
-        $totalLiabilities = array_sum(array_column($liabilities, 'amount'));
-        $totalEquity = array_sum(array_column($equity, 'amount'));
-        $totalLiabilitiesEquity = $totalLiabilities + $totalEquity;
+        $asOf = $this->balanceSheetAsOf($request);
 
         return Inertia::render('Reports/BalanceSheet', [
-            'report' => [
-                'assets' => $assets,
-                'liabilities' => $liabilities,
-                'equity' => $equity,
-                'totals' => [
-                    'assets' => $totalAssets,
-                    'liabilities' => $totalLiabilities,
-                    'equity' => $totalEquity,
-                    'liabilities_plus_equity' => $totalLiabilitiesEquity,
-                ],
-                'is_balanced' => $totalAssets === $totalLiabilitiesEquity,
-            ],
+            'report' => $this->balanceSheetReportService->asOf($team, $asOf),
             'as_of' => $asOf->toDateString(),
         ]);
+    }
+
+    public function balanceSheetPdf(Request $request): SymfonyResponse|RedirectResponse
+    {
+        $this->authorizeTeam('reports.export', $request);
+        $team = $request->user()->currentTeam;
+        abort_if($team === null, 403);
+
+        try {
+            return $this->balanceSheetPdfService->download($team, $this->balanceSheetAsOf($request));
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first() ?: __('Could not export PDF.'));
+        }
     }
 
     public function cashFlow(Request $request): Response
@@ -396,6 +351,71 @@ class ReportsController extends Controller
             ],
             'as_of' => $asOf->toDateString(),
         ]);
+    }
+
+    /**
+     * @return array{
+     *     report: array<string, mixed>,
+     *     comparison: array<string, mixed>|null,
+     *     period: array{from: string, to: string, preset: string},
+     *     compare: string,
+     *     comparison_period: array{from: string, to: string}|null
+     * }
+     */
+    private function profitLossBundle(Request $request): array
+    {
+        $team = $request->user()->currentTeam;
+        abort_if($team === null, 403);
+
+        $preset = (string) $request->string('preset')->toString() ?: 'this_month';
+        $compare = (string) $request->string('compare')->toString() ?: 'none';
+
+        [$from, $to] = $this->resolvePeriod(
+            $preset,
+            $request->string('from')->toString() ?: null,
+            $request->string('to')->toString() ?: null
+        );
+
+        $report = $this->profitLossReportService->forPeriod((int) $team->id, $from, $to);
+        $comparison = null;
+        $comparisonPeriod = null;
+        if ($compare === 'previous_period') {
+            $days = max(1, $from->diffInDays($to) + 1);
+            $compTo = $from->copy()->subDay();
+            $compFrom = $compTo->copy()->subDays($days - 1);
+            $comparison = $this->profitLossReportService->forPeriod((int) $team->id, $compFrom, $compTo);
+            $comparisonPeriod = [
+                'from' => $compFrom->toDateString(),
+                'to' => $compTo->toDateString(),
+            ];
+        } elseif ($compare === 'same_period_last_year') {
+            $compFrom = $from->copy()->subYear();
+            $compTo = $to->copy()->subYear();
+            $comparison = $this->profitLossReportService->forPeriod((int) $team->id, $compFrom, $compTo);
+            $comparisonPeriod = [
+                'from' => $compFrom->toDateString(),
+                'to' => $compTo->toDateString(),
+            ];
+        }
+
+        return [
+            'report' => $report,
+            'comparison' => $comparison,
+            'period' => [
+                'from' => $from->toDateString(),
+                'to' => $to->toDateString(),
+                'preset' => $preset,
+            ],
+            'compare' => $compare,
+            'comparison_period' => $comparisonPeriod,
+        ];
+    }
+
+    private function balanceSheetAsOf(Request $request): Carbon
+    {
+        return $request->string('as_of')->toString()
+            ? Carbon::parse($request->string('as_of')->toString())->endOfDay()
+            : now()->endOfDay();
     }
 
     /**
