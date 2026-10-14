@@ -2,6 +2,15 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.44](https://github.com/mortolian/nrth/compare/v0.1.43...v0.1.44) (2026-10-14)
+
+
+### Features
+
+* add aged receivables and client statement reports with PDF export functionality ([594aed8](https://github.com/mortolian/nrth/commit/594aed8de5b10fa0662326d7c089fdf09e9de3fe))
+* add income report feature and update reports navigation ([833bf39](https://github.com/mortolian/nrth/commit/833bf39ce5822f2b854a901dc9d6566227fb6868))
+* enhance income report functionality with detailed and summary views ([a50b291](https://github.com/mortolian/nrth/commit/a50b2913223b64a21b24fa406b1bd34524e4b29a))
+
 ## [0.1.43](https://github.com/mortolian/nrth/compare/v0.1.42...v0.1.43) (2026-10-12)
 
 
