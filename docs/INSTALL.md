@@ -42,6 +42,12 @@ cd /opt/nrth
 
 Always use `./scripts/compose.sh` for Docker Compose (it handles sudo/docker group). Do not use bare `docker compose` in docs or habits.
 
+Every Compose service uses `restart: unless-stopped`, so a host reboot brings the stack back as long as Docker itself is enabled (`systemctl enable docker`). Containers created before that policy was in the file stay at `no` until the next `./scripts/compose.sh up -d`. On a live server that has not pulled this change yet:
+
+```bash
+docker update --restart unless-stopped $(docker ps -aq)
+```
+
 ---
 
 ## 2. Update (every time)
