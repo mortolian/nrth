@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.45](https://github.com/mortolian/nrth/compare/v0.1.44...v0.1.45) (2026-11-03)
+
+
+### Bug Fixes
+
+* tighten report PDF layout to use less paper ([0edf3cb](https://github.com/mortolian/nrth/commit/0edf3cbb60e6362e2cc3c87878c0eb47fdd7fff2))
+
 ## [0.1.44](https://github.com/mortolian/nrth/compare/v0.1.43...v0.1.44) (2026-10-14)
 
 
