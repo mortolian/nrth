@@ -53,6 +53,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 6. Never commit `.env`
 7. Leave `PAYFAST_SANDBOX` unset or `false` on a live host (sandbox ITNs can mark invoices paid). `MEDIA_DISK` should stay `local` (private) unless you have configured private object storage.
 8. If more than one business will use this instance, read [Multi-tenant hardening](#multi-tenant-hardening).
+9. After a host reboot the stack must come back by itself. Docker is enabled, and Compose uses `restart: unless-stopped` ([INSTALL.md](INSTALL.md)). An older running stack still has restart policy `no` until `./scripts/compose.sh up -d`.
 
 ---
 

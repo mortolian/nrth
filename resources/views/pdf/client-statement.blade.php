@@ -1,61 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
 @php
     $issuer = $issuer ?? ['name' => config('app.name'), 'address_lines' => []];
     $businessName = $issuer['name'] ?? config('app.name');
-    $physicalLines = array_values(array_filter(array_map(
-        static fn ($line) => trim((string) $line),
-        is_array($issuer['address_lines'] ?? null) ? $issuer['address_lines'] : [],
-    )));
     $currency = (string) ($currency ?? 'ZAR');
     $fmt = static fn (int $cents): string => \App\Support\FormatMoney::minorUnits($cents, $currency);
     $client = $statement['client'] ?? ['name' => '', 'email' => null, 'address_lines' => []];
     $period = $statement['period'] ?? ['from' => '', 'to' => ''];
     $lines = $statement['lines'] ?? [];
+    $note = implode(' · ', array_values(array_filter([
+        $client['email'] ?? null,
+        ...array_map(
+            static fn ($line) => trim((string) $line),
+            is_array($client['address_lines'] ?? null) ? $client['address_lines'] : [],
+        ),
+    ])));
+    $meta = [
+        ['Client', (string) ($client['name'] ?? '')],
+        ['Period', trim(($period['from'] ?? '').' – '.($period['to'] ?? ''), ' –')],
+        ['Currency', $currency],
+    ];
 @endphp
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <title>Statement — {{ $client['name'] }}</title>
-    @include('pdf._styles')
-    @include('pdf._statement-styles')
+    @include('pdf._report-styles')
 </head>
 <body>
-<table class="brand">
-    <tr>
-        <td class="logo-cell">
-            @if(!empty($logoSrc))
-                <img src="{{ $logoSrc }}" alt="" style="max-width: 180px; max-height: 52px; object-fit: contain; margin-bottom: 6px;">
-            @endif
-            <div class="company-name">{{ $businessName }}</div>
-            @foreach($physicalLines as $line)
-                <div class="company-line">{{ $line }}</div>
-            @endforeach
-            @if(!empty($issuer['email']))
-                <div class="company-line">{{ $issuer['email'] }}</div>
-            @endif
-        </td>
-        <td class="doc-cell">
-            <h1 class="report-title">Client statement</h1>
-            <p class="report-subtitle">Invoices, payments, and balance</p>
-            <table class="doc-meta">
-                <tr><td>Client</td><td>{{ $client['name'] }}</td></tr>
-                <tr><td>Period</td><td>{{ $period['from'] }} – {{ $period['to'] }}</td></tr>
-                <tr><td>Currency</td><td>{{ $currency }}</td></tr>
-                <tr><td>Prepared</td><td>{{ isset($generatedAt) ? $generatedAt->timezone(config('app.timezone'))->format('d M Y H:i') : '' }}</td></tr>
-            </table>
-        </td>
-    </tr>
-</table>
-
-@if(!empty($client['email']) || count($client['address_lines'] ?? []) > 0)
-    <p class="muted" style="margin: 0 0 12px;">
-        {{ $client['name'] }}
-        @if(!empty($client['email'])) · {{ $client['email'] }} @endif
-        @foreach($client['address_lines'] ?? [] as $line)
-            · {{ $line }}
-        @endforeach
-    </p>
-@endif
+@include('pdf._report-header', [
+    'title' => 'Client statement',
+    'subtitle' => 'Invoices, payments, and balance',
+    'meta' => $meta,
+    'note' => $note,
+])
 
 <table class="summary">
     <tr>

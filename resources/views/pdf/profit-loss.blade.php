@@ -1,14 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
 @php
     $issuer = $issuer ?? ['name' => config('app.name'), 'address_lines' => []];
     $businessName = $issuer['name'] ?? config('app.name');
-    $physicalLines = array_values(array_filter(array_map(
-        static fn ($line) => trim((string) $line),
-        is_array($issuer['address_lines'] ?? null) ? $issuer['address_lines'] : [],
-    )));
     $currency = (string) ($currency ?? 'ZAR');
     $fmt = static fn (int $cents): string => \App\Support\FormatMoney::minorUnits($cents, $currency);
     $period = $period ?? ['from' => '', 'to' => ''];
@@ -22,60 +14,33 @@
     $expenses = $expenses ?? [];
     $totals = $totals ?? ['income' => 0, 'expenses' => 0, 'net_profit' => 0];
     $comparisonTotals = $comparison_totals ?? ['income' => 0, 'expenses' => 0, 'net_profit' => 0];
+    $cols = $hasComparison ? 5 : 3;
+    $meta = [
+        ['Period', trim(($period['from'] ?? '').' – '.($period['to'] ?? ''), ' –')],
+    ];
+    if ($hasComparison && ! empty($comparison_period)) {
+        $meta[] = [$compareLabel, trim(($comparison_period['from'] ?? '').' – '.($comparison_period['to'] ?? ''), ' –')];
+    }
+    $meta[] = ['Currency', $currency];
 @endphp
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <title>Profit and loss — {{ $businessName }}</title>
-    @include('pdf._styles')
-    @include('pdf._statement-styles')
+    @include('pdf._report-styles')
 </head>
 <body>
-<table class="brand">
-    <tr>
-        <td class="logo-cell">
-            @if(!empty($logoSrc))
-                <img src="{{ $logoSrc }}" alt="" style="max-width: 180px; max-height: 52px; object-fit: contain; margin-bottom: 6px;">
-            @endif
-            <div class="company-name">{{ $businessName }}</div>
-            @foreach($physicalLines as $line)
-                <div class="company-line">{{ $line }}</div>
-            @endforeach
-        </td>
-        <td class="doc-cell">
-            <h1 class="report-title">Profit and loss</h1>
-            <p class="report-subtitle">Statement of income and expenses</p>
-            <table class="doc-meta">
-                <tr><td>Period</td><td>{{ $period['from'] }} – {{ $period['to'] }}</td></tr>
-                @if($hasComparison && !empty($comparison_period))
-                    <tr><td>{{ $compareLabel }}</td><td>{{ $comparison_period['from'] }} – {{ $comparison_period['to'] }}</td></tr>
-                @endif
-                <tr><td>Currency</td><td>{{ $currency }}</td></tr>
-                <tr><td>Prepared</td><td>{{ isset($generatedAt) ? $generatedAt->timezone(config('app.timezone'))->format('d M Y H:i') : '' }}</td></tr>
-            </table>
-        </td>
-    </tr>
-</table>
+@include('pdf._report-header', [
+    'title' => 'Profit and loss',
+    'subtitle' => 'Statement of income and expenses',
+    'meta' => $meta,
+])
 
-<table class="summary">
-    <tr>
-        <td>
-            <div class="label">Income</div>
-            <div class="value">{{ $fmt((int) $totals['income']) }}</div>
-        </td>
-        <td>
-            <div class="label">Expenses</div>
-            <div class="value">{{ $fmt((int) $totals['expenses']) }}</div>
-        </td>
-        <td>
-            <div class="label">Net profit</div>
-            <div class="value">{{ $fmt((int) $totals['net_profit']) }}</div>
-        </td>
-    </tr>
-</table>
-
-<h2 class="section-heading">Income</h2>
 <table class="sheet">
     <thead>
         <tr>
-            <th>Code</th>
+            <th style="width: 14%">Code</th>
             <th>Account</th>
             <th class="num">Amount</th>
             @if($hasComparison)
@@ -85,8 +50,11 @@
         </tr>
     </thead>
     <tbody>
-        @forelse($income as $line)
-            <tr>
+        <tr class="group">
+            <td colspan="{{ $cols }}">Income</td>
+        </tr>
+        @forelse($income as $index => $line)
+            <tr class="{{ $index % 2 === 1 ? 'zebra' : '' }}">
                 <td>{{ $line['code'] }}</td>
                 <td>{{ $line['name'] }}</td>
                 <td class="num">{{ $fmt((int) $line['amount']) }}</td>
@@ -96,7 +64,7 @@
                 @endif
             </tr>
         @empty
-            <tr><td colspan="{{ $hasComparison ? 5 : 3 }}" class="muted">No income in this period.</td></tr>
+            <tr><td colspan="{{ $cols }}" class="muted">No income in this period.</td></tr>
         @endforelse
         <tr class="total">
             <td colspan="2">Total income</td>
@@ -106,25 +74,11 @@
                 <td class="num">{{ $fmt((int) $totals['income'] - (int) ($comparisonTotals['income'] ?? 0)) }}</td>
             @endif
         </tr>
-    </tbody>
-</table>
-
-<h2 class="section-heading">Expenses</h2>
-<table class="sheet">
-    <thead>
-        <tr>
-            <th>Code</th>
-            <th>Account</th>
-            <th class="num">Amount</th>
-            @if($hasComparison)
-                <th class="num">{{ $compareLabel }}</th>
-                <th class="num">Change</th>
-            @endif
+        <tr class="group">
+            <td colspan="{{ $cols }}">Expenses</td>
         </tr>
-    </thead>
-    <tbody>
-        @forelse($expenses as $line)
-            <tr>
+        @forelse($expenses as $index => $line)
+            <tr class="{{ $index % 2 === 1 ? 'zebra' : '' }}">
                 <td>{{ $line['code'] }}</td>
                 <td>{{ $line['name'] }}</td>
                 <td class="num">{{ $fmt((int) $line['amount']) }}</td>
@@ -134,7 +88,7 @@
                 @endif
             </tr>
         @empty
-            <tr><td colspan="{{ $hasComparison ? 5 : 3 }}" class="muted">No expenses in this period.</td></tr>
+            <tr><td colspan="{{ $cols }}" class="muted">No expenses in this period.</td></tr>
         @endforelse
         <tr class="total">
             <td colspan="2">Total expenses</td>

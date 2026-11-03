@@ -63,6 +63,7 @@ x-laravel-env: &laravel-env
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${FORWARD_DB_PORT:-5432}:5432"
     environment:
@@ -80,6 +81,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
       - "127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379"
@@ -94,6 +96,7 @@ services:
 
   mailpit:
     image: axllent/mailpit:latest
+    restart: unless-stopped
     profiles:
       - dev
     ports:
@@ -101,6 +104,7 @@ services:
       - "127.0.0.1:${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
 
   app:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -144,6 +148,7 @@ services:
 
   vite:
     image: nrth:local
+    restart: unless-stopped
     profiles:
       - dev
     working_dir: /var/www/html
@@ -166,6 +171,7 @@ services:
 
   horizon:
     image: nrth:local
+    restart: unless-stopped
     working_dir: /var/www/html
     environment:
       <<: *laravel-env
@@ -196,6 +202,7 @@ services:
 
   scheduler:
     image: nrth:local
+    restart: unless-stopped
     environment:
       <<: *laravel-env
       DB_HOST: postgres
@@ -227,6 +234,7 @@ services:
   # Terminates HTTPS on 443 and forwards plain HTTP to Octane on app:8000.
   caddy:
     image: caddy:2-alpine
+    restart: unless-stopped
     profiles:
       - proxy
     ports:

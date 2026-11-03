@@ -98,7 +98,7 @@ final class ExpenseReportPdfService
 
         try {
             $pdf = Pdf::loadView('pdf.expense-report', $document)
-                ->setPaper('a4', 'landscape')
+                ->setPaper('a4', ($document['presentation']['view'] ?? 'detailed') === 'summary' ? 'portrait' : 'landscape')
                 ->setOptions([
                     'isRemoteEnabled' => false,
                     'isPhpEnabled' => false,

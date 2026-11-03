@@ -163,6 +163,9 @@ class IncomeReportTest extends TestCase
         $this->assertStringContainsString('August consulting', $html);
         $this->assertStringContainsString('4000', $html);
         $this->assertStringContainsString('Services', $html);
+        $this->assertStringContainsString('Transaction register', $html);
+        $this->assertStringNotContainsString('class="txn"', $html);
+        $this->assertStringNotContainsString('>Debit<', $html);
 
         $this->actingAs($user)
             ->get(route('reports.income.pdf'))
@@ -200,6 +203,7 @@ class IncomeReportTest extends TestCase
 
         $this->assertStringContainsString('August 2026', $html);
         $this->assertStringContainsString('March 2026', $html);
+        $this->assertStringNotContainsString('April 2026', $html);
         $this->assertStringNotContainsString('Transaction register', $html);
         $this->assertStringNotContainsString('August consulting', $html);
     }
