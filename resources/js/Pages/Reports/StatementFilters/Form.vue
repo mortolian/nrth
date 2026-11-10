@@ -4,14 +4,29 @@ import { router, useForm } from '@inertiajs/vue3';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import FormActions from '@/Components/FormActions.vue';
 import { useReportsTabs } from '@/Composables/useFeatureTabs';
+import { useFormatCurrency } from '@/composables/useFormatCurrency';
+import MatchPreview from '@/Pages/Reports/StatementFilters/MatchPreview.vue';
 
 const reportsTabs = useReportsTabs();
 
 type Rule = { alias: string; match: string };
 
-const props = defineProps<{
+type Suggestion = {
+    alias: string;
+    match: string;
+    count: number;
+    total_cents: number;
+    examples: string[];
+};
+
+const props = withDefaults(defineProps<{
     report: { id: number; name: string; rules: Rule[] } | null;
-}>();
+    suggestions?: Suggestion[];
+    currency?: string;
+}>(), {
+    suggestions: () => [],
+    currency: 'ZAR',
+});
 
 const editing = computed(() => props.report !== null);
 
@@ -23,8 +38,29 @@ const form = useForm({
     })),
 });
 
+const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, props.currency || 'ZAR');
+
+const usedMatches = computed(() => new Set(
+    form.rules
+        .map((rule) => rule.match.trim().toLowerCase())
+        .filter((match) => match !== ''),
+));
+
 const addRule = () => {
     form.rules.push({ alias: '', match: '' });
+};
+
+const addSuggestion = (suggestion: Suggestion) => {
+    if (usedMatches.value.has(suggestion.match)) {
+        return;
+    }
+    const blank = form.rules.find((rule) => rule.alias.trim() === '' && rule.match.trim() === '');
+    if (blank) {
+        blank.alias = suggestion.alias;
+        blank.match = suggestion.match;
+        return;
+    }
+    form.rules.push({ alias: suggestion.alias, match: suggestion.match });
 };
 
 const removeRule = (index: number) => {
@@ -75,6 +111,37 @@ const destroyReport = () => {
                     <p v-if="form.errors.name" class="mt-1.5 text-xs text-red-600">{{ form.errors.name }}</p>
                 </div>
 
+                <div v-if="suggestions.length" class="mt-6">
+                    <h2 class="text-sm font-semibold text-slate-900">From your statements</h2>
+                    <p class="mt-1 text-xs text-slate-500">Repeated wording, with card numbers, store numbers, and dates removed.</p>
+                    <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                        <li
+                            v-for="suggestion in suggestions"
+                            :key="suggestion.match"
+                            class="flex items-start justify-between gap-3 px-3 py-2"
+                        >
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-slate-900">{{ suggestion.alias }}</p>
+                                <p class="text-xs text-slate-500">
+                                    {{ suggestion.count }} lines · {{ formatCents(suggestion.total_cents) }} · contains “{{ suggestion.match }}”
+                                </p>
+                                <p v-if="suggestion.examples.length" class="truncate text-xs text-slate-400">
+                                    {{ suggestion.examples.join(' · ') }}
+                                </p>
+                            </div>
+                            <AppButton
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                :disabled="usedMatches.has(suggestion.match)"
+                                @click="addSuggestion(suggestion)"
+                            >
+                                {{ usedMatches.has(suggestion.match) ? 'Added' : 'Add' }}
+                            </AppButton>
+                        </li>
+                    </ul>
+                </div>
+
                 <div class="mt-6 space-y-3">
                     <div
                         v-for="(rule, index) in form.rules"
@@ -90,6 +157,7 @@ const destroyReport = () => {
                             <label class="mb-1 block text-xs font-medium text-slate-500">Contains</label>
                             <AppInput v-model="rule.match" placeholder="Woolworths" />
                             <p v-if="ruleError(index, 'match')" class="mt-1.5 text-xs text-red-600">{{ ruleError(index, 'match') }}</p>
+                            <MatchPreview :match="rule.match" :currency="currency" />
                         </div>
                         <div class="md:pt-5">
                             <AppButton type="button" variant="ghost" @click="removeRule(index)">Remove</AppButton>

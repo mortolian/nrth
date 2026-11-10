@@ -201,6 +201,78 @@ class StatementFilterReportTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_suggestions_group_noisy_statement_lines_and_preview_counts_matches(): void
+    {
+        $user = User::factory()->withPersonalTeam()->create();
+        $team = $user->currentTeam;
+        $account = BankingAccount::factory()->for($team)->create();
+
+        $this->line($team->id, $account->id, '2026-03-04', 'POS PURCHASE WOOLWORTHS 5521', null, '400.00', TransactionDirection::Debit);
+        $this->line($team->id, $account->id, '2026-03-18', 'Card purchase', 'Woolworths', '50.00', TransactionDirection::Credit);
+        $this->line($team->id, $account->id, '2026-08-02', 'Woolworths Canal Walk 2026-08-02', null, '125.50', TransactionDirection::Debit);
+        $this->line($team->id, $account->id, '2026-03-04', 'SHELL 4412 MENLYN', null, '300.00', TransactionDirection::Debit);
+        $this->line($team->id, $account->id, '2026-04-04', 'Shell fuel', null, '200.00', TransactionDirection::Debit);
+        $this->line($team->id, $account->id, '2026-03-09', 'RENT JANUARY', null, '9000.00', TransactionDirection::Debit);
+        $this->line($team->id, $account->id, '2026-05-01', 'CHECKERS HYPER 12/03/2026', null, '80.00', TransactionDirection::Debit);
+        $this->line($team->id, $account->id, '2026-05-02', 'POS PURCHASE CHECKERS 453212349999', null, '20.00', TransactionDirection::Debit);
+
+        $other = User::factory()->withPersonalTeam()->create();
+        $otherAccount = BankingAccount::factory()->for($other->currentTeam)->create();
+        $this->line($other->currentTeam->id, $otherAccount->id, '2026-03-04', 'Woolworths other books', null, '999.00', TransactionDirection::Debit);
+        $this->line($other->currentTeam->id, $otherAccount->id, '2026-03-05', 'Woolworths other books', null, '10.00', TransactionDirection::Debit);
+
+        $this->actingAs($user)
+            ->get(route('reports.statement-filters.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Reports/StatementFilters/Form')
+                ->where('suggestions.0.match', 'woolworths')
+                ->where('suggestions.0.alias', 'Woolworths')
+                ->where('suggestions.0.count', 3)
+                ->where('suggestions.0.total_cents', 47550)
+                ->where('suggestions.1.match', 'shell')
+                ->where('suggestions.1.count', 2)
+                ->where('suggestions.1.total_cents', 50000)
+                ->where('suggestions.2.match', 'checkers')
+                ->where('suggestions.2.count', 2)
+                ->where('suggestions', fn ($suggestions) => collect($suggestions)->pluck('match')->doesntContain('rent')));
+
+        $this->actingAs($user)
+            ->getJson(route('reports.statement-filters.preview', ['match' => 'wool']))
+            ->assertOk()
+            ->assertJsonPath('count', 3)
+            ->assertJsonPath('total_cents', 47550);
+
+        $this->actingAs($user)
+            ->getJson(route('reports.statement-filters.preview', ['match' => 'wo']))
+            ->assertOk()
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('samples', []);
+    }
+
+    public function test_viewer_cannot_preview_statement_matches(): void
+    {
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        EnsureTeamSystemRoles::ensureFor($team);
+
+        $role = TeamRole::query()->create([
+            'team_id' => $team->id,
+            'key' => 'reporter',
+            'name' => 'Reporter',
+            'description' => 'Reports only',
+            'permissions' => ['reports.view'],
+            'is_system' => false,
+        ]);
+        $member = User::factory()->create();
+        $team->users()->attach($member, ['role' => $role->key]);
+        $member->forceFill(['current_team_id' => $team->id])->save();
+
+        $this->actingAs($member)
+            ->getJson(route('reports.statement-filters.preview', ['match' => 'woolworths']))
+            ->assertForbidden();
+    }
+
     private function line(
         int $teamId,
         int $accountId,

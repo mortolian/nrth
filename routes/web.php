@@ -253,6 +253,7 @@ Route::middleware([
     Route::get('/reports/cash-flow', [ReportsController::class, 'cashFlow'])->name('reports.cash-flow');
     Route::get('/reports/statement-filters', [StatementFilterReportController::class, 'index'])->name('reports.statement-filters.index');
     Route::get('/reports/statement-filters/create', [StatementFilterReportController::class, 'create'])->name('reports.statement-filters.create');
+    Route::get('/reports/statement-filters/preview', [StatementFilterReportController::class, 'preview'])->name('reports.statement-filters.preview');
     Route::post('/reports/statement-filters', [StatementFilterReportController::class, 'store'])->name('reports.statement-filters.store');
     Route::get('/reports/statement-filters/{statementFilterReport}', [StatementFilterReportController::class, 'show'])->name('reports.statement-filters.show');
     Route::get('/reports/statement-filters/{statementFilterReport}/edit', [StatementFilterReportController::class, 'edit'])->name('reports.statement-filters.edit');

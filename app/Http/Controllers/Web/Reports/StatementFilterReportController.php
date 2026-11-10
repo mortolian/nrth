@@ -6,9 +6,11 @@ use App\Domain\Reports\Models\StatementFilterReport;
 use App\Domain\Reports\Services\ReportPeriod;
 use App\Domain\Reports\Services\StatementFilterReportPdfService;
 use App\Domain\Reports\Services\StatementFilterReportService;
+use App\Domain\Reports\Services\StatementFilterSuggestionService;
 use App\Http\Controllers\Controller;
 use App\Support\StickyFilters;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +23,7 @@ class StatementFilterReportController extends Controller
     public function __construct(
         private readonly StatementFilterReportService $statementFilterReportService,
         private readonly StatementFilterReportPdfService $statementFilterReportPdfService,
+        private readonly StatementFilterSuggestionService $statementFilterSuggestionService,
     ) {}
 
     public function index(Request $request): Response
@@ -50,7 +53,19 @@ class StatementFilterReportController extends Controller
 
         return Inertia::render('Reports/StatementFilters/Form', [
             'report' => null,
+            ...$this->discovery($request),
         ]);
+    }
+
+    public function preview(Request $request): JsonResponse
+    {
+        $this->authorizeTeam('reports.manage', $request);
+        $team = $request->user()->currentTeam;
+        abort_if($team === null, 403);
+
+        return response()->json(
+            $this->statementFilterSuggestionService->preview((int) $team->id, $request->string('match')->toString())
+        );
     }
 
     public function store(Request $request): RedirectResponse
@@ -111,6 +126,7 @@ class StatementFilterReportController extends Controller
 
         return Inertia::render('Reports/StatementFilters/Form', [
             'report' => $this->formPayload($statementFilterReport),
+            ...$this->discovery($request),
         ]);
     }
 
@@ -159,6 +175,20 @@ class StatementFilterReportController extends Controller
             $breakdown,
             $view,
         );
+    }
+
+    /**
+     * @return array{suggestions: list<array{alias: string, match: string, count: int, total_cents: int, examples: list<string>}>, currency: string}
+     */
+    private function discovery(Request $request): array
+    {
+        $team = $request->user()->currentTeam;
+        abort_if($team === null, 403);
+
+        return [
+            'suggestions' => $this->statementFilterSuggestionService->suggest((int) $team->id),
+            'currency' => ReportPeriod::currency($team),
+        ];
     }
 
     /**
