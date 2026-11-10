@@ -138,15 +138,15 @@ const apply = () => {
                 table-class="text-sm"
                 :show-pagination="false"
                 :columns="[
-                    { key: 'match', label: 'Filter' },
                     { key: 'alias', label: 'Alias' },
+                    { key: 'match', label: 'Filter' },
                     { key: 'count', label: 'Transactions', align: 'right' },
                     { key: 'total', label: 'Total', align: 'right' },
                 ]"
             >
                 <tr v-for="filter in result.filters" :key="filter.id">
-                    <td class="px-3 py-2 text-slate-900">{{ filter.match }}</td>
                     <td class="px-3 py-2 font-medium text-slate-900">{{ filter.alias }}</td>
+                    <td class="px-3 py-2 text-slate-900">{{ filter.match }}</td>
                     <td class="px-3 py-2 text-right tabular-nums text-slate-700">{{ filter.count }}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium text-slate-900">{{ formatCents(filter.total_cents) }}</td>
                 </tr>
@@ -176,7 +176,7 @@ const apply = () => {
             </AppCard>
 
             <AppCard v-if="result.presentation.view === 'detailed'" class="mt-5">
-                <h2 class="mb-1 text-sm font-semibold text-slate-900">{{ filter.alias }}</h2>
+                <h2 class="mb-1 text-[1.3em] font-semibold leading-tight text-slate-900">{{ filter.alias }}</h2>
                 <p class="mb-3 text-xs text-slate-500">Contains “{{ filter.match }}”</p>
                 <p v-if="filter.count === 0" class="text-sm text-slate-500">No matching statement lines in this period.</p>
                 <template v-else>

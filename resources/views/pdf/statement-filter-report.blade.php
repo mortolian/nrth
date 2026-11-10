@@ -32,8 +32,8 @@
     <table class="sheet">
         <thead>
             <tr>
-                <th>Filter</th>
                 <th>Alias</th>
+                <th>Filter</th>
                 <th class="num">Transactions</th>
                 <th class="num">Total</th>
             </tr>
@@ -41,8 +41,8 @@
         <tbody>
             @foreach($filters as $filter)
                 <tr>
-                    <td>{{ $filter['match'] }}</td>
                     <td>{{ $filter['alias'] }}</td>
+                    <td>{{ $filter['match'] }}</td>
                     <td class="num">{{ number_format((int) $filter['count']) }}</td>
                     <td class="num">{{ $fmt((int) $filter['total_cents']) }}</td>
                 </tr>

@@ -105,6 +105,7 @@ class StatementFilterReportTest extends TestCase
         $this->assertStringContainsString('Woolies', $html);
         $this->assertStringContainsString('Woolworths', $html);
         $this->assertStringContainsString('10.00', $html);
+        $this->assertMatchesRegularExpression('/<th>Alias<\/th>\s*<th>Filter<\/th>/', $html);
 
         $this->actingAs($user)
             ->get(route('reports.statement-filters.pdf', [
