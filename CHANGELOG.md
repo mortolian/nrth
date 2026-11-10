@@ -2,6 +2,19 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.46](https://github.com/mortolian/nrth/compare/v0.1.45...v0.1.46) (2026-11-10)
+
+
+### Features
+
+* add statement filter reports functionality ([da8d767](https://github.com/mortolian/nrth/commit/da8d7678ecdb5cc2bf30896e4cef3dd3434c34fa))
+* enhance statement filter reports with suggestions and preview functionality ([edd789c](https://github.com/mortolian/nrth/commit/edd789ca856704efaeafd16e6d0d65ae65f6ea70))
+
+
+### Bug Fixes
+
+* reorder columns in statement filter reports for consistency ([de8a9f5](https://github.com/mortolian/nrth/commit/de8a9f5c7456f7f069347a105edf1999059d78c4))
+
 ## [0.1.45](https://github.com/mortolian/nrth/compare/v0.1.44...v0.1.45) (2026-11-03)
 
 
