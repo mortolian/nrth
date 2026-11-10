@@ -172,11 +172,26 @@ php artisan app:install
 
 Interactive admin user and business team. Further setup (business profile, chart of accounts, VAT) happens in the in-app wizard after sign-in.
 
+## Sample business
+
+For local development, a client demo, or a public sample install, load a fictional studio instead of real books:
+
+```bash
+php artisan app:sample-data
+```
+
+That creates **Northwind Studio** (`sample@northwind.example` / `password`) with a March–February financial year: invoices, expenses, a bank statement, VAT periods, and the Travel, Planning, and Wealth modules. Posted activity stops on today. Later months in the year stay as drafts and recurring schedules. `--previous-year` posts the year that just closed, with nothing left in the future.
+
+Running the command again deletes only that sample login and rebuilds it. Other businesses on the instance are left alone. The command refuses to run when `APP_ENV=production` unless you pass `--force` on a demo server.
+
+When a new feature should show up in the demo, add a chapter under `app/Domain/SampleData/Chapters` and register it in `SampleDataRunner::chapters()`. The sample test loads the whole year and checks the headline counts.
+
 ## Useful commands
 
 | Command | Purpose |
 |---------|---------|
 | `php artisan app:install` | First install |
+| `php artisan app:sample-data` | Replace the Northwind Studio sample business (current financial year) |
 | `php artisan app:update` | Production upgrade (migrate, caches, workers) |
 | `php artisan nrth:upgrade-status` | Version + pending migrations |
 | `./scripts/backup` | Instance backup (wait until ready); run before `./scripts/update` |

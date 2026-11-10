@@ -28,6 +28,15 @@ From a git clone: `./scripts/install.sh --production` (or `--lan`).
 
 The installer installs Docker if needed, writes `.env`, starts Compose, and runs `app:install` (admin + business). Open the URL it prints and sign in.
 
+To put a fictional business on a demo install after that (full financial year, safe to rebuild):
+
+```bash
+cd /opt/nrth
+./scripts/compose.sh exec -T app php artisan app:sample-data --force
+```
+
+Sign in as `sample@northwind.example` / `password`. This replaces only the Northwind Studio business. See [DEVELOPMENT.md](DEVELOPMENT.md#sample-business).
+
 Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance. Several businesses can share one install; isolation and production `.env` warnings: **[SELF_HOST.md — Multi-tenant hardening](SELF_HOST.md#multi-tenant-hardening)**.
 
 For safety, self-hosted installs do **not** start the optional Vite HMR or Mailpit services by default.
