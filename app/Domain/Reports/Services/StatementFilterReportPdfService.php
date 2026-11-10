@@ -22,7 +22,6 @@ final class StatementFilterReportPdfService
         string $view,
     ): Response {
         $result = $this->statementFilterReportService->run($report, $from, $to, $breakdown, $view);
-        $orientation = $view === 'detailed' ? 'landscape' : 'portrait';
 
         return ReportPdf::download(
             'pdf.statement-filter-report',
@@ -33,7 +32,7 @@ final class StatementFilterReportPdfService
                 ...$result,
             ],
             'statement-filters-'.$report->id.'-'.$from->toDateString().'.pdf',
-            $orientation,
+            'portrait',
         );
     }
 }

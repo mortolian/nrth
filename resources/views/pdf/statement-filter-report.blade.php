@@ -5,8 +5,11 @@
     <title>{{ $reportName }} — statement filters</title>
     @include('pdf._report-styles')
     <style>
-        table.sheet.cols { table-layout: fixed; }
-        table.sheet.cols td { word-wrap: break-word; }
+        table.sheet.cols { table-layout: fixed; margin: 0 0 2px; }
+        table.sheet.cols th { padding: 2px 3px; letter-spacing: 0; }
+        table.sheet.cols td { padding: 1px 3px; word-wrap: break-word; }
+        table.sheet.cols td.date { white-space: nowrap; }
+        h2.section-heading { margin: 5px 0 2px; }
     </style>
 </head>
 <body>
@@ -35,10 +38,10 @@
 @else
     <table class="sheet cols">
         <colgroup>
-            <col style="width: 28%">
             <col style="width: 32%">
-            <col style="width: 16%">
-            <col style="width: 24%">
+            <col style="width: 36%">
+            <col style="width: 14%">
+            <col style="width: 18%">
         </colgroup>
         <thead>
             <tr>
@@ -65,9 +68,9 @@
             <h2 class="section-heading">{{ $filter['alias'] }} · {{ $filter['match'] }}</h2>
             <table class="sheet cols">
                 <colgroup>
-                    <col style="width: 60%">
-                    <col style="width: 16%">
-                    <col style="width: 24%">
+                    <col style="width: 68%">
+                    <col style="width: 14%">
+                    <col style="width: 18%">
                 </colgroup>
                 <thead>
                     <tr>
@@ -98,27 +101,32 @@
             <table class="sheet cols">
                 <colgroup>
                     <col style="width: 14%">
-                    <col style="width: 28%">
+                    <col style="width: 68%">
                     <col style="width: 18%">
-                    <col style="width: 16%">
-                    <col style="width: 24%">
                 </colgroup>
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Description</th>
-                        <th>Reference</th>
-                        <th>Account</th>
                         <th class="num">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($filter['transactions'] as $line)
+                        @php
+                            $extra = array_values(array_filter(
+                                [$line['reference'] ?? '', $line['account'] ?? ''],
+                                static fn ($value) => trim((string) $value) !== '',
+                            ));
+                        @endphp
                         <tr>
-                            <td>{{ $line['date'] }}</td>
-                            <td>{{ $line['description'] }}</td>
-                            <td>{{ $line['reference'] ?: '—' }}</td>
-                            <td>{{ $line['account'] ?: '—' }}</td>
+                            <td class="date">{{ $line['date'] }}</td>
+                            <td>
+                                {{ $line['description'] }}
+                                @if($extra !== [])
+                                    <div class="sub">{{ implode(' · ', $extra) }}</div>
+                                @endif
+                            </td>
                             <td class="num">{{ $fmt((int) $line['signed_cents']) }}</td>
                         </tr>
                     @endforeach
