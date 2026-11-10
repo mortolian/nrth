@@ -113,6 +113,7 @@ export function useReportsTabs() {
         { id: 'expenses', label: 'Expenses', href: route('reports.expense') },
         { id: 'aged-receivables', label: 'Receivables', href: route('reports.aged-receivables') },
         { id: 'client-statement', label: 'Client Statement', href: route('reports.client-statement') },
+        { id: 'statement-filters', label: 'Statement Filters', href: route('reports.statement-filters.index') },
         ...(vatEnabled.value
             ? [
                   { id: 'profit-loss', label: 'Profit And Loss', href: route('reports.profit-loss') },

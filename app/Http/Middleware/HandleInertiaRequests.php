@@ -280,6 +280,7 @@ class HandleInertiaRequests extends Middleware
             $can('reports.view') ? ['id' => 'expense-report', 'label' => 'Expense Report', 'href' => route('reports.expense')] : null,
             $can('reports.view') ? ['id' => 'aged-receivables', 'label' => 'Aged Receivables', 'href' => route('reports.aged-receivables')] : null,
             $can('reports.view') ? ['id' => 'client-statement', 'label' => 'Client Statement', 'href' => route('reports.client-statement')] : null,
+            $can('reports.view') ? ['id' => 'statement-filters', 'label' => 'Statement Filters', 'href' => route('reports.statement-filters.index')] : null,
             $can('settings.business') ? ['id' => 'business-settings', 'label' => 'Business Settings', 'href' => route('settings.business')] : null,
             $can('settings.business') ? ['id' => 'note-templates', 'label' => 'Note Templates (Business)', 'href' => route('settings.note-templates.index')] : null,
             $can('settings.business') ? ['id' => 'features-settings', 'label' => 'Features', 'href' => route('settings.features')] : null,

@@ -30,6 +30,7 @@ use App\Http\Controllers\Web\Reports\AgedReceivablesController;
 use App\Http\Controllers\Web\Reports\ClientStatementController;
 use App\Http\Controllers\Web\Reports\ExpenseReportController;
 use App\Http\Controllers\Web\Reports\IncomeReportController;
+use App\Http\Controllers\Web\Reports\StatementFilterReportController;
 use App\Http\Controllers\Web\ReportsController;
 use App\Http\Controllers\Web\Settings\BusinessSettingsController;
 use App\Http\Controllers\Web\Settings\FeaturesSettingsController;
@@ -250,6 +251,14 @@ Route::middleware([
     Route::get('/reports/balance-sheet/pdf', [ReportsController::class, 'balanceSheetPdf'])->name('reports.balance-sheet.pdf');
     Route::get('/reports/trial-balance', [ReportsController::class, 'trialBalance'])->name('reports.trial-balance');
     Route::get('/reports/cash-flow', [ReportsController::class, 'cashFlow'])->name('reports.cash-flow');
+    Route::get('/reports/statement-filters', [StatementFilterReportController::class, 'index'])->name('reports.statement-filters.index');
+    Route::get('/reports/statement-filters/create', [StatementFilterReportController::class, 'create'])->name('reports.statement-filters.create');
+    Route::post('/reports/statement-filters', [StatementFilterReportController::class, 'store'])->name('reports.statement-filters.store');
+    Route::get('/reports/statement-filters/{statementFilterReport}', [StatementFilterReportController::class, 'show'])->name('reports.statement-filters.show');
+    Route::get('/reports/statement-filters/{statementFilterReport}/edit', [StatementFilterReportController::class, 'edit'])->name('reports.statement-filters.edit');
+    Route::put('/reports/statement-filters/{statementFilterReport}', [StatementFilterReportController::class, 'update'])->name('reports.statement-filters.update');
+    Route::delete('/reports/statement-filters/{statementFilterReport}', [StatementFilterReportController::class, 'destroy'])->name('reports.statement-filters.destroy');
+    Route::get('/reports/statement-filters/{statementFilterReport}/pdf', [StatementFilterReportController::class, 'pdf'])->name('reports.statement-filters.pdf');
     Route::prefix('vehicles')->name('vehicles.')->middleware('team.module:travel')->group(function () {
         Route::get('/trips', [TripController::class, 'index'])->name('trips.index');
         Route::get('/trips/export', [TripController::class, 'exportCsv'])->name('trips.export');

@@ -46,6 +46,7 @@ final class PermissionCatalog
             'tax.view' => ['label' => 'View tax', 'group' => 'Tax'],
             'tax.manage' => ['label' => 'Manage tax', 'group' => 'Tax'],
             'reports.view' => ['label' => 'View reports', 'group' => 'Reports'],
+            'reports.manage' => ['label' => 'Create and edit statement filter reports', 'group' => 'Reports'],
             'reports.export' => ['label' => 'Export reports', 'group' => 'Reports'],
             'vehicles.view' => ['label' => 'View vehicles and trip log', 'group' => 'Travel'],
             'vehicles.manage' => ['label' => 'Create and edit vehicles and trips', 'group' => 'Travel'],
