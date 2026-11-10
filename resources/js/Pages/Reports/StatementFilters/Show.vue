@@ -135,13 +135,13 @@ const apply = () => {
             <AppTable
                 dense
                 embedded
-                table-class="text-sm"
+                table-class="text-sm table-fixed"
                 :show-pagination="false"
                 :columns="[
                     { key: 'alias', label: 'Alias' },
                     { key: 'match', label: 'Filter' },
-                    { key: 'count', label: 'Transactions', align: 'right' },
-                    { key: 'total', label: 'Total', align: 'right' },
+                    { key: 'count', label: 'Transactions', align: 'right', widthClass: 'w-32' },
+                    { key: 'total', label: 'Total', align: 'right', widthClass: 'w-40' },
                 ]"
             >
                 <tr v-for="filter in result.filters" :key="filter.id">
@@ -159,12 +159,12 @@ const apply = () => {
                 <AppTable
                     dense
                     embedded
-                    table-class="text-sm"
+                    table-class="text-sm table-fixed"
                     :show-pagination="false"
                     :columns="[
                         { key: 'month', label: 'Month' },
-                        { key: 'count', label: 'Transactions', align: 'right' },
-                        { key: 'total', label: 'Total', align: 'right' },
+                        { key: 'count', label: 'Transactions', align: 'right', widthClass: 'w-32' },
+                        { key: 'total', label: 'Total', align: 'right', widthClass: 'w-40' },
                     ]"
                 >
                     <tr v-for="month in filter.months" :key="month.key">
@@ -186,14 +186,15 @@ const apply = () => {
                     <AppTable
                         dense
                         embedded
-                        table-class="text-sm"
+                        max-body-class="max-h-96 overflow-y-auto"
+                        table-class="text-sm table-fixed"
                         :show-pagination="false"
                         :columns="[
-                            { key: 'date', label: 'Date' },
+                            { key: 'date', label: 'Date', widthClass: 'w-28' },
                             { key: 'description', label: 'Description' },
-                            { key: 'reference', label: 'Reference' },
-                            { key: 'account', label: 'Account' },
-                            { key: 'amount', label: 'Amount', align: 'right' },
+                            { key: 'reference', label: 'Reference', widthClass: 'w-44' },
+                            { key: 'account', label: 'Account', widthClass: 'w-36' },
+                            { key: 'amount', label: 'Amount', align: 'right', widthClass: 'w-40' },
                         ]"
                     >
                         <tr v-for="line in filter.transactions" :key="line.id">

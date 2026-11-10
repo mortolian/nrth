@@ -29,6 +29,8 @@ const props = withDefaults(defineProps<{
     embedded?: boolean;
     /** Tighter header padding (`px-3 py-2`) to match money-out / dense body cells. */
     dense?: boolean;
+    /** Extra classes on the table scroller, such as a max height so long bodies scroll. */
+    maxBodyClass?: string;
     /** Called with the data `<tbody>` when the slot body is mounted (or `null` when unmounted). For row Sortable. */
     tbodyRefFn?: (el: HTMLTableSectionElement | null) => void;
     /** Controlled sort column key (keeps header state in sync with server filters). */
@@ -47,6 +49,7 @@ const props = withDefaults(defineProps<{
     showPagination: true,
     embedded: false,
     dense: false,
+    maxBodyClass: '',
     sortKey: null,
     sortDirection: 'asc',
 });
@@ -114,9 +117,9 @@ const onSort = (column: TableColumn) => {
             embedded ? '' : 'rounded-lg border border-canvas-200 shadow-sm',
         ]"
     >
-        <div class="overflow-x-auto">
+        <div :class="['overflow-x-auto', props.maxBodyClass]">
             <table :class="tableClassName">
-                <thead v-if="normalizedColumns.length" class="bg-slate-50">
+                <thead v-if="normalizedColumns.length" :class="['bg-slate-50', props.maxBodyClass ? 'sticky top-0 z-10' : '']">
                     <tr>
                         <th
                             v-for="column in normalizedColumns"

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>{{ $reportName }} — statement filters</title>
     @include('pdf._report-styles')
+    <style>
+        table.sheet.cols { table-layout: fixed; }
+        table.sheet.cols td { word-wrap: break-word; }
+    </style>
 </head>
 <body>
 @php
@@ -29,7 +33,13 @@
 @if($filters === [])
     <div class="empty-note">This report has no filters.</div>
 @else
-    <table class="sheet">
+    <table class="sheet cols">
+        <colgroup>
+            <col style="width: 28%">
+            <col style="width: 32%">
+            <col style="width: 16%">
+            <col style="width: 24%">
+        </colgroup>
         <thead>
             <tr>
                 <th>Alias</th>
@@ -53,7 +63,12 @@
     @foreach($filters as $filter)
         @if($monthly && ($filter['months'] ?? []) !== [])
             <h2 class="section-heading">{{ $filter['alias'] }} · {{ $filter['match'] }}</h2>
-            <table class="sheet">
+            <table class="sheet cols">
+                <colgroup>
+                    <col style="width: 60%">
+                    <col style="width: 16%">
+                    <col style="width: 24%">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Month</th>
@@ -80,7 +95,14 @@
 
         @if($detailed && ($filter['transactions'] ?? []) !== [])
             <h2 class="section-heading">{{ $filter['alias'] }} transactions</h2>
-            <table class="sheet">
+            <table class="sheet cols">
+                <colgroup>
+                    <col style="width: 14%">
+                    <col style="width: 28%">
+                    <col style="width: 18%">
+                    <col style="width: 16%">
+                    <col style="width: 24%">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>Date</th>

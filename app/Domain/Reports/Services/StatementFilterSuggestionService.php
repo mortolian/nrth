@@ -4,7 +4,7 @@ namespace App\Domain\Reports\Services;
 
 use App\Domain\Banking\Enums\TransactionDirection;
 use App\Domain\Banking\Models\BankingTransaction;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 
 final class StatementFilterSuggestionService
 {
@@ -41,31 +41,31 @@ final class StatementFilterSuggestionService
             return ['count' => 0, 'total_cents' => 0, 'samples' => []];
         }
 
-        $matched = $this->lines($teamId)->filter(
-            fn (BankingTransaction $transaction): bool => $this->contains($transaction, $needle)
-        );
-
+        $count = 0;
+        $total = 0;
         $samples = [];
-        foreach ($matched as $transaction) {
-            $label = $this->sampleLabel($transaction, $needle);
-            if (! isset($samples[$label])) {
-                $samples[$label] = 0;
+        foreach ($this->lineQuery($teamId)->cursor() as $transaction) {
+            if (! $this->contains($transaction, $needle)) {
+                continue;
             }
-            $samples[$label]++;
+            $count++;
+            $total += $this->signedCents($transaction);
+            $label = $this->sampleLabel($transaction, $needle);
+            $samples[$label] = ($samples[$label] ?? 0) + 1;
         }
         arsort($samples);
 
         $listed = [];
-        foreach (array_slice($samples, 0, self::MAX_PREVIEW_SAMPLES, true) as $description => $count) {
+        foreach (array_slice($samples, 0, self::MAX_PREVIEW_SAMPLES, true) as $description => $sampleCount) {
             $listed[] = [
                 'description' => (string) $description,
-                'count' => $count,
+                'count' => $sampleCount,
             ];
         }
 
         return [
-            'count' => $matched->count(),
-            'total_cents' => (int) $matched->sum(fn (BankingTransaction $transaction): int => $this->signedCents($transaction)),
+            'count' => $count,
+            'total_cents' => $total,
             'samples' => $listed,
         ];
     }
@@ -78,7 +78,7 @@ final class StatementFilterSuggestionService
         /** @var array<string, array{count: int, total_cents: int, examples: array<string, int>}> $groups */
         $groups = [];
 
-        foreach ($this->lines($teamId) as $transaction) {
+        foreach ($this->lineQuery($teamId)->cursor() as $transaction) {
             $key = $this->merchantKey($transaction->description, $transaction->reference);
             if ($key === null) {
                 continue;
@@ -118,14 +118,14 @@ final class StatementFilterSuggestionService
     }
 
     /**
-     * @return Collection<int, BankingTransaction>
+     * @return Builder<BankingTransaction>
      */
-    private function lines(int $teamId): Collection
+    private function lineQuery(int $teamId): Builder
     {
         return BankingTransaction::query()
+            ->select(['id', 'description', 'reference', 'amount', 'direction'])
             ->where('team_id', $teamId)
-            ->orderBy('id')
-            ->get(['id', 'description', 'reference', 'amount', 'direction']);
+            ->orderBy('id');
     }
 
     private function contains(BankingTransaction $transaction, string $needle): bool

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
+import { ChevronDown } from 'lucide-vue-next';
+import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'radix-vue';
 import FeatureShell from '@/Components/FeatureShell.vue';
 import FormActions from '@/Components/FormActions.vue';
 import { useReportsTabs } from '@/Composables/useFeatureTabs';
@@ -29,6 +31,7 @@ const props = withDefaults(defineProps<{
 });
 
 const editing = computed(() => props.report !== null);
+const suggestionsOpen = ref(false);
 
 const form = useForm({
     name: props.report?.name ?? '',
@@ -105,41 +108,89 @@ const destroyReport = () => {
     >
         <AppCard>
             <form @submit.prevent="save">
-                <div class="max-w-xl">
+                <div>
                     <label class="mb-1 block text-xs font-medium text-slate-500" for="report-name">Report name</label>
                     <AppInput id="report-name" v-model="form.name" placeholder="Household spend" />
                     <p v-if="form.errors.name" class="mt-1.5 text-xs text-red-600">{{ form.errors.name }}</p>
                 </div>
 
                 <div v-if="suggestions.length" class="mt-6">
-                    <h2 class="text-sm font-semibold text-slate-900">From your statements</h2>
-                    <p class="mt-1 text-xs text-slate-500">Repeated wording, with card numbers, store numbers, and dates removed.</p>
-                    <ul class="mt-3 divide-y divide-slate-100 rounded-lg border border-slate-200">
-                        <li
-                            v-for="suggestion in suggestions"
-                            :key="suggestion.match"
-                            class="flex items-start justify-between gap-3 px-3 py-2"
-                        >
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-slate-900">{{ suggestion.alias }}</p>
-                                <p class="text-xs text-slate-500">
-                                    {{ suggestion.count }} lines · {{ formatCents(suggestion.total_cents) }} · contains “{{ suggestion.match }}”
-                                </p>
-                                <p v-if="suggestion.examples.length" class="truncate text-xs text-slate-400">
-                                    {{ suggestion.examples.join(' · ') }}
-                                </p>
-                            </div>
-                            <AppButton
+                    <PopoverRoot v-model:open="suggestionsOpen">
+                        <PopoverTrigger as-child>
+                            <button
                                 type="button"
-                                size="sm"
-                                variant="secondary"
-                                :disabled="usedMatches.has(suggestion.match)"
-                                @click="addSuggestion(suggestion)"
+                                class="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 text-left outline-none transition hover:border-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
                             >
-                                {{ usedMatches.has(suggestion.match) ? 'Added' : 'Add' }}
-                            </AppButton>
-                        </li>
-                    </ul>
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-medium text-slate-900">From your statements</span>
+                                    <span class="block truncate text-xs text-slate-500">
+                                        {{ suggestions.length }} {{ suggestions.length === 1 ? 'repeated merchant' : 'repeated merchants' }}
+                                    </span>
+                                </span>
+                                <ChevronDown
+                                    class="h-4 w-4 shrink-0 text-slate-400 transition-transform"
+                                    :class="suggestionsOpen ? 'rotate-180' : ''"
+                                    aria-hidden="true"
+                                />
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverPortal>
+                            <PopoverContent
+                                align="start"
+                                :side-offset="6"
+                                class="z-[200] max-h-96 w-[var(--radix-popover-trigger-width)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-lg outline-none"
+                            >
+                                <p class="px-2 pb-2 pt-1 text-xs text-slate-500">
+                                    Repeated wording, with card numbers, store numbers, and dates removed.
+                                </p>
+                                <ul class="space-y-1">
+                                    <li
+                                        v-for="suggestion in suggestions"
+                                        :key="suggestion.match"
+                                        class="rounded-md px-2 py-2.5"
+                                        :class="usedMatches.has(suggestion.match) ? 'bg-slate-50' : 'hover:bg-slate-50'"
+                                    >
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-semibold text-slate-900">{{ suggestion.alias }}</p>
+                                                <p class="mt-0.5 text-xs text-slate-500">
+                                                    {{ suggestion.count }} lines · {{ formatCents(suggestion.total_cents) }}
+                                                </p>
+                                                <p class="text-xs text-slate-400">Contains “{{ suggestion.match }}”</p>
+                                            </div>
+                                            <AppButton
+                                                type="button"
+                                                size="sm"
+                                                variant="secondary"
+                                                :disabled="usedMatches.has(suggestion.match)"
+                                                @click="addSuggestion(suggestion)"
+                                            >
+                                                {{ usedMatches.has(suggestion.match) ? 'Added' : 'Add' }}
+                                            </AppButton>
+                                        </div>
+                                        <details
+                                            v-if="suggestion.examples.length"
+                                            class="group mt-2 overflow-hidden rounded-md border border-slate-200 bg-white"
+                                        >
+                                            <summary class="flex cursor-pointer list-none items-center justify-between px-2 py-1.5 text-xs font-medium text-slate-600 [&::-webkit-details-marker]:hidden">
+                                                Statement lines
+                                                <ChevronDown class="h-3.5 w-3.5 text-slate-400 transition group-open:rotate-180" aria-hidden="true" />
+                                            </summary>
+                                            <ul class="space-y-1 border-t border-slate-100 px-2 py-1.5">
+                                                <li
+                                                    v-for="example in suggestion.examples"
+                                                    :key="example"
+                                                    class="truncate text-xs text-slate-600"
+                                                >
+                                                    {{ example }}
+                                                </li>
+                                            </ul>
+                                        </details>
+                                    </li>
+                                </ul>
+                            </PopoverContent>
+                        </PopoverPortal>
+                    </PopoverRoot>
                 </div>
 
                 <div class="mt-6 space-y-3">

@@ -3,11 +3,12 @@
 namespace App\Domain\Reports\Services;
 
 use App\Domain\Banking\Enums\TransactionDirection;
+use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingTransaction;
 use App\Domain\Reports\Models\StatementFilterReport;
 use App\Domain\Reports\Models\StatementFilterRule;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 
 final class StatementFilterReportService
 {
@@ -26,26 +27,55 @@ final class StatementFilterReportService
         $monthly = $breakdown === 'monthly';
         $detailed = $view === 'detailed';
         $rules = $report->rules()->get();
-        $transactions = $this->transactions((int) $report->team_id, $from, $to);
+        $accountNames = BankingAccount::query()
+            ->where('team_id', $report->team_id)
+            ->pluck('name', 'id');
 
-        $filters = $rules->map(function (StatementFilterRule $rule) use ($transactions, $monthly, $detailed): array {
-            $needle = mb_strtolower(trim($rule->match));
-            $matched = $transactions->filter(
-                fn (BankingTransaction $transaction): bool => $this->matches($transaction, $needle)
-            )->values();
+        /** @var array<int, array{count: int, total_cents: int, months: array<string, array{key: string, label: string, count: int, total_cents: int}>, transactions: list<array<string, mixed>>}> $buckets */
+        $buckets = [];
+        $needles = [];
+        foreach ($rules as $rule) {
+            $buckets[$rule->id] = [
+                'count' => 0,
+                'total_cents' => 0,
+                'months' => [],
+                'transactions' => [],
+            ];
+            $needles[$rule->id] = mb_strtolower(trim($rule->match));
+        }
 
-            $lines = $matched->map(fn (BankingTransaction $transaction): array => $this->present($transaction));
-            $total = (int) $lines->sum('signed_cents');
+        foreach ($this->transactionQuery((int) $report->team_id, $from, $to)->cursor() as $transaction) {
+            foreach ($rules as $rule) {
+                if (! $this->matches($transaction, $needles[$rule->id])) {
+                    continue;
+                }
+
+                $line = $this->present($transaction, $accountNames[$transaction->account_id] ?? null);
+                $buckets[$rule->id]['count']++;
+                $buckets[$rule->id]['total_cents'] += $line['signed_cents'];
+                if ($monthly) {
+                    $this->addMonth($buckets[$rule->id]['months'], $line);
+                }
+                if ($detailed && count($buckets[$rule->id]['transactions']) < self::MAX_DETAILED_LINES) {
+                    $buckets[$rule->id]['transactions'][] = $line;
+                }
+            }
+        }
+
+        $filters = $rules->map(function (StatementFilterRule $rule) use ($buckets, $monthly, $detailed): array {
+            $bucket = $buckets[$rule->id];
+            $months = $bucket['months'];
+            ksort($months);
 
             return [
                 'id' => $rule->id,
                 'alias' => $rule->alias,
                 'match' => $rule->match,
-                'count' => $lines->count(),
-                'total_cents' => $total,
-                'truncated' => $detailed && $lines->count() > self::MAX_DETAILED_LINES,
-                'months' => $monthly ? $this->months($lines) : [],
-                'transactions' => $detailed ? $lines->take(self::MAX_DETAILED_LINES)->all() : [],
+                'count' => $bucket['count'],
+                'total_cents' => $bucket['total_cents'],
+                'truncated' => $detailed && $bucket['count'] > self::MAX_DETAILED_LINES,
+                'months' => $monthly ? array_values($months) : [],
+                'transactions' => $detailed ? $bucket['transactions'] : [],
             ];
         })->all();
 
@@ -63,18 +93,25 @@ final class StatementFilterReportService
     }
 
     /**
-     * @return Collection<int, BankingTransaction>
+     * @return Builder<BankingTransaction>
      */
-    private function transactions(int $teamId, CarbonInterface $from, CarbonInterface $to): Collection
+    private function transactionQuery(int $teamId, CarbonInterface $from, CarbonInterface $to): Builder
     {
         return BankingTransaction::query()
+            ->select([
+                'id',
+                'account_id',
+                'transaction_date',
+                'description',
+                'reference',
+                'amount',
+                'direction',
+            ])
             ->where('team_id', $teamId)
-            ->whereDate('transaction_date', '>=', $from->toDateString())
-            ->whereDate('transaction_date', '<=', $to->toDateString())
-            ->with('account:id,name')
+            ->where('transaction_date', '>=', $from->toDateString())
+            ->where('transaction_date', '<=', $to->toDateString())
             ->orderBy('transaction_date')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
     }
 
     private function matches(BankingTransaction $transaction, string $needle): bool
@@ -91,7 +128,7 @@ final class StatementFilterReportService
     /**
      * @return array<string, mixed>
      */
-    private function present(BankingTransaction $transaction): array
+    private function present(BankingTransaction $transaction, ?string $accountName): array
     {
         $cents = (int) round(((float) $transaction->amount) * 100);
         $outflow = $transaction->direction === TransactionDirection::Debit;
@@ -101,7 +138,7 @@ final class StatementFilterReportService
             'date' => $transaction->transaction_date?->toDateString(),
             'description' => $transaction->description,
             'reference' => $transaction->reference,
-            'account' => $transaction->account?->name,
+            'account' => $accountName,
             'direction' => $outflow ? 'out' : 'in',
             'signed_cents' => $outflow ? $cents : -$cents,
             'month_key' => $transaction->transaction_date?->format('Y-m'),
@@ -110,32 +147,24 @@ final class StatementFilterReportService
     }
 
     /**
-     * @param  Collection<int, array<string, mixed>>  $lines
-     * @return list<array{key: string, label: string, count: int, total_cents: int}>
+     * @param  array<string, array{key: string, label: string, count: int, total_cents: int}>  $groups
+     * @param  array<string, mixed>  $line
      */
-    private function months(Collection $lines): array
+    private function addMonth(array &$groups, array $line): void
     {
-        $groups = [];
-
-        foreach ($lines as $line) {
-            $key = (string) ($line['month_key'] ?? '');
-            if ($key === '') {
-                continue;
-            }
-            if (! isset($groups[$key])) {
-                $groups[$key] = [
-                    'key' => $key,
-                    'label' => (string) ($line['month_label'] ?? $key),
-                    'count' => 0,
-                    'total_cents' => 0,
-                ];
-            }
-            $groups[$key]['count']++;
-            $groups[$key]['total_cents'] += (int) $line['signed_cents'];
+        $key = (string) ($line['month_key'] ?? '');
+        if ($key === '') {
+            return;
         }
-
-        ksort($groups);
-
-        return array_values($groups);
+        if (! isset($groups[$key])) {
+            $groups[$key] = [
+                'key' => $key,
+                'label' => (string) ($line['month_label'] ?? $key),
+                'count' => 0,
+                'total_cents' => 0,
+            ];
+        }
+        $groups[$key]['count']++;
+        $groups[$key]['total_cents'] += (int) $line['signed_cents'];
     }
 }
