@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Check, Copy } from 'lucide-vue-next';
 import { computed, ref, watch, withDefaults } from 'vue';
 import { router, useForm, usePage } from '@inertiajs/vue3';
 import SettingsShell from '@/Components/SettingsShell.vue';
-import InstanceSettingsShell from '@/Components/InstanceSettingsShell.vue';
 import AppTabs from '@/Components/AppTabs.vue';
 import { businessSettingsTabs } from '@/Composables/useBusinessSettingsTabs';
 import { useToast } from '@/Composables/useToast';
@@ -67,13 +65,11 @@ const props = withDefaults(
             canManageRoles?: boolean;
         };
         role_summaries: RoleSummary[];
-        settings_context?: 'business' | 'instance';
         team_settings_entry?: 'settings' | 'direct';
         session_idle_timeout_minutes?: number;
         session_lifetime_minutes?: number;
     }>(),
     {
-        settings_context: 'business',
         team_settings_entry: 'settings',
         session_idle_timeout_minutes: 0,
         session_lifetime_minutes: 120,
@@ -87,57 +83,15 @@ const teamPermissions = computed(() => {
     const perms = page.props.team_permissions;
     return Array.isArray(perms) ? (perms as string[]) : [];
 });
-const settingsContext = computed(() => props.settings_context ?? 'business');
-const isBusinessContext = computed(() => settingsContext.value === 'business');
 const businessTabs = computed(() => businessSettingsTabs({
     linkAll: true,
     teamPermissions: teamPermissions.value,
 }));
 const canManageRoles = computed(() => Boolean(props.permissions.canManageRoles ?? props.permissions.canUpdateTeam));
 
-const teamSubtitle = computed(() => {
-    if (isBusinessContext.value) {
-        return `People who can access “${props.team.name}”. Invite members and assign roles for this business.`;
-    }
-
-    return `Manage members and roles for “${props.team.name}”.`;
-});
-
-const repairLedgerDryRunCommand = computed(
-    () => `php artisan invoicing:repair-foreign-ledger --team=${props.team.id}`,
+const teamSubtitle = computed(
+    () => `People who can access “${props.team.name}”. Invite members and assign roles for this business.`,
 );
-const repairLedgerApplyCommand = computed(
-    () => `php artisan invoicing:repair-foreign-ledger --team=${props.team.id} --apply`,
-);
-
-const copiedOperatorCommand = ref<string | null>(null);
-
-const copyOperatorCommand = async (command: string) => {
-    try {
-        await navigator.clipboard.writeText(command);
-        copiedOperatorCommand.value = command;
-        toast.success('Command copied.');
-        window.setTimeout(() => {
-            if (copiedOperatorCommand.value === command) {
-                copiedOperatorCommand.value = null;
-            }
-        }, 2000);
-    } catch {
-        toast.error('Could not copy to clipboard.');
-    }
-};
-
-const shellComponent = computed(() => (isBusinessContext.value ? SettingsShell : InstanceSettingsShell));
-
-const shellBind = computed(() => (
-    isBusinessContext.value
-        ? { section: 'business' as const, subtitle: teamSubtitle.value }
-        : {
-            section: 'teams' as const,
-            title: `Teams · ${props.team.name}`,
-            subtitle: teamSubtitle.value,
-        }
-));
 
 const idleTimeoutForm = useForm({
     session_idle_timeout_minutes: String(Number(props.session_idle_timeout_minutes ?? 0)),
@@ -375,8 +329,8 @@ const deleteCustomRole = (summary: RoleSummary) => {
 </script>
 
 <template>
-    <component :is="shellComponent" v-bind="shellBind">
-        <div v-if="isBusinessContext" class="border-b border-slate-200">
+    <SettingsShell section="business" :subtitle="teamSubtitle">
+        <div class="border-b border-slate-200">
             <AppTabs
                 model-value="team_members"
                 :tabs="businessTabs"
@@ -669,61 +623,6 @@ const deleteCustomRole = (summary: RoleSummary) => {
                     </section>
                 </div>
             </AppCard>
-
-            <AppCard v-if="!isBusinessContext">
-                <h3 class="text-base font-semibold text-slate-900">Operator commands</h3>
-                <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                    Run these on the server shell for this business. Use the business ID with
-                    <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs text-slate-700">--team=</code>.
-                </p>
-
-                <dl class="mt-4 grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm sm:grid-cols-[auto_1fr] sm:items-center sm:gap-x-4">
-                    <dt class="text-slate-500">Business ID</dt>
-                    <dd class="font-mono tabular-nums font-medium text-slate-900">{{ team.id }}</dd>
-                </dl>
-
-                <div class="mt-5 space-y-5">
-                    <div>
-                        <h4 class="text-sm font-medium text-slate-900">Repair foreign invoice ledger</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">
-                            Dry-run first — reports drift without writing to the ledger.
-                        </p>
-                        <div class="mt-2 flex items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 pl-3 pr-1">
-                            <pre class="min-w-0 flex-1 overflow-x-auto py-2.5 font-mono text-xs leading-relaxed text-slate-800">{{ repairLedgerDryRunCommand }}</pre>
-                            <AppButton
-                                variant="ghost"
-                                size="sm"
-                                class="shrink-0 !px-2"
-                                :aria-label="copiedOperatorCommand === repairLedgerDryRunCommand ? 'Copied' : 'Copy command'"
-                                @click="copyOperatorCommand(repairLedgerDryRunCommand)"
-                            >
-                                <Check v-if="copiedOperatorCommand === repairLedgerDryRunCommand" class="h-4 w-4" aria-hidden="true" />
-                                <Copy v-else class="h-4 w-4" aria-hidden="true" />
-                            </AppButton>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="text-sm font-medium text-slate-900">Apply ledger repair</h4>
-                        <p class="mt-0.5 text-xs text-slate-500">
-                            Voids incorrect journals and rebuilds from invoice and payment rows.
-                        </p>
-                        <div class="mt-2 flex items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 pl-3 pr-1">
-                            <pre class="min-w-0 flex-1 overflow-x-auto py-2.5 font-mono text-xs leading-relaxed text-slate-800">{{ repairLedgerApplyCommand }}</pre>
-                            <AppButton
-                                variant="ghost"
-                                size="sm"
-                                class="shrink-0 !px-2"
-                                :aria-label="copiedOperatorCommand === repairLedgerApplyCommand ? 'Copied' : 'Copy command'"
-                                @click="copyOperatorCommand(repairLedgerApplyCommand)"
-                            >
-                                <Check v-if="copiedOperatorCommand === repairLedgerApplyCommand" class="h-4 w-4" aria-hidden="true" />
-                                <Copy v-else class="h-4 w-4" aria-hidden="true" />
-                            </AppButton>
-                        </div>
-                    </div>
-                </div>
-            </AppCard>
         </div>
 
         <div
@@ -892,5 +791,5 @@ const deleteCustomRole = (summary: RoleSummary) => {
                 </div>
             </div>
         </div>
-    </component>
+    </SettingsShell>
 </template>

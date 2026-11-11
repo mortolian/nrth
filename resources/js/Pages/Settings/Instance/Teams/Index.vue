@@ -6,10 +6,10 @@ type TeamRow = {
     id: number;
     name: string;
     personal_team: boolean;
-    owner_name: string | null;
-    owner_email: string | null;
+    owners_label: string;
+    owners_count: number;
     members_count: number;
-    manage_url: string;
+    owners_url: string;
 };
 
 defineProps<{
@@ -23,7 +23,7 @@ defineProps<{
             <div class="border-b border-canvas-200 bg-canvas-100 px-5 py-3">
                 <h3 class="text-base font-semibold text-slate-900">All businesses</h3>
                 <p class="mt-0.5 text-sm text-slate-500">
-                    Instance operators can open any business to manage members, roles, and invitations — even if you are not a member yourself.
+                    Open a business to manage its owners, members, and roles.
                 </p>
             </div>
 
@@ -34,7 +34,7 @@ defineProps<{
                 :columns="[
                     { key: 'id', label: 'Business ID', widthClass: 'whitespace-nowrap tabular-nums' },
                     { key: 'name', label: 'Business' },
-                    { key: 'owner', label: 'Owner' },
+                    { key: 'owners', label: 'Owners' },
                     { key: 'members', label: 'Members', widthClass: 'whitespace-nowrap tabular-nums' },
                     { key: 'actions', label: '', widthClass: 'text-right' },
                 ]"
@@ -46,17 +46,16 @@ defineProps<{
                         <div v-if="team.personal_team" class="text-xs text-slate-500">Personal business</div>
                     </td>
                     <td class="px-3 py-2 text-slate-600">
-                        <div v-if="team.owner_name">{{ team.owner_name }}</div>
-                        <div v-if="team.owner_email" class="text-xs text-slate-500">{{ team.owner_email }}</div>
+                        <div v-if="team.owners_label">{{ team.owners_label }}</div>
                         <span v-else class="text-slate-400">—</span>
                     </td>
                     <td class="px-3 py-2 text-slate-700">{{ team.members_count }}</td>
                     <td class="px-3 py-2 text-right">
                         <Link
-                            :href="team.manage_url"
+                            :href="team.owners_url"
                             class="text-sm font-medium text-brand-700 hover:text-brand-800"
                         >
-                            Manage members
+                            Manage
                         </Link>
                     </td>
                 </tr>

@@ -17,7 +17,7 @@ final class TeamAccess
             return [];
         }
 
-        if ($user->ownsTeam($team)) {
+        if ($user->ownsTeam($team) || self::membershipRoleKey($user, $team) === 'owner') {
             return RolePresets::ownerPermissions();
         }
 

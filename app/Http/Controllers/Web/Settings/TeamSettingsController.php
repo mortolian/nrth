@@ -11,11 +11,7 @@ use App\Support\TeamAccess\RolePresets;
 use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,7 +26,7 @@ class TeamSettingsController extends Controller
 
         abort_unless($team !== null && $user->belongsToTeam($team), 403);
 
-        return $this->show($request, $team, 'business');
+        return $this->show($request, $team);
     }
 
     public function updateSessionIdleTimeout(Request $request, Team $team): RedirectResponse
@@ -50,7 +46,7 @@ class TeamSettingsController extends Controller
         return back()->with('success', __('Session idle timeout saved.'));
     }
 
-    public function show(Request $request, Team $team, string $context = 'business'): Response
+    public function show(Request $request, Team $team): Response
     {
         $user = $request->user();
         $isOperator = Gate::allows('manageInstanceBackups');
@@ -63,7 +59,7 @@ class TeamSettingsController extends Controller
 
         Gate::authorize('view', $team);
 
-        if ($context === 'business' && ! $isOperator) {
+        if (! $isOperator) {
             abort_unless($team->id === $user->currentTeam?->id, 403);
         }
 
@@ -93,15 +89,16 @@ class TeamSettingsController extends Controller
                 continue;
             }
             $roleKey = $memberUser->membership->role ?? RolePresets::VIEWER;
+            $isOwner = $roleKey === 'owner' || $memberUser->isBusinessOwner($team);
             $teamRole = $rolesByKey->get($roleKey);
             $members->push([
                 'id' => $memberUser->id,
                 'name' => $memberUser->name,
                 'email' => $memberUser->email,
                 'profile_photo_url' => $memberUser->profile_photo_url,
-                'role_key' => $roleKey,
-                'role_label' => $teamRole?->name ?? ucfirst($roleKey),
-                'is_owner' => false,
+                'role_key' => $isOwner ? 'owner' : $roleKey,
+                'role_label' => $isOwner ? 'Owner' : ($teamRole?->name ?? ucfirst($roleKey)),
+                'is_owner' => $isOwner,
             ]);
         }
 
@@ -135,7 +132,6 @@ class TeamSettingsController extends Controller
         })->values()->all();
 
         return Inertia::render('Settings/Team', [
-            'settings_context' => $context,
             'team_settings_entry' => $request->routeIs('teams.show') ? 'direct' : 'settings',
             'team' => [
                 'id' => $team->id,

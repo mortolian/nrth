@@ -39,7 +39,7 @@ class BackupsExportsController extends Controller
     {
         $user = $request->user();
         $team = $user->currentTeam;
-        $isOwner = $team !== null && $user->ownsTeam($team);
+        $isOwner = $team !== null && $user->isBusinessOwner($team);
         $canManageBackups = Gate::allows('manageInstanceBackups');
 
         abort_unless($isOwner || $canManageBackups, 403);

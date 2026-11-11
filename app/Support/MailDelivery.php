@@ -29,6 +29,33 @@ final class MailDelivery
     /**
      * @return array{0: string, 1: string} flash key + message
      */
+    public static function ownerAssignedFlash(string $email, bool $sent): array
+    {
+        if (! $sent) {
+            return [
+                'warning',
+                __('Owner added, but the notice to :email could not be sent.', ['email' => $email]),
+            ];
+        }
+
+        if (self::isLoggingOnly()) {
+            return [
+                'warning',
+                __('Owner added for :email, but MAIL_MAILER is “log” so the notice was not delivered. Use Mailpit (http://localhost:8025) or set real MAIL_* values. See docs/DEVELOPMENT.md.', [
+                    'email' => $email,
+                ]),
+            ];
+        }
+
+        return [
+            'success',
+            __('Owner added. A notice was sent to :email.', ['email' => $email]),
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: string} flash key + message
+     */
     public static function invoiceEmailedFlash(string $email, bool $reminder = false, bool $resent = false): array
     {
         if (self::isLoggingOnly()) {

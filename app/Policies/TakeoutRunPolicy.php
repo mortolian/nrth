@@ -12,31 +12,31 @@ class TakeoutRunPolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->currentTeam !== null && $user->ownsTeam($user->currentTeam);
+        return $user->currentTeam !== null && $user->isBusinessOwner($user->currentTeam);
     }
 
     public function view(User $user, TakeoutRun $takeoutRun): bool
     {
-        return $user->ownsTeam($takeoutRun->team);
+        return $user->isBusinessOwner($takeoutRun->team);
     }
 
     public function create(User $user): bool
     {
-        return $user->currentTeam !== null && $user->ownsTeam($user->currentTeam);
+        return $user->currentTeam !== null && $user->isBusinessOwner($user->currentTeam);
     }
 
     public function download(User $user, TakeoutRun $takeoutRun): bool
     {
-        return $user->ownsTeam($takeoutRun->team);
+        return $user->isBusinessOwner($takeoutRun->team);
     }
 
     public function delete(User $user, TakeoutRun $takeoutRun): bool
     {
-        return $user->ownsTeam($takeoutRun->team);
+        return $user->isBusinessOwner($takeoutRun->team);
     }
 
     public function retry(User $user, TakeoutRun $takeoutRun): bool
     {
-        return $user->ownsTeam($takeoutRun->team);
+        return $user->isBusinessOwner($takeoutRun->team);
     }
 }

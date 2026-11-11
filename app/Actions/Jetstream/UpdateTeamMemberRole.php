@@ -2,9 +2,11 @@
 
 namespace App\Actions\Jetstream;
 
+use App\Models\Team;
 use App\Rules\TeamRoleKey;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Events\TeamMemberUpdated;
 use Laravel\Jetstream\Jetstream;
 
@@ -27,6 +29,13 @@ class UpdateTeamMemberRole
         ], [
             'role' => ['required', 'string', new TeamRoleKey($team)],
         ])->validate();
+
+        $member = Jetstream::findUserByIdOrFail($teamMemberId);
+        if ($team instanceof Team && $member->isBusinessOwner($team)) {
+            throw ValidationException::withMessages([
+                'role' => __('Owners are changed from the owners section.'),
+            ]);
+        }
 
         $team->users()->updateExistingPivot($teamMemberId, [
             'role' => $role,

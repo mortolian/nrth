@@ -31,13 +31,17 @@ class SyncSpatieTeamRole
                     }
                 }
 
-                if ($user->ownsTeam($team)) {
+                $member = $team->users->firstWhere('id', $user->id);
+                $roleKey = $user->ownsTeam($team)
+                    ? 'owner'
+                    : ($member?->membership->role ?? 'viewer');
+
+                if ($roleKey === 'owner') {
                     $user->assignRole('team_owner');
+                } elseif ($roleKey === 'accountant') {
+                    $user->assignRole('team_accountant');
                 } else {
-                    $member = $team->users->firstWhere('id', $user->id);
-                    $key = $member?->membership->role ?? 'viewer';
-                    $spatie = $key === 'accountant' ? 'team_accountant' : 'team_viewer';
-                    $user->assignRole($spatie);
+                    $user->assignRole('team_viewer');
                 }
             }
         }

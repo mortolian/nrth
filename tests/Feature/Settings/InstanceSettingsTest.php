@@ -6,8 +6,11 @@ use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use App\Domain\Instance\Services\InstanceTimezoneSettings;
+use App\Mail\BusinessOwnerAssignedMail;
 use App\Mail\InstanceSmtpTestMail;
+use App\Mail\TeamInvitationMail;
 use App\Models\User;
+use App\Support\TeamAccess\TeamAccess;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -68,11 +71,265 @@ class InstanceSettingsTest extends TestCase
             ->get(route('settings.instance.teams.show', $otherTeam))
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('Settings/Team')
-                ->where('settings_context', 'instance')
+                ->component('Settings/Instance/Teams/Manage')
                 ->where('team.id', $otherTeam->id)
-                ->where('permissions.canManageRoles', true)
-                ->where('permissions.canAddTeamMembers', true));
+                ->has('owners', 1)
+                ->where('owners.0.email', $otherOwner->email)
+                ->has('members')
+                ->has('roles')
+                ->has('permission_groups'));
+
+        $this->actingAs($operator)
+            ->get(route('settings.instance.teams.members', $otherTeam))
+            ->assertRedirect(route('settings.instance.teams.show', $otherTeam));
+    }
+
+    public function test_operator_manages_members_and_roles_on_another_business(): void
+    {
+        Mail::fake();
+
+        $operator = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+
+        $team->teamInvitations()->create([
+            'email' => 'pending@northwind.example',
+            'role' => 'viewer',
+        ]);
+        $invitation = $team->teamInvitations()->first();
+        $this->assertNotNull($invitation);
+
+        $this->actingAs($operator)
+            ->post(route('team-invitations.resend', $invitation))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Mail::assertSent(TeamInvitationMail::class, fn (TeamInvitationMail $mail): bool => $mail->hasTo('pending@northwind.example'));
+
+        $this->actingAs($operator)
+            ->post(route('settings.instance.teams.members.store', $team), [
+                'name' => 'Sam Lee',
+                'email' => 'sam@northwind.example',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+                'role' => 'viewer',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Mail::assertNotSent(BusinessOwnerAssignedMail::class);
+
+        $sam = User::query()->where('email', 'sam@northwind.example')->first();
+        $this->assertNotNull($sam);
+        $this->assertTrue(password_verify('new-password', $sam->password));
+        $this->assertTrue($sam->belongsToTeam($team));
+        $this->assertSame('viewer', $team->users()->where('users.id', $sam->id)->first()?->membership->role);
+        $this->assertFalse($sam->isBusinessOwner($team));
+
+        $this->actingAs($operator)
+            ->put(route('settings.instance.teams.members.update', [$team, $sam]), [
+                'role' => 'accountant',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('accountant', $team->users()->where('users.id', $sam->id)->first()?->membership->role);
+
+        $this->actingAs($operator)
+            ->post(route('settings.team.roles.store', $team), [
+                'name' => 'Bookkeeper',
+                'description' => 'Books only',
+                'permissions' => ['invoices.view'],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('team_roles', [
+            'team_id' => $team->id,
+            'name' => 'Bookkeeper',
+        ]);
+
+        $this->actingAs($operator)
+            ->delete(route('settings.instance.teams.members.destroy', [$team, $sam]))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertFalse($sam->fresh()->belongsToTeam($team));
+        $this->assertNotNull($sam->fresh());
+
+        $stranger = User::factory()->withPersonalTeam()->create();
+        $this->actingAs($stranger)
+            ->post(route('settings.instance.teams.members.store', $team), [
+                'name' => 'Pat Lee',
+                'email' => 'pat@northwind.example',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+                'role' => 'viewer',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_operator_adds_an_owner_and_sends_an_ownership_notice(): void
+    {
+        Mail::fake();
+
+        $operator = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $team = $operator->currentTeam;
+
+        $this->actingAs($operator)
+            ->post(route('settings.instance.teams.owners.store', $team), [
+                'name' => 'Sam Lee',
+                'email' => 'sam@northwind.example',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Mail::assertSent(BusinessOwnerAssignedMail::class, function (BusinessOwnerAssignedMail $mail) use ($team): bool {
+            $html = $mail->render();
+
+            return $mail->hasTo('sam@northwind.example')
+                && $mail->newAccount
+                && $mail->team->is($team)
+                && str_contains($html, $team->name)
+                && str_contains($html, 'assigned as an owner')
+                && ! str_contains($html, 'new-password');
+        });
+        Mail::assertNotSent(TeamInvitationMail::class);
+
+        $sam = User::query()->where('email', 'sam@northwind.example')->first();
+        $this->assertNotNull($sam);
+        $this->assertTrue(password_verify('new-password', $sam->password));
+        $this->assertNotNull($sam->completed_onboarding_at);
+        $this->assertTrue($sam->isBusinessOwner($team));
+        $this->assertFalse($sam->ownsTeam($team));
+        $this->assertTrue(TeamAccess::allows($sam, $team, 'settings.team'));
+
+        $existing = User::factory()->create([
+            'email' => 'riley@northwind.example',
+            'password' => 'already-set',
+        ]);
+        Mail::fake();
+
+        $this->actingAs($operator)
+            ->post(route('settings.instance.teams.owners.store', $team), [
+                'name' => 'Riley Chen',
+                'email' => 'riley@northwind.example',
+                'password' => '',
+                'password_confirmation' => '',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        Mail::assertSent(BusinessOwnerAssignedMail::class, function (BusinessOwnerAssignedMail $mail) use ($existing): bool {
+            return $mail->hasTo('riley@northwind.example')
+                && ! $mail->newAccount
+                && $mail->user->is($existing)
+                && str_contains($mail->render(), 'existing password');
+        });
+        $this->assertTrue(password_verify('already-set', $existing->fresh()->password));
+
+        $this->actingAs($operator)
+            ->delete(route('settings.instance.teams.owners.destroy', [$team, $operator]))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertFalse($operator->fresh()->ownsTeam($team->fresh()));
+        $this->assertTrue($sam->fresh()->ownsTeam($team->fresh()));
+
+        $riley = User::query()->where('email', 'riley@northwind.example')->first();
+        $this->actingAs($operator)
+            ->delete(route('settings.instance.teams.owners.destroy', [$team, $riley]))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->actingAs($operator)
+            ->from(route('settings.instance.teams.show', $team))
+            ->delete(route('settings.instance.teams.owners.destroy', [$team, $sam]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('owner');
+
+        $this->assertTrue($sam->fresh()->ownsTeam($team->fresh()));
+    }
+
+    public function test_operator_can_update_another_business_owners_sign_in(): void
+    {
+        $operator = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $owner = User::factory()->withPersonalTeam()->create([
+            'name' => 'Alex North',
+            'email' => 'sample@northwind.example',
+            'password' => 'password',
+        ]);
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+
+        $this->actingAs($operator)
+            ->put(route('settings.instance.teams.owners.update', [$team, $owner]), [
+                'name' => 'Alex Studio',
+                'email' => 'studio@northwind.example',
+                'password' => 'new-password',
+                'password_confirmation' => 'new-password',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $owner->refresh();
+        $this->assertSame('Alex Studio', $owner->name);
+        $this->assertSame('studio@northwind.example', $owner->email);
+        $this->assertTrue(password_verify('new-password', $owner->password));
+        $this->assertNotNull($owner->email_verified_at);
+        $this->assertSame($operator->email, $operator->fresh()->email);
+    }
+
+    public function test_operator_can_rename_an_owner_without_changing_the_password(): void
+    {
+        $operator = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $owner = User::factory()->withPersonalTeam()->create([
+            'password' => 'password',
+        ]);
+
+        $this->actingAs($operator)
+            ->put(route('settings.instance.teams.owners.update', [$owner->currentTeam, $owner]), [
+                'name' => 'Renamed Owner',
+                'email' => $owner->email,
+                'password' => '',
+                'password_confirmation' => '',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $owner->refresh();
+        $this->assertSame('Renamed Owner', $owner->name);
+        $this->assertTrue(password_verify('password', $owner->password));
+    }
+
+    public function test_non_operator_cannot_update_an_owner(): void
+    {
+        User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => false,
+        ]);
+        $user->forceFill(['is_instance_operator' => false])->save();
+        $owner = User::factory()->withPersonalTeam()->create();
+
+        $this->actingAs($user)
+            ->put(route('settings.instance.teams.owners.update', [$owner->currentTeam, $owner]), [
+                'name' => 'Hijack',
+                'email' => 'hijack@example.test',
+            ])
+            ->assertForbidden();
+
+        $this->assertNotSame('Hijack', $owner->fresh()->name);
     }
 
     public function test_non_operator_cannot_access_instance_teams(): void

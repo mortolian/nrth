@@ -15,7 +15,6 @@ use App\Models\Team;
 use App\Models\User;
 use Database\Seeders\DefaultChartOfAccountsSeeder;
 use Database\Seeders\DefaultTaxRatesSeeder;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -75,8 +74,6 @@ final class SampleBusiness
                 'account_number_last4' => '4821',
                 'type' => 'cheque',
             ])->save();
-
-            Auth::login($user);
 
             $accounts = Account::queryWithoutTeamScope()
                 ->where('team_id', $team->id)

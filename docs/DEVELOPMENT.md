@@ -97,9 +97,9 @@ at `http://localhost:5173`; use `./vendor/bin/sail logs -f vite` or
 `./vendor/bin/sail logs -f horizon` to inspect either service. See `.env.example` for
 Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
 
-### Email (invitations, invoices, password reset)
+### Email (invitations, owner notices, invoices, password reset)
 
-Team invitations use Laravel mail **synchronously**. If `MAIL_MAILER=log` (the `.env.example` default), messages are written to `storage/logs/laravel.log` and **never reach an inbox**.
+Team invitations and the instance-operator owner notice use Laravel mail **synchronously**. The owner notice tells the person a business was created and they own it. It is not a join link, and it does not include the password. If `MAIL_MAILER=log` (the `.env.example` default), messages are written to `storage/logs/laravel.log` and **never reach an inbox**.
 
 With Docker Compose / Sail and `COMPOSE_PROFILES=dev`, set:
 

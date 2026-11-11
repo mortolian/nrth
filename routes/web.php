@@ -102,6 +102,13 @@ Route::middleware([
     Route::get('/settings/instance', [InstanceSettingsController::class, 'edit'])->name('settings.instance');
     Route::get('/settings/instance/teams', [InstanceTeamsController::class, 'index'])->name('settings.instance.teams');
     Route::get('/settings/instance/teams/{team}', [InstanceTeamsController::class, 'show'])->name('settings.instance.teams.show');
+    Route::get('/settings/instance/teams/{team}/members', [InstanceTeamsController::class, 'members'])->name('settings.instance.teams.members');
+    Route::post('/settings/instance/teams/{team}/members', [InstanceTeamsController::class, 'storeMember'])->name('settings.instance.teams.members.store');
+    Route::put('/settings/instance/teams/{team}/members/{user}', [InstanceTeamsController::class, 'updateMember'])->name('settings.instance.teams.members.update');
+    Route::delete('/settings/instance/teams/{team}/members/{user}', [InstanceTeamsController::class, 'destroyMember'])->name('settings.instance.teams.members.destroy');
+    Route::post('/settings/instance/teams/{team}/owners', [InstanceTeamsController::class, 'storeOwner'])->name('settings.instance.teams.owners.store');
+    Route::put('/settings/instance/teams/{team}/owners/{user}', [InstanceTeamsController::class, 'updateOwner'])->name('settings.instance.teams.owners.update');
+    Route::delete('/settings/instance/teams/{team}/owners/{user}', [InstanceTeamsController::class, 'destroyOwner'])->name('settings.instance.teams.owners.destroy');
     Route::get('/settings/instance/timezone', [InstanceSettingsController::class, 'timezone'])->name('settings.instance.timezone');
     Route::put('/settings/instance/timezone', [InstanceSettingsController::class, 'updateTimezone'])
         ->name('settings.instance.timezone.update');

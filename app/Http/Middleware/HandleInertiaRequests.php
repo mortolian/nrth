@@ -175,7 +175,7 @@ class HandleInertiaRequests extends Middleware
                     return false;
                 }
                 $team = $user->currentTeam;
-                $isOwner = $team !== null && $user->ownsTeam($team);
+                $isOwner = $team !== null && $user->isBusinessOwner($team);
 
                 return $isOwner || Gate::forUser($user)->allows('manageInstanceBackups');
             },
@@ -194,7 +194,7 @@ class HandleInertiaRequests extends Middleware
                 return $user !== null
                     && $team !== null
                     && $user->belongsToTeam($team)
-                    && ! $user->ownsTeam($team);
+                    && ! $user->isBusinessOwner($team);
             },
             'current_team_role' => function () use ($request) {
                 $user = $request->user();

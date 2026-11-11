@@ -31,7 +31,7 @@ const headerSubtitle = computed(() => {
         case 'operators':
             return 'Who can manage instance settings and whole-server backups.';
         case 'teams':
-            return 'All businesses on this install — open one to manage its members and roles.';
+            return 'All businesses on this install. Open one to manage its owners, members, and roles.';
         default:
             return 'Install-wide settings for operators — separate from each business.';
     }

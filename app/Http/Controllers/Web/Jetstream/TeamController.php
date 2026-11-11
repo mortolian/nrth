@@ -17,10 +17,11 @@ class TeamController extends JetstreamTeamController
     {
         $team = Jetstream::newTeamModel()->query()->findOrFail($teamId);
         $user = $request->user();
-        $context = Gate::allows('manageInstanceBackups') && ! $user->belongsToTeam($team)
-            ? 'instance'
-            : 'business';
 
-        return app(TeamSettingsController::class)->show($request, $team, $context);
+        if ($user !== null && Gate::allows('manageInstanceBackups') && ! $user->belongsToTeam($team)) {
+            return redirect()->route('settings.instance.teams.show', $team);
+        }
+
+        return app(TeamSettingsController::class)->show($request, $team);
     }
 }

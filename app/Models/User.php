@@ -137,4 +137,27 @@ class User extends Authenticatable
     {
         return TeamAccess::allows($this, $team ?? $this->currentTeam, $permission);
     }
+
+    /**
+     * Primary Jetstream owner, or an additional owner attached with the owner role.
+     */
+    public function isBusinessOwner(?Team $team): bool
+    {
+        if ($team === null) {
+            return false;
+        }
+
+        if ($this->ownsTeam($team)) {
+            return true;
+        }
+
+        if ($this->relationLoaded('teams')) {
+            return ($this->teams->firstWhere('id', $team->id)?->membership->role ?? null) === 'owner';
+        }
+
+        return $this->teams()
+            ->where('teams.id', $team->id)
+            ->wherePivot('role', 'owner')
+            ->exists();
+    }
 }

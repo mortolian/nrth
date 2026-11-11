@@ -41,7 +41,7 @@ class TeamPolicy
      */
     public function update(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team) || $this->isInstanceOperator($user);
+        return $user->isBusinessOwner($team) || $this->isInstanceOperator($user);
     }
 
     /**
@@ -73,12 +73,13 @@ class TeamPolicy
      */
     public function delete(User $user, Team $team): bool
     {
-        return $user->ownsTeam($team);
+        return $user->isBusinessOwner($team);
     }
 
     private function canManageTeamAccess(User $user, Team $team): bool
     {
         return $user->ownsTeam($team)
+            || $user->isBusinessOwner($team)
             || TeamAccess::allows($user, $team, 'settings.team')
             || $this->isInstanceOperator($user);
     }

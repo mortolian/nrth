@@ -18,7 +18,8 @@ class TeamInvitationController extends Controller
         $user = $request->user();
         $team = $invitation->team;
 
-        abort_unless($team !== null && $user->belongsToTeam($team), 403);
+        $isOperator = Gate::allows('manageInstanceBackups');
+        abort_unless($team !== null && $user !== null && ($user->belongsToTeam($team) || $isOperator), 403);
         Gate::forUser($user)->authorize('addTeamMember', $team);
 
         if ($team->hasUserWithEmail($invitation->email)) {
