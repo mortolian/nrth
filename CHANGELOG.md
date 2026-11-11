@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.47](https://github.com/mortolian/nrth/compare/v0.1.46...v0.1.47) (2026-11-11)
+
+
+### Documentation
+
+* add sample business setup instructions for local development ([46d4b4f](https://github.com/mortolian/nrth/commit/46d4b4f363c5d998cc7b0bac5c389a8e05ed5b7d))
+
 ## [0.1.46](https://github.com/mortolian/nrth/compare/v0.1.45...v0.1.46) (2026-11-10)
 
 
