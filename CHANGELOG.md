@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.49](https://github.com/mortolian/nrth/compare/v0.1.48...v0.1.49) (2026-11-11)
+
+
+### Features
+
+* enhance backup process with integrity verification and improved restoration ([437c1df](https://github.com/mortolian/nrth/commit/437c1dfe5edeefe354ae31ec6516283f5a0e379d))
+
 ## [0.1.48](https://github.com/mortolian/nrth/compare/v0.1.47...v0.1.48) (2026-11-11)
 
 
