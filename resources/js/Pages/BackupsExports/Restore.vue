@@ -108,6 +108,22 @@ echo "Importing dump…"
 $RUNNER exec -T -i postgres psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$HOST_DUMP"
 rm -f "$HOST_DUMP"
 
+echo "Restoring stored files (receipts, invoices, logos, statements)…"
+$RUNNER exec -T app sh -c 'mkdir -p /var/www/html/storage
+WORKDIR="'"$WORKDIR"'"
+if [ -d "$WORKDIR/storage/app" ]; then
+  cp -a "$WORKDIR/storage/." /var/www/html/storage/
+elif [ -d "$WORKDIR/var/www/html/storage/app" ]; then
+  cp -a "$WORKDIR/var/www/html/storage/." /var/www/html/storage/
+else
+  found=$(find "$WORKDIR" -type d -path "*/storage/app" | head -1)
+  if [ -z "$found" ]; then
+    echo "The zip has no storage files. Aborting so receipts and uploads are not left behind." >&2
+    exit 1
+  fi
+  cp -a "$(dirname "$found")/." /var/www/html/storage/
+fi'
+
 echo "Starting services…"
 $RUNNER start app scheduler
 $RUNNER start horizon 2>/dev/null || true
@@ -115,10 +131,6 @@ $RUNNER start worker 2>/dev/null || true
 
 echo "Cleaning up extract dir…"
 $RUNNER exec -T app rm -rf "$WORKDIR"
-
-echo "Optional: restore uploaded files from the zip (re-extract, then):"
-echo "  $RUNNER exec -T app sh -c 'unzip -o $ZIP -d /tmp/nrth-files && cp -a /tmp/nrth-files/var/www/html/storage/app/private/. /var/www/html/storage/app/private/ && rm -rf /tmp/nrth-files'"
-echo "(Skip if you only need the database.)"
 
 echo "Done. Open the app and sign in. If assets look wrong, run ./scripts/update (self-host) or rebuild Vite."
 `;
@@ -184,7 +196,7 @@ const downloadRestoreScript = () => {
                     <li>This replaces the live Postgres database. Everyone will be signed out.</li>
                     <li>Prefer a quiet maintenance window; stop public traffic first if the instance is exposed.</li>
                     <li>Keep a copy of the current backup zip before overwriting data.</li>
-                    <li>App code still comes from git — the script restores data (and optionally storage files).</li>
+                    <li>The script restores the database and every uploaded file (receipts, invoices, logos, statements). App code still comes from git.</li>
                 </ul>
             </div>
 

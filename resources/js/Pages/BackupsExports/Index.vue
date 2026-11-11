@@ -567,7 +567,7 @@ onBeforeUnmount(() => {
                 <div>
                     <h2 class="text-lg font-semibold text-slate-900">Instance backup</h2>
                     <p class="mt-1 text-sm text-slate-600">
-                        Whole server backup (database + app files). Not a tax export.
+                        Whole server backup (database, application files, and every uploaded file). Not a tax export.
                     </p>
                 </div>
                 <AppButton

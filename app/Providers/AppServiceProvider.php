@@ -9,14 +9,15 @@ use App\Domain\Ai\AnthropicProvider;
 use App\Domain\Ai\GeminiProvider;
 use App\Domain\Ai\OpenAiCompatibleClient;
 use App\Domain\Ai\OpenAiCompatibleProvider;
+use App\Domain\Backup\Listeners\IncludeInstanceStorageInBackup;
 use App\Domain\Backup\Notifications\SafeBackupEventHandler;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
 use App\Domain\Banking\Importers\OfxBankStatementImporter;
 use App\Domain\Banking\Services\BankingStatementImporterRegistry;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceMailSettings;
-use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Instance\Services\InstanceOperatorService;
+use App\Domain\Instance\Services\InstanceTimezoneSettings;
 use App\Domain\Takeout\Models\TakeoutRun;
 use App\Http\Controllers\Web\Jetstream\TeamController as AppTeamController;
 use App\Http\Controllers\Web\Jetstream\TeamInvitationController as AppTeamInvitationController;
@@ -42,6 +43,7 @@ use Laravel\Jetstream\Http\Controllers\Inertia\TeamController as JetstreamTeamCo
 use Laravel\Jetstream\Http\Controllers\Inertia\TeamMemberController as JetstreamTeamMemberController;
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
 use Laravel\Jetstream\Http\Controllers\TeamInvitationController as JetstreamTeamInvitationController;
+use Spatie\Backup\Events\BackupManifestWasCreated;
 use Spatie\Backup\Notifications\EventHandler as SpatieBackupEventHandler;
 
 class AppServiceProvider extends ServiceProvider
@@ -132,6 +134,7 @@ class AppServiceProvider extends ServiceProvider
         // Horizon (and any queue worker) keeps boot-time config; re-apply per job so
         // instance SMTP / offsite disks match Settings after workers have started.
         Event::listen(JobProcessing::class, ApplyInstanceRuntimeSettings::class);
+        Event::listen(BackupManifestWasCreated::class, IncludeInstanceStorageInBackup::class);
 
         // After Jetstream registers Fortify views, enrich login for invitation joins.
         $this->app->booted(function (): void {

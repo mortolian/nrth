@@ -3,7 +3,9 @@
 namespace App\Domain\Backup\Jobs;
 
 use App\Domain\Backup\Enums\InstanceBackupRunStatus;
+use App\Domain\Backup\Exceptions\IncompleteInstanceBackup;
 use App\Domain\Backup\Models\InstanceBackupRun;
+use App\Domain\Backup\Services\InstanceBackupArchiveVerifier;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,6 +13,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Spatie\Backup\Events\BackupHasFailed;
 use Spatie\Backup\Events\BackupWasSuccessful;
@@ -101,6 +104,23 @@ class RunInstanceBackupJob implements ShouldQueue
                 $this->notifyBackupFinished(success: false, backupName: $backupName, failure: new RuntimeException($message));
 
                 throw new RuntimeException($message);
+            }
+
+            try {
+                app(InstanceBackupArchiveVerifier::class)->assertComplete(
+                    Storage::disk('local')->path((string) $match['path']),
+                );
+            } catch (IncompleteInstanceBackup $incomplete) {
+                $this->markFailed($run, $backups, $incomplete->getMessage());
+                // Keep the filename on the failed row so a leftover zip is not imported as Ready.
+                $run->forceFill([
+                    'filename' => $match['filename'],
+                    'storage_path' => $match['path'],
+                ])->save();
+                $backups->delete((string) $match['filename']);
+                $this->notifyBackupFinished(success: false, backupName: $backupName, failure: $incomplete);
+
+                throw $incomplete;
             }
 
             InstanceBackupRun::query()

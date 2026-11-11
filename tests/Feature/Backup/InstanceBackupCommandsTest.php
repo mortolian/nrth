@@ -6,6 +6,7 @@ use App\Console\Commands\RunInstanceBackupCommand;
 use App\Domain\Backup\Enums\InstanceBackupRunStatus;
 use App\Domain\Backup\Jobs\RunInstanceBackupJob;
 use App\Domain\Backup\Models\InstanceBackupRun;
+use App\Domain\Backup\Services\InstanceBackupArchiveVerifier;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Backup\Services\InstanceBackupTypeResolver;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
@@ -71,6 +72,9 @@ class InstanceBackupCommandsTest extends TestCase
         ]);
         $service->shouldReceive('mirrorWarningFor')->with($filename)->andReturn(null);
         $this->app->instance(InstanceBackupService::class, $service);
+        $this->mock(InstanceBackupArchiveVerifier::class, function ($mock): void {
+            $mock->shouldReceive('assertComplete')->once();
+        });
 
         Artisan::shouldReceive('call')->once()->with('backup:run', ['--disable-notifications' => true])->andReturn(0);
         Artisan::shouldReceive('output')->andReturn('');

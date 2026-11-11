@@ -35,7 +35,6 @@ return [
                  */
                 'include' => [
                     base_path(),
-                    // storage_path(),  // Include if you use zero downtime deployments and don't follow symlinks
                 ],
 
                 /*
@@ -51,6 +50,10 @@ return [
 
                 /*
                  * Determines if symlinks should be followed.
+                 *
+                 * Left off so public/storage (a link to storage/app/public) is not
+                 * archived twice. IncludeInstanceStorageInBackup still adds every
+                 * file under storage/app when the project walk skips them.
                  */
                 'follow_links' => false,
 
@@ -60,11 +63,11 @@ return [
                 'ignore_unreadable_directories' => false,
 
                 /*
-                 * This path is used to make directories in resulting zip-file relative
-                 * Set to `null` to include complete absolute path
-                 * Example: base_path()
+                 * Store project files as storage/app/... rather than the absolute
+                 * install path, so receipts and other uploads are obvious in the zip
+                 * and restore does not depend on /var/www/html.
                  */
-                'relative_path' => null,
+                'relative_path' => base_path(),
             ],
 
             /*
