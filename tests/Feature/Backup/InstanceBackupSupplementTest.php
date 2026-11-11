@@ -7,7 +7,6 @@ use App\Domain\Accounting\Enums\TransactionType;
 use App\Domain\Accounting\Models\Supplier;
 use App\Domain\Accounting\Models\Transaction;
 use App\Domain\Backup\Services\InstanceBackupReadablePath;
-use App\Domain\Backup\Services\InstanceBackupStorageCatalog;
 use App\Domain\Backup\Services\InstanceBackupSupplement;
 use App\Domain\Banking\Models\BankingAccount;
 use App\Domain\Banking\Models\BankingStatementImport;
@@ -70,7 +69,6 @@ class InstanceBackupSupplementTest extends TestCase
             fn ($entry) => $entry->name,
             app(InstanceBackupSupplement::class)->entries(),
         );
-        $nameSet = array_flip($names);
 
         $teamDir = InstanceBackupReadablePath::teamDirectory('Acme Books', $team->id);
         $this->assertContains('README.md', $names);
@@ -81,7 +79,6 @@ class InstanceBackupSupplementTest extends TestCase
         $this->assertStringContainsString('instance_backup', (string) $readme->contents);
         $this->assertStringContainsString('takeout_backup', (string) $readme->contents);
         $this->assertStringContainsString('db-dumps', (string) $readme->contents);
-        $this->assertContains('instance_backup/README.txt', $names);
         $this->assertContains('takeout_backup/README.txt', $names);
         $this->assertContains(
             'takeout_backup/'.$teamDir.'/expense-receipts/2026-06-20_Stationery-Co_receipt.pdf',
@@ -95,10 +92,8 @@ class InstanceBackupSupplementTest extends TestCase
             'takeout_backup/'.$teamDir.'/bank-statements/2026-06_FNB-Cheque_june-statement.csv',
             $names,
         );
-        $catalog = app(InstanceBackupStorageCatalog::class);
-        foreach ($catalog->files() as $path) {
-            $expected = InstanceBackupReadablePath::instanceFile($catalog->storageRoot(), $path);
-            $this->assertArrayHasKey($expected, $nameSet);
-        }
+        $this->assertFalse(collect($names)->contains(
+            fn (string $name) => str_starts_with($name, 'instance_backup/'),
+        ));
     }
 }

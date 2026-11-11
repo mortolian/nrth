@@ -573,9 +573,9 @@ class InstanceBackupService
         return $missing;
     }
 
-    public function mirrorWarningFor(string $filename): ?string
+    public function mirrorWarningFor(string $filename, bool $replace = false): ?string
     {
-        $copyErrors = $this->copyMissingOffsiteMirrors($filename);
+        $copyErrors = $this->copyMissingOffsiteMirrors($filename, $replace);
         $missing = $this->missingOffsiteDisksFor($filename);
         if ($missing === []) {
             return null;
@@ -606,7 +606,7 @@ class InstanceBackupService
      *
      * @return array<string, string>
      */
-    private function copyMissingOffsiteMirrors(string $filename): array
+    private function copyMissingOffsiteMirrors(string $filename, bool $replace = false): array
     {
         $errors = [];
         $safeName = $this->sanitizeFilename($filename);
@@ -614,7 +614,9 @@ class InstanceBackupService
             return $errors;
         }
 
-        $missing = $this->missingOffsiteDisksFor($safeName);
+        $missing = $replace
+            ? $this->destinationsSettings->offsiteDiskNames()
+            : $this->missingOffsiteDisksFor($safeName);
         if ($missing === []) {
             return $errors;
         }
@@ -681,7 +683,7 @@ class InstanceBackupService
                         'Content-Type' => 'application/zip',
                     ]);
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Fall through to stream.
             }
         }

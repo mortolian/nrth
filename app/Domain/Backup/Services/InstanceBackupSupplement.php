@@ -20,16 +20,15 @@ use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
- * Extra zip roots on top of the raw storage tree Spatie already archives.
+ * Readable copies and the restore guide added beside the application tree.
  *
- * instance_backup/ is the same bytes the app stores (numbered media folders).
- * takeout_backup/ is a readable copy grouped by business. Restore uses only
- * instance_backup.
+ * The www files, storage, and database dump live in instance_backup/.
+ * takeout_backup/ is a readable copy grouped by business. Restore uses
+ * instance_backup and leaves takeout_backup alone.
  */
 final class InstanceBackupSupplement
 {
     public function __construct(
-        private readonly InstanceBackupStorageCatalog $catalog,
         private readonly InstanceBackupRestoreReadme $restoreReadme,
     ) {}
 
@@ -46,25 +45,6 @@ final class InstanceBackupSupplement
             $this->restoreReadme->contents($filename),
             $used,
         );
-
-        $entries[] = $this->readme(
-            InstanceBackupReadablePath::INSTANCE_ROOT.'/README.txt',
-            "Raw uploaded files, stored the way the app stores them (numbered folders).\n"
-            ."Restore copies this folder onto storage. takeout_backup is a readable copy and is not restored.\n",
-            $used,
-        );
-
-        foreach ($this->catalog->files() as $path) {
-            $name = $this->unique(
-                InstanceBackupReadablePath::instanceFile($this->catalog->storageRoot(), $path),
-                $used,
-            );
-            $bytes = filesize($path);
-            if ($bytes === false) {
-                throw new IncompleteInstanceBackup("Cannot read storage file [{$path}] for instance_backup.");
-            }
-            $entries[] = new InstanceBackupZipEntry($name, $path, null, $bytes);
-        }
 
         $entries[] = $this->readme(
             InstanceBackupReadablePath::TAKEOUT_ROOT.'/README.txt',

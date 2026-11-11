@@ -4,9 +4,10 @@ namespace App\Domain\Backup\Services;
 
 use App\Domain\Backup\Exceptions\IncompleteInstanceBackup;
 use Spatie\Backup\Enums\Encryption;
+use Throwable;
 use ZipArchive;
 
-final class InstanceBackupZipWriter
+class InstanceBackupZipWriter
 {
     /**
      * @param  list<InstanceBackupZipEntry>  $entries
@@ -53,8 +54,16 @@ final class InstanceBackupZipWriter
                     }
                 }
             }
-        } finally {
+
+            $closed = $zip->close();
+        } catch (Throwable $failed) {
             $zip->close();
+
+            throw $failed;
+        }
+
+        if ($closed !== true) {
+            throw new IncompleteInstanceBackup('Could not save the readable file copies into the backup zip.');
         }
     }
 }

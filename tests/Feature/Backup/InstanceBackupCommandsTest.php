@@ -9,6 +9,8 @@ use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupArchiveVerifier;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Backup\Services\InstanceBackupTypeResolver;
+use App\Domain\Backup\Services\InstanceBackupZipLayout;
+use App\Domain\Backup\Services\InstanceBackupZipWriter;
 use App\Domain\Instance\Services\InstanceBackupDestinationSettings;
 use App\Domain\Instance\Services\InstanceBackupRetentionSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,11 +72,17 @@ class InstanceBackupCommandsTest extends TestCase
                 'size_bytes' => 2048,
             ],
         ]);
-        $service->shouldReceive('mirrorWarningFor')->with($filename)->andReturn(null);
+        $service->shouldReceive('mirrorWarningFor')->with($filename, true)->andReturn(null);
         $this->app->instance(InstanceBackupService::class, $service);
         $this->mock(InstanceBackupArchiveVerifier::class, function ($mock): void {
             $mock->shouldReceive('assertComplete')->once();
             $mock->shouldReceive('assertEntries')->once();
+        });
+        $this->mock(InstanceBackupZipWriter::class, function ($mock): void {
+            $mock->shouldReceive('add')->once();
+        });
+        $this->mock(InstanceBackupZipLayout::class, function ($mock): void {
+            $mock->shouldReceive('moveProjectTree')->once();
         });
 
         Artisan::shouldReceive('call')->once()->with('backup:run', ['--disable-notifications' => true])->andReturn(0);

@@ -107,7 +107,9 @@ class InstanceBackupStorageCatalog
         $names = [];
         $base = rtrim(base_path(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
         if (str_starts_with($absolutePath, $base)) {
-            $names[] = str_replace('\\', '/', substr($absolutePath, strlen($base)));
+            $relative = str_replace('\\', '/', substr($absolutePath, strlen($base)));
+            $names[] = $relative;
+            $names[] = 'instance_backup/'.$relative;
         }
 
         $names[] = str_replace('\\', '/', ltrim($absolutePath, DIRECTORY_SEPARATOR));

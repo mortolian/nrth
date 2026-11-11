@@ -37,15 +37,17 @@ final class InstanceBackupRestoreReadme
         {$encryptionNote}
         ## What is in this zip
 
-        - `db-dumps/*.sql` — Postgres dump (`pg_dump`, no owner, no ACLs). The database client must be Postgres **16**.
-        - `storage/` — uploaded files the way the app stores them, including numbered media folders.
-        - `instance_backup/` — those same uploaded files again. Restore copies this folder onto `storage`. The `README.txt` in that folder is not copied.
-        - `takeout_backup/` — the same files with readable names, grouped by business (expense receipts, invoices, payment receipts, estimates, logos, bank statements). Open this when you want to look at a file. Restore does not copy it onto the app.
-        - The rest of the project tree. `vendor`, `node_modules`, and `storage/framework` are left out, so do not boot a server from the unzipped tree alone.
+        The root of the zip has three things:
+
+        - `README.md` — this file.
+        - `instance_backup/` — the application tree from the server. That includes the code, `storage` (receipts and other uploads, still in the numbered folders the app uses), and `db-dumps` (the Postgres dump). `vendor`, `node_modules`, and `storage/framework` are left out.
+        - `takeout_backup/` — the same uploaded files with readable names, grouped by business (expense receipts, invoices, payment receipts, estimates, logos, bank statements). Open this when you want to look at a file. Restore does not copy it onto the app.
+
+        The database dump is `instance_backup/db-dumps/*.sql` (`pg_dump`, no owner, no ACLs). The database client must be Postgres **16**.
 
         This backup's database name was `{$database}` and its database user was `{$username}`. The dump has no owner, so a new install can import it with that install's own database user.
 
-        If a `.env` file is in this zip, it contains the old `APP_KEY` and database password. Treat it as a secret. Copy `APP_KEY` onto the new server. Keep the new server's `DB_PASSWORD` if Postgres was already initialized with it.
+        If `instance_backup/.env` is in this zip, it contains the old `APP_KEY` and database password. Treat it as a secret. Copy `APP_KEY` onto the new server. Keep the new server's `DB_PASSWORD` if Postgres was already initialized with it.
 
         ## 1. Install nrth on the new machine
 
@@ -89,7 +91,7 @@ final class InstanceBackupRestoreReadme
 
         ## 4. Restore the database and uploaded files
 
-        This stops the app, drops the live database, imports the dump, and copies `instance_backup` onto `storage`. `takeout_backup` is left unused. Postgres stays up. Expect downtime.
+        This stops the app, drops the live database, imports the dump from `instance_backup/db-dumps`, and copies `instance_backup/storage` onto the app. `takeout_backup` is left unused. Postgres stays up. Expect downtime.
 
         Save the script as `restore-backup.sh` in `/opt/nrth`, review it, then run `bash restore-backup.sh`.
 
@@ -117,9 +119,9 @@ final class InstanceBackupRestoreReadme
         \$RUNNER exec -T app mkdir -p "\$WORKDIR"
         \$RUNNER exec -T app unzip -o "\$ZIP" -d "\$WORKDIR"
 
-        DUMP="\$(\$RUNNER exec -T app sh -c "ls \$WORKDIR/db-dumps/*.sql 2>/dev/null | head -1")"
+        DUMP="\$(\$RUNNER exec -T app sh -c "ls \$WORKDIR/instance_backup/db-dumps/*.sql \$WORKDIR/db-dumps/*.sql 2>/dev/null | head -1")"
         if [ -z "\$DUMP" ]; then
-          echo "No SQL dump found in \$WORKDIR/db-dumps — aborting." >&2
+          echo "No SQL dump found in instance_backup/db-dumps or db-dumps — aborting." >&2
           exit 1
         fi
         echo "Using dump: \$DUMP"
@@ -139,17 +141,19 @@ final class InstanceBackupRestoreReadme
         \$RUNNER exec -T -i postgres psql -U "\$DB_USER" -d "\$DB_NAME" -v ON_ERROR_STOP=1 < "\$HOST_DUMP"
         rm -f "\$HOST_DUMP"
 
-        echo "Restoring stored files from instance_backup (not takeout_backup)…"
+        echo "Restoring stored files from instance_backup/storage (not takeout_backup)…"
         \$RUNNER exec -T app sh -c 'mkdir -p /var/www/html/storage
         WORKDIR="'"\$WORKDIR"'"
-        if [ -d "\$WORKDIR/instance_backup/app" ]; then
+        if [ -d "\$WORKDIR/instance_backup/storage/app" ]; then
+          cp -a "\$WORKDIR/instance_backup/storage/." /var/www/html/storage/
+        elif [ -d "\$WORKDIR/instance_backup/app" ]; then
           find "\$WORKDIR/instance_backup" -mindepth 1 -maxdepth 1 ! -name README.txt -exec cp -a {} /var/www/html/storage/ \\;
         elif [ -d "\$WORKDIR/storage/app" ]; then
           cp -a "\$WORKDIR/storage/." /var/www/html/storage/
         elif [ -d "\$WORKDIR/var/www/html/storage/app" ]; then
           cp -a "\$WORKDIR/var/www/html/storage/." /var/www/html/storage/
         else
-          found=\$(find "\$WORKDIR" -type d -path "*/storage/app" | head -1)
+          found=\$(find "\$WORKDIR" -type d -path "*/storage/app" ! -path "*/takeout_backup/*" | head -1)
           if [ -z "\$found" ]; then
             echo "The zip has no storage files. Aborting so receipts and uploads are not left behind." >&2
             exit 1

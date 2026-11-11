@@ -8,6 +8,8 @@ use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupArchiveVerifier;
 use App\Domain\Backup\Services\InstanceBackupService;
 use App\Domain\Backup\Services\InstanceBackupSupplement;
+use App\Domain\Backup\Services\InstanceBackupZipLayout;
+use App\Domain\Backup\Services\InstanceBackupZipWriter;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -109,9 +111,15 @@ class RunInstanceBackupJob implements ShouldQueue
 
             try {
                 $archive = Storage::disk('local')->path((string) $match['path']);
+                $entries = app(InstanceBackupSupplement::class)->entries((string) $match['filename']);
+                // The queue worker may have booted before the zip listener existed.
+                // Move the application tree and add the readable copies on the saved zip.
+                app(InstanceBackupZipLayout::class)->moveProjectTree($archive);
+                app(InstanceBackupZipWriter::class)->add($archive, $entries);
                 $verifier = app(InstanceBackupArchiveVerifier::class);
                 $verifier->assertComplete($archive);
-                $verifier->assertEntries($archive, app(InstanceBackupSupplement::class)->entries((string) $match['filename']));
+                $verifier->assertEntries($archive, $entries);
+                $archiveSize = is_file($archive) ? filesize($archive) : false;
             } catch (IncompleteInstanceBackup $incomplete) {
                 $this->markFailed($run, $backups, $incomplete->getMessage());
                 // Keep the filename on the failed row so a leftover zip is not imported as Ready.
@@ -135,9 +143,9 @@ class RunInstanceBackupJob implements ShouldQueue
                 'filename' => $match['filename'],
                 'disk' => 'local',
                 'storage_path' => $match['path'],
-                'file_size_bytes' => $match['size_bytes'],
+                'file_size_bytes' => $archiveSize !== false ? $archiveSize : $match['size_bytes'],
                 'error_message' => null,
-                'mirror_warning' => $backups->mirrorWarningFor($match['filename']),
+                'mirror_warning' => $backups->mirrorWarningFor($match['filename'], true),
                 'completed_at' => ! empty($match['date'])
                     ? Carbon::parse($match['date'])
                     : now(),
