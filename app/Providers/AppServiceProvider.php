@@ -9,6 +9,7 @@ use App\Domain\Ai\AnthropicProvider;
 use App\Domain\Ai\GeminiProvider;
 use App\Domain\Ai\OpenAiCompatibleClient;
 use App\Domain\Ai\OpenAiCompatibleProvider;
+use App\Domain\Backup\Listeners\AddInstanceBackupSupplements;
 use App\Domain\Backup\Listeners\IncludeInstanceStorageInBackup;
 use App\Domain\Backup\Notifications\SafeBackupEventHandler;
 use App\Domain\Banking\Importers\CsvBankStatementImporter;
@@ -44,6 +45,7 @@ use Laravel\Jetstream\Http\Controllers\Inertia\TeamMemberController as Jetstream
 use Laravel\Jetstream\Http\Controllers\Inertia\UserProfileController as JetstreamUserProfileController;
 use Laravel\Jetstream\Http\Controllers\TeamInvitationController as JetstreamTeamInvitationController;
 use Spatie\Backup\Events\BackupManifestWasCreated;
+use Spatie\Backup\Events\BackupZipWasCreated;
 use Spatie\Backup\Notifications\EventHandler as SpatieBackupEventHandler;
 
 class AppServiceProvider extends ServiceProvider
@@ -135,6 +137,7 @@ class AppServiceProvider extends ServiceProvider
         // instance SMTP / offsite disks match Settings after workers have started.
         Event::listen(JobProcessing::class, ApplyInstanceRuntimeSettings::class);
         Event::listen(BackupManifestWasCreated::class, IncludeInstanceStorageInBackup::class);
+        Event::listen(BackupZipWasCreated::class, AddInstanceBackupSupplements::class);
 
         // After Jetstream registers Fortify views, enrich login for invitation joins.
         $this->app->booted(function (): void {

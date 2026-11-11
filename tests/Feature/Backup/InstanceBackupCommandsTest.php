@@ -74,6 +74,7 @@ class InstanceBackupCommandsTest extends TestCase
         $this->app->instance(InstanceBackupService::class, $service);
         $this->mock(InstanceBackupArchiveVerifier::class, function ($mock): void {
             $mock->shouldReceive('assertComplete')->once();
+            $mock->shouldReceive('assertEntries')->once();
         });
 
         Artisan::shouldReceive('call')->once()->with('backup:run', ['--disable-notifications' => true])->andReturn(0);

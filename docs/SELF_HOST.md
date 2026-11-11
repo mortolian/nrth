@@ -150,9 +150,12 @@ cd /opt/nrth
 
 Each zip is a full instance snapshot:
 
+- **`README.md`** at the zip root: how to install a new instance and restore this zip onto it (database, `APP_KEY`, and `instance_backup`).
 - A Postgres dump (`db-dumps/*.sql`) via `pg_dump` with `--no-owner --no-acl`. The client in the app image must match Compose Postgres **16**.
 - Application files from the project tree, stored relative to the install (`storage/app/...`, not an absolute `/var/www/html/...` path). `vendor`, `node_modules`, and `storage/framework` are left out.
 - **Every file under `storage/app`**: expense receipts, invoice PDFs, payment receipts, logos, bank-statement uploads, and takeouts. Those files live on the private disk (`storage/app/private`) and, for older media, the public disk (`storage/app/public`). The `public/storage` symlink is not the copy of record. The backup is marked failed, and the zip is deleted, if any of these files are missing from the archive.
+- **`instance_backup/`**: the same uploaded files again, still in the numbered folders the app uses. Restore copies this folder onto `storage`.
+- **`takeout_backup/`**: the same files with readable names, grouped by business (`expense-receipts`, `invoices`, `payment-receipts`, `estimates`, `logos`, `bank-statements`). This copy is for opening the zip by hand. Restore does not copy it back onto the app.
 - The backup zip directory itself (`storage/app/private/{APP_NAME}`) and `storage/app/backup-temp` are not nested inside the new zip.
 - Local zips are written to **`storage/app/private/{APP_NAME}/`** (default `APP_NAME=nrth` → `storage/app/private/nrth/*.zip`). That directory lives on the Compose `storage_data` volume.
 
@@ -223,7 +226,7 @@ There is no in-app one-click restore — it would overwrite the live database wh
 1. Confirm a **Ready** zip exists locally (download it from the UI, or copy it back from offsite).
 2. Open **Settings → Backups & exports → Instance restore guide** (or **Restore guide** on a ready row).
 3. Pick the zip and runtime (`./scripts/compose.sh` for self-host, Sail for laptop). Copy or download the generated script.
-4. Review it. It extracts the zip, stops app services (Postgres stays up), **drops and recreates** the database, imports the dump, copies `storage` from the zip back onto the install (receipts and other uploads included), then starts services again. Older zips keep those files under `var/www/html/storage/...`; current zips use `storage/...`. The script accepts both.
+4. Review it. It extracts the zip, stops app services (Postgres stays up), **drops and recreates** the database, imports the dump, copies `instance_backup` (the raw numbered files) onto `storage`, then starts services again. It does not restore `takeout_backup`. Older zips have no `instance_backup` folder; the script then uses `storage/...` or `var/www/html/storage/...`.
 5. If you are rolling back an upgrade, restore data first, then point code at the previous tag: `./scripts/update --ref v0.x.y` ([UPGRADE.md](UPGRADE.md)).
 
 App code still comes from git. The zip is not a full OS image.

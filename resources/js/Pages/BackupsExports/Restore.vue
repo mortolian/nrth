@@ -108,10 +108,12 @@ echo "Importing dump…"
 $RUNNER exec -T -i postgres psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$HOST_DUMP"
 rm -f "$HOST_DUMP"
 
-echo "Restoring stored files (receipts, invoices, logos, statements)…"
+echo "Restoring stored files from instance_backup (raw numbered folders, not takeout_backup)…"
 $RUNNER exec -T app sh -c 'mkdir -p /var/www/html/storage
 WORKDIR="'"$WORKDIR"'"
-if [ -d "$WORKDIR/storage/app" ]; then
+if [ -d "$WORKDIR/instance_backup/app" ]; then
+  find "$WORKDIR/instance_backup" -mindepth 1 -maxdepth 1 ! -name README.txt -exec cp -a {} /var/www/html/storage/ \;
+elif [ -d "$WORKDIR/storage/app" ]; then
   cp -a "$WORKDIR/storage/." /var/www/html/storage/
 elif [ -d "$WORKDIR/var/www/html/storage/app" ]; then
   cp -a "$WORKDIR/var/www/html/storage/." /var/www/html/storage/
@@ -196,7 +198,7 @@ const downloadRestoreScript = () => {
                     <li>This replaces the live Postgres database. Everyone will be signed out.</li>
                     <li>Prefer a quiet maintenance window; stop public traffic first if the instance is exposed.</li>
                     <li>Keep a copy of the current backup zip before overwriting data.</li>
-                    <li>The script restores the database and every uploaded file (receipts, invoices, logos, statements). App code still comes from git.</li>
+                    <li>The script restores the database and the raw uploaded files from instance_backup (numbered folders). takeout_backup is a readable copy and is not copied back onto the app. App code still comes from git.</li>
                 </ul>
             </div>
 

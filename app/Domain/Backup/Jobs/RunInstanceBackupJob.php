@@ -7,6 +7,7 @@ use App\Domain\Backup\Exceptions\IncompleteInstanceBackup;
 use App\Domain\Backup\Models\InstanceBackupRun;
 use App\Domain\Backup\Services\InstanceBackupArchiveVerifier;
 use App\Domain\Backup\Services\InstanceBackupService;
+use App\Domain\Backup\Services\InstanceBackupSupplement;
 use App\Domain\Instance\Services\InstanceMailSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -107,9 +108,10 @@ class RunInstanceBackupJob implements ShouldQueue
             }
 
             try {
-                app(InstanceBackupArchiveVerifier::class)->assertComplete(
-                    Storage::disk('local')->path((string) $match['path']),
-                );
+                $archive = Storage::disk('local')->path((string) $match['path']);
+                $verifier = app(InstanceBackupArchiveVerifier::class);
+                $verifier->assertComplete($archive);
+                $verifier->assertEntries($archive, app(InstanceBackupSupplement::class)->entries((string) $match['filename']));
             } catch (IncompleteInstanceBackup $incomplete) {
                 $this->markFailed($run, $backups, $incomplete->getMessage());
                 // Keep the filename on the failed row so a leftover zip is not imported as Ready.
