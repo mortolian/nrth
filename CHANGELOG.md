@@ -2,6 +2,13 @@
 
 All notable changes to nrth are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.1.48](https://github.com/mortolian/nrth/compare/v0.1.47...v0.1.48) (2026-11-11)
+
+
+### Features
+
+* enhance takeout notifications with email support ([236057a](https://github.com/mortolian/nrth/commit/236057ab10a1affcac89d258cfae6d2e0c23f09f))
+
 ## [0.1.47](https://github.com/mortolian/nrth/compare/v0.1.46...v0.1.47) (2026-11-11)
 
 
