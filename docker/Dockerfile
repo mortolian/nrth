@@ -62,8 +62,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     pdo_pgsql \
     zip
 
-RUN pecl install redis swoole \
-    && docker-php-ext-enable redis swoole
+RUN pecl install swoole \
+    && docker-php-ext-enable swoole
 
 # Node/npm in the runtime image so `sail npm` / Vite can run inside the app container (not on the host).
 COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node

@@ -29,7 +29,7 @@
 - **Banking** — import CSV/OFX statements (one or more files per upload), duplicate detection, match or exclude imported lines (including mixed personal/business accounts), or create an expense from an unmatched debit
 - **Tax** — VAT returns and rates (configure during setup wizard)
 - **Teams** — multi-user companies via Jetstream
-- **Self-hosted** — Docker Compose stack with Postgres, Redis, and MinIO included; sidebar shows the installed version and when a newer GitHub Release is available
+- **Self-hosted** — Docker Compose stack with Postgres (sessions, cache, and queues in Postgres); sidebar shows the installed version and when a newer GitHub Release is available
 
 ## Screenshots
 
@@ -94,7 +94,7 @@ Please search [existing issues](https://github.com/mortolian/nrth/issues) before
 
 ## Tech stack
 
-Laravel 13 · Jetstream (Inertia + Teams) · Vue 3 · Tailwind CSS v4 · PostgreSQL · Redis · Octane (Swoole) · Horizon
+Laravel 13 · Jetstream (Inertia + Teams) · Vue 3 · Tailwind CSS v4 · PostgreSQL · Octane (Swoole)
 
 Domain logic lives under `app/Domain/`. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

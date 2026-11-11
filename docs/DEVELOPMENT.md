@@ -7,7 +7,7 @@ This document is for **contributors** who have cloned the repository from git. I
 - PHP 8.3+ (8.4+ recommended; Docker image uses 8.4)
 - Composer 2.7+
 - Node.js 20.19+ or 22.12+
-- PostgreSQL and Redis for full parity — or use Docker Compose
+- PostgreSQL for a full install — or use Docker Compose (sessions, cache, and queues use that Postgres)
 
 ## Local setup (PHP on the host)
 
@@ -34,7 +34,7 @@ Set `APP_URL=https://localhost:8000` in `.env`. For local development without a 
 
 ### SQLite (minimal)
 
-The default `.env.example` uses SQLite for quick experiments. For features that need Postgres/Redis/queues, use Docker Compose instead.
+The default `.env.example` uses SQLite for quick experiments. For Postgres and queues, use Docker Compose instead.
 
 ### Tests
 
@@ -61,7 +61,7 @@ NRTH_ALLOW_DESTRUCTIVE_DATABASE_RESET=1 ./scripts/compose.sh exec -T app php art
 
 ## Docker Compose (full stack while developing)
 
-If you need Postgres, Redis, and queues while working on a clone, you can use the same `compose.yaml` as production — but **new installs should use `scripts/install.sh`**, not manual `docker compose` steps.
+If you need Postgres and queues while working on a clone, you can use the same `compose.yaml` as production — but **new installs should use `scripts/install.sh`**, not manual `docker compose` steps.
 
 After cloning:
 
@@ -95,7 +95,7 @@ COMPOSE_PROFILES=dev ./vendor/bin/sail up -d
 Or add `COMPOSE_PROFILES=dev` to `.env` before starting the stack. Then Vite HMR is available
 at `http://localhost:5173`; use `./vendor/bin/sail logs -f vite` or
 `./vendor/bin/sail logs -f horizon` to inspect either service. See `.env.example` for
-Docker-related variables (`DB_HOST`, `REDIS_HOST`, forwarded ports).
+Docker-related variables (`DB_HOST`, forwarded ports).
 
 ### Email (invitations, owner notices, invoices, password reset)
 
@@ -121,7 +121,7 @@ Canonical self-host guide: [SELF_HOST.md](SELF_HOST.md) (`./scripts/backup`, res
 
 - Team owners use **Settings → Backups & exports** for data takeouts (Tax → Documents redirects there).
 - The first user created is an instance operator. Public self-registration is disabled; for local access, use the installer-created account or create users/admins explicitly. Manage operators under **Settings → Instance**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
-- Takeout and instance backup jobs run on Horizon’s `long` queue (multi-minute). Restart Horizon after pulling changes: `./vendor/bin/sail restart horizon` (or `php artisan horizon:terminate`). `./scripts/backup` waits in the `app` container and does not need Horizon.
+- Takeout and instance backup jobs run on the `long` queue (multi-minute). The Compose `horizon` service runs `queue:work` for that queue. Restart it after pulling worker changes: `./vendor/bin/sail restart horizon`. `./scripts/backup` waits in the `app` container.
 - Instance backups need `pg_dump` matching Compose Postgres (**16**). After Dockerfile client changes: `./vendor/bin/sail build` then recreate containers.
 
 ## Architecture
@@ -159,7 +159,7 @@ Internal AI/editor conventions may live in `.cursor/rules` — optional for huma
 
 `brick/money`, Spatie (permission, activity log, media library, backup), PhpSpreadsheet (VAT export), Laravel Pennant, Cashier, Horizon, Octane, Sanctum.
 
-- **Horizon** requires Redis (`QUEUE_CONNECTION=redis`).
+- **Queues** use Postgres (`QUEUE_CONNECTION=database`). The Compose `horizon` service runs `queue:work` on the `long` and `default` queues.
 - **Cashier** needs Stripe keys in `.env` when billing is enabled.
 
 ## First-time app setup

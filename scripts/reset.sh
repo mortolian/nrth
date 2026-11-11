@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Nuclear reset: stop the stack, delete all Docker volumes, and re-run install.
-# All database rows, uploads, Redis data, and MinIO objects are destroyed.
+# All database rows and uploads in Docker volumes are destroyed.
 #
 # Usage:
 #   ./scripts/reset.sh --force
@@ -58,7 +58,7 @@ confirm_data_risk() {
     fi
 
     echo ""
-    echo "This will permanently delete all Docker volumes (database, uploads, Redis, MinIO)."
+    echo "This will permanently delete all Docker volumes (database, uploads, and other named volumes)."
     echo ""
     echo "Before continuing, please confirm:"
     echo "  • You have verified this machine is backed up."
@@ -108,8 +108,8 @@ parse_args() {
 
     if [[ "$FORCE" -ne 1 && "${NRTH_FORCE:-}" != "1" ]]; then
         cat >&2 <<'EOF'
-error: reset.sh permanently deletes all Docker volumes (PostgreSQL, Redis, MinIO,
-       storage uploads, vendor, and node_modules).
+error: reset.sh permanently deletes all Docker volumes (PostgreSQL, storage
+       uploads, vendor, and node_modules).
 
 Re-run with --force when you have no data to keep:
   ./scripts/reset.sh --force

@@ -55,7 +55,7 @@ We appreciate responsible disclosure. We will not pursue legal action against re
 If you run your own instance:
 
 - Keep `APP_DEBUG=false` in production
-- Use HTTPS and strong passwords for database, Redis, and MinIO
+- Use HTTPS and a strong database password
 - Apply updates from `master` or tagged releases promptly
 - See [docs/SELF_HOST.md](docs/SELF_HOST.md) (HTTPS, backups, [multi-tenant hardening](docs/SELF_HOST.md#multi-tenant-hardening))
 

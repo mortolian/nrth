@@ -4,7 +4,7 @@
 
 Self-host users: follow [INSTALL.md](INSTALL.md) — same install and `./scripts/update` commands.
 
-**Security:** the default below is `--lan` (plain HTTP on `:8000`). That is fine only on a **trusted private LAN**. It is not secure on the public internet. Postgres and Redis bind to `127.0.0.1` on the host, while Vite HMR and Mailpit stay behind the optional `dev` profile. For HTTPS on the same box, switch to the Caddy/`proxy` setup in [SELF_HOST.md](SELF_HOST.md).
+**Security:** the default below is `--lan` (plain HTTP on `:8000`). That is fine only on a **trusted private LAN**. It is not secure on the public internet. Postgres binds to `127.0.0.1` on the host, while Vite HMR and Mailpit stay behind the optional `dev` profile. For HTTPS on the same box, switch to the Caddy/`proxy` setup in [SELF_HOST.md](SELF_HOST.md).
 
 ---
 

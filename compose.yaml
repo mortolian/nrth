@@ -30,10 +30,7 @@ x-laravel-env: &laravel-env
   FILESYSTEM_DISK: "${FILESYSTEM_DISK}"
   QUEUE_CONNECTION: "${QUEUE_CONNECTION}"
   CACHE_STORE: "${CACHE_STORE}"
-  REDIS_CLIENT: "${REDIS_CLIENT}"
-  REDIS_HOST: "${REDIS_HOST}"
-  REDIS_PASSWORD: "${REDIS_PASSWORD}"
-  REDIS_PORT: "${REDIS_PORT}"
+  DB_QUEUE_RETRY_AFTER: "${DB_QUEUE_RETRY_AFTER:-3900}"
   MAIL_MAILER: "${MAIL_MAILER}"
   MAIL_SCHEME: "${MAIL_SCHEME}"
   MAIL_HOST: "${MAIL_HOST}"
@@ -56,9 +53,10 @@ x-laravel-env: &laravel-env
   VITE_DEV_SERVER_HMR_PORT: "${VITE_DEV_SERVER_HMR_PORT:-5173}"
   VITE_DEV_SERVER_USE_POLLING: "${VITE_DEV_SERVER_USE_POLLING:-false}"
 
-# Service names (postgres, redis, mailpit) only resolve inside the Compose network.
+# Service names (postgres, mailpit) only resolve inside the Compose network.
 # `.env` can use 127.0.0.1 + forwarded ports for `php artisan` on the host; app/horizon/scheduler
-# override those keys below so containers always use in-network hosts.
+# override DB_HOST below so containers always use the in-network Postgres host.
+# Sessions, cache, and queues use that Postgres database (no Redis service).
 
 services:
   postgres:
@@ -78,21 +76,6 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    ports:
-      - "127.0.0.1:${FORWARD_REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
 
   mailpit:
     image: axllent/mailpit:latest
@@ -117,7 +100,6 @@ services:
     environment:
       <<: *laravel-env
       DB_HOST: postgres
-      REDIS_HOST: redis
       DOCKER_ROLE: app
       LARAVEL_SAIL: '1'
       # Octane's file-watcher.cjs runs under vendor/laravel/octane/bin; NODE_PATH guarantees
@@ -125,8 +107,6 @@ services:
       NODE_PATH: /var/www/html/node_modules
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     volumes:
       # Host source (hot reload for PHP/Vue) + Linux vendor/node_modules in named volumes.
@@ -169,6 +149,8 @@ services:
     entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
     command: ['npm', 'run', 'dev']
 
+  # Queue worker. The service name stays `horizon` so existing Compose overrides keep attaching.
+  # Jobs are stored in Postgres. Horizon itself needs Redis, so this process is queue:work.
   horizon:
     image: nrth:local
     restart: unless-stopped
@@ -176,12 +158,9 @@ services:
     environment:
       <<: *laravel-env
       DB_HOST: postgres
-      REDIS_HOST: redis
       DOCKER_ROLE: horizon
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       app:
         condition: service_started
@@ -192,9 +171,9 @@ services:
       - node_modules_data:/var/www/html/node_modules
       - storage_data:/var/www/html/storage
     entrypoint: ['/bin/sh', '/usr/local/bin/docker-entrypoint.sh']
-    command: ['php', 'artisan', 'horizon']
+    command: ['php', 'artisan', 'queue:work', '--queue=long,default', '--sleep=1', '--tries=1', '--timeout=3600']
     healthcheck:
-      test: ['CMD-SHELL', 'pgrep -f "artisan horizon" >/dev/null']
+      test: ['CMD-SHELL', 'pgrep -f "artisan queue:work" >/dev/null']
       interval: 30s
       timeout: 10s
       retries: 5
@@ -206,12 +185,9 @@ services:
     environment:
       <<: *laravel-env
       DB_HOST: postgres
-      REDIS_HOST: redis
       DOCKER_ROLE: scheduler
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       app:
         condition: service_started
@@ -261,7 +237,6 @@ services:
 
 volumes:
   mysql_data:
-  redis_data:
   storage_data:
   vendor_data:
   node_modules_data:

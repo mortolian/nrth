@@ -102,8 +102,8 @@ guard_destructive_compose() {
     compose_args_include_force "${@:2}" && return 0
 
     cat >&2 <<'EOF'
-error: `compose down -v` permanently deletes Docker volumes (PostgreSQL, Redis, MinIO,
-       storage uploads, vendor, and node_modules). All application data in those
+error: `compose down -v` permanently deletes Docker volumes (PostgreSQL, storage
+       uploads, vendor, and node_modules). All application data in those
        volumes will be lost.
 
 To proceed anyway, pass --force:

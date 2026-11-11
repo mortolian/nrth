@@ -16,8 +16,8 @@ nrth is a financial app — do not expose plain HTTP long-term.
 - Never open `https://host:8000` — nothing speaks TLS on that port.
 - `--lan` / HTTP on `:8000` is **trusted private network only**. Do not port-forward the app to the internet.
 - Do not publish Octane `:8000` on a public interface. The default `TRUSTED_PROXIES=*` trusts `X-Forwarded-*` from any client; only Caddy (or your reverse proxy) should be able to reach port 8000.
-- Postgres and Redis host ports bind to `127.0.0.1` by default. Vite HMR and Mailpit are dev-only services behind the optional `dev` Compose profile.
-- Production: do not publish Postgres, Redis, or Mailpit on `0.0.0.0`; firewall should allow **80/443 only** to the host.
+- Postgres host ports bind to `127.0.0.1` by default. Vite HMR and Mailpit are dev-only services behind the optional `dev` Compose profile.
+- Production: do not publish Postgres or Mailpit on `0.0.0.0`; firewall should allow **80/443 only** to the host.
 
 ### LAN IP (self-signed)
 
@@ -47,7 +47,7 @@ Port 80 must be reachable for ACME. Temporary plain HTTP for private LAN only: s
 
 1. `APP_DEBUG=false`, `APP_ENV=production`
 2. Set the instance default under **Settings → Instance → Timezone** (or `APP_TIMEZONE` in `.env` as the install fallback, e.g. `Africa/Johannesburg`). Each business can override under **Settings → Business**. Schedules and backups use the instance default; the sidebar clock uses the current business timezone (or the instance default when unset).
-3. HTTPS on 443; firewall only 80/443 (not `:8000`, and not Postgres/Redis/Mailpit)
+3. HTTPS on 443; firewall only 80/443 (not `:8000`, and not Postgres or Mailpit)
 4. Outbound email: configure SMTP under **Settings → Instance → Outbound email**, or set `MAIL_*` in `.env` (Mailpit is for testing — do not expose `:8025` publicly). Instance SMTP overrides `.env` when enabled (applied on each Octane request and Horizon job — no worker restart required after saving). Use a **From** address on a domain your provider has verified (not `example.com`); that From is also used for instance backup status emails, which go to instance operators. A backup zip is still marked Ready if the status email fails to send.
 5. Instance backups (`./scripts/backup`) plus a host-level snapshot of Postgres + `storage` volumes — see [Backups and restore](#backups-and-restore)
 6. Never commit `.env`
@@ -110,7 +110,7 @@ The checked-in [.env.example](../.env.example) is a **local template**. Before t
 | `PAYFAST_SANDBOX` | `false` or unset |
 | PayFast passphrase / Stripe webhook secret | Required in business settings when that gateway is enabled |
 
-Also: never commit `.env`; do not publish Octane `:8000` or Postgres/Redis on a public interface. Full HTTPS and backup checklist is above.
+Also: never commit `.env`; do not publish Octane `:8000` or Postgres on a public interface. Full HTTPS and backup checklist is above.
 
 ---
 

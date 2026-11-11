@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/mortolian/nrth/master/scripts/insta
   | sudo bash -s -- --accept-data-risk --lan --install-dir /opt/nrth
 ```
 
-`--lan` is **trusted private network only** — plain HTTP, no Caddy. Do not port-forward `:8000` (or Postgres/Redis) to the internet. For anything broader, use `--production` or turn on HTTPS later ([SELF_HOST.md](SELF_HOST.md)).
+`--lan` is **trusted private network only** — plain HTTP, no Caddy. Do not port-forward `:8000` (or Postgres) to the internet. For anything broader, use `--production` or turn on HTTPS later ([SELF_HOST.md](SELF_HOST.md)).
 
 From a git clone: `./scripts/install.sh --production` (or `--lan`).
 
@@ -40,7 +40,7 @@ Sign in as `sample@northwind.example` / `password`. This replaces only the North
 Public self-registration is disabled. The installer-created admin account (and any later accounts created by the instance administrator) is the supported way into an instance. Several businesses can share one install; isolation and production `.env` warnings: **[SELF_HOST.md — Multi-tenant hardening](SELF_HOST.md#multi-tenant-hardening)**.
 
 For safety, self-hosted installs do **not** start the optional Vite HMR or Mailpit services by default.
-Deployed instances should serve built assets from `public/build`, and Postgres/Redis host ports bind to `127.0.0.1`.
+Deployed instances should serve built assets from `public/build`, and the Postgres host port binds to `127.0.0.1`.
 
 If the admin wizard did not run (non-interactive install):
 
