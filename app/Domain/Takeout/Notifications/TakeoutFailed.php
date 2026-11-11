@@ -5,6 +5,7 @@ namespace App\Domain\Takeout\Notifications;
 use App\Domain\Takeout\Models\TakeoutRun;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class TakeoutFailed extends Notification implements ShouldQueue
@@ -21,7 +22,21 @@ class TakeoutFailed extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['mail', 'database'];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $from = $this->takeoutRun->from_date->toDateString();
+        $to = $this->takeoutRun->to_date->toDateString();
+
+        return (new MailMessage)
+            ->subject(__('Your data takeout failed'))
+            ->markdown('emails.takeout-failed', [
+                'fromDate' => $from,
+                'toDate' => $to,
+                'reason' => $this->reason,
+            ]);
     }
 
     /**

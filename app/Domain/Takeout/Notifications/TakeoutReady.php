@@ -5,6 +5,7 @@ namespace App\Domain\Takeout\Notifications;
 use App\Domain\Takeout\Models\TakeoutRun;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 class TakeoutReady extends Notification implements ShouldQueue
@@ -20,7 +21,22 @@ class TakeoutReady extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['mail', 'database'];
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $from = $this->takeoutRun->from_date->toDateString();
+        $to = $this->takeoutRun->to_date->toDateString();
+
+        return (new MailMessage)
+            ->subject(__('Your data takeout is ready'))
+            ->markdown('emails.takeout-ready', [
+                'fromDate' => $from,
+                'toDate' => $to,
+                'downloadUrl' => route('tax.takeouts.download', $this->takeoutRun),
+                'expiresAt' => $this->takeoutRun->expires_at?->timezone((string) config('app.timezone'))->toDayDateTimeString(),
+            ]);
     }
 
     /**

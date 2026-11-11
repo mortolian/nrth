@@ -52,6 +52,9 @@ class TaxDocumentsControllerTest extends TestCase
 
         (new GenerateTakeoutJob($run->id))->handle(app(TakeoutBuilder::class));
 
-        Notification::assertSentTo($user, TakeoutReady::class);
+        Notification::assertSentTo($user, TakeoutReady::class, function (TakeoutReady $notification) use ($user): bool {
+            return $notification->via($user) === ['mail', 'database']
+                && $notification->toMail($user)->subject === 'Your data takeout is ready';
+        });
     }
 }

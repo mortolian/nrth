@@ -121,7 +121,7 @@ Canonical self-host guide: [SELF_HOST.md](SELF_HOST.md) (`./scripts/backup`, res
 
 - Team owners use **Settings → Backups & exports** for data takeouts (Tax → Documents redirects there).
 - The first user created is an instance operator. Public self-registration is disabled; for local access, use the installer-created account or create users/admins explicitly. Manage operators under **Settings → Instance**. Optional: `NRTH_OPERATOR_EMAILS` as break-glass. For existing DBs with no operators: `php artisan nrth:promote-first-operator`.
-- Takeout and instance backup jobs run on the `long` queue (multi-minute). The Compose `horizon` service runs `queue:work` for that queue. Restart it after pulling worker changes: `./vendor/bin/sail restart horizon`. `./scripts/backup` waits in the `app` container.
+- Takeout and instance backup jobs run on the `long` queue (multi-minute). The owner who requested a takeout is emailed when the zip is ready. The Compose `horizon` service runs `queue:work` for that queue. Restart it after pulling worker changes: `./vendor/bin/sail restart horizon`. `./scripts/backup` waits in the `app` container.
 - Instance backups need `pg_dump` matching Compose Postgres (**16**). After Dockerfile client changes: `./vendor/bin/sail build` then recreate containers.
 
 ## Architecture

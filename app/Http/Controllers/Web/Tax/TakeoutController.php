@@ -41,7 +41,7 @@ class TakeoutController extends Controller
                 'from' => $validated['from_date'],
                 'to' => $validated['to_date'],
             ])
-            ->with('success', 'Your data takeout is being prepared. Refresh this page when it is ready to download.');
+            ->with('success', 'Your data takeout is being prepared. We will email you when it is ready to download.');
     }
 
     public function download(Request $request, TakeoutRun $takeoutRun): StreamedResponse
