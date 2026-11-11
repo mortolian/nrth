@@ -72,11 +72,6 @@ final class BusinessOwners
                 ]);
             }
 
-            $existing->name = $name;
-            if (filled($password)) {
-                $existing->password = $password;
-            }
-            $existing->save();
             $user = $existing;
         }
 

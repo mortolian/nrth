@@ -172,6 +172,63 @@ class InstanceSettingsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_operator_assigns_an_existing_account_by_id(): void
+    {
+        Mail::fake();
+
+        $operator = User::factory()->withPersonalTeam()->create([
+            'is_instance_operator' => true,
+        ]);
+        $owner = User::factory()->withPersonalTeam()->create();
+        $team = $owner->currentTeam;
+        $this->assertNotNull($team);
+        $existing = User::factory()->create([
+            'name' => 'Riley Chen',
+            'email' => 'riley@northwind.example',
+            'password' => 'already-set',
+        ]);
+
+        $this->actingAs($operator)
+            ->get(route('settings.instance.teams.show', $team))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Settings/Instance/Teams/Manage')
+                ->has('accounts'));
+
+        $this->actingAs($operator)
+            ->post(route('settings.instance.teams.owners.store', $team), [
+                'user_id' => $existing->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $existing->refresh();
+        $this->assertSame('Riley Chen', $existing->name);
+        $this->assertTrue(password_verify('already-set', $existing->password));
+        $this->assertTrue($existing->isBusinessOwner($team));
+        Mail::assertSent(BusinessOwnerAssignedMail::class, fn (BusinessOwnerAssignedMail $mail): bool => $mail->hasTo('riley@northwind.example') && ! $mail->newAccount);
+
+        $accountant = User::factory()->create([
+            'name' => 'Pat Lee',
+            'email' => 'pat@northwind.example',
+            'password' => 'pat-password',
+        ]);
+
+        $this->actingAs($operator)
+            ->post(route('settings.instance.teams.members.store', $team), [
+                'user_id' => $accountant->id,
+                'role' => 'accountant',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $accountant->refresh();
+        $this->assertSame('Pat Lee', $accountant->name);
+        $this->assertTrue(password_verify('pat-password', $accountant->password));
+        $this->assertSame('accountant', $team->users()->where('users.id', $accountant->id)->first()?->membership->role);
+        $this->assertFalse($accountant->isBusinessOwner($team));
+    }
+
     public function test_operator_adds_an_owner_and_sends_an_ownership_notice(): void
     {
         Mail::fake();

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { router, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
     DialogContent,
     DialogOverlay,
@@ -47,12 +47,19 @@ type PermissionGroup = {
     permissions: Array<{ key: string; label: string }>;
 };
 
+type AccountRow = {
+    id: number;
+    name: string;
+    email: string;
+};
+
 const props = defineProps<{
     team: { id: number; name: string };
     owners: OwnerRow[];
     members: MemberRow[];
     invitations: InvitationRow[];
     roles: RoleRow[];
+    accounts: AccountRow[];
     permission_groups: PermissionGroup[];
 }>();
 
@@ -66,10 +73,7 @@ const ownerForm = useForm({
 });
 
 const openAddOwner = () => {
-    editingOwnerId.value = null;
-    ownerForm.reset();
-    ownerForm.clearErrors();
-    ownerOpen.value = true;
+    openAddPerson('owner');
 };
 
 const openEditOwner = (owner: OwnerRow) => {
@@ -83,20 +87,13 @@ const openEditOwner = (owner: OwnerRow) => {
 };
 
 const saveOwner = () => {
-    const options = {
+    ownerForm.put(route('settings.instance.teams.owners.update', [props.team.id, editingOwnerId.value]), {
         preserveScroll: true,
         onSuccess: () => {
             ownerOpen.value = false;
             ownerForm.reset('password', 'password_confirmation');
         },
-    };
-
-    if (editingOwnerId.value === null) {
-        ownerForm.post(route('settings.instance.teams.owners.store', props.team.id), options);
-        return;
-    }
-
-    ownerForm.put(route('settings.instance.teams.owners.update', [props.team.id, editingOwnerId.value]), options);
+    });
 };
 
 const removeOwner = (owner: OwnerRow) => {
@@ -109,27 +106,84 @@ const removeOwner = (owner: OwnerRow) => {
     });
 };
 
-const memberOpen = ref(false);
-const memberForm = useForm({
+const personOpen = ref(false);
+const accountQuery = ref('');
+const creatingAccount = ref(false);
+const personForm = useForm({
+    user_id: '' as string | number,
     name: '',
     email: '',
     password: '',
     password_confirmation: '',
-    role: props.roles[0]?.key ?? 'accountant',
+    role: 'owner',
 });
 
-const openAddMember = () => {
-    memberForm.reset();
-    memberForm.clearErrors();
-    memberForm.role = props.roles[0]?.key ?? 'accountant';
-    memberOpen.value = true;
+const selectedAccount = computed(() => props.accounts.find((account) => account.id === Number(personForm.user_id)) ?? null);
+
+const accountMatches = computed(() => {
+    const query = accountQuery.value.trim().toLowerCase();
+
+    return props.accounts
+        .filter((account) => query === '' || `${account.name} ${account.email}`.toLowerCase().includes(query))
+        .slice(0, 8);
+});
+
+const openAddPerson = (role: string) => {
+    personForm.reset();
+    personForm.clearErrors();
+    personForm.role = role;
+    accountQuery.value = '';
+    creatingAccount.value = false;
+    personOpen.value = true;
 };
 
-const saveMember = () => {
-    memberForm.post(route('settings.instance.teams.members.store', props.team.id), {
-        preserveScroll: true,
-        onSuccess: () => memberOpen.value = false,
-    });
+const openAddMember = () => {
+    openAddPerson(props.roles[0]?.key ?? 'accountant');
+};
+
+const chooseAccount = (account: AccountRow) => {
+    personForm.user_id = account.id;
+    creatingAccount.value = false;
+    accountQuery.value = '';
+    personForm.clearErrors();
+};
+
+const chooseNewAccount = () => {
+    personForm.user_id = '';
+    creatingAccount.value = true;
+    personForm.clearErrors();
+};
+
+const savePerson = () => {
+    const isOwner = personForm.role === 'owner';
+    personForm
+        .transform((data) => {
+            if (data.user_id) {
+                return isOwner
+                    ? { user_id: data.user_id }
+                    : { user_id: data.user_id, role: data.role };
+            }
+
+            const account = {
+                name: data.name,
+                email: data.email,
+                password: data.password,
+                password_confirmation: data.password_confirmation,
+            };
+
+            return isOwner ? account : { ...account, role: data.role };
+        })
+        .post(
+            isOwner
+                ? route('settings.instance.teams.owners.store', props.team.id)
+                : route('settings.instance.teams.members.store', props.team.id),
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    personOpen.value = false;
+                },
+            },
+        );
 };
 
 const roleTarget = ref<MemberRow | null>(null);
@@ -277,7 +331,7 @@ const deleteRole = (role: RoleRow) => {
                     <div>
                         <h3 class="text-base font-semibold text-slate-900">Owners</h3>
                         <p class="mt-0.5 max-w-2xl text-sm text-slate-500">
-                            A new email creates a sign-in and emails a notice. There is nothing to accept, and the password is not in the email.
+                            Pick an existing account, or create a new sign-in. Choosing an account keeps their name and password.
                         </p>
                     </div>
                     <AppButton variant="primary" size="sm" @click="openAddOwner">
@@ -320,7 +374,7 @@ const deleteRole = (role: RoleRow) => {
                     <div>
                         <h3 class="text-base font-semibold text-slate-900">Members</h3>
                         <p class="mt-0.5 max-w-2xl text-sm text-slate-500">
-                            Add an accountant, viewer, or custom role without an invitation. Invite by email when they should accept a link.
+                            Pick an existing account and a role, or create a new sign-in. No invitation is sent.
                         </p>
                     </div>
                     <div class="flex gap-2">
@@ -429,12 +483,8 @@ const deleteRole = (role: RoleRow) => {
             <DialogPortal>
                 <DialogOverlay class="fixed inset-0 z-[80] bg-slate-900/40" />
                 <DialogContent class="fixed left-1/2 top-1/2 z-[90] w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
-                    <DialogTitle class="text-lg font-semibold text-slate-900">
-                        {{ editingOwnerId === null ? 'Add owner' : 'Edit owner' }}
-                    </DialogTitle>
-                    <p class="mt-1 text-sm text-slate-500">
-                        {{ editingOwnerId === null ? 'They receive a notice that they own this business.' : 'Leave the password blank to keep the current one.' }}
-                    </p>
+                    <DialogTitle class="text-lg font-semibold text-slate-900">Edit owner</DialogTitle>
+                    <p class="mt-1 text-sm text-slate-500">Leave the password blank to keep the current one.</p>
                     <form class="mt-4 space-y-3" @submit.prevent="saveOwner">
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-500" for="owner-name">Name</label>
@@ -464,42 +514,75 @@ const deleteRole = (role: RoleRow) => {
             </DialogPortal>
         </DialogRoot>
 
-        <DialogRoot v-model:open="memberOpen">
+        <DialogRoot v-model:open="personOpen">
             <DialogPortal>
                 <DialogOverlay class="fixed inset-0 z-[80] bg-slate-900/40" />
                 <DialogContent class="fixed left-1/2 top-1/2 z-[90] w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-slate-200 bg-white p-5 shadow-xl">
-                    <DialogTitle class="text-lg font-semibold text-slate-900">Add member</DialogTitle>
-                    <p class="mt-1 text-sm text-slate-500">A new email creates a sign-in. No invitation is sent.</p>
-                    <form class="mt-4 space-y-3" @submit.prevent="saveMember">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500" for="member-name">Name</label>
-                            <AppInput id="member-name" v-model="memberForm.name" type="text" autocomplete="off" />
-                            <p v-if="memberForm.errors.name" class="mt-1 text-xs text-rose-600">{{ memberForm.errors.name }}</p>
+                    <DialogTitle class="text-lg font-semibold text-slate-900">Add person</DialogTitle>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Select an account that already exists, then choose owner, accountant, viewer, or a custom role.
+                    </p>
+                    <form class="mt-4 space-y-3" @submit.prevent="savePerson">
+                        <div v-if="selectedAccount" class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div class="text-sm font-medium text-slate-900">{{ selectedAccount.name }}</div>
+                            <div class="text-xs text-slate-500">{{ selectedAccount.email }}</div>
+                            <button type="button" class="mt-1 text-xs font-medium text-brand-700 hover:text-brand-800" @click="personForm.user_id = ''">
+                                Choose a different account
+                            </button>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500" for="member-email">Email</label>
-                            <AppInput id="member-email" v-model="memberForm.email" type="email" autocomplete="off" />
-                            <p v-if="memberForm.errors.email" class="mt-1 text-xs text-rose-600">{{ memberForm.errors.email }}</p>
+                        <div v-else-if="!creatingAccount">
+                            <label class="mb-1 block text-xs font-medium text-slate-500" for="account-search">Account</label>
+                            <AppInput id="account-search" v-model="accountQuery" type="text" placeholder="Search name or email" autocomplete="off" />
+                            <ul v-if="accountMatches.length" class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-slate-200">
+                                <li v-for="account in accountMatches" :key="account.id" class="border-t border-slate-100 first:border-t-0">
+                                    <button type="button" class="w-full px-3 py-2 text-left hover:bg-slate-50" @click="chooseAccount(account)">
+                                        <span class="block text-sm font-medium text-slate-900">{{ account.name }}</span>
+                                        <span class="block text-xs text-slate-500">{{ account.email }}</span>
+                                    </button>
+                                </li>
+                            </ul>
+                            <p v-else class="mt-2 text-xs text-slate-500">No matching accounts.</p>
+                            <button type="button" class="mt-2 text-sm font-medium text-brand-700 hover:text-brand-800" @click="chooseNewAccount">
+                                Create a new account
+                            </button>
+                            <p v-if="personForm.errors.user_id" class="mt-1 text-xs text-rose-600">{{ personForm.errors.user_id }}</p>
                         </div>
+                        <template v-else>
+                            <button type="button" class="text-sm font-medium text-brand-700 hover:text-brand-800" @click="creatingAccount = false">
+                                Select an existing account
+                            </button>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500" for="person-name">Name</label>
+                                <AppInput id="person-name" v-model="personForm.name" type="text" autocomplete="off" />
+                                <p v-if="personForm.errors.name" class="mt-1 text-xs text-rose-600">{{ personForm.errors.name }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500" for="person-email">Email</label>
+                                <AppInput id="person-email" v-model="personForm.email" type="email" autocomplete="off" />
+                                <p v-if="personForm.errors.email" class="mt-1 text-xs text-rose-600">{{ personForm.errors.email }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500" for="person-password">Password</label>
+                                <AppInput id="person-password" v-model="personForm.password" type="password" autocomplete="new-password" />
+                                <p v-if="personForm.errors.password" class="mt-1 text-xs text-rose-600">{{ personForm.errors.password }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-slate-500" for="person-password-confirmation">Confirm password</label>
+                                <AppInput id="person-password-confirmation" v-model="personForm.password_confirmation" type="password" autocomplete="new-password" />
+                            </div>
+                        </template>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500" for="member-role">Role</label>
-                            <select id="member-role" v-model="memberForm.role" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900">
+                            <label class="mb-1 block text-xs font-medium text-slate-500" for="person-role">Role</label>
+                            <select id="person-role" v-model="personForm.role" class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900">
+                                <option value="owner">Owner</option>
                                 <option v-for="role in roles" :key="role.key" :value="role.key">{{ role.name }}</option>
                             </select>
-                            <p v-if="memberForm.errors.role" class="mt-1 text-xs text-rose-600">{{ memberForm.errors.role }}</p>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500" for="member-password">Password</label>
-                            <AppInput id="member-password" v-model="memberForm.password" type="password" autocomplete="new-password" />
-                            <p v-if="memberForm.errors.password" class="mt-1 text-xs text-rose-600">{{ memberForm.errors.password }}</p>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-500" for="member-password-confirmation">Confirm password</label>
-                            <AppInput id="member-password-confirmation" v-model="memberForm.password_confirmation" type="password" autocomplete="new-password" />
+                            <p v-if="personForm.errors.role" class="mt-1 text-xs text-rose-600">{{ personForm.errors.role }}</p>
+                            <p v-if="personForm.errors.email && selectedAccount" class="mt-1 text-xs text-rose-600">{{ personForm.errors.email }}</p>
                         </div>
                         <div class="flex justify-end gap-3 pt-2">
-                            <AppButton type="button" variant="secondary" @click="memberOpen = false">Cancel</AppButton>
-                            <AppButton type="submit" variant="primary" :loading="memberForm.processing">Save</AppButton>
+                            <AppButton type="button" variant="secondary" @click="personOpen = false">Cancel</AppButton>
+                            <AppButton type="submit" variant="primary" :loading="personForm.processing">Save</AppButton>
                         </div>
                     </form>
                 </DialogContent>

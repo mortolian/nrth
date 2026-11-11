@@ -127,6 +127,16 @@ class InstanceTeamsController extends Controller
             'members' => $members,
             'invitations' => $invitations,
             'roles' => $roles,
+            'accounts' => User::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'email'])
+                ->map(fn (User $user): array => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])
+                ->values()
+                ->all(),
             'permission_groups' => PermissionCatalog::groupsForUi(),
         ]);
     }
@@ -142,14 +152,18 @@ class InstanceTeamsController extends Controller
     {
         Gate::authorize('manageInstanceBackups');
 
-        $validated = $this->validateOwner($request, null);
-
-        $added = $this->businessOwners->add(
-            $team,
-            $validated['name'],
-            $validated['email'],
-            $validated['password'] ?? null,
-        );
+        $account = $this->selectedAccount($request);
+        if ($account !== null) {
+            $added = $this->businessOwners->add($team, $account->name, $account->email, null);
+        } else {
+            $validated = $this->validateOwner($request, null);
+            $added = $this->businessOwners->add(
+                $team,
+                $validated['name'],
+                $validated['email'],
+                $validated['password'] ?? null,
+            );
+        }
 
         [$level, $message] = MailDelivery::ownerAssignedFlash($added->user->email, $added->noticeSent);
 
@@ -186,20 +200,27 @@ class InstanceTeamsController extends Controller
     {
         Gate::authorize('manageInstanceBackups');
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255'],
-            'password' => ['nullable', 'string', Password::default(), 'confirmed'],
-            'role' => ['required', 'string', new TeamRoleKey($team)],
-        ]);
-
-        $this->businessMembers->add(
-            $team,
-            $validated['name'],
-            $validated['email'],
-            $validated['password'] ?? null,
-            $validated['role'],
-        );
+        $account = $this->selectedAccount($request);
+        if ($account !== null) {
+            $validated = $request->validate([
+                'role' => ['required', 'string', new TeamRoleKey($team)],
+            ]);
+            $this->businessMembers->add($team, $account->name, $account->email, null, $validated['role']);
+        } else {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'string', 'email', 'max:255'],
+                'password' => ['nullable', 'string', Password::default(), 'confirmed'],
+                'role' => ['required', 'string', new TeamRoleKey($team)],
+            ]);
+            $this->businessMembers->add(
+                $team,
+                $validated['name'],
+                $validated['email'],
+                $validated['password'] ?? null,
+                $validated['role'],
+            );
+        }
 
         return back()->with('success', __('Member added. No invitation was sent.'));
     }
@@ -254,5 +275,18 @@ class InstanceTeamsController extends Controller
             'email' => $validated['email'],
             'password' => $validated['password'] ?? null,
         ];
+    }
+
+    private function selectedAccount(Request $request): ?User
+    {
+        if (! $request->filled('user_id')) {
+            return null;
+        }
+
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        return User::query()->findOrFail($validated['user_id']);
     }
 }

@@ -56,11 +56,6 @@ final class BusinessMembers
                 'completed_onboarding_at' => now(),
             ])->save();
         } else {
-            $existing->name = $name;
-            if (filled($password)) {
-                $existing->password = $password;
-            }
-            $existing->save();
             $user = $existing;
         }
 
