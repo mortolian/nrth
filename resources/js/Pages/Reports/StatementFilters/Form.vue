@@ -43,10 +43,16 @@ const form = useForm({
 
 const formatCents = (cents: number) => useFormatCurrency((Number(cents) || 0) / 100, props.currency || 'ZAR');
 
+const normalizeMatch = (value: string) => value.trim().toLowerCase();
+
 const usedMatches = computed(() => new Set(
     form.rules
-        .map((rule) => rule.match.trim().toLowerCase())
+        .map((rule) => normalizeMatch(rule.match))
         .filter((match) => match !== ''),
+));
+
+const availableSuggestions = computed(() => props.suggestions.filter(
+    (suggestion) => ! usedMatches.value.has(normalizeMatch(suggestion.match)),
 ));
 
 const addRule = () => {
@@ -54,7 +60,7 @@ const addRule = () => {
 };
 
 const addSuggestion = (suggestion: Suggestion) => {
-    if (usedMatches.value.has(suggestion.match)) {
+    if (usedMatches.value.has(normalizeMatch(suggestion.match))) {
         return;
     }
     const blank = form.rules.find((rule) => rule.alias.trim() === '' && rule.match.trim() === '');
@@ -124,7 +130,10 @@ const destroyReport = () => {
                                 <span class="min-w-0">
                                     <span class="block text-sm font-medium text-slate-900">From your statements</span>
                                     <span class="block truncate text-xs text-slate-500">
-                                        {{ suggestions.length }} {{ suggestions.length === 1 ? 'repeated merchant' : 'repeated merchants' }}
+                                        <template v-if="availableSuggestions.length">
+                                            {{ availableSuggestions.length }} {{ availableSuggestions.length === 1 ? 'repeated merchant' : 'repeated merchants' }}
+                                        </template>
+                                        <template v-else>All repeated merchants are already filters</template>
                                     </span>
                                 </span>
                                 <ChevronDown
@@ -143,12 +152,11 @@ const destroyReport = () => {
                                 <p class="px-2 pb-2 pt-1 text-xs text-slate-500">
                                     Repeated wording, with card numbers, store numbers, and dates removed.
                                 </p>
-                                <ul class="space-y-1">
+                                <ul v-if="availableSuggestions.length" class="space-y-1">
                                     <li
-                                        v-for="suggestion in suggestions"
+                                        v-for="suggestion in availableSuggestions"
                                         :key="suggestion.match"
-                                        class="rounded-md px-2 py-2.5"
-                                        :class="usedMatches.has(suggestion.match) ? 'bg-slate-50' : 'hover:bg-slate-50'"
+                                        class="rounded-md px-2 py-2.5 hover:bg-slate-50"
                                     >
                                         <div class="flex items-start justify-between gap-3">
                                             <div class="min-w-0">
@@ -162,10 +170,9 @@ const destroyReport = () => {
                                                 type="button"
                                                 size="sm"
                                                 variant="secondary"
-                                                :disabled="usedMatches.has(suggestion.match)"
                                                 @click="addSuggestion(suggestion)"
                                             >
-                                                {{ usedMatches.has(suggestion.match) ? 'Added' : 'Add' }}
+                                                Add
                                             </AppButton>
                                         </div>
                                         <details
@@ -188,6 +195,9 @@ const destroyReport = () => {
                                         </details>
                                     </li>
                                 </ul>
+                                <p v-else class="px-2 py-2 text-xs text-slate-500">
+                                    All repeated merchants are already filters. Remove one to put it back here.
+                                </p>
                             </PopoverContent>
                         </PopoverPortal>
                     </PopoverRoot>
